@@ -1,0 +1,21 @@
+# Grex Verification Patterns
+# These patterns define what the grex skill will look for when verifying the workspace structure.
+
+# Standard Rust Project Structure
+^#.*\[workspace\]
+^#.*\[package\]
+^#.*\[lib\]
+^#.*\[dependencies\]
+
+# Common Development Tools
+^#.*\[dev-dependencies\]
+^#.*\[features\]
+
+# Standard Naming Conventions
+^#.*\s+name\s*=\s*["']mirror-[a-z-]+["']
+^#.*\s+name\s*=\s*["']crab-[a-z-]+["']
+
+# Documentation Standards
+^#.*\s+license\s*=\s*["'][MIT|Apache-2\.0|Unlicense]["']
+^#.*\s+authors\s*=\s*["'].*["']
+^#.*\s+repository\s*=\s*["']https://github\.com/.*["']
