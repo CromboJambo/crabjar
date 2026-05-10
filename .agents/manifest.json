@@ -1,0 +1,7 @@
+{
+  "role": "agent skills and tool definitions",
+  "entry_points": ["skills/", "SKILL.md"],
+  "dependencies": ["crabjar-config"],
+  "data_source": "filesystem",
+  "capabilities": ["skill loading", "tool definition"]
+}
