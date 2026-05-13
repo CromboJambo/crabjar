@@ -2,134 +2,50 @@
 
 ## Project Structure & Module Organization
 
-```
-crabjar/
-├── src/
-│   ├── main.rs               # CLI entry point — command parsing and dispatch
-│   ├── project_loader.rs     # Loads .crabjar_config.toml from the working directory
-│   ├── state_docs.rs         # state-docs read/write and overlay annotation logic
-│   ├── knowledge_store/      # Knowledge bridge (mod.rs, commands.rs)
-│   └── crabjar-config/       # Workspace crate: config struct, TOML parsing
-├── memory/files/             # agent-context crate: knowledge store (SQLite-backed)
-├── tests/
-│   └── cli.rs                # Integration tests that exercise the compiled binary
-├── Cargo.toml                # Workspace root + crabjar binary manifest
-└── Justfile                  # Task runner shortcuts
-```
+CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI:
 
-The active Rust surface is **`crabjar` (binary) + `crabjar-config` (library) + `agent-context` (library)**.
-
----
+```text
+src/main.rs                  # CLI entry point and command dispatch
+src/lib.rs                   # shared library surface for the binary
+src/project_loader.rs        # config loading
+src/state_docs.rs            # state-doc and overlay handling
+src/knowledge_store/         # knowledge-store command bridge
+src/crabjar-config/          # workspace config crate
+memory/                      # agent-context crate, SQLite-backed storage
+orchestrator/, guard/        # supporting workspace crates
+tests/cli.rs                 # integration tests against the compiled binary
+state-docs/                  # project state documentation and overlays
+```
 
 ## Build, Test, and Development Commands
 
-All common tasks are available via [`just`](https://github.com/casey/just). Run `just` with no arguments to list them.
+Use `just` for common workflows:
 
-| Command | What it does |
-|---|---|
-| `just check` | `cargo check --workspace` — fast type/borrow check, no artifacts |
-| `just build` | `cargo build -p crabjar` — compile the CLI binary |
-| `just run state list` | Run the binary with arbitrary args (default: `state list`) |
-| `just test` | `cargo test --workspace` — unit + integration tests |
-| `just clean` | Remove all build artifacts |
-
-Raw Cargo equivalents work too (e.g., `cargo test -p crabjar`).
-
----
+- `just check`: runs `cargo check --workspace`.
+- `just build`: runs `cargo build -p crabjar` to compile the CLI.
+- `just run state list`: runs the binary with replaceable arguments.
+- `just test`: runs `cargo test --workspace`.
+- `just clean`: removes Cargo build artifacts.
+Use raw Cargo for narrower scope, for example `cargo test -p crabjar`.
 
 ## Coding Style & Naming Conventions
 
-- **Formatter**: `rustfmt` with default settings. Run `cargo fmt` before committing; CI treats formatting failures as errors (`cargo fmt --check`).
-- **Linter**: `cargo clippy -- -D warnings`. Fix all warnings before opening a PR.
-- **Naming**: follow standard Rust conventions — `snake_case` for functions/variables/modules, `PascalCase` for types/traits/enums, `SCREAMING_SNAKE_CASE` for constants.
-- **Error handling**: use `thiserror` for library errors; propagate with `?`. Avoid `unwrap()` outside of tests.
-- **Edition**: Rust 2024 (`edition = "2024"`). Use idiomatic edition-2024 patterns.
-- **JSON output**: all CLI commands write structured JSON to stdout. Maintain this contract — do not add plain-text output paths.
+Run `cargo fmt` before submitting changes. Use `cargo clippy -- -D warnings` and fix warnings. Follow standard Rust naming: `snake_case` for functions, variables, and modules; `PascalCase` for types and traits; `SCREAMING_SNAKE_CASE` for constants.
 
----
+Use `thiserror` for library errors and propagate failures with `?`. Avoid `unwrap()` outside tests. CLI commands should emit structured JSON to stdout; do not add plain-text success paths.
 
 ## Testing Guidelines
 
-- **Framework**: standard `#[test]` / `#[tokio::test]`. No external test framework.
-- **Integration tests** live in `tests/cli.rs` and run the compiled binary via `std::process::Command`. Use `tempfile::tempdir()` for all filesystem fixtures — never write to the project directory.
-- **Unit tests** belong in `#[cfg(test)]` modules inside the relevant source file.
-- **Naming**: test function names should read as plain sentences describing the expected behaviour, e.g. `state_list_returns_json`, `missing_command_exits_nonzero`.
-- **Coverage**: every new CLI subcommand or state-docs operation must have at least one integration test covering the happy path and one covering the error path.
-- Run the full suite with `just test` before pushing.
+Use `#[test]` and `#[tokio::test]`. Place unit tests beside the code under `#[cfg(test)]`; place CLI integration tests in `tests/cli.rs` using `std::process::Command`.
 
----
+Filesystem fixtures must use `tempfile::tempdir()` and must not write into the repository. New CLI subcommands and state-doc operations need happy-path and error-path tests. Test names should describe behavior, for example `state_list_returns_json`.
 
 ## Commit & Pull Request Guidelines
 
-**Commit messages** in this repository follow an imperative, descriptive style:
+Recent commits use imperative subjects such as `Add comprehensive guides for bounded agent workflows` and `Update REPRO.md with current project details`. Start with a capital verb, keep the subject under about 72 characters, and add a body when context matters.
 
-- Start with a capital verb: `Add`, `Fix`, `Remove`, `Refactor`, `Update`.
-- Keep the subject line under ~72 characters.
-- Use the body for context when the change is non-trivial (see the multi-bullet commit in the log for a good example).
-
-```
-Add overlay persistence for state-doc annotations
-
-Writes resolved annotations back to state-docs/overlay/<doc>.overlay.json
-so that agent sessions survive process restarts.
-```
-
-**Pull requests** should:
-
-1. Reference the issue or context driving the change.
-2. Include a brief description of *what* changed and *why*.
-3. Pass `just check`, `just test`, `cargo fmt --check`, and `cargo clippy -- -D warnings` locally before requesting review.
-4. Keep changes focused — avoid mixing refactors with feature additions in a single PR.
-
----
+Pull requests should explain what changed and why, link relevant context, and keep refactors separate from features. Before review, run `just check`, `just test`, `cargo fmt --check`, and `cargo clippy -- -D warnings`.
 
 ## Architecture Notes
 
-- The CLI is **synchronous at the command-parsing layer** and async only where I/O requires it (Tokio runtime in `main`).
-- State docs are Markdown files under `<project-root>/state-docs/`. Overlay annotations are stored as JSON sidecars in `state-docs/overlay/`.
-- Workspace config is loaded from `.crabjar_config.toml` in the current working directory. A missing or malformed config is a soft failure — the CLI continues with `workspace: null`.
-
----
-
-## Non-Negotiable Architectural Constraints
-
-### Truth vs Convenience
-
-Every time you make something faster, cleaner, or easier to reuse, you risk moving away from truth. This is the core design tension.
-
-**Rule:** Detection ≠ authorization. Knowing what happened does not grant the right to change what happens.
-
-### Detection vs Action Layer Separation
-
-| Component | Role | Can act? |
-|---|---|---|
-| `crabjar` | Pure observer — state-docs, overlays, knowledge store | **No** — runtime execution disabled |
-| `mirror-log` | Append-only event log — no deletion, no modification | **No** |
-| `mirror-kernel` | Decision records, kernel dispatch — produces reflections, not actions | **No** |
-| `mirror-daemon` | File watcher + pipeline execution — the only action-capable component | **⚠️ Gated** |
-
-### Execution Gate (mirror-daemon)
-
-The daemon is the single place the system can flip from Path A (stabilizer) → Path B (amplifier). Before any pipeline execution, the gate must enforce:
-
-1. **Raw data reference**: the event must reference raw data, not interpreted summaries
-2. **Uncertainty exposure**: if confidence is below threshold, surface it before executing
-3. **Interruptibility**: allow the gate to return `Interrupted` instead of executing
-
-No component that executes actions is allowed to consume interpreted data without a verification layer. Raw events → OK. Interpreted summaries → must be challenged before execution.
-
-### Confidence Decay
-
-Patterns decay once conditions change. A command that worked 10 times a year ago is not reliable today. Confidence decreases over time unless reinforced by recent success.
-
-### Every Abstraction Carries Its Own Doubt
-
-If your system outputs "clean answers," it's lying to you. Every derived output must include:
-- what it might have missed
-- what assumptions it made
-- where it might break
-- how stale it is
-
-### Context Preservation
-
-Responses must stay under 4 lines of text (not including tool use). Massive responses consume conversation context — when the user asks to continue, the agent has no context to continue with. Keep responses short.
+Workspace config comes from `.crabjar_config.toml`; missing or malformed config is a soft failure and should leave `workspace: null`. State docs live under `state-docs/`, with overlay JSON sidecars in `state-docs/overlay/`. Detection is not authorization: observer crates may report, but must not execute actions.
