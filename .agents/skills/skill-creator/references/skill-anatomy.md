@@ -4,7 +4,7 @@
 
 | Scope | Paths |
 |---|---|
-| User-wide | `~/.corust-agent/skills/`, `~/.agents/skills/` |
+| User-wide | `~/.agents/skills/` |
 | Project | `.agents/skills/`, `.corust-agent/skills/` (relative to cwd) |
 
 ## Directory structure
