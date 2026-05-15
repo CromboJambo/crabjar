@@ -32,6 +32,7 @@ pub mod memory;
 pub mod retrieval;
 pub mod trust;
 pub mod types;
+pub mod reversibility;
 
 pub use annealing::AnnealingPipeline;
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
