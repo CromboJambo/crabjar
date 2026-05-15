@@ -3,7 +3,7 @@
 echo "=== Crabjar Agent vs User Role Test ==="
 echo ""
 echo "Question 1: Who is executing this action?"
-echo "A) Agent (crabjar) - Pure observer, no execution capability"
+echo "A) Agent (${REPO_ROOT}) - Pure observer, no execution capability"
 echo "B) User - Has execution authority"
 echo "C) Neither - System component without direct user control"
 read choice
@@ -21,7 +21,7 @@ if [ "$choice" = "B" ]; then echo "Incorrect: The agent cannot actively modify s
 if [ "$choice" = "C" ]; then echo "Partially correct: Configuration tools assist but don't execute actions"; fi
 echo ""
 echo "Question 3: Where does authority reside?"
-echo "A) Agent (crabjar) - No execution authority"
+echo "A) Agent (${REPO_ROOT}) - No execution authority"
 echo "B) User - Has full command execution authority"
 echo "C) System governance - Authority comes from documented rules, not individual components"
 read choice

@@ -3,13 +3,13 @@
 ## Structure
 
 ```
-crabjar/
+${REPO_ROOT}/
 ├── src/
 │   ├── main.rs
 │   ├── project_loader.rs
 │   ├── state_docs.rs
 │   ├── knowledge_store/
-│   └── crabjar-config/
+│   └── ${REPO_ROOT}-config/
 ├── memory/files/
 ├── tests/
 ├── Cargo.toml

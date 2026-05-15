@@ -3,7 +3,7 @@
 set -euo pipefail
 
 STAGING_DIR="${STAGING_DIR:-$HOME/.mirror-lab/staging}"
-OUTPUT_DIR="${OUTPUT_DIR:-$HOME/.mirror-lab/crabjar}"
+OUTPUT_DIR="${OUTPUT_DIR:-$HOME/.mirror-lab/${REPO_ROOT}}"
 
 if [[ ! -d "$STAGING_DIR" ]]; then
     echo '{"error": "staging directory not found", "path": "'"$STAGING_DIR"'"}'
@@ -25,7 +25,7 @@ for event in $events; do
     head -10 "$event"
 done
 
-# Write synthesis to crabjar
+# Write synthesis to ${REPO_ROOT}
 synthesis_file="$OUTPUT_DIR/session_summary.md"
 cat <<EOF > "$synthesis_file"
 # Session Summary

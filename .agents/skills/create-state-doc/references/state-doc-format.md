@@ -21,7 +21,7 @@ Map each component to one of:
 - Decision records (produces reflections, not actions)
 
 ### Integration Points
-Identify patterns from this project that crabjar could adopt:
+Identify patterns from this project that ${REPO_ROOT} could adopt:
 - config loading patterns
 - state-docs format conventions
 - knowledge bridge mechanisms

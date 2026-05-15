@@ -36,7 +36,7 @@ Before beginning work, consider what code is supposed to do based on filenames/d
 
 # Repository Guidelines (from AGENTS.md)
 ## Project Structure
-Active Rust surface: crabjar (binary) + crabjar-config (library) + agent-context (library). archive/ excluded from build.
+Active Rust surface: ${REPO_ROOT} (binary) + ${REPO_ROOT}-config (library) + agent-context (library). archive/ excluded from build.
 ## Commands
 just check / just build / just run state list / just test / just clean. Raw cargo equivalents work.
 ## Coding Style
@@ -46,10 +46,10 @@ rustfmt default, clippy -D warnings. snake_case functions/variables/modules, Pas
 ## Commit Messages
 Imperative style: capital verb start, ~72 char subject line. body for non-trivial context.
 ## Architecture
-CLI synchronous at command-parsing layer, async only where I/O requires. State docs Markdown under state-docs/, overlays JSON in state-docs/overlay/. Config from .crabjar_config.toml — soft failure with workspace: null.
+CLI synchronous at command-parsing layer, async only where I/O requires. State docs Markdown under state-docs/, overlays JSON in state-docs/overlay/. Config from .${REPO_ROOT}_config.toml — soft failure with workspace: null.
 ## Non-Negotiable Constraints
 Truth vs Convenience: Detection ≠ authorization. Knowing ≠ granting right to change.
-Detection vs Action Layer Separation: crabjar/mirror-log/mirror-kernel = observer only, mirror-daemon = gated action.
+Detection vs Action Layer Separation: ${REPO_ROOT}/mirror-log/mirror-kernel = observer only, mirror-daemon = gated action.
 Execution Gate (mirror-daemon): raw data reference, uncertainty exposure, interruptibility.
 Confidence Decay: patterns decay when conditions change.
 Every Abstraction Carries Its Own Doubt: derived outputs must include missed items, assumptions, break points, staleness.

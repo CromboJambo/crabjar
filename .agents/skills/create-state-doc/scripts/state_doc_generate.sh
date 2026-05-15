@@ -3,7 +3,7 @@
 set -euo pipefail
 
 TARGET_PATH="${1:-$PWD}"
-OUTPUT_DIR="${OUTPUT_DIR:-$HOME/.mirror-lab/crabjar/state-docs}"
+OUTPUT_DIR="${OUTPUT_DIR:-$HOME/.mirror-lab/${REPO_ROOT}/state-docs}"
 mkdir -p "$OUTPUT_DIR"
 
 if [[ ! -d "$TARGET_PATH" ]]; then
@@ -64,7 +64,7 @@ Rules, guidelines, style patterns if applicable.
 Table mapping components to Crabjar's role (Pure observer, append-only, gated, etc.).
 
 ### 5.2 Integration Points
-Patterns from this project that crabjar could adopt.
+Patterns from this project that ${REPO_ROOT} could adopt.
 
 ---
 
