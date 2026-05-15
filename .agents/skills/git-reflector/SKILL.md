@@ -34,9 +34,9 @@ This skill automs the integration of unstructured reflections into the immutable
 *   `$git-reflector: finalize all staged reflections in the directory`
 
 ## Reference Files
-*   `mirror-kernel/src/git_decision_layer/mod.rs`: For implementation details of `GitDecisionLayer`.
-*   `mirror-kernel/src/lib.rs`: For `DecisionBlob` and `MirrorEvent` structures.
-*   `references/decision-blob-schema.md`: For DecisionBlob field definitions and constraints.
+*   `mirror-kernel/src/git_decision_layer/mod.rs`: For implementation details of `GitDecisionLayer` (future crate)
+*   `mirror-kernel/src/lib.rs`: For `DecisionBlob` and `MirrorEvent` structures (future crate)
+*   `references/decision-blob-schema.md`: For DecisionBlob field definitions and constraints
 
 ## Bundled Scripts
 *   `scripts/decision_blob.sh`: Create DecisionBlob JSON from staged event

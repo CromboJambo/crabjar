@@ -67,15 +67,11 @@ On domain violation:
 - **Blocked domains**: explicit block list
 - **Dynamic updates**: allowlist can be updated mid-session
 
-## Integration with Crabjar
+## Integration with ${PROJECT}
 
-Crabjar's webfetch should adopt:
+${PROJECT}'s webfetch should adopt:
 - Domain allowlist for scope gating
 - Navigation gate before all open/back/forward actions
 - Sub-resource gate for external loading
 - Violation logging with reason
 - Uncertainty surface before domain expansion
-
-## References
-
-Read `state-docs/agent-browser-state.md` section 2.6 for security features context and section 7.5 for stale detection thresholds.

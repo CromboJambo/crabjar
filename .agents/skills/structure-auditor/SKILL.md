@@ -10,7 +10,7 @@ The Structure Auditor is a diagnostic tool designed to detect "structural drift"
 
 ## Core Workflow
 
-1.  **Load Reference**: Read the current `crabjar/project_map.md` to extract the list of expected paths and responsance/responsibilities.
+1.  **Load Reference**: Read the current `${PROJECT}/project_map.md` to extract the list of expected paths and responsance/responsibilities.
 2.  **Filesystem Scan**: Perform a recursive scan of the workspace (or specific sub-paths) using `list_directory` or `find_path`.
 3.  **Discrepancy Analysis**: Compare the observed tree against the map. 
     *   **Missing**: A path exists in the map but not on disk.
@@ -21,7 +21,7 @@ The Structure Auditor is a diagnostic tool designed to detect "structural drift"
 ## Usage Instructions
 
 ### Input Requirements
-*   The path to the `project_map.md` file (defaults to `crabjar/project_map.md`).
+*   The path to the `project_map.md` file (defaults to `${PROJECT}/project_map.md`).
 *   (Optional) A target root directory to scan (defaults to the workspace root).
 
 ### Example Prompt
@@ -29,9 +29,8 @@ The Structure Auditor is a diagnostic tool designed to detect "structural drift"
 *   `$structure-auditor audit mirror-kernel/`
 
 ## Reference Files
-*   `crabjar/project_map.md`: The primary source of truth for structural alignment.
-*   `crabjar/agent_config.md`: For understanding the "Discovery" and "Verification" protocols.
-*   `references/project-map-format.md`: project_map format conventions and audit rules.
+*   `${PROJECT}/project_map.md`: The primary source of truth for structural alignment.
+*   `${PROJECT}/agent_config.md`: For understanding the "Discovery" and "Verification" protocols.
 
 ## Bundled Scripts
 *   `scripts/fs_audit.sh`: filesystem vs project_map discrepancy analysis

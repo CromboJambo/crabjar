@@ -44,8 +44,8 @@ If a specific `event_id` is provided, use `AttentionLayer::calculate_attention_s
 
 ## Reference Material
 
-- For the underlying logic and SQL queries, refer to: `mirror-log/src/attention/mod.rs`
-- For understanding how decay is calculated, see: `mirror-log/src/decay.rs`
+- For the underlying logic and SQL queries, refer to: `mirror-log/src/attention/mod.rs` (future crate)
+- For understanding how decay is calculated, see: `mirror-log/src/decay.rs` (future crate)
 - For attention layer schema, read: `references/attention-layer-schema.md`
 
 ## Bundled Scripts

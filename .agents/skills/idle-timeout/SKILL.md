@@ -53,15 +53,11 @@ Restart daemon on command:
 - **Auto-save**: save state on shutdown
 - **Auto-restore**: restore state on restart
 
-## Integration with Crabjar
+## Integration with ${PROJECT}
 
-Crabjar's resource management should adopt:
+${PROJECT}'s resource management should adopt:
 - Idle timeout for daemon auto-shutdown
 - Threshold configuration via env var
 - Auto-save/restore on shutdown/restart
 - Resource cleanup on idle
 - Cost awareness for persistent sessions
-
-## References
-
-Read `state-docs/agent-browser-state.md` section 2.3 for core pipeline context and section 7.5 for stale detection thresholds.

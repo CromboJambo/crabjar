@@ -49,3 +49,19 @@ Pull requests should explain what changed and why, link relevant context, and ke
 ## Architecture Notes
 
 Workspace config comes from `.crabjar_config.toml`; missing or malformed config is a soft failure and should leave `workspace: null`. State docs live under `state-docs/`, with overlay JSON sidecars in `state-docs/overlay/`. Detection is not authorization: observer crates may report, but must not execute actions.
+
+## Tool Override
+- Content search: Use Bash with `rg` (ripgrep) instead of the Grep tool
+- File search: Use Glob (NOT find or ls)
+- Read files: Use Read (NOT cat/head/tail)
+- Edit files: Use Edit (NOT sed/awk)
+- Write files: Use Write (NOT echo >/cat <<EOF)
+- Communication: Output text directly (NOT echo/printf)
+
+## Tool Override
+- Content search: Use Bash with `rg` (ripgrep) instead of the Grep tool
+- File search: Use Glob (NOT find or ls)
+- Read files: Use Read (NOT cat/head/tail)
+- Edit files: Use Edit (NOT sed/awk)
+- Write files: Use Write (NOT echo >/cat <<EOF)
+- Communication: Output text directly (NOT echo/printf)

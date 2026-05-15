@@ -24,36 +24,17 @@ Action policy gates destructive actions via JSON file. This separates detection 
 ```json
 {
   "categories": {
-    "safe": {
-      "allowed": true,
-      "confirmation": false
-    },
-    "sensitive": {
-      "allowed": true,
-      "confirmation": true
-    },
-    "destructive": {
-      "allowed": false,
-      "confirmation": true
-    },
-    "critical": {
-      "allowed": false,
-      "confirmation": true
-    }
+    "safe": {"allowed": true, "confirmation": false},
+    "sensitive": {"allowed": true, "confirmation": true},
+    "destructive": {"allowed": false, "confirmation": true},
+    "critical": {"allowed": false, "confirmation": true}
   },
   "domain_restrictions": {
-    "example.com": {
-      "sensitive": {
-        "allowed": true
-      }
-    }
+    "human_in_the_loop": true,
+    "example.com": {"sensitive": {"allowed": true}}
   },
   "element_restrictions": {
-    "@e1": {
-      "click": {
-        "allowed": false
-      }
-    }
+    "@e1": {"click": {"allowed": false}}
   }
 }
 ```
@@ -99,16 +80,12 @@ If confidence is below threshold:
 - **Confirmation mode**: manual, automated, required
 - **Threshold**: confidence threshold for uncertainty surface
 
-## Integration with Crabjar
+## Integration with ${PROJECT}
 
-Crabjar's authorization layer should adopt:
+${PROJECT}'s authorization layer should adopt:
 - Action policy as gate for destructive actions
 - Category classification for risk assessment
 - Domain-specific restrictions
 - Element-specific restrictions
 - Uncertainty surface before execution
 - Pending queue for review actions
-
-## References
-
-Read `state-docs/agent-browser-state.md` section 2.6 for security features context and section 7.5 for stale detection thresholds.

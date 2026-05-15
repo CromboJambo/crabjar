@@ -45,19 +45,11 @@ Use refs to execute actions:
 - **Action policy**: gate destructive actions via JSON file
 - **Element refs**: `@eN` deterministic refs from snapshots
 
-## Integration with Crabjar
+## Integration with ${PROJECT}
 
-Crabjar's webfetch tooling should adopt this pattern:
+${PROJECT}'s webfetch tooling should adopt this pattern:
 - Snapshot → refs → click/fill/get text as the core workflow
 - Semantic locators for deterministic element selection without CSS selectors
 - Content boundary markers for webfetch output
 - Domain allowlist for webfetch scope gating
 - Action policy for authorization layer
-- Annotated screenshots for visual element discovery
-- Batch execution for multi-step workflow efficiency
-- Element refs for stable element selection across page changes
-- Diff commands for page change detection
-
-## References
-
-Read `state-docs/agent-browser-state.md` section 6.4 for the full integration points list and section 2.4 for the CLI command surface.

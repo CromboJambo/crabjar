@@ -53,6 +53,6 @@ The skill MUST return a structured response in the following format to ensure do
 ```
 
 ## ⚙️ Operational Constraints
-- **Scope:** The skill should only operate on files within the `mirror-lab` workspace.
+- **Scope:** Operate on files within the current workspace.
 - **Immutability:** This skill is a *read-only* verification engine. It must NEVER modify the file it is inspecting.
 - **Performance:** For large files, use the `context_limit` to prevent excessive resource consumption.

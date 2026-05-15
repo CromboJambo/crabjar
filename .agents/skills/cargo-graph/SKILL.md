@@ -6,7 +6,7 @@ description: |
 
 # Cargo Graph
 
-Reasons about the declared-vs-compiled dependency gap for any Rust workspace or crate. Built on `cargo-declared` logic — the same tool authored by the mirror-lab workspace owner (source in `crabjar/reference_materials/cargo-declared/`).
+Reasons about the declared-vs-compiled dependency gap for any Rust workspace or crate. Built on `cargo-declared` logic — analyze Cargo.toml vs Cargo.lock to identify transitive crates, orphaned dependencies, and the compiled gap.
 
 ## Core Concepts
 
@@ -115,29 +115,7 @@ Compare `[[package]]` entries. New entries = added to compiled set. Removed entr
 
 ---
 
-## Integration with mirror-lab
-
-Pipe JSON output into the mirror-lab ingestion pipeline:
-
-```bash
-cargo declared --path <path> --json | mirror-log add --source cargo-declared
-```
-
-This is the designed handoff point. The JSON keys map directly to mirror-log's event schema. Use this pattern when producing a dependency audit that should be persisted across sessions.
-
 ---
-
-## Reference Files
-
-- `references/output-schema.md` — full JSON output schema for `cargo-declared --json`
-- `references/cargo-lock-format.md` — `Cargo.lock` v3 format reference for manual analysis
-- `crabjar/state-docs/cargo-declared-state.md` — full architecture review of the `cargo-declared` source
-
-Read a reference file when you need precise field definitions or format details. Do not load all three at once — read only the one relevant to the current step.
-
-## Bundled Scripts
-
-- `scripts/cargo_graph.sh` — run `cargo-declared` analysis or fallback to manual
 
 ---
 

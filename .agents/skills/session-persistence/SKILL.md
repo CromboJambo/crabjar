@@ -71,15 +71,11 @@ Restore session storage:
 - **Auto-restore**: on session start, on reconnect, manual
 - **Storage location**: session-specific file, shared, encrypted
 
-## Integration with Crabjar
+## Integration with ${PROJECT}
 
-Crabjar's auth state management should adopt:
+${PROJECT}'s auth state management should adopt:
 - Session persistence for cookie/localStorage save/restore
 - AES-256-GCM encryption for sensitive data
 - Session-specific storage isolation
 - Auto-save/restore on idle timeout
 - Encryption key management
-
-## References
-
-Read `state-docs/agent-browser-state.md` section 2.8 for authentication context and section 7.5 for stale detection thresholds.

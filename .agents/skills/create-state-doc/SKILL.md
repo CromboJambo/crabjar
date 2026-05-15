@@ -97,10 +97,10 @@ Crabjar's state-docs commands and overlay system.
 Knowledge bridge description.
 
 ### 6.4 Project Config
-`.crabjar_config.toml` resolution.
+`.${PROJECT}_config.toml` resolution.
 
 ### 6.5 Integration Points
-Patterns from this project that crabjar could adopt.
+Patterns from this project that ${PROJECT} could adopt.
 
 ---
 
@@ -147,7 +147,7 @@ Write tool for state-docs/<project>-state.md
 - **Follow existing format**: Use the established structure from existing state-docs as the template.
 - **Include doubt**: Every derived output must include doubt block (what might have missed, assumptions, blind spots, stale after).
 - **Crabjar context**: Always include Crabjar alignment section mapping this project's components to Crabjar's architecture.
-- **Integration points**: Identify patterns from this project that crabjar could adopt.
+- **Integration points**: Identify patterns from this project that ${PROJECT} could adopt.
 - **No comments**: Do not add comments to the state-doc.
 - **Imperative takeaways**: Key takeaways should read as plain statements.
 

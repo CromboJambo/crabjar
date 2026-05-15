@@ -275,19 +275,19 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
 ---
 
-## Integration Points for Crabjar
+## Integration Points for ${PROJECT}
 
 ### Adoption Patterns
 
-1. **Sub-agent coordination**: Crabjar's parallel task coordination mirrors DeepSeek
+1. **Sub-agent coordination**: ${PROJECT}'s parallel task coordination mirrors DeepSeek
    sub-agent fan-out — use bounded completion events for integration
-2. **Bounded retrieval**: Crabjar knowledge bridge bounded retrieval parallels handle_read
+2. **Bounded retrieval**: ${PROJECT} knowledge bridge bounded retrieval parallels handle_read
    pattern — use slice/range projections for large knowledge store results
-3. **Execution gating**: Crabjar's execution gate alignment mirrors approval policy
+3. **Execution gating**: ${PROJECT}'s execution gate alignment mirrors approval policy
    tiers — enforce raw data reference before pipeline execution
-4. **Network policy**: Crabjar domain allowlist alignment mirrors per-domain rules
+4. **Network policy**: ${PROJECT} domain allowlist alignment mirrors per-domain rules
    — use exact match + subdomain wildcard for scope gating
-5. **Session persistence**: Crabjar state-docs overlay persistence parallels UUID-based
+5. **Session persistence**: ${PROJECT} state-docs overlay persistence parallels UUID-based
    checkpoint/resume — use sidecar JSON for agent session survival
 
 ---

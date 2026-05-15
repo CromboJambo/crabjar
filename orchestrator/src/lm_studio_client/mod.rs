@@ -1225,4 +1225,4 @@ pub enum LmStudioError {
 /// Returns a list of available endpoints. If none are available, returns
 /// an error.
 pub async fn detect_available_endpoints(
-    base
+    basee

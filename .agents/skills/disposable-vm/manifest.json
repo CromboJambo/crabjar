@@ -1,7 +1,0 @@
-{
-  "role": "disposable virtual machine configuration",
-  "entry_points": ["disposable-vm/"],
-  "dependencies": ["Dockerfile", "Containerfile"],
-  "data_source": "filesystem",
-  "capabilities": ["VM provisioning"]
-}
