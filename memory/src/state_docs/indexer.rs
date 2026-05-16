@@ -278,8 +278,7 @@ fn extract_tables(content: &str) -> Vec<Table> {
     }
 
     // Close any open table
-    if in_table
-        && let Some(mut t) = current_table.take() {
+    if in_table && let Some(mut t) = current_table.take() {
         t.end_line = lines.len();
         tables.push(t);
     }
@@ -442,18 +441,10 @@ fn extract_confidence(content: &str) -> Option<ConfidenceAssessment> {
                 Some(key) if key == "what_captured" => {
                     c.what_captured = current_value_lines.join("\n")
                 }
-                Some(key) if key == "what_missed" => {
-                    c.what_missed = current_value_lines.join("\n")
-                }
-                Some(key) if key == "assumptions" => {
-                    c.assumptions = current_value_lines.clone()
-                }
-                Some(key) if key == "blind_spots" => {
-                    c.blind_spots = current_value_lines.clone()
-                }
-                Some(key) if key == "stale_after" => {
-                    c.stale_after = current_value_lines.join("\n")
-                }
+                Some(key) if key == "what_missed" => c.what_missed = current_value_lines.join("\n"),
+                Some(key) if key == "assumptions" => c.assumptions = current_value_lines.clone(),
+                Some(key) if key == "blind_spots" => c.blind_spots = current_value_lines.clone(),
+                Some(key) if key == "stale_after" => c.stale_after = current_value_lines.join("\n"),
                 _ => {}
             }
         }
