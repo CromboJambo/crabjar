@@ -2,7 +2,7 @@ use crate::error::SandboxError;
 use crate::schema::{create_agent_sandbox, init_db, list_all_sandboxes, query_agent_sandbox};
 use path_absolutize::Absolutize;
 use rusqlite::Connection;
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 /// Agent isolation tooling for per-agent Unix user creation, systemd-nspawn containers, and cgroup resource limits.
 ///
@@ -25,6 +25,7 @@ impl<'a> AgentIsolation<'a> {
     }
 
     /// Create an agent sandbox configuration.
+    #[allow(clippy::too_many_arguments)]
     pub fn create_sandbox(
         &self,
         agent_name: &str,
@@ -76,7 +77,7 @@ impl<'a> AgentIsolation<'a> {
         resource_limits: &str,
     ) -> Result<String, SandboxError> {
         let mut config = String::new();
-        config.push_str(&format!("[Container]\n"));
+        config.push_str("[Container]\n");
         config.push_str(&format!("HostName = {}\n", agent_name));
         config.push_str(&format!("NetworkInterface = {}\n", agent_name));
 

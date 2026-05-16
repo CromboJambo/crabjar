@@ -37,6 +37,7 @@ pub fn init_db(conn: &Connection) -> Result<(), SandboxSchemaError> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_agent_sandbox(
     conn: &Connection,
     agent_name: &str,
