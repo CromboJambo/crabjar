@@ -1,8 +1,8 @@
 use crate::error::SandboxError;
-use crate::schema::{init_db, create_agent_sandbox, query_agent_sandbox, list_all_sandboxes};
+use crate::schema::{create_agent_sandbox, init_db, list_all_sandboxes, query_agent_sandbox};
+use path_absolutize::Absolutize;
 use rusqlite::Connection;
 use tracing::{debug, info, warn};
-use path_absolutize::Absolutize;
 
 /// Agent isolation tooling for per-agent Unix user creation, systemd-nspawn containers, and cgroup resource limits.
 ///
@@ -21,7 +21,7 @@ impl<'a> AgentIsolation<'a> {
 
     /// Initialize the sandbox database.
     pub fn init(&self) -> Result<(), SandboxError> {
-        init_db(self.conn).map_err(|e| SandboxError::Sqlite(e.into()))
+        init_db(self.conn).map_err(SandboxError::Schema)
     }
 
     /// Create an agent sandbox configuration.
@@ -37,20 +37,35 @@ impl<'a> AgentIsolation<'a> {
         sudo_policy: &str,
         mount_scopes: &str,
     ) -> Result<String, SandboxError> {
-        create_agent_sandbox(self.conn, agent_name, isolation_type, home_path, shell_config, cache_dirs, network_egress, resource_limits, sudo_policy, mount_scopes)
-            .map_err(|e| SandboxError::Sqlite(e.into()))
+        create_agent_sandbox(
+            self.conn,
+            agent_name,
+            isolation_type,
+            home_path,
+            shell_config,
+            cache_dirs,
+            network_egress,
+            resource_limits,
+            sudo_policy,
+            mount_scopes,
+        )
+        .map_err(SandboxError::Schema)
     }
 
     /// Query an agent sandbox configuration.
-    pub fn query_sandbox(&self, agent_name: &str) -> Result<Option<crate::schema::SandboxRow>, SandboxError> {
-        query_agent_sandbox(self.conn, agent_name)
-            .map_err(|e| SandboxError::Sqlite(e.into()))
+    pub fn query_sandbox(
+        &self,
+        agent_name: &str,
+    ) -> Result<Option<crate::schema::SandboxRow>, SandboxError> {
+        query_agent_sandbox(self.conn, agent_name).map_err(SandboxError::Schema)
     }
 
     /// List all agent sandbox configurations.
-    pub fn list_sandboxes(&self, limit: usize) -> Result<Vec<crate::schema::SandboxRow>, SandboxError> {
-        list_all_sandboxes(self.conn, limit)
-            .map_err(|e| SandboxError::Sqlite(e.into()))
+    pub fn list_sandboxes(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::SandboxRow>, SandboxError> {
+        list_all_sandboxes(self.conn, limit).map_err(SandboxError::Schema)
     }
 
     /// Generate systemd-nspawn container configuration.
@@ -104,13 +119,13 @@ impl<'a> AgentIsolation<'a> {
 
     /// Verify sandbox path existence.
     pub fn verify_home_path(&self, home_path: &str) -> Result<bool, SandboxError> {
-        let abs_path = std::path::Path::new(home_path).absolutize();
+        let abs_path = std::path::Path::new(home_path).absolutize()?;
         Ok(abs_path.exists())
     }
 
     /// Verify mount scope existence.
     pub fn verify_mount_scope(&self, scope: &str) -> Result<bool, SandboxError> {
-        let abs_path = std::path::Path::new(scope).absolutize();
+        let abs_path = std::path::Path::new(scope).absolutize()?;
         Ok(abs_path.exists())
     }
 }
@@ -142,17 +157,19 @@ mod tests {
         let isolation = AgentIsolation::new(&conn);
         isolation.init().unwrap();
 
-        let id = isolation.create_sandbox(
-            "test-agent",
-            "unix_user",
-            "/home/test-agent",
-            "bash",
-            "/home/test-agent/.cache",
-            "restricted",
-            "cpu=1,memory=2g",
-            "no_sudo",
-            "/repo:/tmp",
-        ).unwrap();
+        let id = isolation
+            .create_sandbox(
+                "test-agent",
+                "unix_user",
+                "/home/test-agent",
+                "bash",
+                "/home/test-agent/.cache",
+                "restricted",
+                "cpu=1,memory=2g",
+                "no_sudo",
+                "/repo:/tmp",
+            )
+            .unwrap();
 
         let row = isolation.query_sandbox("test-agent").unwrap();
         assert!(row.is_some());
@@ -168,11 +185,13 @@ mod tests {
         let isolation = AgentIsolation::new(&conn);
         isolation.init().unwrap();
 
-        let config = isolation.generate_nspawn_config(
-            "test-agent",
-            &[dir.path().to_string_lossy().to_string(), "/tmp".to_string()],
-            "cpu=1,memory=2g",
-        ).unwrap();
+        let config = isolation
+            .generate_nspawn_config(
+                "test-agent",
+                &[dir.path().to_string_lossy().to_string(), "/tmp".to_string()],
+                "cpu=1,memory=2g",
+            )
+            .unwrap();
 
         assert!(config.contains("[Container]"));
         assert!(config.contains("HostName = test-agent"));
@@ -187,10 +206,9 @@ mod tests {
         let isolation = AgentIsolation::new(&conn);
         isolation.init().unwrap();
 
-        let config = isolation.generate_cgroup_config(
-            "test-agent",
-            "cpu=1,memory=2g",
-        ).unwrap();
+        let config = isolation
+            .generate_cgroup_config("test-agent", "cpu=1,memory=2g")
+            .unwrap();
 
         assert!(config.contains("cpu.test-agent"));
         assert!(config.contains("memory.test-agent"));
@@ -205,7 +223,9 @@ mod tests {
         let isolation = AgentIsolation::new(&conn);
         isolation.init().unwrap();
 
-        let exists = isolation.verify_home_path(dir.path()).unwrap();
+        let exists = isolation
+            .verify_home_path(dir.path().to_string_lossy().as_ref())
+            .unwrap();
         assert!(exists);
     }
 }
