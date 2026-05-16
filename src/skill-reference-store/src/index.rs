@@ -2,11 +2,8 @@ use anyhow::Result;
 
 use crate::index_reference;
 
-
 /// Index a skill reference file into the store.
-pub fn index_all(
-    skill_dir: &std::path::Path,
-) -> Result<Vec<serde_json::Value>> {
+pub fn index_all(skill_dir: &std::path::Path) -> Result<Vec<serde_json::Value>> {
     let skill_name = skill_dir
         .file_name()
         .map(|n| n.to_string_lossy())
