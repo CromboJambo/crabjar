@@ -397,9 +397,70 @@ fn usage_response(show_usage: bool) -> serde_json::Value {
 }
 
 fn optimize_engine(
-    _classified: &[codeburn_provider::SessionData],
+    classified: &[codeburn_provider::SessionData],
 ) -> Result<Vec<codeburn_provider::SessionData>, Box<dyn std::error::Error>> {
-    Ok(Vec::new())
+    let mut waste_findings = Vec::new();
+
+    // Detect token waste patterns: high-output sessions with low task complexity
+    for session in classified {
+        let complexity = match session.task_category.as_str() {
+            "edit" | "fix" | "debugging" => 1,
+            "test" | "docs" | "review" => 2,
+            "refactor" | "design" | "research" => 3,
+            "architecture" | "integration" | "deployment" => 4,
+            _ => 0,
+        };
+
+        let output_ratio = if session.input_tokens > 0 {
+            session.output_tokens as f64 / session.input_tokens as f64
+        } else {
+            0.0
+        };
+
+        // High output ratio on low complexity = potential waste
+        if complexity <= 2 && output_ratio > 10.0 {
+            waste_findings.push(codeburn_provider::SessionData {
+                provider: session.provider.clone(),
+                date: session.date,
+                input_tokens: session.input_tokens,
+                output_tokens: session.output_tokens,
+                model: session.model.clone(),
+                task_category: "waste_detected".to_string(),
+                project: session.project.clone(),
+                message_id: session.message_id.clone(),
+                provenance: codeburn_provider::ProvenanceEntry {
+                    provenance_id: uuid::Uuid::new_v4().to_string(),
+                    provider_id: "codeburn-optimize".to_string(),
+                    data_path: session.provenance.data_path.clone(),
+                    format: "waste_analysis".to_string(),
+                    ingestion_timestamp: chrono::Utc::now().timestamp(),
+                },
+            });
+        }
+
+        // Sessions with very high output tokens = potential waste
+        if session.output_tokens > 500_000 {
+            waste_findings.push(codeburn_provider::SessionData {
+                provider: session.provider.clone(),
+                date: session.date,
+                input_tokens: session.input_tokens,
+                output_tokens: session.output_tokens,
+                model: session.model.clone(),
+                task_category: "high_output".to_string(),
+                project: session.project.clone(),
+                message_id: session.message_id.clone(),
+                provenance: codeburn_provider::ProvenanceEntry {
+                    provenance_id: uuid::Uuid::new_v4().to_string(),
+                    provider_id: "codeburn-optimize".to_string(),
+                    data_path: session.provenance.data_path.clone(),
+                    format: "high_output_analysis".to_string(),
+                    ingestion_timestamp: chrono::Utc::now().timestamp(),
+                },
+            });
+        }
+    }
+
+    Ok(waste_findings)
 }
 
 fn usage_lines() -> &'static [&'static str] {
