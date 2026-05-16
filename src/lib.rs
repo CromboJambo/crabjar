@@ -40,6 +40,24 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: WorkspaceCommand,
     },
+
+    /// Execute command with guard + telemetry
+    Exec {
+        #[arg(short, long)]
+        command: String,
+
+        #[arg(short, long)]
+        args: Vec<String>,
+
+        #[arg(short, long, default_value = "")]
+        cwd: String,
+
+        #[arg(short, long)]
+        reason: String,
+
+        #[arg(short, long, default_value = "false")]
+        dry_run: bool,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]

@@ -44,6 +44,15 @@ async fn main() {
         Some(CliCommand::Workspace {
             command: WorkspaceCommand::Status,
         }) => handle_workspace_status().await,
+        Some(CliCommand::Exec {
+            command,
+            args,
+            cwd,
+            reason,
+            dry_run,
+        }) => handle_exec(&command, &args, &cwd, &reason, dry_run)
+            .await
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         None => {
             print_json(&error_response("missing command", true));
             std::process::exit(1);
@@ -181,6 +190,109 @@ async fn handle_workspace_status() -> serde_json::Value {
 }
 
 /// Error response helper
+async fn handle_exec(
+    command: &str,
+    args: &[String],
+    cwd: &str,
+    reason: &str,
+    dry_run: bool,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let project_root = std::env::current_dir()?;
+
+    // Guard layer: gate check before execution
+    let guard_db = crabjar_guard::GuardDb::open(":memory:")
+        .unwrap_or_else(|_| crabjar_guard::GuardDb::open(project_root.join("guard.db")).unwrap());
+
+    let gate = crabjar_guard::ExecutionGate::new(&guard_db, dry_run, &project_root);
+
+    let gate_result = gate.check(crabjar_guard::GateContext {
+        action_type: "exec",
+        command,
+        args: args.to_vec(),
+        trust_layer: 2,
+        confidence: crabjar_guard::TrustScore::new(0.5),
+        source_event_id: None,
+        has_raw_data: true,
+        has_uncertainty: true,
+        can_interrupt: true,
+    })?;
+
+    match gate_result {
+        crabjar_guard::GateResult::DryRun => Ok(json!({
+            "success": true,
+            "exec": {
+                "dry_run": true,
+                "command": command,
+                "args": args,
+                "cwd": cwd,
+                "reason": reason,
+                "gate_result": "dry_run",
+            },
+        })),
+        crabjar_guard::GateResult::Interrupted {
+            reason: gate_reason,
+        } => Ok(json!({
+            "success": false,
+            "exec": {
+                "command": command,
+                "args": args,
+                "cwd": cwd,
+                "reason": reason,
+                "gate_result": "interrupted",
+                "gate_reason": gate_reason,
+            },
+        })),
+        crabjar_guard::GateResult::Pending => Ok(json!({
+            "success": false,
+            "exec": {
+                "command": command,
+                "args": args,
+                "cwd": cwd,
+                "reason": reason,
+                "gate_result": "pending",
+                "requires_review": true,
+            },
+        })),
+        crabjar_guard::GateResult::Proceed => {
+            // Telemetry layer: flight recorder capture
+            let dir = tempfile::tempdir()?;
+            let flight_db_path = dir.path().join("flight.db");
+            let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
+            let flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
+                &flight_conn,
+                "exec-session",
+            );
+            flight_recorder.init()?;
+
+            let cmd_id = flight_recorder
+                .execute_command(command, args, cwd, reason)
+                .await?;
+
+            let git_dirty = flight_recorder.capture_git_dirty(cwd).await?;
+            let git_diff = flight_recorder.capture_git_diff(cwd).await?;
+
+            let records = flight_recorder.query_records(1)?;
+            let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
+
+            Ok(json!({
+                "success": true,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "cwd": cwd,
+                    "reason": reason,
+                    "cmd_id": cmd_id,
+                    "exit_code": exit_code,
+                    "gate_result": "proceed",
+                    "git_dirty": git_dirty,
+                    "git_diff_hash": git_diff,
+                    "flight_recorder": true,
+                },
+            }))
+        }
+    }
+}
+
 fn error_response(message: &str, show_usage: bool) -> serde_json::Value {
     let mut response = json!({
         "success": false,
