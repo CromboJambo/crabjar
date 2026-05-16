@@ -98,6 +98,9 @@ impl PricingEngine {
         aliases.insert("local-model", "local_model");
         aliases.insert("lm-studio", "lm_studio");
         aliases
+            .into_iter()
+            .map(|(from, to)| (from.to_string(), to.to_string()))
+            .collect()
     }
 
     pub async fn calculate(

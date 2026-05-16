@@ -43,13 +43,13 @@ pub enum CliCommand {
 
     /// Execute command with guard + telemetry
     Exec {
-        #[arg(short, long)]
+        #[arg(long)]
         command: String,
 
         #[arg(short, long)]
         args: Vec<String>,
 
-        #[arg(short, long, default_value = "")]
+        #[arg(short = 'C', long, default_value = "")]
         cwd: String,
 
         #[arg(short, long)]

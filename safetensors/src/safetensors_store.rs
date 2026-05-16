@@ -123,6 +123,18 @@ impl<'a> SafetensorsStore<'a> {
         Ok(abs_path.exists())
     }
 
+    /// Generate a minimal safetensors load configuration for downstream model loaders.
+    pub fn generate_load_config(
+        &self,
+        model_name: &str,
+        dtype: &str,
+        device: &str,
+    ) -> Result<String, SafetensorsError> {
+        Ok(format!(
+            "model = {model_name}\nformat = safetensors\ndtype = {dtype}\ndevice = {device}\nlazy_loading = true\n"
+        ))
+    }
+
     /// Parse a safetensors file and extract tensor metadata.
     pub fn parse_weights(
         &self,

@@ -198,6 +198,11 @@ async fn handle_exec(
     dry_run: bool,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let project_root = std::env::current_dir()?;
+    let effective_cwd = if cwd.trim().is_empty() {
+        project_root.to_string_lossy().into_owned()
+    } else {
+        cwd.to_string()
+    };
 
     // Guard layer: gate check before execution
     let guard_db = crabjar_guard::GuardDb::open(":memory:")
@@ -209,8 +214,8 @@ async fn handle_exec(
         action_type: "exec",
         command,
         args: args.to_vec(),
-        trust_layer: 2,
-        confidence: crabjar_guard::TrustScore::new(0.5),
+        trust_layer: 3,
+        confidence: crabjar_guard::TrustScore::new(0.9),
         source_event_id: None,
         has_raw_data: true,
         has_uncertainty: true,
@@ -224,7 +229,7 @@ async fn handle_exec(
                 "dry_run": true,
                 "command": command,
                 "args": args,
-                "cwd": cwd,
+                "cwd": effective_cwd,
                 "reason": reason,
                 "gate_result": "dry_run",
             },
@@ -236,7 +241,7 @@ async fn handle_exec(
             "exec": {
                 "command": command,
                 "args": args,
-                "cwd": cwd,
+                "cwd": effective_cwd,
                 "reason": reason,
                 "gate_result": "interrupted",
                 "gate_reason": gate_reason,
@@ -247,7 +252,7 @@ async fn handle_exec(
             "exec": {
                 "command": command,
                 "args": args,
-                "cwd": cwd,
+                "cwd": effective_cwd,
                 "reason": reason,
                 "gate_result": "pending",
                 "requires_review": true,
@@ -265,11 +270,11 @@ async fn handle_exec(
             flight_recorder.init()?;
 
             let cmd_id = flight_recorder
-                .execute_command(command, args, cwd, reason)
+                .execute_command(command, args, &effective_cwd, reason)
                 .await?;
 
-            let git_dirty = flight_recorder.capture_git_dirty(cwd).await?;
-            let git_diff = flight_recorder.capture_git_diff(cwd).await?;
+            let git_dirty = flight_recorder.capture_git_dirty(&effective_cwd).await?;
+            let git_diff = flight_recorder.capture_git_diff(&effective_cwd).await?;
 
             let records = flight_recorder.query_records(1)?;
             let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
@@ -279,7 +284,7 @@ async fn handle_exec(
                 "exec": {
                     "command": command,
                     "args": args,
-                    "cwd": cwd,
+                    "cwd": effective_cwd,
                     "reason": reason,
                     "cmd_id": cmd_id,
                     "exit_code": exit_code,
