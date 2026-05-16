@@ -4,8 +4,8 @@ use axum::{
     response::sse::{Event as SseEvent, Sse},
     routing::post,
 };
-use futures_util::stream;
 use crabjar_guard::{ActionStatus, ExecutionGate, GateContext};
+use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
