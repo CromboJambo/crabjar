@@ -1,8 +1,7 @@
+use crate::GateResult;
 use crate::guard_db::GuardDb;
 use crate::types::TrustScore;
-use crate::GateResult;
 use tracing::{debug, warn};
-use uuid::Uuid;
 
 /// Reversibility score for an action. Higher score means easier to undo.
 ///
@@ -113,7 +112,12 @@ impl ActionRiskAssessment {
         uncertainty_exposed: bool,
         interruptible: bool,
     ) -> Self {
-        let risk_level = Self::determine_risk_level(&reversibility, &confidence, uncertainty_exposed, interruptible);
+        let risk_level = Self::determine_risk_level(
+            &reversibility,
+            &confidence,
+            uncertainty_exposed,
+            interruptible,
+        );
 
         Self {
             reversibility,
@@ -152,7 +156,10 @@ impl ActionRiskAssessment {
     }
 
     pub fn requires_permission(&self) -> bool {
-        matches!(self.risk_level, CommandRiskExtended::Critical | CommandRiskExtended::High)
+        matches!(
+            self.risk_level,
+            CommandRiskExtended::Critical | CommandRiskExtended::High
+        )
     }
 
     pub fn confidence_below_floor(&self, floor: f64) -> bool {
@@ -196,7 +203,12 @@ pub fn gate_check_with_reversibility(
         data_integrity,
     );
 
-    let assessment = ActionRiskAssessment::new(reversibility.clone(), confidence, has_uncertainty, can_interrupt);
+    let assessment = ActionRiskAssessment::new(
+        reversibility.clone(),
+        confidence,
+        has_uncertainty,
+        can_interrupt,
+    );
 
     let risk_level = assessment.get_risk_level();
 
@@ -235,15 +247,23 @@ pub fn gate_check_with_reversibility(
         CommandRiskExtended::Low => {
             // Apply existing gate logic from guard/src/gate.rs
             if !has_raw_data {
-                Ok((GateResult::Interrupted {
-                    reason: "Action triggered without raw data reference".to_string(),
-                }, assessment))
+                Ok((
+                    GateResult::Interrupted {
+                        reason: "Action triggered without raw data reference".to_string(),
+                    },
+                    assessment,
+                ))
             } else if !has_uncertainty {
-                Ok((GateResult::Interrupted {
-                    reason: "Action triggered without uncertainty exposure".to_string(),
-                }, assessment))
+                Ok((
+                    GateResult::Interrupted {
+                        reason: "Action triggered without uncertainty exposure".to_string(),
+                    },
+                    assessment,
+                ))
             } else {
-                let _can_auto = db.load_anneal_config().map_err(|_| crate::guard_db::GuardDbError::SchemaError("config load failed".to_string()))?;
+                let _can_auto = db.load_anneal_config().map_err(|_| {
+                    crate::guard_db::GuardDbError::SchemaError("config load failed".to_string())
+                })?;
                 // Simplified: proceed if trust layer >= 3 and confidence >= 0.8
                 if trust_layer >= 3 && confidence.get() >= 0.8 {
                     Ok((GateResult::Proceed, assessment))
@@ -252,11 +272,12 @@ pub fn gate_check_with_reversibility(
                 }
             }
         }
-        CommandRiskExtended::Unauthorized => {
-            Ok((GateResult::Interrupted {
+        CommandRiskExtended::Unauthorized => Ok((
+            GateResult::Interrupted {
                 reason: "Unauthorized action: detection != authorization".to_string(),
-            }, assessment))
-        }
+            },
+            assessment,
+        )),
     }
 }
 
@@ -271,7 +292,11 @@ mod tests {
         let score = ReversibilityScore::score_action(
             "echo",
             &["hello".to_string()],
-            true, true, true, true, true,
+            true,
+            true,
+            true,
+            true,
+            true,
         );
 
         assert_eq!(score.get(), 1.0);
@@ -283,7 +308,11 @@ mod tests {
         let score = ReversibilityScore::score_action(
             "rm -rf",
             &["-rf".to_string(), "/tmp".to_string()],
-            false, false, false, false, false,
+            false,
+            false,
+            false,
+            false,
+            false,
         );
 
         assert_eq!(score.get(), 0.0);
@@ -295,7 +324,11 @@ mod tests {
         let score = ReversibilityScore::score_action(
             "git commit",
             &["commit".to_string(), "-m".to_string(), "test".to_string()],
-            true, false, true, false, false,
+            true,
+            false,
+            true,
+            false,
+            false,
         );
 
         assert_eq!(score.get(), 0.45);
@@ -307,15 +340,15 @@ mod tests {
         let reversibility = ReversibilityScore::score_action(
             "rm -rf",
             &["-rf".to_string(), "/tmp".to_string()],
-            false, false, false, false, false,
+            false,
+            false,
+            false,
+            false,
+            false,
         );
 
-        let assessment = ActionRiskAssessment::new(
-            reversibility,
-            TrustScore::new(0.3),
-            false,
-            true,
-        );
+        let assessment =
+            ActionRiskAssessment::new(reversibility, TrustScore::new(0.3), false, true);
 
         assert_eq!(assessment.get_risk_level(), CommandRiskExtended::Critical);
         assert!(assessment.requires_permission());
@@ -326,15 +359,14 @@ mod tests {
         let reversibility = ReversibilityScore::score_action(
             "cargo fmt",
             &["--check".to_string()],
-            true, true, true, true, true,
+            true,
+            true,
+            true,
+            true,
+            true,
         );
 
-        let assessment = ActionRiskAssessment::new(
-            reversibility,
-            TrustScore::new(0.9),
-            true,
-            true,
-        );
+        let assessment = ActionRiskAssessment::new(reversibility, TrustScore::new(0.9), true, true);
 
         assert_eq!(assessment.get_risk_level(), CommandRiskExtended::Low);
         assert!(!assessment.requires_permission());
@@ -359,7 +391,8 @@ mod tests {
             false,
             false,
             false,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(matches!(result.0, GateResult::Interrupted { .. }));
         assert_eq!(result.1.get_risk_level(), CommandRiskExtended::Critical);
@@ -384,7 +417,8 @@ mod tests {
             true,
             true,
             true,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(result.0, GateResult::Proceed);
         assert_eq!(result.1.get_risk_level(), CommandRiskExtended::Low);
