@@ -44,7 +44,11 @@ impl KnowledgeCommandExt for KnowledgeCommand {
                     json!({ "rows": rows }),
                 ))
             }
-            Self::Insert { content, kind, tags } => {
+            Self::Insert {
+                content,
+                kind,
+                tags,
+            } => {
                 let kind = match kind.to_lowercase().as_str() {
                     "instruction" => KnowledgeKind::Instruction,
                     "pattern" => KnowledgeKind::Pattern,
@@ -54,7 +58,7 @@ impl KnowledgeCommandExt for KnowledgeCommand {
                         return Err(agent_context::Error::Internal(format!(
                             "unknown knowledge kind: {}",
                             kind
-                        )))
+                        )));
                     }
                 };
                 let id = bridge.insert_entry(content, kind, tags.clone())?;
@@ -78,11 +82,7 @@ impl KnowledgeCommandExt for KnowledgeCommand {
                 ))
             }
             Self::Deactivate { id, reason } => {
-                bridge.deactivate(
-                    *id,
-                    agent_context::Source::User,
-                    Some(reason),
-                )?;
+                bridge.deactivate(*id, agent_context::Source::User, Some(reason))?;
                 Ok(knowledge_response(
                     "knowledge entry deactivated",
                     json!({ "id": id, "reason": reason }),

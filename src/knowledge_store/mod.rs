@@ -104,9 +104,7 @@ impl<'a> KnowledgeBridge<'a> {
     ) -> Result<Self, agent_context::Error> {
         let knowledge_store = Store::open(knowledge_store_path)?;
         let state_docs = StateDocsManager::new(project_root);
-        let mirror_log_conn = mirror_log_db_path
-            .map(Connection::open)
-            .transpose()?;
+        let mirror_log_conn = mirror_log_db_path.map(Connection::open).transpose()?;
 
         Ok(Self {
             knowledge_store,
@@ -297,13 +295,9 @@ impl<'a> KnowledgeBridge<'a> {
             .state_docs
             .resolve_annotation(doc_name, annotation_id)?
             .ok_or_else(|| {
-                agent_context::Error::Internal(format!(
-                    "annotation not found: {}",
-                    annotation_id
-                ))
+                agent_context::Error::Internal(format!("annotation not found: {}", annotation_id))
             })?;
-        let deactivated =
-            self.deactivate_resolved_annotation_knowledge(&resolved, Some(reason))?;
+        let deactivated = self.deactivate_resolved_annotation_knowledge(&resolved, Some(reason))?;
         Ok((deactivated, resolved))
     }
 
