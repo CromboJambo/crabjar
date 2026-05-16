@@ -97,6 +97,7 @@ pub enum ReversibilityFactor {
 /// - uncertainty exposure (below threshold → surface before executing)
 /// - interruptibility (allow gate to return Interrupted)
 /// - additional risk factors established through testing and iteration
+#[allow(dead_code)]
 pub struct ActionRiskAssessment {
     reversibility: ReversibilityScore,
     confidence: TrustScore,
@@ -142,9 +143,7 @@ impl ActionRiskAssessment {
             CommandRiskExtended::Critical
         } else if rev_score < 0.5 && conf_score < 0.6 {
             CommandRiskExtended::High
-        } else if conf_score < 0.6 || !uncertainty_exposed {
-            CommandRiskExtended::Medium
-        } else if !interruptible {
+        } else if conf_score < 0.6 || !uncertainty_exposed || !interruptible {
             CommandRiskExtended::Medium
         } else {
             CommandRiskExtended::Low
@@ -178,6 +177,7 @@ pub enum CommandRiskExtended {
 }
 
 /// Gate check with reversibility scoring.
+#[allow(clippy::too_many_arguments)]
 pub fn gate_check_with_reversibility(
     db: &GuardDb,
     command: &str,
