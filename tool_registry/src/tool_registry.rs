@@ -3,9 +3,8 @@ use crate::schema::{
     init_db, list_all_tools, list_tools_by_type, query_discovery, query_tool, query_tool_usage,
     record_tool_discovery, record_tool_usage, register_tool,
 };
-use path_absolutize::Absolutize;
 use rusqlite::Connection;
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 /// MCP tool registry with rig/mistral.rs patterns for tool discovery, registration, and execution policy.
 ///
@@ -26,6 +25,7 @@ impl<'a> ToolRegistry<'a> {
     }
 
     /// Register a tool.
+    #[allow(clippy::too_many_arguments)]
     pub fn register_tool(
         &self,
         name: &str,
@@ -149,20 +149,86 @@ impl<'a> ToolRegistry<'a> {
         Ok(config)
     }
 
-    /// Discover tools from a source.
+    /// Discover tools from a source by scanning skill directories and MCP manifests.
     pub async fn discover_tools(
         &self,
         source: &str,
-        query: &str,
+        project_root: &std::path::Path,
     ) -> Result<Vec<String>, ToolRegistryError> {
-        // Placeholder: tool discovery would use rig/aur_search patterns
         let mut discovered = Vec::new();
-        discovered.push(query.to_string());
+
+        // Scan project-level skill directories for tool definitions
+        for ancestor in project_root.ancestors() {
+            let candidate = ancestor.join(".agents/skills");
+            if candidate.is_dir() {
+                for entry in std::fs::read_dir(&candidate)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.is_dir() {
+                        let skill_md = path.join("SKILL.md");
+                        if skill_md.exists() {
+                            let content = std::fs::read_to_string(&skill_md)?;
+                            for line in content.lines() {
+                                if line.contains("tool")
+                                    || line.contains("function")
+                                    || line.contains("command")
+                                {
+                                    let tool_name = line
+                                        .split_once(':')
+                                        .or_else(|| line.split_once('='))
+                                        .map(|(k, _v)| k.trim())
+                                        .unwrap_or(line.trim());
+                                    if !tool_name.is_empty()
+                                        && !discovered.contains(&tool_name.to_string())
+                                    {
+                                        discovered.push(tool_name.to_string());
+                                        self.record_discovery(source, tool_name)?;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Scan user-level skill directories
+        let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+        for scope in [".corust-agent/skills", ".agents/skills"] {
+            let candidate = std::path::Path::new(&home_dir).join(scope);
+            if candidate.is_dir() {
+                for entry in std::fs::read_dir(&candidate)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.is_dir() && path.join("SKILL.md").exists() {
+                        let content = std::fs::read_to_string(path.join("SKILL.md"))?;
+                        for line in content.lines() {
+                            if line.contains("tool")
+                                || line.contains("function")
+                                || line.contains("command")
+                            {
+                                let tool_name = line
+                                    .split_once(':')
+                                    .or_else(|| line.split_once('='))
+                                    .map(|(k, _v)| k.trim())
+                                    .unwrap_or(line.trim());
+                                if !tool_name.is_empty()
+                                    && !discovered.contains(&tool_name.to_string())
+                                {
+                                    discovered.push(tool_name.to_string());
+                                    self.record_discovery(source, tool_name)?;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         debug!(
             source = %source,
-            query = %query,
-            "Tool registry: discovery placeholder"
+            tool_count = discovered.len(),
+            "Tool registry: tools discovered"
         );
 
         Ok(discovered)

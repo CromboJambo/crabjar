@@ -70,6 +70,7 @@ pub fn init_db(conn: &Connection) -> Result<(), ToolRegistrySchemaError> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn register_tool(
     conn: &Connection,
     name: &str,
