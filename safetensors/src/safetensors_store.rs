@@ -1,9 +1,12 @@
 use crate::error::SafetensorsError;
-use crate::schema::{init_db, insert_model_weights, insert_tensor_metadata, query_model_weights, query_tensor_metadata, verify_weight_checksum, deactivate_weight, list_active_weights};
-use rusqlite::Connection;
-use tracing::{debug, info, warn};
-use std::path::Path;
+use crate::schema::{
+    deactivate_weight, init_db, insert_model_weights, insert_tensor_metadata, list_active_weights,
+    query_model_weights, query_tensor_metadata, verify_weight_checksum,
+};
 use path_absolutize::Absolutize;
+use rusqlite::Connection;
+use std::path::Path;
+use tracing::{debug, info, warn};
 
 /// Safetensors model weight storage for SQLite-backed storage.
 ///
@@ -20,7 +23,7 @@ impl<'a> SafetensorsStore<'a> {
 
     /// Initialize the safetensors database.
     pub fn init(&self) -> Result<(), SafetensorsError> {
-        init_db(self.conn).map_err(|e| SafetensorsError::Sqlite(e.into()))
+        init_db(self.conn).map_err(SafetensorsError::Schema)
     }
 
     /// Insert model weights metadata.
@@ -36,8 +39,19 @@ impl<'a> SafetensorsStore<'a> {
         checksum: &str,
         metadata: &str,
     ) -> Result<String, SafetensorsError> {
-        insert_model_weights(self.conn, model_name, repo_id, file_path, tensor_count, dtype, device, size_bytes, checksum, metadata)
-            .map_err(|e| SafetensorsError::Sqlite(e.into()))
+        insert_model_weights(
+            self.conn,
+            model_name,
+            repo_id,
+            file_path,
+            tensor_count,
+            dtype,
+            device,
+            size_bytes,
+            checksum,
+            metadata,
+        )
+        .map_err(SafetensorsError::Schema)
     }
 
     /// Insert tensor metadata for a weight.
@@ -50,38 +64,55 @@ impl<'a> SafetensorsStore<'a> {
         size_bytes: i64,
         checksum: &str,
     ) -> Result<(), SafetensorsError> {
-        insert_tensor_metadata(self.conn, weight_id, tensor_name, shape, dtype, size_bytes, checksum)
-            .map_err(|e| SafetensorsError::Sqlite(e.into()))
+        insert_tensor_metadata(
+            self.conn,
+            weight_id,
+            tensor_name,
+            shape,
+            dtype,
+            size_bytes,
+            checksum,
+        )
+        .map_err(SafetensorsError::Schema)
     }
 
     /// Query model weights by name.
-    pub fn query_weights(&self, model_name: &str, limit: usize) -> Result<Vec<crate::schema::ModelWeightRow>, SafetensorsError> {
-        query_model_weights(self.conn, model_name, limit)
-            .map_err(|e| SafetensorsError::Sqlite(e.into()))
+    pub fn query_weights(
+        &self,
+        model_name: &str,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::ModelWeightRow>, SafetensorsError> {
+        query_model_weights(self.conn, model_name, limit).map_err(SafetensorsError::Schema)
     }
 
     /// Query tensor metadata for a weight.
-    pub fn query_tensors(&self, weight_id: &str) -> Result<Vec<crate::schema::TensorMetadataRow>, SafetensorsError> {
-        query_tensor_metadata(self.conn, weight_id)
-            .map_err(|e| SafetensorsError::Sqlite(e.into()))
+    pub fn query_tensors(
+        &self,
+        weight_id: &str,
+    ) -> Result<Vec<crate::schema::TensorMetadataRow>, SafetensorsError> {
+        query_tensor_metadata(self.conn, weight_id).map_err(SafetensorsError::Schema)
     }
 
     /// Verify weight checksum integrity.
-    pub fn verify_checksum(&self, weight_id: &str, expected: &str) -> Result<bool, SafetensorsError> {
-        verify_weight_checksum(self.conn, weight_id, expected)
-            .map_err(|e| SafetensorsError::Sqlite(e.into()))
+    pub fn verify_checksum(
+        &self,
+        weight_id: &str,
+        expected: &str,
+    ) -> Result<bool, SafetensorsError> {
+        verify_weight_checksum(self.conn, weight_id, expected).map_err(SafetensorsError::Schema)
     }
 
     /// Deactivate a model weight.
     pub fn deactivate(&self, weight_id: &str) -> Result<usize, SafetensorsError> {
-        deactivate_weight(self.conn, weight_id)
-            .map_err(|e| SafetensorsError::Sqlite(e.into()))
+        deactivate_weight(self.conn, weight_id).map_err(SafetensorsError::Schema)
     }
 
     /// List all active model weights.
-    pub fn list_active(&self, limit: usize) -> Result<Vec<crate::schema::ModelWeightRow>, SafetensorsError> {
-        list_active_weights(self.conn, limit)
-            .map_err(|e| SafetensorsError::Sqlite(e.into()))
+    pub fn list_active(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::ModelWeightRow>, SafetensorsError> {
+        list_active_weights(self.conn, limit).map_err(SafetensorsError::Schema)
     }
 
     /// Verify safetensors file path existence.
@@ -140,17 +171,19 @@ mod tests {
         let store = SafetensorsStore::new(&conn);
         store.init().unwrap();
 
-        let id = store.insert_weights(
-            "qwen3-4b",
-            "Qwen/Qwen3-4B",
-            "/tmp/model.safetensors",
-            150,
-            "F32",
-            "CPU",
-            2000000000,
-            "abc123",
-            "{}",
-        ).unwrap();
+        let id = store
+            .insert_weights(
+                "qwen3-4b",
+                "Qwen/Qwen3-4B",
+                "/tmp/model.safetensors",
+                150,
+                "F32",
+                "CPU",
+                2000000000,
+                "abc123",
+                "{}",
+            )
+            .unwrap();
 
         let rows = store.query_weights("qwen3-4b", 10).unwrap();
         assert_eq!(rows.len(), 1);
@@ -166,17 +199,19 @@ mod tests {
         let store = SafetensorsStore::new(&conn);
         store.init().unwrap();
 
-        let id = store.insert_weights(
-            "qwen3-4b",
-            "Qwen/Qwen3-4B",
-            "/tmp/model.safetensors",
-            150,
-            "F32",
-            "CPU",
-            2000000000,
-            "abc123",
-            "{}",
-        ).unwrap();
+        let id = store
+            .insert_weights(
+                "qwen3-4b",
+                "Qwen/Qwen3-4B",
+                "/tmp/model.safetensors",
+                150,
+                "F32",
+                "CPU",
+                2000000000,
+                "abc123",
+                "{}",
+            )
+            .unwrap();
 
         let verified = store.verify_checksum(&id, "abc123").unwrap();
         assert!(verified);
@@ -194,17 +229,19 @@ mod tests {
         let store = SafetensorsStore::new(&conn);
         store.init().unwrap();
 
-        let id = store.insert_weights(
-            "qwen3-4b",
-            "Qwen/Qwen3-4B",
-            "/tmp/model.safetensors",
-            150,
-            "F32",
-            "CPU",
-            2000000000,
-            "abc123",
-            "{}",
-        ).unwrap();
+        let id = store
+            .insert_weights(
+                "qwen3-4b",
+                "Qwen/Qwen3-4B",
+                "/tmp/model.safetensors",
+                150,
+                "F32",
+                "CPU",
+                2000000000,
+                "abc123",
+                "{}",
+            )
+            .unwrap();
 
         let affected = store.deactivate(&id).unwrap();
         assert_eq!(affected, 1);
@@ -222,7 +259,9 @@ mod tests {
         let store = SafetensorsStore::new(&conn);
         store.init().unwrap();
 
-        let config = store.generate_load_config("qwen3-4b", "F32", "CPU").unwrap();
+        let config = store
+            .generate_load_config("qwen3-4b", "F32", "CPU")
+            .unwrap();
 
         assert!(config.contains("model = qwen3-4b"));
         assert!(config.contains("format = safetensors"));

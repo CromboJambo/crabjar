@@ -1,15 +1,6 @@
+use crate::error::SafetensorsSchemaError;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum SafetensorsSchemaError {
-    #[error("SQLite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
-
-    #[error("schema initialization failed: {0}")]
-    SchemaError(String),
-}
 
 /// Safetensors model weight storage DDL schema.
 pub const SAFETENSORS_SCHEMA: &str = r#"
@@ -152,14 +143,13 @@ pub fn query_model_weights(
             size_bytes: row.get(7)?,
             checksum: row.get(8)?,
             metadata,
-            loaded_at: row.get(9)?,
-            created_at: row.get(10)?,
-            active: row.get(11)?,
+            loaded_at: row.get(10)?,
+            created_at: row.get(11)?,
+            active: row.get(12)?,
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -185,8 +175,7 @@ pub fn query_tensor_metadata(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -196,9 +185,8 @@ pub fn verify_weight_checksum(
     weight_id: &str,
     expected_checksum: &str,
 ) -> Result<bool, SafetensorsSchemaError> {
-    let mut stmt = conn.prepare(
-        "SELECT checksum FROM model_weights WHERE id = ?1 AND active = 1 LIMIT 1",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT checksum FROM model_weights WHERE id = ?1 AND active = 1 LIMIT 1")?;
 
     let stored = stmt.query_row(params![weight_id], |row| row.get::<_, String>(0));
 
@@ -246,14 +234,13 @@ pub fn list_active_weights(
             size_bytes: row.get(7)?,
             checksum: row.get(8)?,
             metadata,
-            loaded_at: row.get(9)?,
-            created_at: row.get(10)?,
-            active: row.get(11)?,
+            loaded_at: row.get(10)?,
+            created_at: row.get(11)?,
+            active: row.get(12)?,
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -325,7 +312,8 @@ mod tests {
             2000000000,
             "abc123",
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(!id.is_empty());
 
@@ -353,7 +341,8 @@ mod tests {
             2000000000,
             "abc123",
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         insert_tensor_metadata(
             &conn,
@@ -363,7 +352,8 @@ mod tests {
             "F32",
             800000,
             "hash1",
-        ).unwrap();
+        )
+        .unwrap();
 
         let rows = query_tensor_metadata(&conn, &weight_id).unwrap();
         assert_eq!(rows.len(), 1);
@@ -389,7 +379,8 @@ mod tests {
             2000000000,
             "abc123",
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         let verified = verify_weight_checksum(&conn, &weight_id, "abc123").unwrap();
         assert!(verified);
@@ -416,7 +407,8 @@ mod tests {
             2000000000,
             "abc123",
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         insert_model_weights(
             &conn,
@@ -429,7 +421,8 @@ mod tests {
             3000000000,
             "def456",
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         let rows = list_active_weights(&conn, 10).unwrap();
         assert_eq!(rows.len(), 2);
@@ -453,7 +446,8 @@ mod tests {
             2000000000,
             "abc123",
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         let affected = deactivate_weight(&conn, &weight_id).unwrap();
         assert_eq!(affected, 1);
