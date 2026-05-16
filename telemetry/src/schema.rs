@@ -70,6 +70,7 @@ pub fn init_db(conn: &Connection) -> Result<(), FlightRecorderError> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn record_command(
     conn: &Connection,
     session_id: &str,
@@ -88,7 +89,7 @@ pub fn record_command(
     source: &str,
 ) -> Result<String, FlightRecorderError> {
     let id = uuid::Uuid::new_v4().to_string();
-    let args_json = serde_json::to_string(args).map_err(|e| FlightRecorderError::Json(e))?;
+    let args_json = serde_json::to_string(args).map_err(FlightRecorderError::Json)?;
 
     conn.execute(
         "INSERT INTO flight_records (id, session_id, command, cwd, args, exit_code, stdout_hash, stderr_hash, stdout_len, stderr_len, git_dirty, git_diff_count, git_diff_hash, reason, source, metadata)
