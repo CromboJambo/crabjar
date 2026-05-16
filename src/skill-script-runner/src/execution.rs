@@ -10,7 +10,10 @@ pub fn execute_default(
     work_dir: &std::path::Path,
 ) -> Result<Value> {
     let env = std::collections::HashMap::from_iter([
-        ("HOME".to_string(), std::env::var("HOME").unwrap_or_default()),
+        (
+            "HOME".to_string(),
+            std::env::var("HOME").unwrap_or_default(),
+        ),
         ("PWD".to_string(), std::env::var("PWD").unwrap_or_default()),
     ]);
 

@@ -26,7 +26,9 @@ pub fn filter_by_skill(
 ) -> Result<Vec<std::path::PathBuf>> {
     let mut found_scripts = Vec::new();
     for (skill_dir, scripts) in discoveries {
-        if skill_dir.file_name().map(|n| n.to_string_lossy()) == Some(std::borrow::Cow::Borrowed(skill_name)) {
+        if skill_dir.file_name().map(|n| n.to_string_lossy())
+            == Some(std::borrow::Cow::Borrowed(skill_name))
+        {
             found_scripts.extend(scripts.clone());
         }
     }

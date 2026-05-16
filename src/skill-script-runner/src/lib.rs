@@ -74,14 +74,17 @@ pub async fn execute_script(
         anyhow::bail!("script not in allowlist: {}", script_path.display());
     }
 
-    let output = time::timeout(timeout, tokio::process::Command::new(script_path)
-        .args(args)
-        .current_dir(work_dir)
-        .envs(&env)
-        .output())
-        .await
-        .map_err(|e| anyhow::anyhow!("script timed out: {}", e))?
-        .map_err(|e| anyhow::anyhow!("script output failed: {}", e))?;
+    let output = time::timeout(
+        timeout,
+        tokio::process::Command::new(script_path)
+            .args(args)
+            .current_dir(work_dir)
+            .envs(&env)
+            .output(),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("script timed out: {}", e))?
+    .map_err(|e| anyhow::anyhow!("script output failed: {}", e))?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
