@@ -1,5 +1,5 @@
-use crabjar_lib::{Cli, CliCommand, StateCommand, WorkspaceCommand};
 use clap::Parser;
+use crabjar_lib::{Cli, CliCommand, StateCommand, WorkspaceCommand};
 use serde_json::json;
 
 mod dotfile_manager;
@@ -7,10 +7,10 @@ mod knowledge_store;
 mod project_loader;
 mod state_docs;
 
+use crabjar_lib::{DotfileCommand, KnowledgeCommand};
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
-use crabjar_lib::{DotfileCommand, KnowledgeCommand};
 use project_loader::ProjectLoader;
 use state_docs::{AnnotationKind, StateDocsManager};
 

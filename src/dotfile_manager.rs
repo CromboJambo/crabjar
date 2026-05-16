@@ -1,7 +1,5 @@
-
 use serde_json::json;
 use std::path::PathBuf;
-
 
 #[allow(dead_code)]
 pub struct DotfileManager {
