@@ -62,7 +62,42 @@ impl PricingEngine {
     }
 
     pub fn built_in_aliases() -> BTreeMap<String, String> {
-        BTreeMap::new()
+        let mut aliases = BTreeMap::new();
+        aliases.insert("claude-3-opus", "claude_opus");
+        aliases.insert("claude-3-sonnet", "claude_sonnet");
+        aliases.insert("claude-3-haiku", "claude_haiku");
+        aliases.insert("claude-4", "claude_4");
+        aliases.insert("gpt-4o", "gpt_4o");
+        aliases.insert("gpt-4o-mini", "gpt_4o_mini");
+        aliases.insert("gpt-4", "gpt_4");
+        aliases.insert("gpt-3.5-turbo", "gpt_35");
+        aliases.insert("gemini-pro", "gemini_pro");
+        aliases.insert("gemini-1.5-pro", "gemini_15_pro");
+        aliases.insert("gemini-1.5-flash", "gemini_15_flash");
+        aliases.insert("mistral-large", "mistral_large");
+        aliases.insert("mistral-7b", "mistral_7b");
+        aliases.insert("llama-3-70b", "llama_3_70b");
+        aliases.insert("llama-3-8b", "llama_3_8b");
+        aliases.insert("qwen-2.5-72b", "qwen_25_72b");
+        aliases.insert("qwen-2.5-32b", "qwen_25_32b");
+        aliases.insert("qwen-2.5-14b", "qwen_25_14b");
+        aliases.insert("qwen-2.5-7b", "qwen_25_7b");
+        aliases.insert("qwen3-4b", "qwen3_4b");
+        aliases.insert("qwen3-8b", "qwen3_8b");
+        aliases.insert("qwen3-32b", "qwen3_32b");
+        aliases.insert("qwen3-235b", "qwen3_235b");
+        aliases.insert("deepseek-v3", "deepseek_v3");
+        aliases.insert("deepseek-r1", "deepseek_r1");
+        aliases.insert("codex", "openai_codex");
+        aliases.insert("cursor", "cursor");
+        aliases.insert("claude-desktop", "claude_desktop");
+        aliases.insert("claude-code", "claude_code");
+        aliases.insert("pi", "pi");
+        aliases.insert("omp", "omp");
+        aliases.insert("copilot", "github_copilot");
+        aliases.insert("local-model", "local_model");
+        aliases.insert("lm-studio", "lm_studio");
+        aliases
     }
 
     pub async fn calculate(
