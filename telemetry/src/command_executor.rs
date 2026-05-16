@@ -1,6 +1,7 @@
 use crate::error::{FlightRecorderError, TelemetryError};
 use crate::flight_recorder::FlightRecorder;
-use tracing::{debug, info, warn};
+use serde::{Deserialize, Serialize};
+use tracing::{debug, info};
 
 /// Structured command executor that pipes stdout/stderr into session logs with deterministic replay metadata.
 ///
@@ -22,7 +23,10 @@ impl<'a> StructuredCommandExecutor<'a> {
         cwd: &str,
         reason: &str,
     ) -> Result<CommandOutcome, TelemetryError> {
-        let cmd_id = self.flight_recorder.execute_command(command, args, cwd, reason).await?;
+        let cmd_id = self
+            .flight_recorder
+            .execute_command(command, args, cwd, reason)
+            .await?;
 
         let exit_code = self.flight_recorder.query_records(1)?;
         let exit_code = exit_code.first().map(|r| r.exit_code).unwrap_or(-1);
@@ -58,7 +62,7 @@ impl<'a> StructuredCommandExecutor<'a> {
         args: &[String],
         cwd: &str,
         reason: &str,
-    ) -> Result<CommandOutcome, FlightRecorderError> {
+    ) -> Result<CommandOutcome, TelemetryError> {
         let git_dirty = self.flight_recorder.capture_git_dirty(cwd).await?;
         let git_diff = self.flight_recorder.capture_git_diff(cwd).await?;
 
@@ -83,7 +87,10 @@ impl<'a> StructuredCommandExecutor<'a> {
     }
 
     /// Query all command outcomes for a session.
-    pub fn query_outcomes(&self, limit: usize) -> Result<Vec<crate::schema::FlightRecordRow>, FlightRecorderError> {
+    pub fn query_outcomes(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::FlightRecordRow>, FlightRecorderError> {
         self.flight_recorder.query_records(limit)
     }
 }
@@ -107,8 +114,8 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    #[test]
-    fn test_structured_executor_dry_run() {
+    #[tokio::test]
+    async fn test_structured_executor_dry_run() {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
 
@@ -117,7 +124,15 @@ mod tests {
 
         let executor = StructuredCommandExecutor::new(recorder);
 
-        let outcome = executor.dry_run("cargo check", &["--workspace".to_string()], dir.path(), "dry run check").await.unwrap();
+        let outcome = executor
+            .dry_run(
+                "cargo check",
+                &["--workspace".to_string()],
+                dir.path().to_string_lossy().as_ref(),
+                "dry run check",
+            )
+            .await
+            .unwrap();
 
         assert_eq!(outcome.exit_code, -1);
         assert_eq!(outcome.source, "dry-run");

@@ -1,8 +1,11 @@
 use crate::error::{FlightRecorderError, TelemetryError};
-use crate::schema::{init_db, record_command, record_transcript_line, checkpoint_session, query_flight_records, query_session_checkpoints, query_transcript};
+use crate::schema::{
+    checkpoint_session, init_db, query_flight_records, query_session_checkpoints, query_transcript,
+    record_command, record_transcript_line,
+};
 use rusqlite::Connection;
-use tokio::io::AsyncBufReadExt;
 use sha2::Digest;
+use tokio::io::AsyncBufReadExt;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -24,13 +27,21 @@ impl<'a> FlightRecorder<'a> {
 
     /// Initialize the flight recorder database.
     pub fn init(&self) -> Result<(), FlightRecorderError> {
-        init_db(self.conn).map_err(FlightRecorderError::Sqlite)
+        init_db(self.conn)
     }
 
     /// Checkpoint the repo state before work begins.
-    pub fn checkpoint_before(&self, repo_state_hash: &str, dirty_tree_count: i32) -> Result<String, FlightRecorderError> {
-        checkpoint_session(self.conn, &self.session_id, repo_state_hash, dirty_tree_count)
-            .map_err(FlightRecorderError::Sqlite)
+    pub fn checkpoint_before(
+        &self,
+        repo_state_hash: &str,
+        dirty_tree_count: i32,
+    ) -> Result<String, FlightRecorderError> {
+        checkpoint_session(
+            self.conn,
+            &self.session_id,
+            repo_state_hash,
+            dirty_tree_count,
+        )
     }
 
     /// Run a command with full telemetry capture.
@@ -75,7 +86,7 @@ impl<'a> FlightRecorder<'a> {
                     match line {
                         Ok(Some(l)) => {
                             stdout_lines.push(l.clone());
-                            record_transcript_line(self.conn, &self.session_id, &cmd_id, stdout_lines.len() as i32, &l, "").map_err(FlightRecorderError::Sqlite)?;
+                            record_transcript_line(self.conn, &self.session_id, &cmd_id, stdout_lines.len() as i32, &l, "")?;
                         }
                         Ok(None) => {}, // EOF for stdout
                         Err(e) => {
@@ -88,7 +99,7 @@ impl<'a> FlightRecorder<'a> {
                     match line {
                         Ok(Some(l)) => {
                             stderr_lines.push(l.clone());
-                            record_transcript_line(self.conn, &self.session_id, &cmd_id, stderr_lines.len() as i32, "", &l).map_err(FlightRecorderError::Sqlite)?;
+                            record_transcript_line(self.conn, &self.session_id, &cmd_id, stderr_lines.len() as i32, "", &l)?;
                         }
                         Ok(None) => {}, // EOF for stderr
                         Err(e) => {
@@ -119,7 +130,7 @@ impl<'a> FlightRecorder<'a> {
                         "",
                         reason,
                         "agent",
-                    ).map_err(FlightRecorderError::Sqlite)?;
+                    )?;
 
                     info!(
                         session_id = %self.session_id,
@@ -139,27 +150,42 @@ impl<'a> FlightRecorder<'a> {
     }
 
     /// Checkpoint the repo state after work completes.
-    pub fn checkpoint_after(&self, repo_state_hash: &str, dirty_tree_count: i32) -> Result<String, FlightRecorderError> {
-        checkpoint_session(self.conn, &self.session_id, repo_state_hash, dirty_tree_count)
-            .map_err(FlightRecorderError::Sqlite)
+    pub fn checkpoint_after(
+        &self,
+        repo_state_hash: &str,
+        dirty_tree_count: i32,
+    ) -> Result<String, FlightRecorderError> {
+        checkpoint_session(
+            self.conn,
+            &self.session_id,
+            repo_state_hash,
+            dirty_tree_count,
+        )
     }
 
     /// Query flight records for a session.
-    pub fn query_records(&self, limit: usize) -> Result<Vec<crate::schema::FlightRecordRow>, FlightRecorderError> {
+    pub fn query_records(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::FlightRecordRow>, FlightRecorderError> {
         query_flight_records(self.conn, &self.session_id, limit)
-            .map_err(FlightRecorderError::Sqlite)
     }
 
     /// Query session checkpoints.
-    pub fn query_checkpoints(&self, limit: usize) -> Result<Vec<crate::schema::CheckpointRow>, FlightRecorderError> {
+    pub fn query_checkpoints(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::CheckpointRow>, FlightRecorderError> {
         query_session_checkpoints(self.conn, &self.session_id, limit)
-            .map_err(FlightRecorderError::Sqlite)
     }
 
     /// Query transcript lines for a specific command.
-    pub fn query_transcript(&self, command_id: &str, limit: usize) -> Result<Vec<crate::schema::TranscriptRow>, FlightRecorderError> {
+    pub fn query_transcript(
+        &self,
+        command_id: &str,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::TranscriptRow>, FlightRecorderError> {
         query_transcript(self.conn, &self.session_id, command_id, limit)
-            .map_err(FlightRecorderError::Sqlite)
     }
 
     /// Capture git dirty tree count before a command.
@@ -245,8 +271,8 @@ mod tests {
         let recorder = FlightRecorder::new(&conn, "test-session");
         recorder.init().unwrap();
 
-        let before_id = recorder.checkpoint_before(&conn, "before_hash", 0).unwrap();
-        let after_id = recorder.checkpoint_after(&conn, "after_hash", 5).unwrap();
+        let before_id = recorder.checkpoint_before("before_hash", 0).unwrap();
+        let after_id = recorder.checkpoint_after("after_hash", 5).unwrap();
 
         let checkpoints = recorder.query_checkpoints(10).unwrap();
         assert_eq!(checkpoints.len(), 2);
@@ -254,15 +280,18 @@ mod tests {
         assert_eq!(checkpoints[1].repo_state_hash, "after_hash");
     }
 
-    #[test]
-    fn test_capture_git_dirty() {
+    #[tokio::test]
+    async fn test_capture_git_dirty() {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
 
         let recorder = FlightRecorder::new(&conn, "test-session");
         recorder.init().unwrap();
 
-        let dirty = recorder.capture_git_dirty(dir.path()).unwrap();
+        let dirty = recorder
+            .capture_git_dirty(dir.path().to_string_lossy().as_ref())
+            .await
+            .unwrap();
         assert_eq!(dirty, 0);
     }
 }

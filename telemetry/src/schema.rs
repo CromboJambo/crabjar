@@ -1,18 +1,6 @@
+use crate::error::FlightRecorderError;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum FlightRecorderError {
-    #[error("SQLite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
-
-    #[error("JSON serialization failed: {0}")]
-    Json(#[from] serde_json::Error),
-
-    #[error("schema initialization failed: {0}")]
-    SchemaError(String),
-}
 
 /// Flight recorder DDL schema. Append-only — never modify existing steps.
 pub const FLIGHT_RECORDER_SCHEMA: &str = r#"
@@ -191,8 +179,7 @@ pub fn query_flight_records(
 
     let rows = stmt.query_map(params![session_id, limit as i64], |row| {
         let args_str: String = row.get(5)?;
-        let args: Vec<String> = serde_json::from_str(&args_str)
-            .map_err(|e| FlightRecorderError::Json(e))?;
+        let args: Vec<String> = serde_json::from_str(&args_str).unwrap_or_default();
 
         Ok(FlightRecordRow {
             id: row.get(0)?,
@@ -214,8 +201,7 @@ pub fn query_flight_records(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -241,8 +227,7 @@ pub fn query_session_checkpoints(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -271,8 +256,7 @@ pub fn query_transcript(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -288,8 +272,7 @@ pub fn list_all_records(
 
     let rows = stmt.query_map(params![limit as i64], |row| {
         let args_str: String = row.get(5)?;
-        let args: Vec<String> = serde_json::from_str(&args_str)
-            .map_err(|e| FlightRecorderError::Json(e))?;
+        let args: Vec<String> = serde_json::from_str(&args_str).unwrap_or_default();
 
         Ok(FlightRecordRow {
             id: row.get(0)?,
@@ -311,8 +294,7 @@ pub fn list_all_records(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -402,7 +384,8 @@ mod tests {
             "",
             "task: check workspace",
             "agent",
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(!id.is_empty());
 
@@ -450,10 +433,12 @@ mod tests {
             "diff_hash",
             "test: run tests",
             "agent",
-        ).unwrap();
+        )
+        .unwrap();
 
         record_transcript_line(&conn, "session-1", &cmd_id, 1, "test passed", "").unwrap();
-        record_transcript_line(&conn, "session-1", &cmd_id, 2, "", "test failed in parser").unwrap();
+        record_transcript_line(&conn, "session-1", &cmd_id, 2, "", "test failed in parser")
+            .unwrap();
 
         let rows = query_transcript(&conn, "session-1", &cmd_id, 10).unwrap();
         assert_eq!(rows.len(), 2);
@@ -484,7 +469,8 @@ mod tests {
             "",
             "",
             "agent",
-        ).unwrap();
+        )
+        .unwrap();
 
         record_command(
             &conn,
@@ -502,7 +488,8 @@ mod tests {
             "",
             "",
             "agent",
-        ).unwrap();
+        )
+        .unwrap();
 
         let rows = list_all_records(&conn, 10).unwrap();
         assert_eq!(rows.len(), 2);
@@ -531,7 +518,8 @@ mod tests {
             "",
             "action: deleted test dir",
             "agent",
-        ).unwrap();
+        )
+        .unwrap();
 
         let rows = query_flight_records(&conn, "session-1", 10).unwrap();
         assert_eq!(rows[0].exit_code, 1);
