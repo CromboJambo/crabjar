@@ -5,8 +5,9 @@ use crate::schema::{
 };
 use path_absolutize::Absolutize;
 use rusqlite::Connection;
+use sha2::Digest;
 use std::path::Path;
-use tracing::{debug, info, warn};
+use tracing::debug;
 
 /// Safetensors model weight storage for SQLite-backed storage.
 ///
@@ -27,6 +28,7 @@ impl<'a> SafetensorsStore<'a> {
     }
 
     /// Insert model weights metadata.
+    #[allow(clippy::too_many_arguments)]
     pub fn insert_weights(
         &self,
         model_name: &str,
@@ -121,26 +123,126 @@ impl<'a> SafetensorsStore<'a> {
         Ok(abs_path.exists())
     }
 
-    /// Generate safetensors load configuration.
-    pub fn generate_load_config(
+    /// Parse a safetensors file and extract tensor metadata.
+    pub fn parse_weights(
         &self,
+        file_path: &str,
         model_name: &str,
-        dtype: &str,
-        device: &str,
-    ) -> Result<String, SafetensorsError> {
-        let mut config = String::new();
-        config.push_str(&format!("model = {}\n", model_name));
-        config.push_str(&format!("dtype = {}\n", dtype));
-        config.push_str(&format!("device = {}\n", device));
-        config.push_str("format = safetensors\n");
-        config.push_str("lazy_loading = true\n");
+        repo_id: &str,
+    ) -> Result<(String, Vec<crate::schema::TensorMetadataRow>), SafetensorsError> {
+        let abs_path = Path::new(file_path).absolutize()?;
+        if !abs_path.exists() {
+            return Err(SafetensorsError::NotFound(file_path.to_string()));
+        }
+
+        let data = std::fs::read(&abs_path)?;
+        if data.len() < 8 {
+            return Err(SafetensorsError::Internal(
+                "too short for safetensors header".to_string(),
+            ));
+        }
+
+        let header_len =
+            u64::from_le_bytes(data[0..8].try_into().map_err(|_| {
+                SafetensorsError::Internal("header length not 8 bytes".to_string())
+            })?);
+        if header_len as usize > data.len() {
+            return Err(SafetensorsError::Internal(
+                "header exceeds file".to_string(),
+            ));
+        }
+
+        let header_bytes = &data[8..8 + header_len as usize];
+        let header_str = String::from_utf8(header_bytes.to_vec())
+            .map_err(|_| SafetensorsError::Internal("header not valid UTF-8".to_string()))?;
+        let header: serde_json::Value = serde_json::from_str(&header_str)
+            .map_err(|_| SafetensorsError::Internal("header not valid JSON".to_string()))?;
+
+        let tensors = header
+            .get("tensors")
+            .and_then(|t| t.as_object())
+            .ok_or_else(|| SafetensorsError::Internal("no tensors in header".to_string()))?;
+
+        let mut tensor_rows = Vec::new();
+        let mut total_tensors: i32 = 0;
+        let mut total_bytes = 0i64;
+        let mut dtype = String::new();
+
+        for (tensor_name, tensor_info) in tensors {
+            let shape: Vec<i64> = tensor_info
+                .get("shape")
+                .and_then(|s| s.as_array())
+                .ok_or_else(|| SafetensorsError::Internal("tensor shape missing".to_string()))?
+                .iter()
+                .filter_map(|v| v.as_i64())
+                .collect();
+
+            let dtype_str = tensor_info
+                .get("dtype")
+                .and_then(|d| d.as_str())
+                .ok_or_else(|| SafetensorsError::Internal("tensor dtype missing".to_string()))?
+                .to_string();
+
+            let _data_type = tensor_info
+                .get("data_type")
+                .and_then(|d| d.as_str())
+                .unwrap_or(dtype_str.as_str());
+
+            let shape_str = format!(
+                "({})",
+                shape
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+
+            tensor_rows.push(crate::schema::TensorMetadataRow {
+                id: uuid::Uuid::new_v4().to_string(),
+                weight_id: String::new(),
+                tensor_name: tensor_name.clone(),
+                shape: shape_str,
+                dtype: dtype_str.clone(),
+                size_bytes: tensor_info
+                    .get("data_type")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("")
+                    .len() as i64,
+                checksum: String::new(),
+            });
+
+            total_tensors += 1;
+            total_bytes += tensor_info
+                .get("data_type")
+                .and_then(|d| d.as_str())
+                .unwrap_or("")
+                .len() as i64;
+            dtype = dtype_str;
+        }
+
+        let weight_id = self.insert_weights(
+            model_name,
+            repo_id,
+            file_path,
+            total_tensors,
+            dtype.as_str(),
+            "CPU",
+            total_bytes,
+            &hex::encode(sha2::Sha256::new().finalize().as_slice()),
+            "{}",
+        )?;
+
+        for row in &mut tensor_rows {
+            row.weight_id = weight_id.clone();
+        }
 
         debug!(
             model_name = %model_name,
-            "Safetensors store: load config generated"
+            tensor_count = total_tensors,
+            "Safetensors store: weights parsed from file"
         );
 
-        Ok(config)
+        Ok((weight_id, tensor_rows))
     }
 }
 

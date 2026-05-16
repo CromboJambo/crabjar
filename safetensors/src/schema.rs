@@ -52,6 +52,7 @@ pub fn init_db(conn: &Connection) -> Result<(), SafetensorsSchemaError> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn insert_model_weights(
     conn: &Connection,
     model_name: &str,
