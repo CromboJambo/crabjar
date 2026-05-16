@@ -1,9 +1,13 @@
+use crate::schema::ToolRegistrySchemaError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ToolRegistryError {
     #[error("SQLite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
+
+    #[error("schema error: {0}")]
+    Schema(#[from] ToolRegistrySchemaError),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

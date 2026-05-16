@@ -1,8 +1,11 @@
 use crate::error::ToolRegistryError;
-use crate::schema::{init_db, register_tool, query_tool, list_all_tools, list_tools_by_type, record_tool_usage, query_tool_usage, record_tool_discovery, query_discovery};
+use crate::schema::{
+    init_db, list_all_tools, list_tools_by_type, query_discovery, query_tool, query_tool_usage,
+    record_tool_discovery, record_tool_usage, register_tool,
+};
+use path_absolutize::Absolutize;
 use rusqlite::Connection;
 use tracing::{debug, info, warn};
-use path_absolutize::Absolutize;
 
 /// MCP tool registry with rig/mistral.rs patterns for tool discovery, registration, and execution policy.
 ///
@@ -19,14 +22,14 @@ impl<'a> ToolRegistry<'a> {
 
     /// Initialize the tool registry database.
     pub fn init(&self) -> Result<(), ToolRegistryError> {
-        init_db(self.conn).map_err(ToolRegistryError::Sqlite)
+        init_db(self.conn).map_err(ToolRegistryError::Schema)
     }
 
     /// Register a tool.
     pub fn register_tool(
         &self,
         name: &str,
-    type: &str,
+        r#type: &str,
         description: &str,
         schema: &str,
         execution_policy: &str,
@@ -34,26 +37,40 @@ impl<'a> ToolRegistry<'a> {
         confidence: f64,
         metadata: &str,
     ) -> Result<String, ToolRegistryError> {
-        register_tool(self.conn, name, type, description, schema, execution_policy, trust_layer, confidence, metadata)
-            .map_err(ToolRegistryError::Sqlite)
+        register_tool(
+            self.conn,
+            name,
+            r#type,
+            description,
+            schema,
+            execution_policy,
+            trust_layer,
+            confidence,
+            metadata,
+        )
+        .map_err(ToolRegistryError::Schema)
     }
 
     /// Query a tool by name.
-    pub fn query_tool(&self, name: &str) -> Result<Option<crate::schema::ToolRow>, ToolRegistryError> {
-        query_tool(self.conn, name)
-            .map_err(ToolRegistryError::Sqlite)
+    pub fn query_tool(
+        &self,
+        name: &str,
+    ) -> Result<Option<crate::schema::ToolRow>, ToolRegistryError> {
+        query_tool(self.conn, name).map_err(ToolRegistryError::Schema)
     }
 
     /// List all tools.
     pub fn list_all(&self, limit: usize) -> Result<Vec<crate::schema::ToolRow>, ToolRegistryError> {
-        list_all_tools(self.conn, limit)
-            .map_err(ToolRegistryError::Sqlite)
+        list_all_tools(self.conn, limit).map_err(ToolRegistryError::Schema)
     }
 
     /// List tools by type.
-    pub fn list_by_type(&self, type: &str, limit: usize) -> Result<Vec<crate::schema::ToolRow>, ToolRegistryError> {
-        list_tools_by_type(self.conn, type, limit)
-            .map_err(ToolRegistryError::Sqlite)
+    pub fn list_by_type(
+        &self,
+        r#type: &str,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::ToolRow>, ToolRegistryError> {
+        list_tools_by_type(self.conn, r#type, limit).map_err(ToolRegistryError::Schema)
     }
 
     /// Record tool usage metrics.
@@ -65,14 +82,23 @@ impl<'a> ToolRegistry<'a> {
         success_rate: f64,
         avg_latency: f64,
     ) -> Result<(), ToolRegistryError> {
-        record_tool_usage(self.conn, tool_id, session_id, call_count, success_rate, avg_latency)
-            .map_err(ToolRegistryError::Sqlite)
+        record_tool_usage(
+            self.conn,
+            tool_id,
+            session_id,
+            call_count,
+            success_rate,
+            avg_latency,
+        )
+        .map_err(ToolRegistryError::Schema)
     }
 
     /// Query tool usage metrics.
-    pub fn query_usage(&self, tool_id: &str) -> Result<Vec<crate::schema::UsageRow>, ToolRegistryError> {
-        query_tool_usage(self.conn, tool_id)
-            .map_err(ToolRegistryError::Sqlite)
+    pub fn query_usage(
+        &self,
+        tool_id: &str,
+    ) -> Result<Vec<crate::schema::UsageRow>, ToolRegistryError> {
+        query_tool_usage(self.conn, tool_id).map_err(ToolRegistryError::Schema)
     }
 
     /// Record tool discovery.
@@ -81,14 +107,16 @@ impl<'a> ToolRegistry<'a> {
         source: &str,
         tool_name: &str,
     ) -> Result<String, ToolRegistryError> {
-        record_tool_discovery(self.conn, source, tool_name)
-            .map_err(ToolRegistryError::Sqlite)
+        record_tool_discovery(self.conn, source, tool_name).map_err(ToolRegistryError::Schema)
     }
 
     /// Query tool discovery history.
-    pub fn query_discovery(&self, source: &str, limit: usize) -> Result<Vec<crate::schema::DiscoveryRow>, ToolRegistryError> {
-        query_discovery(self.conn, source, limit)
-            .map_err(ToolRegistryError::Sqlite)
+    pub fn query_discovery(
+        &self,
+        source: &str,
+        limit: usize,
+    ) -> Result<Vec<crate::schema::DiscoveryRow>, ToolRegistryError> {
+        query_discovery(self.conn, source, limit).map_err(ToolRegistryError::Schema)
     }
 
     /// Generate tool execution configuration.
@@ -102,7 +130,14 @@ impl<'a> ToolRegistry<'a> {
         config.push_str(&format!("tool = {}\n", tool_name));
         config.push_str(&format!("trust_layer = {}\n", trust_layer));
         config.push_str(&format!("confidence = {}\n", confidence));
-        config.push_str(&format!("auto_execute = {}\n", if trust_layer >= 3 && confidence >= 0.8 { "true" } else { "false" }));
+        config.push_str(&format!(
+            "auto_execute = {}\n",
+            if trust_layer >= 3 && confidence >= 0.8 {
+                "true"
+            } else {
+                "false"
+            }
+        ));
 
         debug!(
             tool_name = %tool_name,
@@ -161,16 +196,18 @@ mod tests {
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
 
-        let id = registry.register_tool(
-            "cargo_check",
-            "command",
-            "Run cargo check on workspace",
-            '{"tool": "cargo", "args": ["check", "--workspace"]}',
-            "low_risk",
-            3,
-            0.9,
-            "{}",
-        ).unwrap();
+        let id = registry
+            .register_tool(
+                "cargo_check",
+                "command",
+                "Run cargo check on workspace",
+                "{\"tool\": \"cargo\", \"args\": [\"check\", \"--workspace\"]}",
+                "low_risk",
+                3,
+                0.9,
+                "{}",
+            )
+            .unwrap();
 
         let row = registry.query_tool("cargo_check").unwrap();
         assert!(row.is_some());
@@ -186,27 +223,31 @@ mod tests {
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
 
-        registry.register_tool(
-            "cargo_check",
-            "command",
-            "Run cargo check on workspace",
-            '{"tool": "cargo", "args": ["check", "--workspace"]}',
-            "low_risk",
-            3,
-            0.9,
-            "{}",
-        ).unwrap();
+        registry
+            .register_tool(
+                "cargo_check",
+                "command",
+                "Run cargo check on workspace",
+                "{\"tool\": \"cargo\", \"args\": [\"check\", \"--workspace\"]}",
+                "low_risk",
+                3,
+                0.9,
+                "{}",
+            )
+            .unwrap();
 
-        registry.register_tool(
-            "openai_chat",
-            "llm",
-            "OpenAI chat completion",
-            '{"provider": "openai", "model": "gpt-4o"}',
-            "medium_risk",
-            2,
-            0.7,
-            "{}",
-        ).unwrap();
+        registry
+            .register_tool(
+                "openai_chat",
+                "llm",
+                "OpenAI chat completion",
+                "{\"provider\": \"openai\", \"model\": \"gpt-4o\"}",
+                "medium_risk",
+                2,
+                0.7,
+                "{}",
+            )
+            .unwrap();
 
         let rows = registry.list_all(10).unwrap();
         assert_eq!(rows.len(), 2);
@@ -221,18 +262,22 @@ mod tests {
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
 
-        let id = registry.register_tool(
-            "cargo_check",
-            "command",
-            "Run cargo check on workspace",
-            '{"tool": "cargo", "args": ["check", "--workspace"]}',
-            "low_risk",
-            3,
-            0.9,
-            "{}",
-        ).unwrap();
+        let id = registry
+            .register_tool(
+                "cargo_check",
+                "command",
+                "Run cargo check on workspace",
+                "{\"tool\": \"cargo\", \"args\": [\"check\", \"--workspace\"]}",
+                "low_risk",
+                3,
+                0.9,
+                "{}",
+            )
+            .unwrap();
 
-        registry.record_usage(&id, "session-1", 5, 1.0, 0.5).unwrap();
+        registry
+            .record_usage(&id, "session-1", 5, 1.0, 0.5)
+            .unwrap();
 
         let rows = registry.query_usage(&id).unwrap();
         assert_eq!(rows.len(), 1);
@@ -248,7 +293,9 @@ mod tests {
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
 
-        let config = registry.generate_execution_config("cargo_check", 3, 0.9).unwrap();
+        let config = registry
+            .generate_execution_config("cargo_check", 3, 0.9)
+            .unwrap();
 
         assert!(config.contains("tool = cargo_check"));
         assert!(config.contains("auto_execute = true"));

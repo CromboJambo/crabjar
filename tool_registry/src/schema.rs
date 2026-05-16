@@ -1,4 +1,5 @@
 use rusqlite::{Connection, params};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -72,7 +73,7 @@ pub fn init_db(conn: &Connection) -> Result<(), ToolRegistrySchemaError> {
 pub fn register_tool(
     conn: &Connection,
     name: &str,
-    type: &str,
+    r#type: &str,
     description: &str,
     schema: &str,
     execution_policy: &str,
@@ -89,7 +90,7 @@ pub fn register_tool(
         params![
             id,
             name,
-            type,
+             r#type,
             description,
             schema,
             execution_policy,
@@ -120,7 +121,7 @@ pub fn query_tool(
         Ok(ToolRow {
             id: row.get(0)?,
             name: row.get(1)?,
-            type: row.get(2)?,
+            r#type: row.get(2)?,
             description: row.get(3)?,
             schema: row.get(4)?,
             execution_policy: row.get(5)?,
@@ -155,7 +156,7 @@ pub fn list_all_tools(
         Ok(ToolRow {
             id: row.get(0)?,
             name: row.get(1)?,
-            type: row.get(2)?,
+            r#type: row.get(2)?,
             description: row.get(3)?,
             schema: row.get(4)?,
             execution_policy: row.get(5)?,
@@ -167,15 +168,14 @@ pub fn list_all_tools(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
 
 pub fn list_tools_by_type(
     conn: &Connection,
-    type: &str,
+    r#type: &str,
     limit: usize,
 ) -> Result<Vec<ToolRow>, ToolRegistrySchemaError> {
     let mut stmt = conn.prepare(
@@ -184,14 +184,14 @@ pub fn list_tools_by_type(
          ORDER BY last_used DESC LIMIT ?2",
     )?;
 
-    let rows = stmt.query_map(params![type, limit as i64], |row| {
+    let rows = stmt.query_map(params![r#type, limit as i64], |row| {
         let metadata_str: String = row.get(10)?;
         let metadata: serde_json::Value = serde_json::from_str(&metadata_str).unwrap_or_default();
 
         Ok(ToolRow {
             id: row.get(0)?,
             name: row.get(1)?,
-            type: row.get(2)?,
+            r#type: row.get(2)?,
             description: row.get(3)?,
             schema: row.get(4)?,
             execution_policy: row.get(5)?,
@@ -203,8 +203,7 @@ pub fn list_tools_by_type(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -260,8 +259,7 @@ pub fn query_tool_usage(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -276,12 +274,7 @@ pub fn record_tool_discovery(
     conn.execute(
         "INSERT INTO tool_discovery (id, source, tool_name, metadata)
          VALUES (?1, ?2, ?3, ?4)",
-        params![
-            id,
-            source,
-            tool_name,
-            "{}",
-        ],
+        params![id, source, tool_name, "{}",],
     )?;
 
     Ok(id)
@@ -307,8 +300,7 @@ pub fn query_discovery(
         })
     })?;
 
-    let results = rows
-        .collect::<Result<Vec<_>, _>>()?;
+    let results = rows.collect::<Result<Vec<_>, _>>()?;
 
     Ok(results)
 }
@@ -318,7 +310,7 @@ pub fn query_discovery(
 pub struct ToolRow {
     pub id: String,
     pub name: String,
-    pub type: String,
+    pub r#type: String,
     pub description: String,
     pub schema: String,
     pub execution_policy: String,
@@ -381,19 +373,21 @@ mod tests {
             "cargo_check",
             "command",
             "Run cargo check on workspace",
-            '{"tool": "cargo", "args": ["check", "--workspace"]}',
+            "{\"tool\": \"cargo\", \"args\": [\"check\", \"--workspace\"]}",
             "low_risk",
             3,
             0.9,
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(!id.is_empty());
 
         let row = query_tool(&conn, "cargo_check").unwrap();
         assert!(row.is_some());
-        assert_eq!(row.unwrap().name, "cargo_check");
-        assert_eq!(row.unwrap().trust_layer, 3);
+        let r = row.as_ref().unwrap();
+        assert_eq!(r.name, "cargo_check");
+        assert_eq!(r.trust_layer, 3);
     }
 
     #[test]
@@ -408,24 +402,26 @@ mod tests {
             "cargo_check",
             "command",
             "Run cargo check on workspace",
-            '{"tool": "cargo", "args": ["check", "--workspace"]}',
+            "{\"tool\": \"cargo\", \"args\": [\"check\", \"--workspace\"]}",
             "low_risk",
             3,
             0.9,
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         register_tool(
             &conn,
             "openai_chat",
             "llm",
             "OpenAI chat completion",
-            '{"provider": "openai", "model": "gpt-4o"}',
+            "{\"provider\": \"openai\", \"model\": \"gpt-4o\"}",
             "medium_risk",
             2,
             0.7,
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         let rows = list_all_tools(&conn, 10).unwrap();
         assert_eq!(rows.len(), 2);
@@ -443,24 +439,26 @@ mod tests {
             "cargo_check",
             "command",
             "Run cargo check on workspace",
-            '{"tool": "cargo", "args": ["check", "--workspace"]}',
+            "{\"tool\": \"cargo\", \"args\": [\"check\", \"--workspace\"]}",
             "low_risk",
             3,
             0.9,
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         register_tool(
             &conn,
             "openai_chat",
             "llm",
             "OpenAI chat completion",
-            '{"provider": "openai", "model": "gpt-4o"}',
+            "{\"provider\": \"openai\", \"model\": \"gpt-4o\"}",
             "medium_risk",
             2,
             0.7,
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
         let rows = list_tools_by_type(&conn, "command", 10).unwrap();
         assert_eq!(rows.len(), 1);
@@ -479,21 +477,15 @@ mod tests {
             "cargo_check",
             "command",
             "Run cargo check on workspace",
-            '{"tool": "cargo", "args": ["check", "--workspace"]}',
+            "{\"tool\": \"cargo\", \"args\": [\"check\", \"--workspace\"]}",
             "low_risk",
             3,
             0.9,
             "{}",
-        ).unwrap();
+        )
+        .unwrap();
 
-        record_tool_usage(
-            &conn,
-            &tool_id,
-            "session-1",
-            5,
-            1.0,
-            0.5,
-        ).unwrap();
+        record_tool_usage(&conn, &tool_id, "session-1", 5, 1.0, 0.5).unwrap();
 
         let rows = query_tool_usage(&conn, &tool_id).unwrap();
         assert_eq!(rows.len(), 1);
@@ -508,11 +500,7 @@ mod tests {
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         init_db(&conn).unwrap();
 
-        let id = record_tool_discovery(
-            &conn,
-            "aur_search",
-            "spotify",
-        ).unwrap();
+        let id = record_tool_discovery(&conn, "aur_search", "spotify").unwrap();
 
         let rows = query_discovery(&conn, "aur_search", 10).unwrap();
         assert_eq!(rows.len(), 1);
