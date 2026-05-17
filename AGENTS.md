@@ -50,6 +50,12 @@ Pull requests should explain what changed and why, link relevant context, and ke
 
 Workspace config comes from `.crabjar_config.toml`; missing or malformed config is a soft failure and should leave `workspace: null`. State docs live under `state-docs/`, with overlay JSON sidecars in `state-docs/overlay/`. Detection is not authorization: observer crates may report, but must not execute actions.
 
+## Agent Autonomy Constraints
+- Agent should never execute sudo commands — present them as user-run actions
+- Detection ≠ authorization: observer reports must not trigger execution
+- Reversibility gating: destructive actions require user permission
+- Commands requiring root access are categorical user-run only
+
 ## Tool Override
 - Content search: Use Bash with `rg` (ripgrep) instead of the Grep tool
 - File search: Use Glob (NOT find or ls)
