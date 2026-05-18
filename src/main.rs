@@ -7,12 +7,17 @@ mod knowledge_store;
 mod project_loader;
 mod state_docs;
 
-use crabjar_lib::{DotfileCommand, KnowledgeCommand, GuardCommand};
+use crabjar_lib::{DotfileCommand, GuardCommand, KnowledgeCommand};
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
 use project_loader::ProjectLoader;
 use state_docs::{AnnotationKind, StateDocsManager};
+
+fn is_help_request(args: &[String]) -> bool {
+    args.iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+}
 
 /// Main CLI entry point for CrabJar
 #[tokio::main]
@@ -71,13 +76,6 @@ async fn main() {
     if exit_code != 0 {
         std::process::exit(exit_code);
     }
-}
-
-fn is_help_request(args: &[String]) -> bool {
-    matches!(
-        args.get(1).map(String::as_str),
-        Some("help" | "--help" | "-h")
-    )
 }
 
 fn print_json(response: &serde_json::Value) {
@@ -203,8 +201,8 @@ async fn handle_exec(
 
     // Config check: tool_execution_enabled must be true
     let loader = ProjectLoader::new();
-    if let Some(config) = loader.get_current_config() {
-        if !config.tool_execution_enabled {
+    if let Some(config) = loader.get_current_config()
+        && !config.tool_execution_enabled {
             return Ok(json!({
                 "success": false,
                 "exec": {
@@ -216,7 +214,6 @@ async fn handle_exec(
                 },
             }));
         }
-    }
 
     let effective_cwd = if cwd.trim().is_empty() {
         project_root.to_string_lossy().into_owned()
@@ -246,30 +243,28 @@ async fn handle_exec(
         gate_result,
         "exec",
         command,
-        &args,
+        args,
         3,
         0.9,
         Some(reason.to_string()),
     );
 
     match status {
-        crabjar_guard::ActionStatus::Denied => {
-            Ok(json!({
-                "success": false,
-                "exec": {
-                    "command": command,
-                    "args": args,
-                    "cwd": effective_cwd,
-                    "reason": reason,
-                    "gate_result": "denied",
-                    "interrupted_id": interrupted_entry.map(|e| e.id.clone()),
-                    "gate_reason": interrupted_entry.map(|e| e.reason.clone()),
-                },
-            }))
-        }
+        crabjar_guard::ActionStatus::Denied => Ok(json!({
+            "success": false,
+            "exec": {
+                "command": command,
+                "args": args,
+                "cwd": effective_cwd,
+                "reason": reason,
+                "gate_result": "denied",
+                "interrupted_id": interrupted_entry.as_ref().map(|e| e.id.clone()),
+                "gate_reason": interrupted_entry.as_ref().map(|e| e.reason.clone()),
+            },
+        })),
         crabjar_guard::ActionStatus::Pending => {
-            if let Some(entry) = pending_entry {
-            guard_db.persist_pending_queue_entry(&entry)?;
+            if let Some(ref entry) = pending_entry {
+                guard_db.persist_pending_queue_entry(entry)?;
             }
             Ok(json!({
                 "success": false,
@@ -286,7 +281,8 @@ async fn handle_exec(
         }
         crabjar_guard::ActionStatus::TrustApproved => {
             // Telemetry layer: persistent flight recorder
-            let flight_db_path = crabjar_guard::GuardDb::from_mirror_path(project_root.join("guard.db"));
+            let flight_db_path =
+                crabjar_guard::GuardDb::from_mirror_path(project_root.join("guard.db"));
             let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
             let flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
                 &flight_conn,
@@ -342,6 +338,18 @@ async fn handle_exec(
                 },
             }))
         }
+        crabjar_guard::ActionStatus::Executed | crabjar_guard::ActionStatus::Interrupted => {
+            Ok(json!({
+                "success": false,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "cwd": effective_cwd,
+                    "reason": reason,
+                    "gate_result": "unhandled",
+                },
+            }))
+        }
     }
 }
 
@@ -367,7 +375,8 @@ fn handle_guard_command(
             }))
         }
         GuardCommand::Approve { action_id } => {
-            guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::TrustApproved)?;
+            guard_db
+                .update_action_status(&action_id, crabjar_guard::ActionStatus::TrustApproved)?;
             Ok(json!({
                 "success": true,
                 "guard": {
@@ -391,7 +400,7 @@ fn handle_guard_command(
                 },
             }))
         }
-        GuardCommand::Interrupted { limit } => {
+        GuardCommand::Interrupted { limit: _ } => {
             let entries = guard_db.read_interrupted_log()?;
             Ok(json!({
                 "success": true,
