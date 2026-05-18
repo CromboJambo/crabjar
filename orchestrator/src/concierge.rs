@@ -1,34 +1,8 @@
-use crabjar_guard::{ActionStatus, GateResult};
-use serde::{Deserialize, Serialize};
+use crabjar_guard::{
+    ActionStatus, GateResult, GuardDbError, InterruptedLogEntry, PendingQueueEntry,
+};
 use tracing::{error, info, warn};
 use uuid::Uuid;
-
-/// Pending queue entry for actions requiring review.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingQueueEntry {
-    pub id: String,
-    pub gate_result_id: String,
-    pub action_type: String,
-    pub command: String,
-    pub args: Vec<String>,
-    pub trust_layer: u32,
-    pub confidence: f64,
-    pub queued_at: i64,
-    pub reason: String,
-}
-
-/// Interrupted log entry for actions blocked by the gate.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InterruptedLogEntry {
-    pub id: String,
-    pub gate_result_id: String,
-    pub action_type: String,
-    pub command: String,
-    pub args: Vec<String>,
-    pub trust_layer: u32,
-    pub reason: String,
-    pub logged_at: i64,
-}
 
 /// Gate concierge that enforces provenance boundaries on gate results.
 ///
@@ -42,9 +16,7 @@ pub struct GateConcierge {
 #[allow(dead_code)]
 impl GateConcierge {
     pub fn new() -> Self {
-        Self {
-            db: None,
-        }
+        Self { db: None }
     }
 
     pub fn with_db(mut self, db: crabjar_guard::GuardDb) -> Self {
@@ -62,6 +34,7 @@ impl GateConcierge {
         args: &[String],
         trust_layer: u32,
         confidence: f64,
+        source_event_id: Option<String>,
     ) -> (
         ActionStatus,
         Option<PendingQueueEntry>,
@@ -89,6 +62,7 @@ impl GateConcierge {
                     args: args.to_vec(),
                     trust_layer,
                     confidence,
+                    source_event_id,
                     queued_at: chrono::Utc::now().timestamp(),
                     reason,
                 };
@@ -111,6 +85,7 @@ impl GateConcierge {
                     command: command.to_string(),
                     args: args.to_vec(),
                     trust_layer,
+                    source_event_id: None,
                     reason: reason.clone(),
                     logged_at: chrono::Utc::now().timestamp(),
                 };
@@ -147,7 +122,7 @@ impl GateConcierge {
     }
 
     /// Return the interrupted log entries from GuardDb.
-    pub fn interrupted_log(&self) -> Result<Vec<InterruptedLogEntry>, crabjar_guard::GuardDbError> {
+    pub fn interrupted_log(&self) -> Result<Vec<InterruptedLogEntry>, GuardDbError> {
         if let Some(db) = &self.db {
             db.read_interrupted_log()
         } else {
@@ -174,6 +149,7 @@ mod tests {
             &["hello".to_string()],
             3,
             0.9,
+            Some("evt-1".to_string()),
         );
         assert_eq!(status, ActionStatus::TrustApproved);
         assert!(pending.is_none());
@@ -192,6 +168,7 @@ mod tests {
             &["commit".to_string(), "-m".to_string(), "test".to_string()],
             2,
             0.5,
+            Some("evt-2".to_string()),
         );
         assert_eq!(status, ActionStatus::Pending);
         assert!(pending.is_some());
@@ -214,6 +191,7 @@ mod tests {
             &["-rf".to_string(), "/tmp/test".to_string()],
             3,
             0.9,
+            Some("evt-3".to_string()),
         );
         assert_eq!(status, ActionStatus::Denied);
         assert!(pending.is_none());
@@ -234,6 +212,7 @@ mod tests {
             &["hello".to_string()],
             0,
             0.0,
+            None,
         );
         assert_eq!(status, ActionStatus::Denied);
         assert!(pending.is_none());
@@ -252,6 +231,7 @@ mod tests {
             &["-rf".to_string(), "/tmp/test".to_string()],
             2,
             0.5,
+            Some("evt-4".to_string()),
         );
         assert_eq!(status, ActionStatus::Pending);
         assert!(pending.is_some());

@@ -445,7 +445,8 @@ async fn handle_chat(
                     let tool_result = execute_tool_call(&tool_call.function.name, &args).await;
                     results.push(format!(
                         "Tool '{}' executed: {}",
-                        tool_call.function.name, tool_result
+                        tool_call.function.name,
+                        tool_result.unwrap_or_else(|e| e)
                     ));
                 }
 
@@ -470,12 +471,13 @@ async fn handle_chat(
 }
 
 /// Execute a tool call based on the function name and arguments.
-async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
+async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<String, String> {
     match function_name {
         "run_command" => {
             if args.len() < 2 {
-                return "Error: run_command requires at least 2 arguments (tool and args)"
-                    .to_string();
+                return Err(
+                    "Error: run_command requires at least 2 arguments (tool and args)".to_string(),
+                );
             }
             let tool = &args[0];
             let command_args = &args[1..];
@@ -494,7 +496,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
 
             let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
-            let mut concierge = concierge::GateConcierge::new().with_db(guard_db);
+            let mut concierge = concierge::GateConcierge::new().with_db(guard_db.clone());
 
             match gate.check(GateContext {
                 action_type: "tool_call",
@@ -506,8 +508,15 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                 can_interrupt: true,
             }) {
                 Ok(result) => {
-                    let (status, pending_entry, interrupted_entry) =
-                        concierge.enforce(result, "tool_call", tool, command_args, 2, 0.5);
+                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
+                        result,
+                        "tool_call",
+                        tool,
+                        command_args,
+                        2,
+                        0.5,
+                        Some("orchestrator-tc".to_string()),
+                    );
 
                     match status {
                         ActionStatus::TrustApproved => {
@@ -524,13 +533,13 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                                     "Gate concierge: Pending → PendingQueue — queued for review"
                                 );
                             }
-                            return format!(
+                            return Err(format!(
                                 "Pending: queued for review (pending_id: {})",
                                 pending_entry
                                     .as_ref()
                                     .map(|e| e.id.clone())
                                     .unwrap_or_default()
-                            );
+                            ));
                         }
                         ActionStatus::Denied => {
                             if let Some(ref entry) = interrupted_entry {
@@ -541,7 +550,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                                     "Gate concierge: Interrupted → InterruptedLog"
                                 );
                             }
-                            return format!(
+                            return Err(format!(
                                 "Interrupted: {} (interrupted_id: {})",
                                 interrupted_entry
                                     .as_ref()
@@ -551,28 +560,30 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                                     .as_ref()
                                     .map(|e| e.id.clone())
                                     .unwrap_or_default()
-                            );
+                            ));
                         }
                         ActionStatus::Executed | ActionStatus::Interrupted => {
-                            return "Status not handled by concierge".to_string();
+                            return Err("Status not handled by concierge".to_string());
                         }
                     }
                 }
                 Err(e) => {
                     error!("Security gate error: {}", e);
-                    return format!("Security gate error: {}", e);
+                    return Err(format!("Security gate error: {}", e));
                 }
             }
 
             // Telemetry layer: flight recorder capture
-            let flight_db_path = crabjar_guard::GuardDb::from_mirror_path(format!("{}/mirror.db", &guard_root));
+            let flight_db_path =
+                crabjar_guard::GuardDb::from_mirror_path(format!("{}/mirror.db", &guard_root));
             let flight_conn = rusqlite::Connection::open(&flight_db_path)
                 .map_err(|e| format!("Flight DB open error: {}", e))?;
             let flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
                 &flight_conn,
                 "orchestrator-session",
             );
-            flight_recorder.init()
+            flight_recorder
+                .init()
                 .map_err(|e| format!("Flight recorder init error: {}", e))?;
 
             let mut child = match tokio::process::Command::new(tool)
@@ -583,7 +594,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
             {
                 Ok(child) => child,
                 Err(e) => {
-                    return format!("Error spawning command: {}", e);
+                    return Err(format!("Error spawning command: {}", e));
                 }
             };
 
@@ -636,14 +647,14 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                 }
             }
 
-            output
+            Ok(output)
         }
         "search_logs" => {
             let search_req: SearchLogsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
                     Ok(req) => req,
                     Err(e) => {
-                        return format!("Error parsing search_logs arguments: {}", e);
+                        return Err(format!("Error parsing search_logs arguments: {}", e));
                     }
                 };
 
@@ -653,14 +664,14 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
             let conn = match local_log::init_db(&db_path) {
                 Ok(conn) => conn,
                 Err(e) => {
-                    return format!("Error initializing event database: {}", e);
+                    return Err(format!("Error initializing event database: {}", e));
                 }
             };
 
             let events = match local_log::search(&conn, &search_req.term) {
                 Ok(events) => events,
                 Err(e) => {
-                    return format!("Error searching events: {}", e);
+                    return Err(format!("Error searching events: {}", e));
                 }
             };
 
@@ -681,14 +692,14 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                 ));
             }
 
-            output
+            Ok(output)
         }
         "recent_events" => {
             let recent_req: RecentEventsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
                     Ok(req) => req,
                     Err(e) => {
-                        return format!("Error parsing recent_events arguments: {}", e);
+                        return Err(format!("Error parsing recent_events arguments: {}", e));
                     }
                 };
 
@@ -698,14 +709,14 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
             let conn = match local_log::init_db(&db_path) {
                 Ok(conn) => conn,
                 Err(e) => {
-                    return format!("Error initializing event database: {}", e);
+                    return Err(format!("Error initializing event database: {}", e));
                 }
             };
 
             let events = match local_log::recent(&conn, Some(recent_req.limit)) {
                 Ok(events) => events,
                 Err(e) => {
-                    return format!("Error fetching recent events: {}", e);
+                    return Err(format!("Error fetching recent events: {}", e));
                 }
             };
 
@@ -722,14 +733,14 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                 ));
             }
 
-            output
+            Ok(output)
         }
         "by_source" => {
             let source_req: BySourceRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
                     Ok(req) => req,
                     Err(e) => {
-                        return format!("Error parsing by_source arguments: {}", e);
+                        return Err(format!("Error parsing by_source arguments: {}", e));
                     }
                 };
 
@@ -739,14 +750,14 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
             let conn = match local_log::init_db(&db_path) {
                 Ok(conn) => conn,
                 Err(e) => {
-                    return format!("Error initializing event database: {}", e);
+                    return Err(format!("Error initializing event database: {}", e));
                 }
             };
 
             let events = match local_log::by_source(&conn, &source_req.source, source_req.limit) {
                 Ok(events) => events,
                 Err(e) => {
-                    return format!("Error fetching events by source: {}", e);
+                    return Err(format!("Error fetching events by source: {}", e));
                 }
             };
 
@@ -763,9 +774,9 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                 ));
             }
 
-            output
+            Ok(output)
         }
-        _ => format!("Unknown tool: {}", function_name),
+        _ => Ok(format!("Unknown tool: {}", function_name)),
     }
 }
 
