@@ -480,7 +480,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
             let tool = &args[0];
             let command_args = &args[1..];
 
-            // Security layer: check command before execution.
+            // Security layer: check command before execution with provenance.
             let guard_root = std::env::var("MIRROR_GUARD_ROOT")
                 .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
 
@@ -494,7 +494,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
 
             let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
-            let mut concierge = concierge::GateConcierge::new();
+            let mut concierge = concierge::GateConcierge::new().with_db(guard_db);
 
             match gate.check(GateContext {
                 action_type: "tool_call",
@@ -502,9 +502,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                 args: command_args.to_vec(),
                 trust_layer: 2,
                 confidence: crabjar_guard::TrustScore::new(0.5),
-                source_event_id: None,
-                has_raw_data: true,
-                has_uncertainty: true,
+                source_event_id: Some("orchestrator-tc"),
                 can_interrupt: true,
             }) {
                 Ok(result) => {
@@ -566,12 +564,18 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
                 }
             }
 
-            info!(
-                "Executing tool call: {} with args: {:?}",
-                tool, command_args
+            // Telemetry layer: flight recorder capture
+            let flight_db_path = crabjar_guard::GuardDb::from_mirror_path(format!("{}/mirror.db", &guard_root));
+            let flight_conn = rusqlite::Connection::open(&flight_db_path)
+                .map_err(|e| format!("Flight DB open error: {}", e))?;
+            let flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
+                &flight_conn,
+                "orchestrator-session",
             );
+            flight_recorder.init()
+                .map_err(|e| format!("Flight recorder init error: {}", e))?;
 
-            let mut child = match Command::new(tool)
+            let mut child = match tokio::process::Command::new(tool)
                 .args(command_args)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
@@ -586,8 +590,8 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> String {
             let stdout = child.stdout.take().expect("Failed to take stdout");
             let stderr = child.stderr.take().expect("Failed to take stderr");
 
-            let mut stdout_reader = BufReader::new(stdout).lines();
-            let mut stderr_reader = BufReader::new(stderr).lines();
+            let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
+            let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
 
             let mut output = String::new();
 
