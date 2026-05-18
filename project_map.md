@@ -201,7 +201,7 @@ Crabjar is a pure observer. It knows what happened but cannot change what happen
 
 ### Executor Layer Status
 
-Runtime execution is intentionally disabled in this stripped-down build. The guard + telemetry + orchestrator infrastructure is built but not wired into a CLI command.
+Runtime execution is executor-capable. Execution is opt-in via `.crabjar_config.toml` `tool_execution_enabled`. The single pipeline is: `request → guard → concierge → telemetry → outcome → trust update`. Pending actions persist to GuardDb. All actions require real provenance lookup.
 
 ### Doubt Output Requirement
 

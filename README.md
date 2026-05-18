@@ -37,7 +37,6 @@ cargo test --workspace
 - `cargo build -p crabjar` should pass.
 - `cargo test --workspace` should pass.
 - `cargo run -p crabjar -- --help` returns structured JSON.
-- Runtime tool execution is intentionally disabled in this stripped-down build.
 - `state-docs/` is the supported feature surface for local project memory and annotations.
 - All supported CLI responses are structured JSON on stdout, including help and error paths.
 
@@ -45,7 +44,7 @@ cargo test --workspace
 
 ### Detection ≠ Authorization
 
-Crabjar is a pure observer. It knows what happened but cannot change what happens. This is enforced by design — no pipeline execution, no file modification beyond append-only overlays.
+Crabjar is an executor-capable CLI with a guard boundary. Execution is opt-in via `.crabjar_config.toml` `tool_execution_enabled`. The guard gate requires real provenance lookup before any action proceeds.
 
 ### Doubt Output Requirement
 

@@ -41,7 +41,7 @@ To maintain high-quality collaboration, the agent will communicate its internal 
 
 ## Agent Autonomy
 
-Runtime execution is disabled in the current stripped-down build. Reversibility scoring and autonomous execution are reserved for future reintroduction of the executor layer.
+Runtime execution is executor-capable. Execution is opt-in via `.crabjar_config.toml` `tool_execution_enabled`. All actions pass through guard gate, concierge queue, and telemetry pipeline. Reversibility scoring is reserved for future reintroduction of autonomous execution.
 
 ### Reversibility Scoring (reserved for future)
 - scan tool calls for reversibility (undo path, data integrity, state preservation)
