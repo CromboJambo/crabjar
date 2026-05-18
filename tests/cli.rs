@@ -581,7 +581,10 @@ tool_execution_enabled = true
     )
     .unwrap();
 
-    let output = run_in(&temp, &["exec", "--command=true", "--reason=review", "--dry-run"]);
+    let output = run_in(
+        &temp,
+        &["exec", "--command=true", "--reason=review", "--dry-run"],
+    );
     assert!(output.status.success());
 
     let body = json_stdout(&output);
