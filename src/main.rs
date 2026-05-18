@@ -7,7 +7,7 @@ mod knowledge_store;
 mod project_loader;
 mod state_docs;
 
-use crabjar_lib::{DotfileCommand, KnowledgeCommand};
+use crabjar_lib::{DotfileCommand, KnowledgeCommand, GuardCommand};
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
@@ -44,6 +44,8 @@ async fn main() {
         Some(CliCommand::Workspace {
             command: WorkspaceCommand::Status,
         }) => handle_workspace_status().await,
+        Some(CliCommand::Guard { command }) => handle_guard_command(command)
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Exec {
             command,
             args,
@@ -177,7 +179,7 @@ async fn handle_workspace_status() -> serde_json::Value {
                     "name": config.workspace_name,
                     "description": config.description,
                     "declared_tools": config.tools.len(),
-                    "tool_execution_enabled": false,
+                    "tool_execution_enabled": config.tool_execution_enabled,
                 }
             });
         }
@@ -198,6 +200,24 @@ async fn handle_exec(
     dry_run: bool,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let project_root = std::env::current_dir()?;
+
+    // Config check: tool_execution_enabled must be true
+    let loader = ProjectLoader::new();
+    if let Some(config) = loader.get_current_config() {
+        if !config.tool_execution_enabled {
+            return Ok(json!({
+                "success": false,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "reason": reason,
+                    "gate_result": "denied",
+                    "reason": "tool_execution_enabled is false in config",
+                },
+            }));
+        }
+    }
+
     let effective_cwd = if cwd.trim().is_empty() {
         project_root.to_string_lossy().into_owned()
     } else {
@@ -205,8 +225,8 @@ async fn handle_exec(
     };
 
     // Guard layer: gate check before execution
-    let guard_db = crabjar_guard::GuardDb::open(":memory:")
-        .unwrap_or_else(|_| crabjar_guard::GuardDb::open(project_root.join("guard.db")).unwrap());
+    let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard.db"))
+        .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").expect("guard db fallback"));
 
     let gate = crabjar_guard::ExecutionGate::new(&guard_db, dry_run, &project_root);
 
@@ -216,52 +236,57 @@ async fn handle_exec(
         args: args.to_vec(),
         trust_layer: 3,
         confidence: crabjar_guard::TrustScore::new(0.9),
-        source_event_id: None,
-        has_raw_data: true,
-        has_uncertainty: true,
+        source_event_id: Some(reason),
         can_interrupt: true,
     })?;
 
-    match gate_result {
-        crabjar_guard::GateResult::DryRun => Ok(json!({
-            "success": true,
-            "exec": {
-                "dry_run": true,
-                "command": command,
-                "args": args,
-                "cwd": effective_cwd,
-                "reason": reason,
-                "gate_result": "dry_run",
-            },
-        })),
-        crabjar_guard::GateResult::Interrupted {
-            reason: gate_reason,
-        } => Ok(json!({
-            "success": false,
-            "exec": {
-                "command": command,
-                "args": args,
-                "cwd": effective_cwd,
-                "reason": reason,
-                "gate_result": "interrupted",
-                "gate_reason": gate_reason,
-            },
-        })),
-        crabjar_guard::GateResult::Pending => Ok(json!({
-            "success": false,
-            "exec": {
-                "command": command,
-                "args": args,
-                "cwd": effective_cwd,
-                "reason": reason,
-                "gate_result": "pending",
-                "requires_review": true,
-            },
-        })),
-        crabjar_guard::GateResult::Proceed => {
-            // Telemetry layer: flight recorder capture
-            let dir = tempfile::tempdir()?;
-            let flight_db_path = dir.path().join("flight.db");
+    // Concierge layer: persist gate result to GuardDb
+    let mut concierge = crabjar_guard::GateConcierge::default();
+    let (status, pending_entry, interrupted_entry) = concierge.enforce(
+        gate_result,
+        "exec",
+        command,
+        &args,
+        3,
+        0.9,
+        Some(reason.to_string()),
+    );
+
+    match status {
+        crabjar_guard::ActionStatus::Denied => {
+            Ok(json!({
+                "success": false,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "cwd": effective_cwd,
+                    "reason": reason,
+                    "gate_result": "denied",
+                    "interrupted_id": interrupted_entry.map(|e| e.id.clone()),
+                    "gate_reason": interrupted_entry.map(|e| e.reason.clone()),
+                },
+            }))
+        }
+        crabjar_guard::ActionStatus::Pending => {
+            if let Some(entry) = pending_entry {
+            guard_db.persist_pending_queue_entry(&entry)?;
+            }
+            Ok(json!({
+                "success": false,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "cwd": effective_cwd,
+                    "reason": reason,
+                    "gate_result": "pending",
+                    "requires_review": true,
+                    "pending_id": pending_entry.map(|e| e.id.clone()),
+                },
+            }))
+        }
+        crabjar_guard::ActionStatus::TrustApproved => {
+            // Telemetry layer: persistent flight recorder
+            let flight_db_path = crabjar_guard::GuardDb::from_mirror_path(project_root.join("guard.db"));
             let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
             let flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
                 &flight_conn,
@@ -273,11 +298,32 @@ async fn handle_exec(
                 .execute_command(command, args, &effective_cwd, reason)
                 .await?;
 
+            let records = flight_recorder.query_records(1)?;
+            let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
+
             let git_dirty = flight_recorder.capture_git_dirty(&effective_cwd).await?;
             let git_diff = flight_recorder.capture_git_diff(&effective_cwd).await?;
 
-            let records = flight_recorder.query_records(1)?;
-            let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
+            // Outcome layer: record in GuardDb action_outcomes
+            let outcome_id = crabjar_guard::GuardDb::open(&flight_db_path)
+                .ok()
+                .map(|db| {
+                    let conn = db.conn();
+                    let id = uuid::Uuid::new_v4().to_string();
+                    conn.execute(
+                        "INSERT INTO action_outcomes (id, action_id, success, exit_code, output_hash, confidence_delta, created_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, unixepoch())",
+                        rusqlite::params![
+                            id,
+                            cmd_id,
+                            exit_code != -1,
+                            exit_code,
+                            git_diff,
+                            0.02,
+                        ],
+                    )
+                })
+                .map(|_| uuid::Uuid::new_v4().to_string());
 
             Ok(json!({
                 "success": true,
@@ -291,7 +337,80 @@ async fn handle_exec(
                     "gate_result": "proceed",
                     "git_dirty": git_dirty,
                     "git_diff_hash": git_diff,
+                    "outcome_id": outcome_id,
                     "flight_recorder": true,
+                },
+            }))
+        }
+    }
+}
+
+/// Handle guard commands
+fn handle_guard_command(
+    command: GuardCommand,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let project_root = std::env::current_dir()?;
+    let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard.db"))
+        .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").expect("guard db fallback"));
+
+    match command {
+        GuardCommand::Queue { status, limit } => {
+            let requests = guard_db.read_action_requests(Some(&status), limit)?;
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "queue": {
+                        "status": status,
+                        "entries": requests,
+                    },
+                },
+            }))
+        }
+        GuardCommand::Approve { action_id } => {
+            guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::TrustApproved)?;
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "approve": {
+                        "action_id": action_id,
+                        "status": "trust-approved",
+                    },
+                },
+            }))
+        }
+        GuardCommand::Reject { action_id, reason } => {
+            guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::Denied)?;
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "reject": {
+                        "action_id": action_id,
+                        "reason": reason,
+                        "status": "denied",
+                    },
+                },
+            }))
+        }
+        GuardCommand::Interrupted { limit } => {
+            let entries = guard_db.read_interrupted_log()?;
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "interrupted": {
+                        "entries": entries,
+                    },
+                },
+            }))
+        }
+        GuardCommand::Provenance { source_event_id } => {
+            let exists = guard_db.verify_provenance(&source_event_id)?;
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "provenance": {
+                        "source_event_id": source_event_id,
+                        "exists": exists,
+                    },
                 },
             }))
         }

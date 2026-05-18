@@ -41,6 +41,12 @@ pub enum CliCommand {
         command: WorkspaceCommand,
     },
 
+    /// Guard: pending queue management and provenance verification
+    Guard {
+        #[command(subcommand)]
+        command: GuardCommand,
+    },
+
     /// Execute command with guard + telemetry
     Exec {
         #[arg(long)]
@@ -127,6 +133,39 @@ pub enum DotfileCommand {
 pub enum WorkspaceCommand {
     /// Show workspace configuration status
     Status,
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum GuardCommand {
+    /// List pending queue entries
+    Queue {
+        #[arg(long, default_value = "pending")]
+        status: String,
+        #[arg(long, default_value = "50")]
+        limit: usize,
+    },
+    /// Approve a pending action
+    Approve {
+        #[arg(long)]
+        action_id: String,
+    },
+    /// Reject a pending action
+    Reject {
+        #[arg(long)]
+        action_id: String,
+        #[arg(long, default_value = "reviewed")]
+        reason: String,
+    },
+    /// List interrupted log entries
+    Interrupted {
+        #[arg(long, default_value = "50")]
+        limit: usize,
+    },
+    /// Verify provenance for a source event ID
+    Provenance {
+        #[arg(long)]
+        source_event_id: String,
+    },
 }
 
 pub fn cli() -> clap::Command {

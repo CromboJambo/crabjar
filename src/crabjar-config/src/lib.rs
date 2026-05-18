@@ -34,6 +34,8 @@ pub struct ProjectConfig {
     pub tools: Vec<ToolDefinition>,
     #[serde(default, rename = "keybindings")]
     pub keybindings: HashMap<String, String>,
+    #[serde(default)]
+    pub tool_execution_enabled: bool,
     #[serde(default = "default_true", skip_serializing_if = "bool::clone")]
     pub auto_register: bool,
 }
@@ -85,6 +87,7 @@ pub struct ProjectConfigBuilder {
     knowledge_store_path: Option<String>,
     tools: Vec<ToolDefinition>,
     keybindings: HashMap<String, String>,
+    tool_execution_enabled: bool,
     auto_register: bool,
 }
 
@@ -129,6 +132,7 @@ impl ProjectConfigBuilder {
             knowledge_store_path: self.knowledge_store_path,
             tools: self.tools,
             keybindings: self.keybindings,
+            tool_execution_enabled: self.tool_execution_enabled,
             auto_register: self.auto_register,
         })
     }
