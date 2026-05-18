@@ -236,6 +236,73 @@ impl GuardDb {
             .collect::<Result<_, _>>()?;
         Ok(entries)
     }
+
+    pub fn verify_provenance(&self, source_event_id: &str) -> Result<bool, GuardDbError> {
+        let conn = self.conn.lock().unwrap();
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM action_requests WHERE source_event_id = ?1)",
+                params![source_event_id],
+                |r| r.get(0),
+            )
+            .map_err(|_| GuardDbError::SchemaError("Provenance check failed".into()))?;
+        Ok(exists)
+    }
+
+    pub fn read_action_requests(&self, status: Option<&str>, limit: usize) -> Result<Vec<ActionRequest>, GuardDbError> {
+        let conn = self.conn.lock().unwrap();
+        let status_filter = if let Some(s) = status {
+            format!(" WHERE status = '{}'", s)
+        } else {
+            String::new()
+        };
+        let mut stmt = conn.prepare(
+            &format!(
+                "SELECT id, source_event_id, source_node_id, action_type, payload, trust_layer, confidence, status, gate_result, requested_at, resolved_at FROM action_requests{} ORDER BY requested_at DESC LIMIT ?1",
+                status_filter
+            )
+        )?;
+        let entries: Vec<ActionRequest> = stmt
+            .query_map(params![limit as i64], |row| {
+                Ok(ActionRequest {
+                    id: row.get(0)?,
+                    source_event_id: row.get(1)?,
+                    source_node_id: row.get(2)?,
+                    action_type: row.get(3)?,
+                    payload: row.get(4)?,
+                    trust_layer: row.get(5)?,
+                    confidence: crate::types::TrustScore::new(
+                        row
+                            .get::<_, String>(6)?
+                            .parse::<f64>()
+                            .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
+                            .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
+                    ),
+                    status: match row.get::<_, String>(7)?.as_str() {
+                        "pending" => crate::types::ActionStatus::Pending,
+                        "trust-approved" => crate::types::ActionStatus::TrustApproved,
+                        "denied" => crate::types::ActionStatus::Denied,
+                        "executed" => crate::types::ActionStatus::Executed,
+                        "interrupted" => crate::types::ActionStatus::Interrupted,
+                        _ => crate::types::ActionStatus::Pending,
+                    },
+                    gate_result: row.get(8)?,
+                    requested_at: row.get(9)?,
+                    resolved_at: row.get(10)?,
+                })
+            })?
+            .collect::<Result<_, _>>()?;
+        Ok(entries)
+    }
+
+    pub fn update_action_status(&self, action_id: &str, new_status: ActionStatus) -> Result<(), GuardDbError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE action_requests SET status = ?, resolved_at = unixepoch() WHERE id = ?",
+            params![format!("{}", new_status), action_id],
+        )?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

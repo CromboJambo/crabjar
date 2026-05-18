@@ -60,23 +60,21 @@ impl<'a> ExecutionGate<'a> {
             return Ok(GateResult::DryRun);
         }
 
-        // 2. Raw data reference check
-        if !ctx.has_raw_data {
-            let reason = "Action triggered without raw data reference; detection != authorization"
+        // 2. Provenance verification: source_event_id must exist in action_requests
+        let provenance_exists = if let Some(id) = ctx.source_event_id {
+            self.verify_provenance(id)?
+        } else {
+            false
+        };
+
+        if !provenance_exists {
+            let reason = "No provenance found in GuardDb; detection != authorization"
                 .to_string();
             warn!(action = %ctx.action_type, %reason, "Gate interrupted");
             return Ok(GateResult::Interrupted { reason });
         }
 
-        // 3. Uncertainty exposure
-        if !ctx.has_uncertainty {
-            let reason =
-                "Action triggered without uncertainty exposure; gate not enforced".to_string();
-            warn!(action = %ctx.action_type, %reason, "Gate interrupted");
-            return Ok(GateResult::Interrupted { reason });
-        }
-
-        // 4. Confidence threshold
+        // 3. Confidence threshold
         if ctx.confidence.get() < self.risk_config.confidence_floor {
             let reason = format!(
                 "Confidence {:.3} below floor {:.3}; must surface before execution",
@@ -92,7 +90,7 @@ impl<'a> ExecutionGate<'a> {
             return Ok(GateResult::Interrupted { reason });
         }
 
-        // 5. Interruptibility check
+        // 4. Interruptibility check
         if !ctx.can_interrupt {
             let reason =
                 "Action cannot be interrupted; gate safety requirement not met".to_string();
@@ -121,7 +119,7 @@ impl<'a> ExecutionGate<'a> {
             return Ok(GateResult::Interrupted { reason });
         }
 
-        // 6. Command risk assessment (from existing guard logic)
+        // 6. Command risk assessment
         let risk = self.assess_command_risk(ctx.command, &ctx.args);
         match risk {
             CommandRisk::High => {
@@ -148,6 +146,19 @@ impl<'a> ExecutionGate<'a> {
         }
 
         Ok(GateResult::Proceed)
+    }
+
+    /// Verify provenance: source_event_id exists in GuardDb action_requests.
+    fn verify_provenance(&self, id: &str) -> Result<bool, GuardDbError> {
+        let conn = self.trust.conn();
+        let exists: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM action_requests WHERE source_event_id = ?1)",
+                rusqlite::params![id],
+                |r| r.get(0),
+            )
+            .map_err(|_| GuardDbError::SchemaError("Provenance check failed".into()))?;
+        Ok(exists)
     }
 
     /// Assess command risk based on name and arguments.
@@ -182,8 +193,6 @@ pub struct GateContext<'a> {
     pub trust_layer: u32,
     pub confidence: TrustScore,
     pub source_event_id: Option<&'a str>,
-    pub has_raw_data: bool,
-    pub has_uncertainty: bool,
     pub can_interrupt: bool,
 }
 
@@ -302,6 +311,23 @@ mod tests {
     fn test_gate_proceeds_for_trusted_action() {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "test-action-1",
+                "evt-1",
+                "echo",
+                "hello",
+                3,
+                0.9,
+                "trust-approved",
+            ],
+        )
+        .unwrap();
+
         let gate = ExecutionGate::new(&db, false, dir.path());
 
         let ctx = GateContext {
@@ -310,9 +336,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("evt-1"),
-            has_raw_data: true,
-            has_uncertainty: true,
+            source_event_id: Some("evt-1".to_string()),
             can_interrupt: true,
         };
 
@@ -324,6 +348,23 @@ mod tests {
     fn test_gate_pending_for_working_layer() {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "test-action-2",
+                "evt-2",
+                "echo",
+                "hello",
+                2,
+                0.65,
+                "trust-approved",
+            ],
+        )
+        .unwrap();
+
         let gate = ExecutionGate::new(&db, false, dir.path());
 
         let ctx = GateContext {
@@ -332,9 +373,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 2,
             confidence: TrustScore::new(0.65),
-            source_event_id: Some("evt-2"),
-            has_raw_data: true,
-            has_uncertainty: true,
+            source_event_id: Some("evt-2".to_string()),
             can_interrupt: true,
         };
 
@@ -343,31 +382,26 @@ mod tests {
     }
 
     #[test]
-    fn test_gate_interrupts_without_raw_data() {
-        let dir = tempdir().unwrap();
-        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
-        let gate = ExecutionGate::new(&db, false, dir.path());
-
-        let ctx = GateContext {
-            action_type: "echo",
-            command: "echo",
-            args: vec!["hello".to_string()],
-            trust_layer: 2,
-            confidence: TrustScore::new(0.65),
-            source_event_id: Some("evt-3"),
-            has_raw_data: false,
-            has_uncertainty: true,
-            can_interrupt: true,
-        };
-
-        let result = gate.check(ctx).unwrap();
-        assert!(matches!(result, GateResult::Interrupted { .. }));
-    }
-
-    #[test]
     fn test_gate_pending_for_low_trust() {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "test-action-4",
+                "evt-4",
+                "echo",
+                "hello",
+                0,
+                0.65,
+                "trust-approved",
+            ],
+        )
+        .unwrap();
+
         let gate = ExecutionGate::new(&db, false, dir.path());
 
         let ctx = GateContext {
@@ -376,9 +410,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 0,
             confidence: TrustScore::new(0.65),
-            source_event_id: Some("evt-4"),
-            has_raw_data: true,
-            has_uncertainty: true,
+            source_event_id: Some("evt-4".to_string()),
             can_interrupt: true,
         };
 
@@ -398,9 +430,7 @@ mod tests {
             args: vec!["-rf".to_string(), "/".to_string()],
             trust_layer: 0,
             confidence: TrustScore::new(0.65),
-            source_event_id: None,
-            has_raw_data: false,
-            has_uncertainty: false,
+            source_event_id: Some("evt-dry-run".to_string()),
             can_interrupt: false,
         };
 
@@ -412,6 +442,23 @@ mod tests {
     fn test_high_risk_command_blocked() {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "test-action-5",
+                "evt-5",
+                "rm",
+                "-rf /tmp/test",
+                3,
+                0.9,
+                "trust-approved",
+            ],
+        )
+        .unwrap();
+
         let gate = ExecutionGate::new(&db, false, dir.path());
 
         let ctx = GateContext {
@@ -420,9 +467,7 @@ mod tests {
             args: vec!["-rf".to_string(), "/tmp/test".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("evt-5"),
-            has_raw_data: true,
-            has_uncertainty: true,
+            source_event_id: Some("evt-5".to_string()),
             can_interrupt: true,
         };
 
@@ -434,6 +479,23 @@ mod tests {
     fn test_medium_risk_command_pending() {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "test-action-6",
+                "evt-6",
+                "git",
+                "commit -m test",
+                3,
+                0.9,
+                "trust-approved",
+            ],
+        )
+        .unwrap();
+
         let gate = ExecutionGate::new(&db, false, dir.path());
 
         let ctx = GateContext {
@@ -442,9 +504,7 @@ mod tests {
             args: vec!["commit".to_string(), "-m".to_string(), "test".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("evt-6"),
-            has_raw_data: true,
-            has_uncertainty: true,
+            source_event_id: Some("evt-6".to_string()),
             can_interrupt: true,
         };
 
@@ -464,14 +524,69 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.1),
-            source_event_id: Some("evt-7"),
-            has_raw_data: true,
-            has_uncertainty: true,
+            source_event_id: Some("evt-7".to_string()),
             can_interrupt: true,
         };
 
         let result = gate.check(ctx).unwrap();
         assert!(matches!(result, GateResult::Interrupted { .. }));
+    }
+
+    #[test]
+    fn test_gate_denies_missing_provenance() {
+        let dir = tempdir().unwrap();
+        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let gate = ExecutionGate::new(&db, false, dir.path());
+
+        let ctx = GateContext {
+            action_type: "echo",
+            command: "echo",
+            args: vec!["hello".to_string()],
+            trust_layer: 3,
+            confidence: TrustScore::new(0.9),
+            source_event_id: Some("nonexistent-provenance".to_string()),
+            can_interrupt: true,
+        };
+
+        let result = gate.check(ctx).unwrap();
+        assert!(matches!(result, GateResult::Interrupted { .. }));
+    }
+
+    #[test]
+    fn test_gate_proceeds_with_valid_provenance() {
+        let dir = tempdir().unwrap();
+        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+        let conn = db.conn();
+        conn.execute(
+            "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                "test-action-1",
+                "evt-1",
+                "echo",
+                "hello",
+                3,
+                0.9,
+                "trust-approved",
+            ],
+        )
+        .unwrap();
+
+        let gate = ExecutionGate::new(&db, false, dir.path());
+
+        let ctx = GateContext {
+            action_type: "echo",
+            command: "echo",
+            args: vec!["hello".to_string()],
+            trust_layer: 3,
+            confidence: TrustScore::new(0.9),
+            source_event_id: Some("evt-1".to_string()),
+            can_interrupt: true,
+        };
+
+        let result = gate.check(ctx).unwrap();
+        assert_eq!(result, GateResult::Proceed);
     }
 
     #[test]

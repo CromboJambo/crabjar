@@ -229,6 +229,11 @@ impl<'a> TrustManager<'a> {
         Ok(new_score)
     }
 
+    /// Get the guard DB connection.
+    pub fn conn(&self) -> std::sync::MutexGuard<'_, rusqlite::Connection> {
+        self.db.conn()
+    }
+
     /// Decay a node's confidence based on time and usage.
     pub fn decay(&self, node_id: &str, rate: f64) -> Result<TrustScore, GuardDbError> {
         let config = self.db.load_anneal_config()?;
