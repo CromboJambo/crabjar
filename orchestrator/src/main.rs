@@ -376,6 +376,7 @@ async fn handle_prompt(Json(payload): Json<PromptRequest>) -> Json<AcpResponse> 
 }
 
 /// Handler for chat requests that queries the LLM via LM Studio.
+#[axum::debug_handler]
 async fn handle_chat(
     Json(payload): Json<ChatRequest>,
 ) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
@@ -572,19 +573,6 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                     return Err(format!("Security gate error: {}", e));
                 }
             }
-
-            // Telemetry layer: flight recorder capture
-            let flight_db_path =
-                crabjar_guard::GuardDb::from_mirror_path(format!("{}/mirror.db", &guard_root));
-            let flight_conn = rusqlite::Connection::open(&flight_db_path)
-                .map_err(|e| format!("Flight DB open error: {}", e))?;
-            let flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
-                &flight_conn,
-                "orchestrator-session",
-            );
-            flight_recorder
-                .init()
-                .map_err(|e| format!("Flight recorder init error: {}", e))?;
 
             let mut child = match tokio::process::Command::new(tool)
                 .args(command_args)
