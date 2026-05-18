@@ -276,6 +276,26 @@ auto_register = false
 }
 
 #[test]
+fn workspace_status_with_tool_execution_enabled_true() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(
+        temp.path().join(".crabjar_config.toml"),
+        r#"
+name = "exec-workspace"
+tool_execution_enabled = true
+"#,
+    )
+    .unwrap();
+
+    let output = run_in(&temp, &["workspace", "status"]);
+    assert!(output.status.success());
+
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], true);
+    assert_eq!(body["workspace"]["tool_execution_enabled"], true);
+}
+
+#[test]
 fn knowledge_sync_and_query_return_json() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
@@ -527,4 +547,104 @@ fn resolve_annotation_deactivates_derived_knowledge() {
     )
     .unwrap();
     assert_eq!(overlay["entries"][0]["status"], "resolved");
+}
+
+#[test]
+fn exec_denied_when_tool_execution_enabled_is_false() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(
+        temp.path().join(".crabjar_config.toml"),
+        r#"
+name = "no-exec"
+tool_execution_enabled = false
+"#,
+    )
+    .unwrap();
+
+    let output = run_in(&temp, &["exec", "--command=true", "--reason=review"]);
+    assert!(!output.status.success());
+
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], false);
+    assert_eq!(body["exec"]["gate_result"], "denied");
+}
+
+#[test]
+fn exec_proceeds_when_tool_execution_enabled_is_true() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(
+        temp.path().join(".crabjar_config.toml"),
+        r#"
+name = "exec-enabled"
+tool_execution_enabled = true
+"#,
+    )
+    .unwrap();
+
+    let output = run_in(&temp, &["exec", "--command=true", "--reason=review", "--dry-run"]);
+    assert!(output.status.success());
+
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], true);
+    assert_eq!(body["exec"]["gate_result"], "dry_run");
+}
+
+#[test]
+fn guard_queue_list_returns_pending_entries() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(
+        temp.path().join(".crabjar_config.toml"),
+        r#"
+name = "guard-test"
+tool_execution_enabled = true
+"#,
+    )
+    .unwrap();
+
+    let output = run_in(&temp, &["guard", "queue", "--status=pending"]);
+    assert!(output.status.success());
+
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], true);
+    assert!(body["guard"]["queue"]["entries"].is_array());
+}
+
+#[test]
+fn guard_provenance_verify_returns_exists() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(
+        temp.path().join(".crabjar_config.toml"),
+        r#"
+name = "provenance-test"
+tool_execution_enabled = true
+"#,
+    )
+    .unwrap();
+
+    let output = run_in(&temp, &["guard", "provenance", "--source-event-id=test-id"]);
+    assert!(output.status.success());
+
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], true);
+    assert!(body["guard"]["provenance"]["exists"].is_boolean());
+}
+
+#[test]
+fn workspace_status_reflects_execution_mode() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::write(
+        temp.path().join(".crabjar_config.toml"),
+        r#"
+name = "exec-workspace"
+tool_execution_enabled = true
+"#,
+    )
+    .unwrap();
+
+    let output = run_in(&temp, &["workspace", "status"]);
+    assert!(output.status.success());
+
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], true);
+    assert_eq!(body["workspace"]["tool_execution_enabled"], true);
 }
