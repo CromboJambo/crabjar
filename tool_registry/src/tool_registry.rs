@@ -119,36 +119,6 @@ impl<'a> ToolRegistry<'a> {
         query_discovery(self.conn, source, limit).map_err(ToolRegistryError::Schema)
     }
 
-    /// Generate tool execution configuration.
-    pub fn generate_execution_config(
-        &self,
-        tool_name: &str,
-        trust_layer: u32,
-        confidence: f64,
-    ) -> Result<String, ToolRegistryError> {
-        let mut config = String::new();
-        config.push_str(&format!("tool = {}\n", tool_name));
-        config.push_str(&format!("trust_layer = {}\n", trust_layer));
-        config.push_str(&format!("confidence = {}\n", confidence));
-        config.push_str(&format!(
-            "auto_execute = {}\n",
-            if trust_layer >= 3 && confidence >= 0.8 {
-                "true"
-            } else {
-                "false"
-            }
-        ));
-
-        debug!(
-            tool_name = %tool_name,
-            trust_layer = trust_layer,
-            confidence = confidence,
-            "Tool registry: execution config generated"
-        );
-
-        Ok(config)
-    }
-
     /// Discover tools from a source by scanning skill directories and MCP manifests.
     pub async fn discover_tools(
         &self,
@@ -165,25 +135,62 @@ impl<'a> ToolRegistry<'a> {
                     let entry = entry?;
                     let path = entry.path();
                     if path.is_dir() {
-                        let skill_md = path.join("SKILL.md");
-                        if skill_md.exists() {
-                            let content = std::fs::read_to_string(&skill_md)?;
-                            for line in content.lines() {
-                                if line.contains("tool")
-                                    || line.contains("function")
-                                    || line.contains("command")
-                                {
-                                    let tool_name = line
-                                        .split_once(':')
-                                        .or_else(|| line.split_once('='))
-                                        .map(|(k, _v)| k.trim())
-                                        .unwrap_or(line.trim());
-                                    if !tool_name.is_empty()
-                                        && !discovered.contains(&tool_name.to_string())
-                                    {
-                                        discovered.push(tool_name.to_string());
-                                        self.record_discovery(source, tool_name)?;
+                        let manifest = path.join("manifest.json");
+                        if manifest.exists() {
+                            let content = std::fs::read_to_string(&manifest)?;
+                            let parsed: serde_json::Value = serde_json::from_str(&content)
+                    .map_err(|e| ToolRegistryError::Schema(ToolRegistrySchemaError::other(e.to_string())))?;
+                            if let Some(tools) = parsed["tools"].as_array() {
+                                for tool in tools {
+                                    if let Some(name) = tool["name"].as_str() {
+                                        if !discovered.contains(&name.to_string()) {
+                                            discovered.push(name.to_string());
+                                            self.record_discovery(source, name)?;
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Scan user-level skill directories
+        let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+        for scope in [".corust-agent/skills", ".agents/skills"] {
+            let candidate = std::path::Path::new(&home_dir).join(scope);
+            if candidate.is_dir() {
+                for entry in std::fs::read_dir(&candidate)? {
+                    let entry = entry?;
+                    let path = entry.path();
+                    if path.is_dir() && path.join("manifest.json").exists() {
+                        let content = std::fs::read_to_string(path.join("manifest.json"))?;
+                        let parsed: serde_json::Value = serde_json::from_str(&content)
+                            .map_err(|e| ToolRegistryError::Schema(ToolRegistrySchemaError::other(e.to_string())))?;
+                        if let Some(tools) = parsed["tools"].as_array() {
+                            for tool in tools {
+                                if let Some(name) = tool["name"].as_str() {
+                                    if !discovered.contains(&name.to_string()) {
+                                        discovered.push(name.to_string());
+                                        self.record_discovery(source, name)?;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        debug!(
+            source = %source,
+            tool_count = discovered.len(),
+            "Tool registry: tools discovered"
+        );
+
+        Ok(discovered)
+    }
+}
                                 }
                             }
                         }
@@ -350,20 +357,4 @@ mod tests {
         assert_eq!(rows[0].call_count, 5);
     }
 
-    #[test]
-    fn test_generate_execution_config() {
-        let dir = tempdir().unwrap();
-        let db_path = dir.path().join("tool_registry.db");
-        let conn = rusqlite::Connection::open(&db_path).unwrap();
-
-        let registry = ToolRegistry::new(&conn);
-        registry.init().unwrap();
-
-        let config = registry
-            .generate_execution_config("cargo_check", 3, 0.9)
-            .unwrap();
-
-        assert!(config.contains("tool = cargo_check"));
-        assert!(config.contains("auto_execute = true"));
-    }
 }
