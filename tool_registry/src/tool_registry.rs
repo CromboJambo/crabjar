@@ -1,7 +1,7 @@
 use crate::error::ToolRegistryError;
 use crate::schema::{
-    init_db, list_all_tools, list_tools_by_type, query_discovery, query_tool, query_tool_usage,
-    record_tool_discovery, record_tool_usage, register_tool,
+    ToolRegistrySchemaError, init_db, list_all_tools, list_tools_by_type, query_discovery,
+    query_tool, query_tool_usage, record_tool_discovery, record_tool_usage, register_tool,
 };
 use rusqlite::Connection;
 use tracing::debug;
@@ -139,13 +139,18 @@ impl<'a> ToolRegistry<'a> {
                         if manifest.exists() {
                             let content = std::fs::read_to_string(&manifest)?;
                             let parsed: serde_json::Value = serde_json::from_str(&content)
-                    .map_err(|e| ToolRegistryError::Schema(ToolRegistrySchemaError::other(e.to_string())))?;
+                                .map_err(|e| {
+                                    ToolRegistryError::Schema(ToolRegistrySchemaError::SchemaError(
+                                        e.to_string(),
+                                    ))
+                                })?;
                             if let Some(tools) = parsed["tools"].as_array() {
                                 for tool in tools {
                                     if let Some(name) = tool["name"].as_str() {
                                         if !discovered.contains(&name.to_string()) {
                                             discovered.push(name.to_string());
                                             self.record_discovery(source, name)?;
+                                        }
                                     }
                                 }
                             }
@@ -165,8 +170,12 @@ impl<'a> ToolRegistry<'a> {
                     let path = entry.path();
                     if path.is_dir() && path.join("manifest.json").exists() {
                         let content = std::fs::read_to_string(path.join("manifest.json"))?;
-                        let parsed: serde_json::Value = serde_json::from_str(&content)
-                            .map_err(|e| ToolRegistryError::Schema(ToolRegistrySchemaError::other(e.to_string())))?;
+                        let parsed: serde_json::Value =
+                            serde_json::from_str(&content).map_err(|e| {
+                                ToolRegistryError::Schema(ToolRegistrySchemaError::SchemaError(
+                                    e.to_string(),
+                                ))
+                            })?;
                         if let Some(tools) = parsed["tools"].as_array() {
                             for tool in tools {
                                 if let Some(name) = tool["name"].as_str() {
@@ -174,56 +183,6 @@ impl<'a> ToolRegistry<'a> {
                                         discovered.push(name.to_string());
                                         self.record_discovery(source, name)?;
                                     }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        debug!(
-            source = %source,
-            tool_count = discovered.len(),
-            "Tool registry: tools discovered"
-        );
-
-        Ok(discovered)
-    }
-}
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Scan user-level skill directories
-        let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
-        for scope in [".corust-agent/skills", ".agents/skills"] {
-            let candidate = std::path::Path::new(&home_dir).join(scope);
-            if candidate.is_dir() {
-                for entry in std::fs::read_dir(&candidate)? {
-                    let entry = entry?;
-                    let path = entry.path();
-                    if path.is_dir() && path.join("SKILL.md").exists() {
-                        let content = std::fs::read_to_string(path.join("SKILL.md"))?;
-                        for line in content.lines() {
-                            if line.contains("tool")
-                                || line.contains("function")
-                                || line.contains("command")
-                            {
-                                let tool_name = line
-                                    .split_once(':')
-                                    .or_else(|| line.split_once('='))
-                                    .map(|(k, _v)| k.trim())
-                                    .unwrap_or(line.trim());
-                                if !tool_name.is_empty()
-                                    && !discovered.contains(&tool_name.to_string())
-                                {
-                                    discovered.push(tool_name.to_string());
-                                    self.record_discovery(source, tool_name)?;
                                 }
                             }
                         }
@@ -356,5 +315,4 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].call_count, 5);
     }
-
 }
