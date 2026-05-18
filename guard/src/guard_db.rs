@@ -20,6 +20,7 @@ pub enum GuardDbError {
 
 /// Manages the guard database connection and schema initialization.
 /// Uses a separate DB file from mirror-log to maintain detection/action separation.
+#[derive(Clone)]
 pub struct GuardDb {
     conn: Arc<Mutex<Connection>>,
 }
@@ -196,11 +197,7 @@ impl GuardDb {
                     command: row.get(3)?,
                     args,
                     trust_layer: row.get(5)?,
-                    confidence: row
-                        .get::<_, String>(6)?
-                        .parse::<f64>()
-                        .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
-                        .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
+                    confidence: row.get::<_, f64>(6)?,
                     source_event_id: row.get(7)?,
                     queued_at: row.get(8)?,
                     reason: row.get(9)?,
@@ -249,7 +246,11 @@ impl GuardDb {
         Ok(exists)
     }
 
-    pub fn read_action_requests(&self, status: Option<&str>, limit: usize) -> Result<Vec<ActionRequest>, GuardDbError> {
+    pub fn read_action_requests(
+        &self,
+        status: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ActionRequest>, GuardDbError> {
         let conn = self.conn.lock().unwrap();
         let status_filter = if let Some(s) = status {
             format!(" WHERE status = '{}'", s)
@@ -272,8 +273,7 @@ impl GuardDb {
                     payload: row.get(4)?,
                     trust_layer: row.get(5)?,
                     confidence: crate::types::TrustScore::new(
-                        row
-                            .get::<_, String>(6)?
+                        row.get::<_, String>(6)?
                             .parse::<f64>()
                             .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
                             .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
@@ -295,7 +295,11 @@ impl GuardDb {
         Ok(entries)
     }
 
-    pub fn update_action_status(&self, action_id: &str, new_status: ActionStatus) -> Result<(), GuardDbError> {
+    pub fn update_action_status(
+        &self,
+        action_id: &str,
+        new_status: ActionStatus,
+    ) -> Result<(), GuardDbError> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "UPDATE action_requests SET status = ?, resolved_at = unixepoch() WHERE id = ?",

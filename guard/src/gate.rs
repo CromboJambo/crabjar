@@ -68,8 +68,7 @@ impl<'a> ExecutionGate<'a> {
         };
 
         if !provenance_exists {
-            let reason = "No provenance found in GuardDb; detection != authorization"
-                .to_string();
+            let reason = "No provenance found in GuardDb; detection != authorization".to_string();
             warn!(action = %ctx.action_type, %reason, "Gate interrupted");
             return Ok(GateResult::Interrupted { reason });
         }
@@ -336,7 +335,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("evt-1".to_string()),
+            source_event_id: Some("evt-1"),
             can_interrupt: true,
         };
 
@@ -373,7 +372,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 2,
             confidence: TrustScore::new(0.65),
-            source_event_id: Some("evt-2".to_string()),
+            source_event_id: Some("evt-2"),
             can_interrupt: true,
         };
 
@@ -410,7 +409,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 0,
             confidence: TrustScore::new(0.65),
-            source_event_id: Some("evt-4".to_string()),
+            source_event_id: Some("evt-4"),
             can_interrupt: true,
         };
 
@@ -430,7 +429,7 @@ mod tests {
             args: vec!["-rf".to_string(), "/".to_string()],
             trust_layer: 0,
             confidence: TrustScore::new(0.65),
-            source_event_id: Some("evt-dry-run".to_string()),
+            source_event_id: Some("evt-dry-run"),
             can_interrupt: false,
         };
 
@@ -467,7 +466,7 @@ mod tests {
             args: vec!["-rf".to_string(), "/tmp/test".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("evt-5".to_string()),
+            source_event_id: Some("evt-5"),
             can_interrupt: true,
         };
 
@@ -504,7 +503,7 @@ mod tests {
             args: vec!["commit".to_string(), "-m".to_string(), "test".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("evt-6".to_string()),
+            source_event_id: Some("evt-6"),
             can_interrupt: true,
         };
 
@@ -524,7 +523,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.1),
-            source_event_id: Some("evt-7".to_string()),
+            source_event_id: Some("evt-7"),
             can_interrupt: true,
         };
 
@@ -544,7 +543,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("nonexistent-provenance".to_string()),
+            source_event_id: Some("nonexistent-provenance"),
             can_interrupt: true,
         };
 
@@ -581,7 +580,7 @@ mod tests {
             args: vec!["hello".to_string()],
             trust_layer: 3,
             confidence: TrustScore::new(0.9),
-            source_event_id: Some("evt-1".to_string()),
+            source_event_id: Some("evt-1"),
             can_interrupt: true,
         };
 

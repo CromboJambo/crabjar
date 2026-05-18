@@ -184,8 +184,7 @@ pub fn gate_check_with_reversibility(
     args: &[String],
     confidence: TrustScore,
     trust_layer: u32,
-    has_raw_data: bool,
-    has_uncertainty: bool,
+    source_event_id: Option<String>,
     can_interrupt: bool,
     has_undo_path: bool,
     has_checksums: bool,
@@ -203,10 +202,16 @@ pub fn gate_check_with_reversibility(
         data_integrity,
     );
 
+    let provenance_verified = if let Some(id) = &source_event_id {
+        db.verify_provenance(id)?
+    } else {
+        false
+    };
+
     let assessment = ActionRiskAssessment::new(
         reversibility.clone(),
         confidence,
-        has_uncertainty,
+        provenance_verified,
         can_interrupt,
     );
 
@@ -246,17 +251,11 @@ pub fn gate_check_with_reversibility(
         }
         CommandRiskExtended::Low => {
             // Apply existing gate logic from guard/src/gate.rs
-            if !has_raw_data {
+            if !provenance_verified {
                 Ok((
                     GateResult::Interrupted {
-                        reason: "Action triggered without raw data reference".to_string(),
-                    },
-                    assessment,
-                ))
-            } else if !has_uncertainty {
-                Ok((
-                    GateResult::Interrupted {
-                        reason: "Action triggered without uncertainty exposure".to_string(),
+                        reason: "No provenance: source_event_id not found in action_requests"
+                            .to_string(),
                     },
                     assessment,
                 ))
@@ -383,8 +382,7 @@ mod tests {
             &["-rf".to_string(), "/tmp".to_string()],
             TrustScore::new(0.3),
             0,
-            true,
-            true,
+            None,
             true,
             false,
             false,
@@ -403,14 +401,31 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = crate::guard_db::GuardDb::open(dir.path().join("guard.db")).unwrap();
 
+        {
+            let conn = db.conn();
+            conn.execute(
+                "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![
+                    "test-action-low",
+                    "evt-low",
+                    "cargo fmt",
+                    "--check",
+                    3,
+                    0.9,
+                    "trust-approved",
+                ],
+            )
+            .unwrap();
+        }
+
         let result = gate_check_with_reversibility(
             &db,
             "cargo fmt",
             &["--check".to_string()],
             TrustScore::new(0.9),
             3,
-            true,
-            true,
+            Some("evt-low".to_string()),
             true,
             true,
             true,
