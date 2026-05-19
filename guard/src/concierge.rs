@@ -41,11 +41,14 @@ pub struct InterruptedLogEntry {
 /// No tool call path bypasses the gate.
 #[derive(Default)]
 pub struct GateConcierge {
-    db: Option<GuardDb>,
+    pub db: Option<GuardDb>,
 }
 
-#[allow(dead_code)]
 impl GateConcierge {
+    pub fn new() -> Self {
+        Self { db: None }
+    }
+
     pub fn with_db(mut self, db: GuardDb) -> Self {
         self.db = Some(db);
         self
