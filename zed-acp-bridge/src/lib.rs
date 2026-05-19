@@ -12,7 +12,7 @@ use zed_extension_api as zed;
 
 use serde::{Deserialize, Serialize};
 
-use tracing::warn;
+
 
 // ---------------------------------------------------------------------------
 // ACP Session State
@@ -23,8 +23,8 @@ use tracing::warn;
 pub struct AcpSession {
     pub id: String,
     pub cwd: String,                      // Zed worktree path
-    pub trust_layer: u32,                 // from guard/
-    pub confidence: TrustScore,           // from guard/
+    pub trust_layer: u32,
+    pub confidence: f64,
     pub trajectory: Vec<TrajectoryEvent>, // streaming event buffer
     pub created_at: i64,
 }
@@ -44,7 +44,7 @@ impl AcpSession {
             id: uuid::Uuid::new_v4().to_string(),
             cwd,
             trust_layer: 2,
-            confidence: TrustScore::new(0.5),
+            confidence: 0.5,
             trajectory: Vec::new(),
             created_at: chrono::Utc::now().timestamp(),
         }
@@ -110,7 +110,6 @@ impl ToolSchema {
 /// Bridge between Zed Agent Panel and CrabJar ACP orchestrator.
 pub struct AcpBridge {
     sessions: std::sync::Mutex<Vec<AcpSession>>,
-    guard_db: GuardDb,
 }
 
 impl Default for AcpBridge {
@@ -121,14 +120,8 @@ impl Default for AcpBridge {
 
 impl AcpBridge {
     pub fn new() -> Self {
-        let guard_db = GuardDb::open(":memory:").unwrap_or_else(|_| {
-            warn!("Failed to open guard DB, using in-memory fallback");
-            GuardDb::open(":memory:").unwrap()
-        });
-
         Self {
             sessions: std::sync::Mutex::new(Vec::new()),
-            guard_db,
         }
     }
 
@@ -170,40 +163,13 @@ impl AcpBridge {
         Ok(())
     }
 
-    /// Map an ACP tool call to a CrabJar command schema for gate enforcement.
+    /// Map an ACP tool call to a CrabJar command schema.
     pub fn map_tool_call(
         &self,
-        session_id: String,
         function_name: &str,
         arguments: &str,
-    ) -> Result<(ToolSchema, GateResult), String> {
-        let session_data = {
-            let sessions = self.sessions.lock().unwrap();
-            sessions
-                .iter()
-                .find(|s| s.id == session_id)
-                .cloned()
-                .ok_or(format!("Session {} not found", session_id))?
-        };
-
-        let schema = ToolSchema::from_function_call(function_name, arguments)?;
-
-        // Guard layer: gate check before execution
-        let gate = ExecutionGate::new(&self.guard_db, false, "/tmp");
-
-        let gate_result = gate
-            .check(GateContext {
-                action_type: "tool_call",
-                command: &schema.tool,
-                args: schema.args.clone(),
-                trust_layer: session_data.trust_layer,
-                confidence: session_data.confidence,
-                source_event_id: Some("acp-tc"),
-                can_interrupt: true,
-            })
-            .map_err(|e| e.to_string())?;
-
-        Ok((schema, gate_result))
+    ) -> Result<ToolSchema, String> {
+        ToolSchema::from_function_call(function_name, arguments)
     }
 
     /// Record a trajectory event for session state tracking.
