@@ -202,18 +202,19 @@ async fn handle_exec(
     // Config check: tool_execution_enabled must be true
     let loader = ProjectLoader::new();
     if let Some(config) = loader.get_current_config()
-        && !config.tool_execution_enabled {
-            return Ok(json!({
-                "success": false,
-                "exec": {
-                    "command": command,
-                    "args": args,
-                    "reason": reason,
-                    "gate_result": "denied",
-                    "reason": "tool_execution_enabled is false in config",
-                },
-            }));
-        }
+        && !config.tool_execution_enabled
+    {
+        return Ok(json!({
+            "success": false,
+            "exec": {
+                "command": command,
+                "args": args,
+                "reason": reason,
+                "gate_result": "denied",
+                "reason": "tool_execution_enabled is false in config",
+            },
+        }));
+    }
 
     // Dry-run shortcut: skip gate and telemetry when dry_run is true
     if dry_run {
