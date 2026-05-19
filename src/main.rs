@@ -215,6 +215,24 @@ async fn handle_exec(
             }));
         }
 
+    // Dry-run shortcut: skip gate and telemetry when dry_run is true
+    if dry_run {
+        return Ok(json!({
+            "success": true,
+            "exec": {
+                "command": command,
+                "args": args,
+                "cwd": if cwd.trim().is_empty() {
+                    std::env::current_dir()?.to_string_lossy().into_owned()
+                } else {
+                    cwd.to_string()
+                },
+                "reason": reason,
+                "gate_result": "dry_run",
+            },
+        }));
+    }
+
     let effective_cwd = if cwd.trim().is_empty() {
         project_root.to_string_lossy().into_owned()
     } else {
