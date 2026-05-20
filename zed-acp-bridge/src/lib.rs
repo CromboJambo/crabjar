@@ -1,235 +1,157 @@
-//! zed-acp-bridge: Zed extension exposing CrabJar ACP orchestrator.
-//!
-//! Implements the `zed::Extension` trait to:
-//! - Launch the CrabJar ACP orchestrator as a context server
-//! - Manage ACP session state locally
-//! - Map ACP tool calls to CrabJar command schemas
-//! - Enforce guard gate on every tool call
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-use zed_extension_api as zed;
+    #[test]
+    fn tool_schema_from_function_call_run_command_works() {
+        let schema = ToolSchema::from_function_call("run_command", r#"["echo", "hello"]"#).unwrap();
+        assert_eq!(schema.tool, "echo");
+        assert_eq!(schema.args, vec!["hello".to_string()]);
+        assert!(schema.requires_guard);
+    }
 
+    #[test]
+    fn tool_schema_from_function_call_search_logs_works() {
+        let schema = ToolSchema::from_function_call("search_logs", r#"[]"#).unwrap();
+        assert_eq!(schema.tool, "crabjar");
+        assert_eq!(schema.args, vec!["guard".to_string(), "queue".to_string()]);
+        assert!(!schema.requires_guard);
+    }
 
+    #[test]
+    fn tool_schema_from_function_call_recent_events_works() {
+        let schema = ToolSchema::from_function_call("recent_events", r#"[]"#).unwrap();
+        assert_eq!(schema.tool, "crabjar");
+        assert_eq!(schema.args, vec!["knowledge".to_string(), "events".to_string()]);
+        assert!(!schema.requires_guard);
+    }
 
-use serde::{Deserialize, Serialize};
+    #[test]
+    fn tool_schema_from_function_call_by_source_works() {
+        let schema = ToolSchema::from_function_call("by_source", r#"[]"#).unwrap();
+        assert_eq!(schema.tool, "crabjar");
+        assert_eq!(schema.args, vec!["knowledge".to_string(), "events".to_string()]);
+        assert!(!schema.requires_guard);
+    }
 
+    #[test]
+    fn tool_schema_from_function_call_analyze_state_works() {
+        let schema = ToolSchema::from_function_call("analyze_state", r#"[]"#).unwrap();
+        assert_eq!(schema.tool, "crabjar");
+        assert_eq!(schema.args, vec!["state".to_string(), "list".to_string()]);
+        assert!(!schema.requires_guard);
+    }
 
+    #[test]
+    fn tool_schema_from_function_call_unknown_returns_passthrough() {
+        let schema = ToolSchema::from_function_call("unknown_tool", r#"["arg1", "arg2"]"#).unwrap();
+        assert_eq!(schema.tool, "unknown_tool");
+        assert_eq!(schema.args, vec!["arg1".to_string(), "arg2".to_string()]);
+        assert!(!schema.requires_guard);
+    }
 
-// ---------------------------------------------------------------------------
-// ACP Session State
-// ---------------------------------------------------------------------------
+    #[test]
+    fn tool_schema_from_function_call_parse_error_errors() {
+        let result = ToolSchema::from_function_call("run_command", "not valid json");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("parse error"));
+    }
 
-/// ACP session maintained across prompt calls in Zed's Agent Panel.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AcpSession {
-    pub id: String,
-    pub cwd: String,                      // Zed worktree path
-    pub trust_layer: u32,
-    pub confidence: f64,
-    pub trajectory: Vec<TrajectoryEvent>, // streaming event buffer
-    pub created_at: i64,
-}
+    #[test]
+    fn tool_schema_from_function_call_empty_args_run_command() {
+        let schema = ToolSchema::from_function_call("run_command", r#"[]"#).unwrap();
+        assert_eq!(schema.tool, "");
+        assert!(schema.args.is_empty());
+        assert!(schema.requires_guard);
+    }
 
-/// A single event in the trajectory buffer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrajectoryEvent {
-    pub timestamp: i64,
-    pub source: String,
-    pub content: String,
-    pub preview: String,
-}
+    #[test]
+    fn acp_session_new_with_custom_cwd() {
+        let session = AcpSession::new("/custom/path".to_string());
+        assert_eq!(session.cwd, "/custom/path");
+    }
 
-impl AcpSession {
-    pub fn new(cwd: String) -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            cwd,
-            trust_layer: 2,
-            confidence: 0.5,
-            trajectory: Vec::new(),
-            created_at: chrono::Utc::now().timestamp(),
-        }
+    #[test]
+    fn acp_bridge_new_session_creates_session() {
+        let bridge = AcpBridge::new();
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        assert!(!session.id.is_empty());
+        assert_eq!(session.cwd, "/tmp/test");
+    }
+
+    #[test]
+    fn acp_bridge_load_session_works() {
+        let mut bridge = AcpBridge::new();
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        let loaded = bridge.load_session(session.id.clone(), "/tmp/new".to_string()).unwrap();
+        assert_eq!(loaded.cwd, "/tmp/new");
+    }
+
+    #[test]
+    fn acp_bridge_load_session_not_found_errors() {
+        let mut bridge = AcpBridge::new();
+        let result = bridge.load_session("nonexistent".to_string(), "/tmp".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn acp_bridge_close_session_works() {
+        let mut bridge = AcpBridge::new();
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        bridge.close_session(session.id.clone()).unwrap();
+        assert!(bridge.list_sessions().is_empty());
+    }
+
+    #[test]
+    fn acp_bridge_close_session_nonexistent_noop() {
+        let mut bridge = AcpBridge::new();
+        bridge.close_session("nonexistent".to_string()).unwrap();
+        assert!(bridge.list_sessions().is_empty());
+    }
+
+    #[test]
+    fn acp_bridge_list_sessions_returns_all() {
+        let mut bridge = AcpBridge::new();
+        bridge.new_session("/tmp/a".to_string()).unwrap();
+        bridge.new_session("/tmp/b".to_string()).unwrap();
+        let sessions = bridge.list_sessions();
+        assert_eq!(sessions.len(), 2);
+    }
+
+    #[test]
+    fn acp_bridge_record_event_works() {
+        let mut bridge = AcpBridge::new();
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        let event = TrajectoryEvent {
+            timestamp: 123,
+            source: "user".to_string(),
+            content: "hello".to_string(),
+            preview: "hello".to_string(),
+        };
+        bridge.record_event(session.id.clone(), event).unwrap();
+        assert_eq!(session.trajectory.len(), 1);
+    }
+
+    #[test]
+    fn acp_bridge_record_event_not_found_errors() {
+        let mut bridge = AcpBridge::new();
+        let event = TrajectoryEvent {
+            timestamp: 123,
+            source: "user".to_string(),
+            content: "hello".to_string(),
+            preview: "hello".to_string(),
+        };
+        let result = bridge.record_event("nonexistent".to_string(), event);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn map_tool_call_passthrough_for_unknown() {
+        let bridge = AcpBridge::new();
+        let schema = bridge.map_tool_call("unknown", r#"[]"#).unwrap();
+        assert_eq!(schema.tool, "unknown");
+        assert!(!schema.requires_guard);
     }
 }
-
-// ---------------------------------------------------------------------------
-// Tool Call Mapping
-// ---------------------------------------------------------------------------
-
-/// Maps ACP tool call names to CrabJar command schemas.
-#[derive(Debug, Clone)]
-pub struct ToolSchema {
-    pub tool: String,
-    pub args: Vec<String>,
-    pub requires_guard: bool,
-}
-
-impl ToolSchema {
-    pub fn from_function_call(name: &str, arguments: &str) -> Result<Self, String> {
-        let args: Vec<String> =
-            serde_json::from_str(arguments).map_err(|e| format!("parse error: {}", e))?;
-
-        match name {
-            "run_command" => Ok(Self {
-                tool: args.first().cloned().unwrap_or_default(),
-                args: args[1..].to_vec(),
-                requires_guard: true,
-            }),
-            "search_logs" => Ok(Self {
-                tool: "crabjar".to_string(),
-                args: vec!["guard".to_string(), "queue".to_string()],
-                requires_guard: false,
-            }),
-            "recent_events" => Ok(Self {
-                tool: "crabjar".to_string(),
-                args: vec!["knowledge".to_string(), "events".to_string()],
-                requires_guard: false,
-            }),
-            "by_source" => Ok(Self {
-                tool: "crabjar".to_string(),
-                args: vec!["knowledge".to_string(), "events".to_string()],
-                requires_guard: false,
-            }),
-            "analyze_state" => Ok(Self {
-                tool: "crabjar".to_string(),
-                args: vec!["state".to_string(), "list".to_string()],
-                requires_guard: false,
-            }),
-            _ => Ok(Self {
-                tool: name.to_string(),
-                args,
-                requires_guard: false,
-            }),
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Orchestrator Bridge
-// ---------------------------------------------------------------------------
-
-/// Bridge between Zed Agent Panel and CrabJar ACP orchestrator.
-pub struct AcpBridge {
-    sessions: std::sync::Mutex<Vec<AcpSession>>,
-}
-
-impl Default for AcpBridge {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AcpBridge {
-    pub fn new() -> Self {
-        Self {
-            sessions: std::sync::Mutex::new(Vec::new()),
-        }
-    }
-
-    /// Create a new ACP session for a Zed worktree.
-    pub fn new_session(&mut self, cwd: String) -> Result<AcpSession, String> {
-        let session = AcpSession::new(cwd);
-        let mut sessions = self.sessions.lock().unwrap();
-        sessions.push(session.clone());
-        Ok(session)
-    }
-
-    /// Load an existing ACP session.
-    pub fn load_session(&mut self, session_id: String, cwd: String) -> Result<AcpSession, String> {
-        let sessions = self.sessions.lock().unwrap();
-        let session = sessions
-            .iter()
-            .find(|s| s.id == session_id)
-            .ok_or(format!("Session {} not found", session_id))?;
-
-        let mut sessions = self.sessions.lock().unwrap();
-        let entry = sessions
-            .iter_mut()
-            .find(|s| s.id == session_id)
-            .ok_or(format!("Session {} not found in active list", session_id))?;
-
-        entry.cwd = cwd;
-        Ok(session.clone())
-    }
-
-    /// List active sessions.
-    pub fn list_sessions(&self) -> Vec<AcpSession> {
-        self.sessions.lock().unwrap().clone()
-    }
-
-    /// Close a session.
-    pub fn close_session(&mut self, session_id: String) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().unwrap();
-        sessions.retain(|s| s.id != session_id);
-        Ok(())
-    }
-
-    /// Map an ACP tool call to a CrabJar command schema.
-    pub fn map_tool_call(
-        &self,
-        function_name: &str,
-        arguments: &str,
-    ) -> Result<ToolSchema, String> {
-        ToolSchema::from_function_call(function_name, arguments)
-    }
-
-    /// Record a trajectory event for session state tracking.
-    pub fn record_event(&mut self, session_id: String, event: TrajectoryEvent) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().unwrap();
-        let entry = sessions
-            .iter_mut()
-            .find(|s| s.id == session_id)
-            .ok_or(format!("Session {} not found", session_id))?;
-
-        entry.trajectory.push(event);
-        Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Zed Extension Implementation
-// ---------------------------------------------------------------------------
-
-/// CrabJar ACP extension for Zed's Agent Panel.
-#[allow(dead_code)]
-pub struct CrabJarAcpExtension {
-    bridge: AcpBridge,
-}
-
-impl Default for CrabJarAcpExtension {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CrabJarAcpExtension {
-    pub fn new() -> Self {
-        Self {
-            bridge: AcpBridge::new(),
-        }
-    }
-}
-
-impl zed::Extension for CrabJarAcpExtension {
-    fn new() -> Self {
-        Self {
-            bridge: AcpBridge::new(),
-        }
-    }
-
-    fn context_server_command(
-        &mut self,
-        _context_server_id: &zed::ContextServerId,
-        _project: &zed::Project,
-    ) -> Result<zed::Command, String> {
-        Ok(zed::Command {
-            command: "/home/crombo/crabjar/target/debug/zed-acp-server".to_string(),
-            args: vec![],
-            env: zed::EnvVars::from_iter(vec![(
-                "ACP_ORCHESTRATOR_URL".to_string(),
-                "http://127.0.0.1:3000/acp".to_string(),
-            )]),
-        })
-    }
-}
-
-zed::register_extension!(CrabJarAcpExtension);
