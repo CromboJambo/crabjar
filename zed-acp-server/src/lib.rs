@@ -54,6 +54,13 @@ impl AcpSession {
 // ACP Protocol Requests
 // ---------------------------------------------------------------------------
 
+/// Zed JSON-RPC request format.
+#[derive(Debug, Deserialize)]
+pub struct ZedRequest {
+    pub method: String,
+    pub params: serde_json::Value,
+}
+
 /// ACP session lifecycle request.
 #[derive(Debug, Deserialize)]
 pub enum AcpRequest {
@@ -66,15 +73,78 @@ pub enum AcpRequest {
     Authenticate { auth_method: String },
 }
 
-/// ACP response.
+impl ZedRequest {
+    pub fn to_acp_request(self) -> Result<AcpRequest, String> {
+        match self.method.as_str() {
+            "new_session" => {
+                let cwd = self.params["cwd"]
+                    .as_str()
+                    .ok_or("cwd not found")
+                    .map(|s| s.to_string())?;
+                Ok(AcpRequest::NewSession { cwd })
+            }
+            "load_session" => {
+                let session_id = self.params["session_id"]
+                    .as_str()
+                    .ok_or("session_id not found")
+                    .map(|s| s.to_string())?;
+                let cwd = self.params["cwd"]
+                    .as_str()
+                    .ok_or("cwd not found")
+                    .map(|s| s.to_string())?;
+                Ok(AcpRequest::LoadSession { session_id, cwd })
+            }
+            "close_session" => {
+                let session_id = self.params["session_id"]
+                    .as_str()
+                    .ok_or("session_id not found")
+                    .map(|s| s.to_string())?;
+                Ok(AcpRequest::CloseSession { session_id })
+            }
+            "list_sessions" => Ok(AcpRequest::ListSessions),
+            "prompt" => {
+                let session_id = self.params["session_id"]
+                    .as_str()
+                    .ok_or("session_id not found")
+                    .map(|s| s.to_string())?;
+                let message = self.params["message"]
+                    .as_str()
+                    .ok_or("message not found")
+                    .map(|s| s.to_string())?;
+                Ok(AcpRequest::Prompt { session_id, message })
+            }
+            "tool_call" => {
+                let session_id = self.params["session_id"]
+                    .as_str()
+                    .ok_or("session_id not found")
+                    .map(|s| s.to_string())?;
+                let function_name = self.params["function_name"]
+                    .as_str()
+                    .ok_or("function_name not found")
+                    .map(|s| s.to_string())?;
+                let arguments = self.params["arguments"]
+                    .as_str()
+                    .ok_or("arguments not found")
+                    .map(|s| s.to_string())?;
+                Ok(AcpRequest::ToolCall { session_id, function_name, arguments })
+            }
+            "authenticate" => {
+                let auth_method = self.params["auth_method"]
+                    .as_str()
+                    .ok_or("auth_method not found")
+                    .map(|s| s.to_string())?;
+                Ok(AcpRequest::Authenticate { auth_method })
+            }
+            _ => Err(format!("Unknown method: {}", self.method)),
+        }
+    }
+}
+
+/// Zed JSON-RPC response.
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AcpResponse {
-    Session { session: AcpSession },
-    Sessions { sessions: Vec<AcpSession> },
-    Prompt { content: String },
-    ToolCall { result: String },
-    Auth { authenticated: bool },
+    Result { value: serde_json::Value },
     Error { error: String },
 }
 
@@ -217,29 +287,33 @@ impl AcpAgentServer {
         }
     }
 
-    /// Handle an ACP request.
-    pub async fn handle_request(&mut self, request: AcpRequest) -> AcpResponse {
-        match request {
+    /// Handle a Zed JSON-RPC request.
+    pub async fn handle_request(&mut self, request: ZedRequest) -> AcpResponse {
+        let acp_request = match request.to_acp_request() {
+            Ok(req) => req,
+            Err(e) => return AcpResponse::Error { error: e },
+        };
+        match acp_request {
             AcpRequest::NewSession { cwd } => {
                 match self.bridge.new_session(cwd) {
-                    Ok(session) => AcpResponse::Session { session },
+                    Ok(session) => AcpResponse::Result { value: serde_json::to_value(&session).unwrap_or_default() },
                     Err(e) => AcpResponse::Error { error: e },
                 }
             }
             AcpRequest::LoadSession { session_id, cwd } => {
                 match self.bridge.load_session(session_id, cwd) {
-                    Ok(session) => AcpResponse::Session { session },
+                    Ok(session) => AcpResponse::Result { value: serde_json::to_value(&session).unwrap_or_default() },
                     Err(e) => AcpResponse::Error { error: e },
                 }
             }
             AcpRequest::CloseSession { session_id } => {
                 match self.bridge.close_session(session_id) {
-                    Ok(()) => AcpResponse::Sessions { sessions: self.bridge.list_sessions() },
+                    Ok(()) => AcpResponse::Result { value: serde_json::to_value(&self.bridge.list_sessions()).unwrap_or_default() },
                     Err(e) => AcpResponse::Error { error: e },
                 }
             }
             AcpRequest::ListSessions => {
-                AcpResponse::Sessions { sessions: self.bridge.list_sessions() }
+                AcpResponse::Result { value: serde_json::to_value(&self.bridge.list_sessions()).unwrap_or_default() }
             }
             AcpRequest::Prompt { session_id, message } => {
                 let client = reqwest::Client::new();
@@ -270,7 +344,7 @@ impl AcpAgentServer {
                                         preview: message.chars().take(200).collect(),
                                     },
                                 );
-                                AcpResponse::Prompt { content }
+                                AcpResponse::Result { value: serde_json::json!({ "content": content }) }
                             }
                             Err(e) => AcpResponse::Error { error: e },
                         }
@@ -319,24 +393,24 @@ impl AcpAgentServer {
                                     .await
                                     .map_err(|e| format!("Failed to parse response: {}", e));
 
-                                match body {
-                                    Ok(content) => {
-                                        let _ = self.bridge.record_event(
-                                            session_id,
-                                            TrajectoryEvent {
-                                                timestamp: chrono::Utc::now().timestamp(),
-                                                source: "tool_call".to_string(),
-                                                content: content.clone(),
-                                                preview: content.chars().take(200).collect(),
-                                            },
-                                        );
-                                        AcpResponse::ToolCall { result: content }
-                                    }
-                                    Err(e) => AcpResponse::Error { error: e },
-                                }
+                        match body {
+                            Ok(content) => {
+                                let _ = self.bridge.record_event(
+                                    session_id,
+                                    TrajectoryEvent {
+                                        timestamp: chrono::Utc::now().timestamp(),
+                                        source: "tool_call".to_string(),
+                                        content: content.clone(),
+                                        preview: content.chars().take(200).collect(),
+                                    },
+                                );
+                                AcpResponse::Result { value: serde_json::json!({ "result": content }) }
                             }
                             Err(e) => AcpResponse::Error { error: e },
                         }
+                    }
+                    Err(e) => AcpResponse::Error { error: e },
+                }
                     }
                     ActionStatus::Executed | ActionStatus::Interrupted => {
                         AcpResponse::Error {
@@ -346,7 +420,7 @@ impl AcpAgentServer {
                 }
             }
             AcpRequest::Authenticate { auth_method: _ } => {
-                AcpResponse::Auth { authenticated: true }
+                AcpResponse::Result { value: serde_json::json!({ "authenticated": true }) }
             }
         }
     }
