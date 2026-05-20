@@ -84,6 +84,8 @@ crabjar/
 | `codeburn` | codeburn CLI binary | CLI | Active |
 | `skill-script-runner` | Skill script discovery and execution | Skill | Active |
 | `skill-reference-store` | Skill reference indexing and staleness | Reference | Active |
+| `zed-acp-server` | stdio JSON-RPC server (ACP protocol execution) | Bridge | Active |
+| `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) | Bridge | Active |
 
 ### 2.3 Workspace Members
 
