@@ -222,7 +222,7 @@ impl zed::Extension for CrabJarAcpExtension {
         _project: &zed::Project,
     ) -> Result<zed::Command, String> {
         Ok(zed::Command {
-            command: "/home/crombo/crabjar/target/debug/orchestrator".to_string(),
+            command: "/home/crombo/crabjar/target/debug/zed-acp-server".to_string(),
             args: vec![],
             env: zed::EnvVars::from_iter(vec![(
                 "ACP_ORCHESTRATOR_URL".to_string(),
