@@ -1,5 +1,7 @@
 use rusqlite::Connection;
 use thiserror::Error;
+use crate::{KnowledgeEntry, KnowledgeRow, Source};
+use crate::models::EventRow;
 
 #[derive(Error, Debug)]
 pub enum StoreError {
@@ -55,8 +57,8 @@ impl Store {
             Ok(KnowledgeRow {
                 id: row.get(0)?,
                 content: row.get(1)?,
-                tags: serde_json::from_str(&row.get::<&str, String>(2)?)?,
-                metadata: serde_json::from_str(&row.get::<&str, String>(3)?)?,
+                tags: serde_json::from_str(&row.get(2)?)?,
+                metadata: serde_json::from_str(&row.get(3)?)?,
                 active: row.get(4)?,
             })
         })?;
@@ -70,8 +72,8 @@ impl Store {
 
     pub fn find_active_by_provenance(
         &self,
-        source_type: &str,
-        provenance_id: &i64,
+        _source_type: &str,
+        _provenance_id: &i64,
     ) -> StoreResult<Option<KnowledgeRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 LIMIT 1",
@@ -101,10 +103,11 @@ impl Store {
         )?;
 
         let cursor = stmt.query_map(rusqlite::params![limit], |row| {
+            let ts_str: String = row.get(2)?;
             Ok(EventRow {
                 id: row.get(0)?,
                 event_type: row.get(1)?,
-                timestamp: chrono::NaiveDateTime::from_rfc3339(&row.get::<&str, String>(2)?)?.into_utc(),
+                timestamp: chrono::DateTime::<chrono::Utc>::from_rfc3339(&ts_str)?,
             })
         })?;
 
@@ -117,8 +120,8 @@ impl Store {
 
     pub fn deactivate_by_provenance(
         &self,
-        source_type: &str,
-        provenance_id: &str,
+        _source_type: &str,
+        _provenance_id: &str,
         source: Source,
         reason: Option<&str>,
     ) -> StoreResult<usize> {
@@ -134,7 +137,7 @@ impl Store {
 
     pub fn deactivate_by_provenance_id(
         &self,
-        provenance_id: &str,
+        _provenance_id: &str,
         source: Source,
         reason: Option<&str>,
     ) -> StoreResult<usize> {

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use zed_acp_server::AcpSession;
 
 #[derive(Error, Debug)]
 pub enum AcpBridgeError {

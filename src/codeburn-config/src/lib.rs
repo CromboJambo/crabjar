@@ -46,6 +46,10 @@ impl CodeBurnConfig {
         toml::from_str(&content)
             .map_err(|e| CodeBurnConfigError::ParseError { reason: e.to_string() })
     }
+
+    pub fn plan_usage(&self, _name: &str) -> Result<String, CodeBurnConfigError> {
+        Ok("default".to_string())
+    }
 }
 
 #[cfg(test)]

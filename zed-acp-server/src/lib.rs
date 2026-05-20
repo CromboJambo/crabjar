@@ -25,7 +25,7 @@ impl AcpSession {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AcpRequest {
+pub enum ZedRequest {
     NewSession { cwd: String },
     LoadSession { session_id: String, cwd: String },
     CloseSession { session_id: String },
@@ -49,5 +49,9 @@ pub struct AcpAgentServer {
 impl AcpAgentServer {
     pub fn new() -> Self {
         Self { sessions: Vec::new() }
+    }
+
+    pub fn default() -> Self {
+        Self::new()
     }
 }
