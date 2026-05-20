@@ -1,58 +1,347 @@
-use anyhow::Result;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
 
-use crate::ReferenceStoreError;
-use crate::check_staleness;
-use crate::retrieve_reference;
-
-/// Retrieve all references, checking staleness for each.
-pub fn retrieve_all(
-    indexed: &[serde_json::Value],
-    staleness_days: u64,
-) -> Result<Vec<(std::path::PathBuf, String)>> {
-    let mut retrieved = Vec::new();
-
-    for entry in indexed {
-        let path = entry["path"].as_str().unwrap_or_default();
-        let path_buf = std::path::PathBuf::from(path);
-
-        match retrieve_reference(&path_buf, staleness_days) {
-            Ok(content) => retrieved.push((path_buf, content)),
-            Err(ReferenceStoreError::Stale { .. }) => {
-                // Skip stale references, flag for update
-                continue;
-            }
-            Err(e) => return Err(e.into()),
-        }
+    #[test]
+    fn retrieve_all_with_no_indexed_returns_empty() {
+        let indexed: Vec<serde_json::Value> = vec![];
+        let result = crate::staleness::retrieve_all(&indexed, 7);
+        assert!(result.unwrap().is_empty());
     }
 
-    Ok(retrieved)
-}
-
-/// Flag stale references for update.
-pub fn flag_stale(
-    indexed: &[serde_json::Value],
-    staleness_days: u64,
-) -> Result<Vec<serde_json::Value>> {
-    let mut stale = Vec::new();
-
-    for entry in indexed {
-        let path = entry["path"].as_str().unwrap_or_default();
-        let path_buf = std::path::PathBuf::from(path);
-
-        #[allow(clippy::collapsible_if)]
-        if let Ok(is_stale) = check_staleness(&path_buf, staleness_days) {
-            if is_stale {
-                stale.push(serde_json::json! {
-                    {
-                        "path": path,
-                        "skill_name": entry["skill_name"],
-                        "type": entry["type"],
-                        "action": "update"
-                    }
-                });
+    #[test]
+    fn retrieve_all_with_empty_path_skips() {
+        let dir = tempdir().unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": "",
+                "skill_name": "test",
+                "type": "reference"
             }
-        }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::retrieve_all(&indexed, 7);
+        assert!(result.unwrap().is_empty());
     }
 
-    Ok(stale)
+    #[test]
+    fn retrieve_all_with_stale_entry_skips() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::retrieve_all(&indexed, 0);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn retrieve_all_with_non_stale_returns_content() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::retrieve_all(&indexed, 7);
+        let retrieved = result.unwrap();
+        assert_eq!(retrieved.len(), 1);
+    }
+
+    #[test]
+    fn retrieve_all_with_corrupted_entry_errors() {
+        let dir = tempdir().unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": dir.path().join("missing.md").to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::retrieve_all(&indexed, 7);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn flag_stale_with_no_indexed_returns_empty() {
+        let indexed: Vec<serde_json::Value> = vec![];
+        let result = crate::staleness::flag_stale(&indexed, 7);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn flag_stale_with_empty_path_no_flag() {
+        let dir = tempdir().unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": "",
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 7);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn flag_stale_with_stale_entry_flags_update() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 0);
+        let stale = result.unwrap();
+        assert_eq!(stale.len(), 1);
+        assert_eq!(stale[0]["action"], "update");
+    }
+
+    #[test]
+    fn flag_stale_with_non_stale_no_flag() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 7);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn flag_stale_with_corrupted_entry_errors() {
+        let dir = tempdir().unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": dir.path().join("missing.md").to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 7);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn flag_stale_with_skill_name_preserved() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "edge-test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 0);
+        let stale = result.unwrap();
+        assert_eq!(stale[0]["skill_name"], "edge-test");
+    }
+
+    #[test]
+    fn flag_stale_with_type_preserved() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "script"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 0);
+        let stale = result.unwrap();
+        assert_eq!(stale[0]["type"], "script");
+    }
+
+    #[test]
+    fn retrieve_all_with_multi_entries_some_stale() {
+        let dir = tempdir().unwrap();
+        let file1 = dir.path().join("test1.md");
+        std::fs::write(&file1, "content 1\n").unwrap();
+        let file2 = dir.path().join("test2.md");
+        std::fs::write(&file2, "content 2\n").unwrap();
+        let entry1 = serde_json::json! {
+            {
+                "path": file1.to_string_lossy(),
+                "skill_name": "test1",
+                "type": "reference"
+            }
+        };
+        let entry2 = serde_json::json! {
+            {
+                "path": file2.to_string_lossy(),
+                "skill_name": "test2",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry1, entry2];
+        let result = crate::staleness::retrieve_all(&indexed, 7);
+        let retrieved = result.unwrap();
+        assert_eq!(retrieved.len(), 2);
+    }
+
+    #[test]
+    fn retrieve_all_with_multi_entries_one_stale() {
+        let dir = tempdir().unwrap();
+        let file1 = dir.path().join("test1.md");
+        std::fs::write(&file1, "content 1\n").unwrap();
+        let file2 = dir.path().join("test2.md");
+        std::fs::write(&file2, "content 2\n").unwrap();
+        let entry1 = serde_json::json! {
+            {
+                "path": file1.to_string_lossy(),
+                "skill_name": "test1",
+                "type": "reference"
+            }
+        };
+        let entry2 = serde_json::json! {
+            {
+                "path": file2.to_string_lossy(),
+                "skill_name": "test2",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry1, entry2];
+        let result = crate::staleness::retrieve_all(&indexed, 0);
+        let retrieved = result.unwrap();
+        assert!(retrieved.is_empty());
+    }
+
+    #[test]
+    fn retrieve_all_with_path_with_spaces() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test file.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::retrieve_all(&indexed, 7);
+        let retrieved = result.unwrap();
+        assert_eq!(retrieved.len(), 1);
+    }
+
+    #[test]
+    fn flag_stale_with_path_with_spaces() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test file.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 0);
+        let stale = result.unwrap();
+        assert_eq!(stale.len(), 1);
+    }
+
+    #[test]
+    fn retrieve_all_with_staleness_days_large() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::retrieve_all(&indexed, 1000);
+        let retrieved = result.unwrap();
+        assert_eq!(retrieved.len(), 1);
+    }
+
+    #[test]
+    fn flag_stale_with_staleness_days_large() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 1000);
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn retrieve_all_with_staleness_days_zero() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::retrieve_all(&indexed, 0);
+        let retrieved = result.unwrap();
+        assert!(retrieved.is_empty());
+    }
+
+    #[test]
+    fn flag_stale_with_staleness_days_zero() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("test.md");
+        std::fs::write(&file, "test content\n").unwrap();
+        let entry = serde_json::json! {
+            {
+                "path": file.to_string_lossy(),
+                "skill_name": "test",
+                "type": "reference"
+            }
+        };
+        let indexed = vec![entry];
+        let result = crate::staleness::flag_stale(&indexed, 0);
+        let stale = result.unwrap();
+        assert_eq!(stale.len(), 1);
+    }
 }
