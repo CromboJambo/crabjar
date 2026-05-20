@@ -64,10 +64,9 @@ Workspace config comes from `.crabjar_config.toml`; missing or malformed config 
 - Write files: Use Write (NOT echo >/cat <<EOF)
 - Communication: Output text directly (NOT echo/printf)
 
-## Tool Override
-- Content search: Use Bash with `rg` (ripgrep) instead of the Grep tool
-- File search: Use Glob (NOT find or ls)
-- Read files: Use Read (NOT cat/head/tail)
-- Edit files: Use Edit (NOT sed/awk)
-- Write files: Use Write (NOT echo >/cat <<EOF)
-- Communication: Output text directly (NOT echo/printf)
+## Wasm Dependency Stripping
+- `zed-acp-bridge` Wasm compilation requires minimal dependency set: `zed_extension_api`, `serde`, `uuid(js)` only
+- `tokio` pulls `mio` (wasm incompatible) — must disable net feature or exclude entirely
+- `rusqlite` pulls `libsqlite3-sys` (C compilation fails on wasm) — incompatible with Wasm
+- `uuid` requires `js` feature for wasm-compatible RNG (v4 disabled on wasm)
+- HTTP (axum) cannot be adapted to stdio — requires dedicated stdio server for Zed agent protocol
