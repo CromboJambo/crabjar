@@ -1,170 +1,768 @@
-use codeburn_provider::{ProvenanceEntry, SessionData};
-use serde::Serialize;
-use std::fmt;
-use thiserror::Error;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use codeburn_provider::SessionData;
+    use codeburn_provider::ProvenanceEntry;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("classification failed: {0}")]
-    ClassificationFailed(String),
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub enum TaskCategory {
-    Edit,
-    Test,
-    Fix,
-    Refactor,
-    Design,
-    Research,
-    Documentation,
-    Debugging,
-    Architecture,
-    Integration,
-    Deployment,
-    Review,
-    Other,
-}
-
-impl fmt::Display for TaskCategory {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TaskCategory::Edit => write!(f, "edit"),
-            TaskCategory::Test => write!(f, "test"),
-            TaskCategory::Fix => write!(f, "fix"),
-            TaskCategory::Refactor => write!(f, "refactor"),
-            TaskCategory::Design => write!(f, "design"),
-            TaskCategory::Research => write!(f, "research"),
-            TaskCategory::Documentation => write!(f, "documentation"),
-            TaskCategory::Debugging => write!(f, "debugging"),
-            TaskCategory::Architecture => write!(f, "architecture"),
-            TaskCategory::Integration => write!(f, "integration"),
-            TaskCategory::Deployment => write!(f, "deployment"),
-            TaskCategory::Review => write!(f, "review"),
-            TaskCategory::Other => write!(f, "other"),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct TaskClassifier {
-    rules: Vec<ClassificationRule>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ClassificationRule {
-    pub pattern: String,
-    pub category: TaskCategory,
-}
-
-impl Default for TaskClassifier {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TaskClassifier {
-    pub fn new() -> Self {
-        Self {
-            rules: vec![
-                ClassificationRule {
-                    pattern: "test".to_string(),
-                    category: TaskCategory::Test,
-                },
-                ClassificationRule {
-                    pattern: "fix".to_string(),
-                    category: TaskCategory::Fix,
-                },
-                ClassificationRule {
-                    pattern: "refactor".to_string(),
-                    category: TaskCategory::Refactor,
-                },
-                ClassificationRule {
-                    pattern: "design".to_string(),
-                    category: TaskCategory::Design,
-                },
-                ClassificationRule {
-                    pattern: "docs".to_string(),
-                    category: TaskCategory::Documentation,
-                },
-                ClassificationRule {
-                    pattern: "debug".to_string(),
-                    category: TaskCategory::Debugging,
-                },
-                ClassificationRule {
-                    pattern: "arch".to_string(),
-                    category: TaskCategory::Architecture,
-                },
-                ClassificationRule {
-                    pattern: "deploy".to_string(),
-                    category: TaskCategory::Deployment,
-                },
-                ClassificationRule {
-                    pattern: "review".to_string(),
-                    category: TaskCategory::Review,
-                },
-                ClassificationRule {
-                    pattern: "edit".to_string(),
-                    category: TaskCategory::Edit,
-                },
-                ClassificationRule {
-                    pattern: "research".to_string(),
-                    category: TaskCategory::Research,
-                },
-                ClassificationRule {
-                    pattern: "integrate".to_string(),
-                    category: TaskCategory::Integration,
-                },
-            ],
-        }
+    #[test]
+    fn task_classifier_new_default_rules() {
+        let classifier = TaskClassifier::new();
+        assert!(classifier.rules.len() >= 12);
     }
 
-    pub fn classify(
-        &self,
-        sessions: &[codeburn_provider::SessionData],
-    ) -> Result<Vec<SessionData>, Error> {
-        let mut classified = Vec::new();
+    #[test]
+    fn task_classifier_classify_test_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
 
-        for session in sessions {
-            let category = self.find_category(session)?;
-            classified.push(SessionData {
-                provider: session.provider.clone(),
-                date: session.date,
-                input_tokens: session.input_tokens,
-                output_tokens: session.output_tokens,
-                model: session.model.clone(),
-                task_category: category.to_string(),
-                project: session.project.clone(),
-                message_id: session.message_id.clone(),
+    #[test]
+    fn task_classifier_classify_fix_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "fix".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "fix");
+    }
+
+    #[test]
+    fn task_classifier_classify_refactor_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "refactor".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "refactor");
+    }
+
+    #[test]
+    fn task_classifier_classify_design_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "design".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "design");
+    }
+
+    #[test]
+    fn task_classifier_classify_docs_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "docs".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "documentation");
+    }
+
+    #[test]
+    fn task_classifier_classify_debug_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "debug".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "debugging");
+    }
+
+    #[test]
+    fn task_classifier_classify_arch_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "arch".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "architecture");
+    }
+
+    #[test]
+    fn task_classifier_classify_deploy_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "deploy".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "deployment");
+    }
+
+    #[test]
+    fn task_classifier_classify_review_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "review".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "review");
+    }
+
+    #[test]
+    fn task_classifier_classify_edit_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "edit".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "edit");
+    }
+
+    #[test]
+    fn task_classifier_classify_research_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "research".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "research");
+    }
+
+    #[test]
+    fn task_classifier_classify_integrate_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "integrate".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "integration");
+    }
+
+    #[test]
+    fn task_classifier_classify_no_match_returns_other() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "xyz-unknown".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "other");
+    }
+
+    #[test]
+    fn task_classifier_classify_empty_sessions_works() {
+        let classifier = TaskClassifier::new();
+        let sessions: Vec<SessionData> = vec![];
+        let result = classifier.classify(&sessions).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn task_classifier_classify_multi_sessions_works() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![
+            SessionData {
+                provider: "claude".to_string(),
+                date: chrono::NaiveDateTime::default(),
+                input_tokens: 100,
+                output_tokens: 100,
+                model: "test".to_string(),
+                task_category: "".to_string(),
+                project: None,
+                message_id: None,
                 provenance: ProvenanceEntry {
-                    provenance_id: session.provenance.provenance_id.clone(),
-                    provider_id: "codeburn-classifier".to_string(),
-                    data_path: session.provenance.data_path.clone(),
-                    format: "classified".to_string(),
+                    provenance_id: "abc".to_string(),
+                    provider_id: "claude".to_string(),
+                    data_path: "".to_string(),
+                    format: "jsonl".to_string(),
                     ingestion_timestamp: chrono::Utc::now().timestamp(),
                 },
-            });
-        }
-
-        Ok(classified)
+            },
+            SessionData {
+                provider: "claude".to_string(),
+                date: chrono::NaiveDateTime::default(),
+                input_tokens: 200,
+                output_tokens: 200,
+                model: "fix".to_string(),
+                task_category: "".to_string(),
+                project: None,
+                message_id: None,
+                provenance: ProvenanceEntry {
+                    provenance_id: "abc".to_string(),
+                    provider_id: "claude".to_string(),
+                    data_path: "".to_string(),
+                    format: "jsonl".to_string(),
+                    ingestion_timestamp: chrono::Utc::now().timestamp(),
+                },
+            },
+        ];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].task_category, "test");
+        assert_eq!(result[1].task_category, "fix");
     }
 
-    fn find_category(
-        &self,
-        session: &codeburn_provider::SessionData,
-    ) -> Result<TaskCategory, Error> {
-        for rule in &self.rules {
-            if session.model.contains(&rule.pattern)
-                || session
-                    .project
-                    .as_ref()
-                    .map(|p| p.contains(&rule.pattern))
-                    .unwrap_or(false)
-            {
-                return Ok(rule.category.clone());
-            }
-        }
+    #[test]
+    fn task_classifier_classify_project_contains_pattern() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "xyz".to_string(),
+            task_category: "".to_string(),
+            project: Some("test-project".to_string()),
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
 
-        Ok(TaskCategory::Other)
+    #[test]
+    fn task_classifier_classify_model_substring_match() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "claude-test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
+
+    #[test]
+    fn task_classifier_classify_first_rule_wins() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test-refactor".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
+
+    #[test]
+    fn task_classifier_classify_provenance_added() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].provenance.provider_id, "codeburn-classifier");
+    }
+
+    #[test]
+    fn task_classifier_classify_format_changed() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].provenance.format, "classified");
+    }
+
+    #[test]
+    fn task_classifier_default_works() {
+        let classifier = TaskClassifier::default();
+        assert!(classifier.rules.len() >= 12);
+    }
+
+    #[test]
+    fn task_classifier_clone_works() {
+        let classifier = TaskClassifier::new();
+        let cloned = classifier.clone();
+        assert_eq!(cloned.rules.len(), classifier.rules.len());
+    }
+
+    #[test]
+    fn task_classifier_classify_works_for_empty_model() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "other");
+    }
+
+    #[test]
+    fn task_classifier_classify_works_for_empty_project() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "xyz".to_string(),
+            task_category: "".to_string(),
+            project: Some("".to_string()),
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "other");
+    }
+
+    #[test]
+    fn task_classifier_classify_works_for_large_tokens() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 1_000_000,
+            output_tokens: 1_000_000,
+            model: "test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+        assert_eq!(result[0].input_tokens, 1_000_000);
+    }
+
+    #[test]
+    fn task_classifier_classify_works_for_zero_tokens() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 0,
+            output_tokens: 0,
+            model: "test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
+
+    #[test]
+    fn task_classifier_classify_works_for_custom_provider() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "custom-provider".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "custom-provider".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
+
+    #[test]
+    fn task_classifier_classify_with_message_id() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: Some("msg-123".to_string()),
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
+
+    #[test]
+    fn task_category_display_test() {
+        assert_eq!(format!("{}", TaskCategory::Test), "test");
+    }
+
+    #[test]
+    fn task_category_display_fix() {
+        assert_eq!(format!("{}", TaskCategory::Fix), "fix");
+    }
+
+    #[test]
+    fn task_category_display_refactor() {
+        assert_eq!(format!("{}", TaskCategory::Refactor), "refactor");
+    }
+
+    #[test]
+    fn task_category_display_design() {
+        assert_eq!(format!("{}", TaskCategory::Design), "design");
+    }
+
+    #[test]
+    fn task_category_display_documentation() {
+        assert_eq!(format!("{}", TaskCategory::Documentation), "documentation");
+    }
+
+    #[test]
+    fn task_category_display_debugging() {
+        assert_eq!(format!("{}", TaskCategory::Debugging), "debugging");
+    }
+
+    #[test]
+    fn task_category_display_architecture() {
+        assert_eq!(format!("{}", TaskCategory::Architecture), "architecture");
+    }
+
+    #[test]
+    fn task_category_display_integration() {
+        assert_eq!(format!("{}", TaskCategory::Integration), "integration");
+    }
+
+    #[test]
+    fn task_category_display_deployment() {
+        assert_eq!(format!("{}", TaskCategory::Deployment), "deployment");
+    }
+
+    #[test]
+    fn task_category_display_review() {
+        assert_eq!(format!("{}", TaskCategory::Review), "review");
+    }
+
+    #[test]
+    fn task_category_display_other() {
+        assert_eq!(format!("{}", TaskCategory::Other), "other");
+    }
+
+    #[test]
+    fn task_category_display_edit() {
+        assert_eq!(format!("{}", TaskCategory::Edit), "edit");
+    }
+
+    #[test]
+    fn task_category_display_research() {
+        assert_eq!(format!("{}", TaskCategory::Research), "research");
+    }
+
+    #[test]
+    fn task_classifier_classify_works_for_special_chars_in_model() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test!@#".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
+    }
+
+    #[test]
+    fn task_classifier_classify_works_for_unicode_in_model() {
+        let classifier = TaskClassifier::new();
+        let sessions = vec![SessionData {
+            provider: "claude".to_string(),
+            date: chrono::NaiveDateTime::default(),
+            input_tokens: 100,
+            output_tokens: 100,
+            model: "test🎉".to_string(),
+            task_category: "".to_string(),
+            project: None,
+            message_id: None,
+            provenance: ProvenanceEntry {
+                provenance_id: "abc".to_string(),
+                provider_id: "claude".to_string(),
+                data_path: "".to_string(),
+                format: "jsonl".to_string(),
+                ingestion_timestamp: chrono::Utc::now().timestamp(),
+            },
+        }];
+        let result = classifier.classify(&sessions).unwrap();
+        assert_eq!(result[0].task_category, "test");
     }
 }
