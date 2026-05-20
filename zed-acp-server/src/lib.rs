@@ -1,429 +1,392 @@
-//! zed-acp-server: stdio ACP agent server implementing Agent Client Protocol via stdin/stdout JSON-RPC.
-//!
-//! Implements the ACP session lifecycle:
-//! - new_session → load_session → close_session
-//! - prompt processing with tool call handling
-//! - gate enforcement via guard/
-//! - tool call mapping via zed-acp-bridge/
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use crabjar_guard::GuardDb;
+    use crabjar_guard::GateResult;
+    use crabjar_guard::ActionStatus;
 
-use crabjar_guard::{
-    ActionStatus, GateResult, ExecutionGate, GateContext, GuardDb, TrustScore, GateConcierge,
-};
-
-use serde::{Deserialize, Serialize};
-use tracing::warn;
-
-// ---------------------------------------------------------------------------
-// ACP Session State
-// ---------------------------------------------------------------------------
-
-/// ACP session maintained across prompt calls.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AcpSession {
-    pub id: String,
-    pub cwd: String,
-    pub trust_layer: u32,
-    pub confidence: TrustScore,
-    pub trajectory: Vec<TrajectoryEvent>,
-    pub created_at: i64,
-}
-
-/// A single event in the trajectory buffer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrajectoryEvent {
-    pub timestamp: i64,
-    pub source: String,
-    pub content: String,
-    pub preview: String,
-}
-
-impl AcpSession {
-    pub fn new(cwd: String) -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            cwd,
-            trust_layer: 2,
-            confidence: TrustScore::new(0.5),
-            trajectory: Vec::new(),
-            created_at: chrono::Utc::now().timestamp(),
-        }
+    #[test]
+    fn zed_request_to_acp_new_session_works() {
+        let req = ZedRequest {
+            method: "new_session".to_string(),
+            params: serde_json::json!({ "cwd": "/tmp/test" }),
+        };
+        let acp = req.to_acp_request().unwrap();
+        assert!(matches!(acp, AcpRequest::NewSession { cwd } if cwd == "/tmp/test"));
     }
-}
 
-// ---------------------------------------------------------------------------
-// ACP Protocol Requests
-// ---------------------------------------------------------------------------
-
-/// Zed JSON-RPC request format.
-#[derive(Debug, Deserialize)]
-pub struct ZedRequest {
-    pub method: String,
-    pub params: serde_json::Value,
-}
-
-/// ACP session lifecycle request.
-#[derive(Debug, Deserialize)]
-pub enum AcpRequest {
-    NewSession { cwd: String },
-    LoadSession { session_id: String, cwd: String },
-    CloseSession { session_id: String },
-    ListSessions,
-    Prompt { session_id: String, message: String },
-    ToolCall { session_id: String, function_name: String, arguments: String },
-    Authenticate { auth_method: String },
-}
-
-impl ZedRequest {
-    pub fn to_acp_request(self) -> Result<AcpRequest, String> {
-        match self.method.as_str() {
-            "new_session" => {
-                let cwd = self.params["cwd"]
-                    .as_str()
-                    .ok_or("cwd not found")
-                    .map(|s| s.to_string())?;
-                Ok(AcpRequest::NewSession { cwd })
-            }
-            "load_session" => {
-                let session_id = self.params["session_id"]
-                    .as_str()
-                    .ok_or("session_id not found")
-                    .map(|s| s.to_string())?;
-                let cwd = self.params["cwd"]
-                    .as_str()
-                    .ok_or("cwd not found")
-                    .map(|s| s.to_string())?;
-                Ok(AcpRequest::LoadSession { session_id, cwd })
-            }
-            "close_session" => {
-                let session_id = self.params["session_id"]
-                    .as_str()
-                    .ok_or("session_id not found")
-                    .map(|s| s.to_string())?;
-                Ok(AcpRequest::CloseSession { session_id })
-            }
-            "list_sessions" => Ok(AcpRequest::ListSessions),
-            "prompt" => {
-                let session_id = self.params["session_id"]
-                    .as_str()
-                    .ok_or("session_id not found")
-                    .map(|s| s.to_string())?;
-                let message = self.params["message"]
-                    .as_str()
-                    .ok_or("message not found")
-                    .map(|s| s.to_string())?;
-                Ok(AcpRequest::Prompt { session_id, message })
-            }
-            "tool_call" => {
-                let session_id = self.params["session_id"]
-                    .as_str()
-                    .ok_or("session_id not found")
-                    .map(|s| s.to_string())?;
-                let function_name = self.params["function_name"]
-                    .as_str()
-                    .ok_or("function_name not found")
-                    .map(|s| s.to_string())?;
-                let arguments = self.params["arguments"]
-                    .as_str()
-                    .ok_or("arguments not found")
-                    .map(|s| s.to_string())?;
-                Ok(AcpRequest::ToolCall { session_id, function_name, arguments })
-            }
-            "authenticate" => {
-                let auth_method = self.params["auth_method"]
-                    .as_str()
-                    .ok_or("auth_method not found")
-                    .map(|s| s.to_string())?;
-                Ok(AcpRequest::Authenticate { auth_method })
-            }
-            _ => Err(format!("Unknown method: {}", self.method)),
-        }
+    #[test]
+    fn zed_request_to_acp_load_session_works() {
+        let req = ZedRequest {
+            method: "load_session".to_string(),
+            params: serde_json::json!({
+                "session_id": "abc",
+                "cwd": "/tmp/test"
+            }),
+        };
+        let acp = req.to_acp_request().unwrap();
+        assert!(matches!(acp, AcpRequest::LoadSession { session_id, cwd } if session_id == "abc" && cwd == "/tmp/test"));
     }
-}
 
-/// Zed JSON-RPC response.
-#[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum AcpResponse {
-    Result { value: serde_json::Value },
-    Error { error: String },
-}
-
-// ---------------------------------------------------------------------------
-// Orchestrator Bridge
-// ---------------------------------------------------------------------------
-
-/// Bridge between ACP session and CrabJar execution.
-pub struct AcpBridge {
-    sessions: std::sync::Mutex<Vec<AcpSession>>,
-    guard_db: GuardDb,
-}
-
-impl Default for AcpBridge {
-    fn default() -> Self {
-        Self::new()
+    #[test]
+    fn zed_request_to_acp_close_session_works() {
+        let req = ZedRequest {
+            method: "close_session".to_string(),
+            params: serde_json::json!({ "session_id": "abc" }),
+        };
+        let acp = req.to_acp_request().unwrap();
+        assert!(matches!(acp, AcpRequest::CloseSession { session_id } if session_id == "abc"));
     }
-}
 
-impl AcpBridge {
-    pub fn new() -> Self {
-        let guard_db = GuardDb::open(":memory:").unwrap_or_else(|_| {
-            warn!("Failed to open guard DB, using in-memory fallback");
-            GuardDb::open(":memory:").unwrap()
-        });
+    #[test]
+    fn zed_request_to_acp_list_sessions_works() {
+        let req = ZedRequest {
+            method: "list_sessions".to_string(),
+            params: serde_json::json!({}),
+        };
+        let acp = req.to_acp_request().unwrap();
+        assert!(matches!(acp, AcpRequest::ListSessions));
+    }
 
-        Self {
+    #[test]
+    fn zed_request_to_acp_prompt_works() {
+        let req = ZedRequest {
+            method: "prompt".to_string(),
+            params: serde_json::json!({
+                "session_id": "abc",
+                "message": "hello"
+            }),
+        };
+        let acp = req.to_acp_request().unwrap();
+        assert!(matches!(acp, AcpRequest::Prompt { session_id, message } if session_id == "abc" && message == "hello"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_tool_call_works() {
+        let req = ZedRequest {
+            method: "tool_call".to_string(),
+            params: serde_json::json!({
+                "session_id": "abc",
+                "function_name": "run_command",
+                "arguments": "[\"echo\", \"hello\"]"
+            }),
+        };
+        let acp = req.to_acp_request().unwrap();
+        assert!(matches!(acp, AcpRequest::ToolCall { session_id, function_name, arguments } if session_id == "abc" && function_name == "run_command" && arguments == "[\"echo\", \"hello\"]"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_authenticate_works() {
+        let req = ZedRequest {
+            method: "authenticate".to_string(),
+            params: serde_json::json!({ "auth_method": "token" }),
+        };
+        let acp = req.to_acp_request().unwrap();
+        assert!(matches!(acp, AcpRequest::Authenticate { auth_method } if auth_method == "token"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_unknown_method_errors() {
+        let req = ZedRequest {
+            method: "unknown_method".to_string(),
+            params: serde_json::json!({}),
+        };
+        let result = req.to_acp_request();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unknown method"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_missing_cwd_errors() {
+        let req = ZedRequest {
+            method: "new_session".to_string(),
+            params: serde_json::json!({}),
+        };
+        let result = req.to_acp_request();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("cwd not found"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_missing_session_id_errors() {
+        let req = ZedRequest {
+            method: "load_session".to_string(),
+            params: serde_json::json!({ "cwd": "/tmp" }),
+        };
+        let result = req.to_acp_request();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("session_id not found"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_missing_message_errors() {
+        let req = ZedRequest {
+            method: "prompt".to_string(),
+            params: serde_json::json!({ "session_id": "abc" }),
+        };
+        let result = req.to_acp_request();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("message not found"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_missing_function_name_errors() {
+        let req = ZedRequest {
+            method: "tool_call".to_string(),
+            params: serde_json::json!({ "session_id": "abc", "arguments": "[]" }),
+        };
+        let result = req.to_acp_request();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("function_name not found"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_missing_arguments_errors() {
+        let req = ZedRequest {
+            method: "tool_call".to_string(),
+            params: serde_json::json!({ "session_id": "abc", "function_name": "run_command" }),
+        };
+        let result = req.to_acp_request();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("arguments not found"));
+    }
+
+    #[test]
+    fn zed_request_to_acp_missing_auth_method_errors() {
+        let req = ZedRequest {
+            method: "authenticate".to_string(),
+            params: serde_json::json!({}),
+        };
+        let result = req.to_acp_request();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("auth_method not found"));
+    }
+
+    #[test]
+    fn acp_session_new_creates_session() {
+        let session = AcpSession::new("/tmp/test".to_string());
+        assert!(!session.id.is_empty());
+        assert_eq!(session.cwd, "/tmp/test");
+        assert_eq!(session.trust_layer, 2);
+        assert!(session.trajectory.is_empty());
+    }
+
+    #[test]
+    fn acp_bridge_new_session_works() {
+        let dir = tempdir().unwrap();
+        let guard_db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let bridge = AcpBridge {
             sessions: std::sync::Mutex::new(Vec::new()),
             guard_db,
-        }
-    }
-
-    pub fn new_session(&mut self, cwd: String) -> Result<AcpSession, String> {
-        let session = AcpSession::new(cwd);
-        let mut sessions = self.sessions.lock().unwrap();
-        sessions.push(session.clone());
-        Ok(session)
-    }
-
-    pub fn load_session(&mut self, session_id: String, cwd: String) -> Result<AcpSession, String> {
-        let mut sessions = self.sessions.lock().unwrap();
-        let mut entry = sessions
-            .iter_mut()
-            .find(|s| s.id == session_id)
-            .cloned()
-            .ok_or(format!("Session {} not found", session_id))?;
-
-        entry.cwd = cwd;
-        Ok(entry)
-    }
-
-    pub fn close_session(&mut self, session_id: String) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().unwrap();
-        sessions.retain(|s| s.id != session_id);
-        Ok(())
-    }
-
-    pub fn list_sessions(&self) -> Vec<AcpSession> {
-        self.sessions.lock().unwrap().clone()
-    }
-
-    /// Gate check for a tool call.
-    pub fn gate_check(
-        &self,
-        session_id: String,
-        command: &str,
-        args: &[String],
-    ) -> Result<(GateResult, ActionStatus), String> {
-        let session_data = {
-            let sessions = self.sessions.lock().unwrap();
-            sessions
-                .iter()
-                .find(|s| s.id == session_id)
-                .cloned()
-                .ok_or(format!("Session {} not found", session_id))?
         };
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        assert!(!session.id.is_empty());
+        assert_eq!(session.cwd, "/tmp/test");
+    }
 
-        let gate = ExecutionGate::new(&self.guard_db, false, "/tmp");
-
-        let gate_result = gate
-            .check(GateContext {
-                action_type: "tool_call",
-                command,
-                args: args.to_vec(),
-                trust_layer: session_data.trust_layer,
-                confidence: session_data.confidence,
-                source_event_id: Some("acp-tc"),
-                can_interrupt: true,
-            })
-            .map_err(|e| e.to_string())?;
-
-        let _concierge = GateConcierge { db: None };
-        let status = match gate_result {
-            GateResult::Proceed => ActionStatus::TrustApproved,
-            GateResult::Pending => ActionStatus::Pending,
-            GateResult::Interrupted { .. } => ActionStatus::Denied,
-            GateResult::DryRun => ActionStatus::Denied,
+    #[test]
+    fn acp_bridge_load_session_works() {
+        let dir = tempdir().unwrap();
+        let guard_db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db,
         };
-
-        Ok((gate_result, status))
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        let loaded = bridge.load_session(session.id.clone(), "/tmp/new".to_string()).unwrap();
+        assert_eq!(loaded.cwd, "/tmp/new");
     }
 
-    /// Record a trajectory event.
-    pub fn record_event(&mut self, session_id: String, event: TrajectoryEvent) -> Result<(), String> {
-        let mut sessions = self.sessions.lock().unwrap();
-        let entry = sessions
-            .iter_mut()
-            .find(|s| s.id == session_id)
-            .ok_or(format!("Session {} not found", session_id))?;
-
-        entry.trajectory.push(event);
-        Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Agent Server
-// ---------------------------------------------------------------------------
-
-/// ACP agent server running via stdin/stdout.
-pub struct AcpAgentServer {
-    bridge: AcpBridge,
-    orchestrator_url: String,
-}
-
-impl Default for AcpAgentServer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AcpAgentServer {
-    pub fn new() -> Self {
-        let orchestrator_url = std::env::var("ACP_ORCHESTRATOR_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:3000/acp".to_string());
-
-        Self {
-            bridge: AcpBridge::new(),
-            orchestrator_url,
-        }
-    }
-
-    /// Handle a Zed JSON-RPC request.
-    pub async fn handle_request(&mut self, request: ZedRequest) -> AcpResponse {
-        let acp_request = match request.to_acp_request() {
-            Ok(req) => req,
-            Err(e) => return AcpResponse::Error { error: e },
+    #[test]
+    fn acp_bridge_load_session_not_found_errors() {
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db: GuardDb::open(":memory:").unwrap(),
         };
-        match acp_request {
-            AcpRequest::NewSession { cwd } => {
-                match self.bridge.new_session(cwd) {
-                    Ok(session) => AcpResponse::Result { value: serde_json::to_value(&session).unwrap_or_default() },
-                    Err(e) => AcpResponse::Error { error: e },
-                }
-            }
-            AcpRequest::LoadSession { session_id, cwd } => {
-                match self.bridge.load_session(session_id, cwd) {
-                    Ok(session) => AcpResponse::Result { value: serde_json::to_value(&session).unwrap_or_default() },
-                    Err(e) => AcpResponse::Error { error: e },
-                }
-            }
-            AcpRequest::CloseSession { session_id } => {
-                match self.bridge.close_session(session_id) {
-                    Ok(()) => AcpResponse::Result { value: serde_json::to_value(&self.bridge.list_sessions()).unwrap_or_default() },
-                    Err(e) => AcpResponse::Error { error: e },
-                }
-            }
-            AcpRequest::ListSessions => {
-                AcpResponse::Result { value: serde_json::to_value(&self.bridge.list_sessions()).unwrap_or_default() }
-            }
-            AcpRequest::Prompt { session_id, message } => {
-                let client = reqwest::Client::new();
-                let response = client
-                    .post(format!("{}/prompt", self.orchestrator_url))
-                    .json(&serde_json::json!({
-                        "message": message,
-                    }))
-                    .send()
-                    .await
-                    .map_err(|e| format!("Failed to connect to orchestrator: {}", e));
+        let result = bridge.load_session("nonexistent".to_string(), "/tmp".to_string());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
 
-                match response {
-                    Ok(resp) => {
-                        let body = resp
-                            .text()
-                            .await
-                            .map_err(|e| format!("Failed to parse response: {}", e));
+    #[test]
+    fn acp_bridge_close_session_works() {
+        let dir = tempdir().unwrap();
+        let guard_db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db,
+        };
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        bridge.close_session(session.id.clone()).unwrap();
+        assert!(bridge.list_sessions().is_empty());
+    }
 
-                        match body {
-                            Ok(content) => {
-                                let _ = self.bridge.record_event(
-                                    session_id,
-                                    TrajectoryEvent {
-                                        timestamp: chrono::Utc::now().timestamp(),
-                                        source: "user_prompt".to_string(),
-                                        content: message.clone(),
-                                        preview: message.chars().take(200).collect(),
-                                    },
-                                );
-                                AcpResponse::Result { value: serde_json::json!({ "content": content }) }
-                            }
-                            Err(e) => AcpResponse::Error { error: e },
-                        }
-                    }
-                    Err(e) => AcpResponse::Error { error: e },
-                }
-            }
-            AcpRequest::ToolCall { session_id, function_name, arguments } => {
-                let args: Vec<String> =
-                    serde_json::from_str(&arguments).unwrap_or_else(|e| {
-                        warn!("Failed to parse tool arguments: {}", e);
-                        vec![]
-                    });
+    #[test]
+    fn acp_bridge_close_session_nonexistent_noop() {
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db: GuardDb::open(":memory:").unwrap(),
+        };
+        bridge.close_session("nonexistent".to_string()).unwrap();
+        assert!(bridge.list_sessions().is_empty());
+    }
 
-                let (gate_result, status) = self
-                    .bridge
-                    .gate_check(session_id.clone(), &function_name, &args)
-                    .unwrap_or_else(|e| {
-                        warn!("Gate check failed: {}", e);
-                        (GateResult::Interrupted { reason: "gate error".to_string() }, ActionStatus::Denied)
-                    });
+    #[test]
+    fn acp_bridge_list_sessions_returns_all() {
+        let dir = tempdir().unwrap();
+        let guard_db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db,
+        };
+        bridge.new_session("/tmp/a".to_string()).unwrap();
+        bridge.new_session("/tmp/b".to_string()).unwrap();
+        let sessions = bridge.list_sessions();
+        assert_eq!(sessions.len(), 2);
+    }
 
-                match status {
-                    ActionStatus::Denied => AcpResponse::Error {
-                        error: format!("Tool call denied by gate: {:?}", gate_result),
-                    },
-                    ActionStatus::Pending => AcpResponse::Error {
-                        error: "Tool call pending — queued for review".to_string(),
-                    },
-                    ActionStatus::TrustApproved => {
-                        let client = reqwest::Client::new();
-                        let response = client
-                            .post(format!("{}/run", self.orchestrator_url))
-                            .json(&serde_json::json!({
-                                "tool": function_name,
-                                "args": args,
-                            }))
-                            .send()
-                            .await
-                            .map_err(|e| format!("Failed to execute via orchestrator: {}", e));
+    #[test]
+    fn acp_bridge_record_event_works() {
+        let dir = tempdir().unwrap();
+        let guard_db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db,
+        };
+        let session = bridge.new_session("/tmp/test".to_string()).unwrap();
+        let event = TrajectoryEvent {
+            timestamp: 123,
+            source: "user".to_string(),
+            content: "hello".to_string(),
+            preview: "hello".to_string(),
+        };
+        bridge.record_event(session.id.clone(), event).unwrap();
+        assert_eq!(session.trajectory.len(), 1);
+    }
 
-                        match response {
-                            Ok(resp) => {
-                                let body = resp
-                                    .text()
-                                    .await
-                                    .map_err(|e| format!("Failed to parse response: {}", e));
+    #[test]
+    fn acp_bridge_record_event_not_found_errors() {
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db: GuardDb::open(":memory:").unwrap(),
+        };
+        let event = TrajectoryEvent {
+            timestamp: 123,
+            source: "user".to_string(),
+            content: "hello".to_string(),
+            preview: "hello".to_string(),
+        };
+        let result = bridge.record_event("nonexistent".to_string(), event);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
 
-                        match body {
-                            Ok(content) => {
-                                let _ = self.bridge.record_event(
-                                    session_id,
-                                    TrajectoryEvent {
-                                        timestamp: chrono::Utc::now().timestamp(),
-                                        source: "tool_call".to_string(),
-                                        content: content.clone(),
-                                        preview: content.chars().take(200).collect(),
-                                    },
-                                );
-                                AcpResponse::Result { value: serde_json::json!({ "result": content }) }
-                            }
-                            Err(e) => AcpResponse::Error { error: e },
-                        }
-                    }
-                    Err(e) => AcpResponse::Error { error: e },
-                }
-                    }
-                    ActionStatus::Executed | ActionStatus::Interrupted => {
-                        AcpResponse::Error {
-                            error: "Status not handled".to_string(),
-                        }
-                    }
-                }
-            }
-            AcpRequest::Authenticate { auth_method: _ } => {
-                AcpResponse::Result { value: serde_json::json!({ "authenticated": true }) }
-            }
-        }
+    #[test]
+    fn acp_bridge_gate_check_proceeds_for_default() {
+        let dir = tempdir().unwrap();
+        let guard_db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db,
+        };
+        let session = bridge.new_session("/tmp".to_string()).unwrap();
+        let (gate_result, status) = bridge.gate_check(session.id.clone(), "echo", &["hello"]).unwrap();
+        assert!(matches!(gate_result, GateResult::Proceed));
+        assert!(matches!(status, ActionStatus::TrustApproved));
+    }
+
+    #[test]
+    fn acp_bridge_gate_check_session_not_found_errors() {
+        let mut bridge = AcpBridge {
+            sessions: std::sync::Mutex::new(Vec::new()),
+            guard_db: GuardDb::open(":memory:").unwrap(),
+        };
+        let result = bridge.gate_check("nonexistent".to_string(), "echo", &["hello"]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn handle_request_new_session_returns_result() {
+        let mut server = AcpAgentServer::new();
+        let req = ZedRequest {
+            method: "new_session".to_string(),
+            params: serde_json::json!({ "cwd": "/tmp/test" }),
+        };
+        let response = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req));
+        assert!(matches!(response, AcpResponse::Result { .. }));
+    }
+
+    #[test]
+    fn handle_request_close_session_returns_result() {
+        let mut server = AcpAgentServer::new();
+        let req = ZedRequest {
+            method: "new_session".to_string(),
+            params: serde_json::json!({ "cwd": "/tmp/test" }),
+        };
+        let _session = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req));
+        let req2 = ZedRequest {
+            method: "close_session".to_string(),
+            params: serde_json::json!({ "session_id": "nonexistent" }),
+        };
+        let response = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req2));
+        assert!(matches!(response, AcpResponse::Result { .. }));
+    }
+
+    #[test]
+    fn handle_request_list_sessions_returns_result() {
+        let mut server = AcpAgentServer::new();
+        let req = ZedRequest {
+            method: "list_sessions".to_string(),
+            params: serde_json::json!({}),
+        };
+        let response = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req));
+        assert!(matches!(response, AcpResponse::Result { .. }));
+    }
+
+    #[test]
+    fn handle_request_unknown_method_returns_error() {
+        let mut server = AcpAgentServer::new();
+        let req = ZedRequest {
+            method: "unknown".to_string(),
+            params: serde_json::json!({}),
+        };
+        let response = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req));
+        assert!(matches!(response, AcpResponse::Error { .. }));
+    }
+
+    #[test]
+    fn handle_request_prompt_orchestrator_unreachable_returns_error() {
+        let mut server = AcpAgentServer::new();
+        let req = ZedRequest {
+            method: "prompt".to_string(),
+            params: serde_json::json!({
+                "session_id": "abc",
+                "message": "hello"
+            }),
+        };
+        let response = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req));
+        assert!(matches!(response, AcpResponse::Error { .. }));
+    }
+
+    #[test]
+    fn handle_request_tool_call_denied_by_gate_returns_error() {
+        let mut server = AcpAgentServer::new();
+        let req = ZedRequest {
+            method: "new_session".to_string(),
+            params: serde_json::json!({ "cwd": "/tmp" }),
+        };
+        let _session = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req));
+        let req2 = ZedRequest {
+            method: "tool_call".to_string(),
+            params: serde_json::json!({
+                "session_id": "nonexistent",
+                "function_name": "run_command",
+                "arguments": "[]"
+            }),
+        };
+        let response = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(req2));
+        assert!(matches!(response, AcpResponse::Error { .. }));
     }
 }
-
-
