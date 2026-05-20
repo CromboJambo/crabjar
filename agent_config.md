@@ -61,3 +61,11 @@ Runtime execution is executor-capable. Execution is opt-in via `.crabjar_config.
 *   **Analysis**: `read_file`, `diagnostics`, `cargo check/clippy`
 *   **Modification**: `edit_file`, `create_file`, `move_path`
 *   **Execution**: tool calls gated by reversibility scoring and permission request
+
+## Zed Agent Server Protocol
+*   Zed agent servers require stdin/stdout JSON-RPC communication
+*   Zed sends `{ "method": "...", "params": {...} }` on stdin
+*   Server responds with `{ "type": "result", "value": {...} }` on stdout
+*   HTTP orchestrator (axum, TCP port 3000) is incompatible with Zed — requires dedicated stdio server
+*   `agent_server_command` is configured via Zed settings JSON, not an Extension trait method
+*   Two-layer architecture: `zed-acp-bridge` (Wasm extension) + `zed-acp-server` (stdio binary)
