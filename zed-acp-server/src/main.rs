@@ -1,4 +1,4 @@
-use zed_acp_server::AcpAgentServer;
+use zed_acp_server::{AcpAgentServer, ZedRequest};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use serde_json;
 use tracing::{info, warn};
