@@ -1,0 +1,30 @@
+# Rust
+target/
+
+# notebooks
+.obsidian
+
+# podman (docker)
+dockerfile
+docker-compose.yml
+docker-compose.override.yml
+
+# cargo
+Cargo.lock
+
+# git
+.gitmodules
+
+# other
+*.log
+*.tmp
+*.bak
+*.swp
+.dotfiles/
+state-docs/
+
+# references:
+
+# Stakpak session files
+.stakpak/session*
+reference_materials/
