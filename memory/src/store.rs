@@ -55,26 +55,67 @@ impl Store {
         source_doc: &str,
     ) -> StoreResult<Vec<KnowledgeRow>> {
         let mut rows = Vec::new();
-        let sql = match (provenance_id.is_empty(), source_id.is_empty(), source_doc.is_empty()) {
-            (false, false, false) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ? AND source_id = ? AND metadata->>'$.source_doc' = ?",
-            (true, false, false) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source_id = ? AND metadata->>'$.source_doc' = ?",
-            (false, true, false) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ? AND metadata->>'$.source_doc' = ?",
-            (true, true, false) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND metadata->>'$.source_doc' = ?",
-            (false, false, true) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ? AND source_id = ?",
-            (true, false, true) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source_id = ?",
-            (false, true, true) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ?",
-            (true, true, true) => "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1",
+        let sql = match (
+            provenance_id.is_empty(),
+            source_id.is_empty(),
+            source_doc.is_empty(),
+        ) {
+            (false, false, false) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ? AND source_id = ? AND metadata->>'$.source_doc' = ?"
+            }
+            (true, false, false) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source_id = ? AND metadata->>'$.source_doc' = ?"
+            }
+            (false, true, false) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ? AND metadata->>'$.source_doc' = ?"
+            }
+            (true, true, false) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND metadata->>'$.source_doc' = ?"
+            }
+            (false, false, true) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ? AND source_id = ?"
+            }
+            (true, false, true) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source_id = ?"
+            }
+            (false, true, true) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ?"
+            }
+            (true, true, true) => {
+                "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1"
+            }
         };
         let mut stmt = self.conn.prepare(sql)?;
 
-        let cursor = match (provenance_id.is_empty(), source_id.is_empty(), source_doc.is_empty()) {
-            (false, false, false) => stmt.query_map(rusqlite::params![provenance_id, source_id, source_doc], raw_knowledge_row)?,
-            (true, false, false) => stmt.query_map(rusqlite::params![source_id, source_doc], raw_knowledge_row)?,
-            (false, true, false) => stmt.query_map(rusqlite::params![provenance_id, source_doc], raw_knowledge_row)?,
-            (true, true, false) => stmt.query_map(rusqlite::params![source_doc], raw_knowledge_row)?,
-            (false, false, true) => stmt.query_map(rusqlite::params![provenance_id, source_id], raw_knowledge_row)?,
-            (true, false, true) => stmt.query_map(rusqlite::params![source_id], raw_knowledge_row)?,
-            (false, true, true) => stmt.query_map(rusqlite::params![provenance_id], raw_knowledge_row)?,
+        let cursor = match (
+            provenance_id.is_empty(),
+            source_id.is_empty(),
+            source_doc.is_empty(),
+        ) {
+            (false, false, false) => stmt.query_map(
+                rusqlite::params![provenance_id, source_id, source_doc],
+                raw_knowledge_row,
+            )?,
+            (true, false, false) => {
+                stmt.query_map(rusqlite::params![source_id, source_doc], raw_knowledge_row)?
+            }
+            (false, true, false) => stmt.query_map(
+                rusqlite::params![provenance_id, source_doc],
+                raw_knowledge_row,
+            )?,
+            (true, true, false) => {
+                stmt.query_map(rusqlite::params![source_doc], raw_knowledge_row)?
+            }
+            (false, false, true) => stmt.query_map(
+                rusqlite::params![provenance_id, source_id],
+                raw_knowledge_row,
+            )?,
+            (true, false, true) => {
+                stmt.query_map(rusqlite::params![source_id], raw_knowledge_row)?
+            }
+            (false, true, true) => {
+                stmt.query_map(rusqlite::params![provenance_id], raw_knowledge_row)?
+            }
             (true, true, true) => stmt.query_map([], raw_knowledge_row)?,
         };
 
@@ -100,10 +141,8 @@ impl Store {
             "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source_type = ? AND source_id = ?",
         )?;
 
-        let mut cursor = stmt.query_map(
-            rusqlite::params![source_type, source_id],
-            raw_knowledge_row,
-        )?;
+        let mut cursor =
+            stmt.query_map(rusqlite::params![source_type, source_id], raw_knowledge_row)?;
 
         if let Some(row) = cursor.next() {
             return Ok(Some(row?));
@@ -164,10 +203,12 @@ impl Store {
         reason: Option<&str>,
     ) -> StoreResult<usize> {
         let _reason = reason.unwrap_or("");
-        let mut stmt = self.conn.prepare(
-            "SELECT id FROM knowledge_entries WHERE active = 1 AND provenance_id = ?",
-        )?;
-        let cursor = stmt.query_map(rusqlite::params![provenance_id], |row| row.get::<usize, i64>(0))?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM knowledge_entries WHERE active = 1 AND provenance_id = ?")?;
+        let cursor = stmt.query_map(rusqlite::params![provenance_id], |row| {
+            row.get::<usize, i64>(0)
+        })?;
         let mut ids = Vec::new();
         for id in cursor {
             ids.push(id?);
@@ -208,17 +249,11 @@ impl Store {
         Ok(())
     }
 
-    fn matching_ids_by_source(
-        &self,
-        source_type: &str,
-        source_id: &str,
-    ) -> StoreResult<Vec<i64>> {
+    fn matching_ids_by_source(&self, source_type: &str, source_id: &str) -> StoreResult<Vec<i64>> {
         let mut stmt = self.conn.prepare(
             "SELECT id FROM knowledge_entries WHERE active = 1 AND source_type = ? AND source_id = ?",
         )?;
-        let cursor = stmt.query_map(rusqlite::params![source_type, source_id], |row| {
-            row.get(0)
-        })?;
+        let cursor = stmt.query_map(rusqlite::params![source_type, source_id], |row| row.get(0))?;
         let mut ids = Vec::new();
 
         for id in cursor {
