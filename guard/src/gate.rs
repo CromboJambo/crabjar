@@ -326,6 +326,7 @@ mod tests {
             ],
         )
         .unwrap();
+        drop(conn);
 
         let gate = ExecutionGate::new(&db, false, dir.path());
 
@@ -363,6 +364,7 @@ mod tests {
             ],
         )
         .unwrap();
+        drop(conn);
 
         let gate = ExecutionGate::new(&db, false, dir.path());
 
@@ -400,6 +402,7 @@ mod tests {
             ],
         )
         .unwrap();
+        drop(conn);
 
         let gate = ExecutionGate::new(&db, false, dir.path());
 
@@ -457,6 +460,7 @@ mod tests {
             ],
         )
         .unwrap();
+        drop(conn);
 
         let gate = ExecutionGate::new(&db, false, dir.path());
 
@@ -494,6 +498,7 @@ mod tests {
             ],
         )
         .unwrap();
+        drop(conn);
 
         let gate = ExecutionGate::new(&db, false, dir.path());
 
@@ -571,6 +576,7 @@ mod tests {
             ],
         )
         .unwrap();
+        drop(conn);
 
         let gate = ExecutionGate::new(&db, false, dir.path());
 

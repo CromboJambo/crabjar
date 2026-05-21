@@ -171,6 +171,7 @@ mod tests {
                 "/repo:/tmp",
             )
             .unwrap();
+        assert!(!id.is_empty());
 
         let row = isolation.query_sandbox("test-agent").unwrap();
         assert!(row.is_some());

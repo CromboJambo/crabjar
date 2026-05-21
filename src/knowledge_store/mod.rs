@@ -285,8 +285,11 @@ impl<'a> KnowledgeBridge<'a> {
         provenance_id: &str,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        Ok(self.knowledge_store
-            .deactivate_by_provenance_id(provenance_id, Source::Agent, reason)?)
+        Ok(self.knowledge_store.deactivate_by_provenance_id(
+            provenance_id,
+            Source::Agent,
+            reason,
+        )?)
     }
 
     /// Resolve an annotation and deactivate derived knowledge entries.

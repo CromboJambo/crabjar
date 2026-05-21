@@ -298,6 +298,7 @@ mod tests {
                 "{}",
             )
             .unwrap();
+        assert!(!id.is_empty());
 
         let rows = store.query_weights("qwen3-4b", 10).unwrap();
         assert_eq!(rows.len(), 1);

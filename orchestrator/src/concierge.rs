@@ -26,6 +26,7 @@ impl GateConcierge {
 
     /// Enforce a gate result through provenance boundaries.
     /// Returns a boundary_enforced status and any queued/logged entries.
+    #[allow(clippy::too_many_arguments)]
     pub fn enforce(
         &mut self,
         gate_result: GateResult,

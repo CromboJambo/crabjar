@@ -273,6 +273,8 @@ mod tests {
 
         let before_id = recorder.checkpoint_before("before_hash", 0).unwrap();
         let after_id = recorder.checkpoint_after("after_hash", 5).unwrap();
+        assert!(!before_id.is_empty());
+        assert!(!after_id.is_empty());
 
         let checkpoints = recorder.query_checkpoints(10).unwrap();
         assert_eq!(checkpoints.len(), 2);

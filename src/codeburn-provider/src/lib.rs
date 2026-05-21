@@ -25,11 +25,9 @@ pub struct ProviderRegistry {
 
 impl ProviderRegistry {
     pub fn new() -> Self {
-        Self { providers: Vec::new() }
-    }
-
-    pub fn default() -> Self {
-        Self::new()
+        Self {
+            providers: Vec::new(),
+        }
     }
 
     pub fn discover(path: &std::path::Path) -> Result<Self, ProviderError> {
@@ -63,40 +61,102 @@ impl ProviderRegistry {
     }
 
     pub fn provider_sessions(&self, name: &str) -> Result<Vec<SessionData>, ProviderError> {
-        Ok(self.providers.iter().filter(|s| s.provider_name == name).cloned().collect())
+        Ok(self
+            .providers
+            .iter()
+            .filter(|s| s.provider_name == name)
+            .cloned()
+            .collect())
     }
 
     pub fn today_usage(&self) -> Result<String, ProviderError> {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        let total: u64 = self.providers.iter().filter(|s| s.date == today).map(|s| s.input_tokens + s.output_tokens).sum();
+        let total: u64 = self
+            .providers
+            .iter()
+            .filter(|s| s.date == today)
+            .map(|s| s.input_tokens + s.output_tokens)
+            .sum();
         Ok(total.to_string())
     }
 
-    pub fn today_usage_json(&self) -> Result<serde_json::Map<String, serde_json::Value>, ProviderError> {
+    pub fn today_usage_json(
+        &self,
+    ) -> Result<serde_json::Map<String, serde_json::Value>, ProviderError> {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let mut map = serde_json::Map::new();
         map.insert("date".to_string(), json!(today));
-        map.insert("total_tokens".to_string(), json!(self.providers.iter().filter(|s| s.date == today).map(|s| s.input_tokens + s.output_tokens).sum::<u64>()));
+        map.insert(
+            "total_tokens".to_string(),
+            json!(
+                self.providers
+                    .iter()
+                    .filter(|s| s.date == today)
+                    .map(|s| s.input_tokens + s.output_tokens)
+                    .sum::<u64>()
+            ),
+        );
         Ok(map)
     }
 
-    pub fn month_usage_json(&self) -> Result<serde_json::Map<String, serde_json::Value>, ProviderError> {
+    pub fn month_usage_json(
+        &self,
+    ) -> Result<serde_json::Map<String, serde_json::Value>, ProviderError> {
         let month = chrono::Utc::now().format("%Y-%m").to_string();
         let mut map = serde_json::Map::new();
         map.insert("month".to_string(), json!(month));
-        map.insert("total_tokens".to_string(), json!(self.providers.iter().filter(|s| s.date.starts_with(&month)).map(|s| s.input_tokens + s.output_tokens).sum::<u64>()));
+        map.insert(
+            "total_tokens".to_string(),
+            json!(
+                self.providers
+                    .iter()
+                    .filter(|s| s.date.starts_with(&month))
+                    .map(|s| s.input_tokens + s.output_tokens)
+                    .sum::<u64>()
+            ),
+        );
         Ok(map)
     }
 
-    pub fn multi_period_export_json(&self) -> Result<serde_json::Map<String, serde_json::Value>, ProviderError> {
+    pub fn multi_period_export_json(
+        &self,
+    ) -> Result<serde_json::Map<String, serde_json::Value>, ProviderError> {
         let mut map = serde_json::Map::new();
         let mut by_date = serde_json::Map::new();
-        for date in self.providers.iter().map(|s| s.date.clone()).collect::<std::collections::HashSet<String>>() {
-            by_date.insert(date.clone(), json!(self.providers.iter().filter(|s| s.date == date).map(|s| s.input_tokens + s.output_tokens).sum::<u64>()));
+        for date in self
+            .providers
+            .iter()
+            .map(|s| s.date.clone())
+            .collect::<std::collections::HashSet<String>>()
+        {
+            by_date.insert(
+                date.clone(),
+                json!(
+                    self.providers
+                        .iter()
+                        .filter(|s| s.date == date)
+                        .map(|s| s.input_tokens + s.output_tokens)
+                        .sum::<u64>()
+                ),
+            );
         }
         map.insert("by_date".to_string(), json!(by_date));
-        map.insert("total_tokens".to_string(), json!(self.providers.iter().map(|s| s.input_tokens + s.output_tokens).sum::<u64>()));
+        map.insert(
+            "total_tokens".to_string(),
+            json!(
+                self.providers
+                    .iter()
+                    .map(|s| s.input_tokens + s.output_tokens)
+                    .sum::<u64>()
+            ),
+        );
         Ok(map)
+    }
+}
+
+impl Default for ProviderRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

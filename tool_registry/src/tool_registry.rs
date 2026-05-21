@@ -146,11 +146,11 @@ impl<'a> ToolRegistry<'a> {
                                 })?;
                             if let Some(tools) = parsed["tools"].as_array() {
                                 for tool in tools {
-                                    if let Some(name) = tool["name"].as_str() {
-                                        if !discovered.contains(&name.to_string()) {
-                                            discovered.push(name.to_string());
-                                            self.record_discovery(source, name)?;
-                                        }
+                                    if let Some(name) = tool["name"].as_str()
+                                        && !discovered.contains(&name.to_string())
+                                    {
+                                        discovered.push(name.to_string());
+                                        self.record_discovery(source, name)?;
                                     }
                                 }
                             }
@@ -178,11 +178,11 @@ impl<'a> ToolRegistry<'a> {
                             })?;
                         if let Some(tools) = parsed["tools"].as_array() {
                             for tool in tools {
-                                if let Some(name) = tool["name"].as_str() {
-                                    if !discovered.contains(&name.to_string()) {
-                                        discovered.push(name.to_string());
-                                        self.record_discovery(source, name)?;
-                                    }
+                                if let Some(name) = tool["name"].as_str()
+                                    && !discovered.contains(&name.to_string())
+                                {
+                                    discovered.push(name.to_string());
+                                    self.record_discovery(source, name)?;
                                 }
                             }
                         }
@@ -240,6 +240,7 @@ mod tests {
                 "{}",
             )
             .unwrap();
+        assert!(!id.is_empty());
 
         let row = registry.query_tool("cargo_check").unwrap();
         assert!(row.is_some());

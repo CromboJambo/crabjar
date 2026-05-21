@@ -11,7 +11,7 @@ use serde_json::json;
 
 pub enum TuiOutput {
     Json(serde_json::Value),
-    Dashboard(TuiDashboard),
+    Dashboard(Box<TuiDashboard>),
     Status(TuiStatus),
 }
 
@@ -196,7 +196,7 @@ impl TuiDashboard {
             .map(|(date, cost)| {
                 let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_cost);
                 Line::from(vec![
-                    Span::raw(format!("{}", date)).fg(Color::White),
+                    Span::raw(date.to_string()).fg(Color::White),
                     Span::raw(" "),
                     Span::raw(bar),
                     Span::raw(" "),

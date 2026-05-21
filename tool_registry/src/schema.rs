@@ -502,6 +502,7 @@ mod tests {
         init_db(&conn).unwrap();
 
         let id = record_tool_discovery(&conn, "aur_search", "spotify").unwrap();
+        assert!(!id.is_empty());
 
         let rows = query_discovery(&conn, "aur_search", 10).unwrap();
         assert_eq!(rows.len(), 1);

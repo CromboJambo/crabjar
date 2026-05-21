@@ -144,11 +144,11 @@ async fn handle_report(cli: &Cli) -> Result<TuiOutput, Box<dyn std::error::Error
                     },
                 })))
             } else {
-                Ok(TuiOutput::Dashboard(TuiDashboard::new(
+                Ok(TuiOutput::Dashboard(Box::new(TuiDashboard::new(
                     costs,
                     sessions,
                     cli_period(cli),
-                )))
+                ))))
             }
         }
         _ => Ok(TuiOutput::Json(json!({
@@ -238,7 +238,7 @@ fn handle_export(cli: &Cli) -> Result<TuiOutput, Box<dyn std::error::Error>> {
                 CliCommand::Export { format, .. } => Some(format),
                 _ => None,
             }),
-            "periods": serde_json::Value::Array(vec![]),
+            "periods": data.get("by_date").cloned().unwrap_or_else(|| json!({})),
         },
     })))
 }
@@ -312,14 +312,16 @@ fn is_valid_iso4217(code: &str) -> bool {
 }
 
 async fn frankfurter_rate(code: &str) -> Result<f64, Box<dyn std::error::Error>> {
-    let rate = reqwest::get(format!("https://api.frankfurter.dev/latest?from=EUR&to={code}"))
-        .await?
-        .json::<serde_json::Value>()
-        .await?
-        .get("rates")
-        .and_then(|r| r.get(code))
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0);
+    let rate = reqwest::get(format!(
+        "https://api.frankfurter.dev/latest?from=EUR&to={code}"
+    ))
+    .await?
+    .json::<serde_json::Value>()
+    .await?
+    .get("rates")
+    .and_then(|r| r.get(code))
+    .and_then(|v| v.as_f64())
+    .unwrap_or(0.0);
 
     Ok(rate)
 }

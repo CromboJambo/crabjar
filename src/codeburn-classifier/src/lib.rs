@@ -50,11 +50,16 @@ impl TaskClassifier {
         }
     }
 
-    pub fn default() -> Self {
-        Self::new()
-    }
-
-    pub fn classify(&self, _sessions: &[codeburn_provider::SessionData]) -> Result<Vec<codeburn_provider::SessionData>, ClassifierError> {
+    pub fn classify(
+        &self,
+        _sessions: &[codeburn_provider::SessionData],
+    ) -> Result<Vec<codeburn_provider::SessionData>, ClassifierError> {
         Ok(_sessions.to_vec())
+    }
+}
+
+impl Default for TaskClassifier {
+    fn default() -> Self {
+        Self::new()
     }
 }

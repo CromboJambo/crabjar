@@ -404,6 +404,7 @@ mod tests {
         init_db(&conn).unwrap();
 
         let id = checkpoint_session(&conn, "session-1", "abc123", 5).unwrap();
+        assert!(!id.is_empty());
 
         let rows = query_session_checkpoints(&conn, "session-1", 10).unwrap();
         assert_eq!(rows.len(), 1);
@@ -521,6 +522,7 @@ mod tests {
             "agent",
         )
         .unwrap();
+        assert!(!id.is_empty());
 
         let rows = query_flight_records(&conn, "session-1", 10).unwrap();
         assert_eq!(rows[0].exit_code, 1);

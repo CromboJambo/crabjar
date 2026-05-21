@@ -1,8 +1,7 @@
-use zed_acp_server::{AcpAgentServer, ZedRequest};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use serde_json;
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use zed_acp_server::AcpAgentServer;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let mut reader = BufReader::new(stdin);
     let mut writer = stdout;
 
-    let mut server = AcpAgentServer::default();
+    let server = AcpAgentServer::default();
 
     loop {
         let mut line = String::new();

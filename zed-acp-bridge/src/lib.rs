@@ -16,8 +16,8 @@ pub struct ToolSchema {
 
 impl ToolSchema {
     pub fn from_function_call(name: &str, args: &str) -> Result<Self, AcpBridgeError> {
-        let parsed = serde_json::from_str(args)
-            .map_err(|e| AcpBridgeError::BridgeError(e.to_string()))?;
+        let parsed =
+            serde_json::from_str(args).map_err(|e| AcpBridgeError::BridgeError(e.to_string()))?;
         Ok(Self {
             function_name: name.to_string(),
             arguments: parsed,
@@ -44,5 +44,11 @@ impl AcpBridge {
             session: None,
             events: Vec::new(),
         }
+    }
+}
+
+impl Default for AcpBridge {
+    fn default() -> Self {
+        Self::new()
     }
 }

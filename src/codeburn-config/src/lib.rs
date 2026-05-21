@@ -29,27 +29,30 @@ impl CodeBurnConfig {
         }
     }
 
-    pub fn default() -> Self {
-        Self::new()
-    }
-
     pub fn load(path: &Path) -> Result<Self, CodeBurnConfigError> {
         let config_path = path.join(".crabjar_config.toml");
         if !config_path.exists() {
-            return Err(CodeBurnConfigError::FileNotFound {
-                path: config_path,
-            });
+            return Err(CodeBurnConfigError::FileNotFound { path: config_path });
         }
 
-        let content = std::fs::read_to_string(&config_path)
-            .map_err(|e| CodeBurnConfigError::ParseError { reason: e.to_string() })?;
+        let content =
+            std::fs::read_to_string(&config_path).map_err(|e| CodeBurnConfigError::ParseError {
+                reason: e.to_string(),
+            })?;
 
-        toml::from_str(&content)
-            .map_err(|e| CodeBurnConfigError::ParseError { reason: e.to_string() })
+        toml::from_str(&content).map_err(|e| CodeBurnConfigError::ParseError {
+            reason: e.to_string(),
+        })
     }
 
     pub fn plan_usage(&self, _name: &str) -> Result<String, CodeBurnConfigError> {
         Ok("default".to_string())
+    }
+}
+
+impl Default for CodeBurnConfig {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

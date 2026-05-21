@@ -26,13 +26,29 @@ impl AcpSession {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ZedRequest {
-    NewSession { cwd: String },
-    LoadSession { session_id: String, cwd: String },
-    CloseSession { session_id: String },
+    NewSession {
+        cwd: String,
+    },
+    LoadSession {
+        session_id: String,
+        cwd: String,
+    },
+    CloseSession {
+        session_id: String,
+    },
     ListSessions,
-    Prompt { session_id: String, message: String },
-    ToolCall { session_id: String, function_name: String, arguments: serde_json::Value },
-    Authenticate { auth_method: String },
+    Prompt {
+        session_id: String,
+        message: String,
+    },
+    ToolCall {
+        session_id: String,
+        function_name: String,
+        arguments: serde_json::Value,
+    },
+    Authenticate {
+        auth_method: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,14 +64,20 @@ pub struct AcpAgentServer {
 
 impl AcpAgentServer {
     pub fn new() -> Self {
-        Self { sessions: Vec::new() }
-    }
-
-    pub fn default() -> Self {
-        Self::new()
+        Self {
+            sessions: Vec::new(),
+        }
     }
 
     pub async fn handle_request(&self, _request: ZedRequest) -> AcpResponse {
-        AcpResponse::Result { value: serde_json::Value::Null }
+        AcpResponse::Result {
+            value: serde_json::Value::Null,
+        }
+    }
+}
+
+impl Default for AcpAgentServer {
+    fn default() -> Self {
+        Self::new()
     }
 }
