@@ -39,7 +39,14 @@ impl Store {
             rusqlite::params![entry.content, kind_str, tags_str, metadata_str, entry.weight, source_str],
         )?;
 
-        Ok(self.conn.last_insert_rowid())
+        let rowid = self.conn.last_insert_rowid();
+        let ts = chrono::Utc::now().to_rfc3339();
+        self.conn.execute(
+            "INSERT INTO event_rows (event_type, timestamp) VALUES (?, ?)",
+            rusqlite::params!["insert", ts],
+        )?;
+
+        Ok(rowid)
     }
 
     pub fn query(
@@ -133,8 +140,8 @@ impl Store {
         let _source = serde_json::to_string(&source)?;
         let _reason = reason.unwrap_or("");
         let affected = self.conn.execute(
-            "UPDATE knowledge_entries SET active = 0 WHERE source = ?",
-            rusqlite::params![_source],
+            "UPDATE knowledge_entries SET active = 0 WHERE source = ? AND metadata LIKE ?",
+            rusqlite::params![_source, format!("'%{}'", _provenance_id)],
         )?;
 
         Ok(affected)
@@ -149,25 +156,25 @@ impl Store {
         let _source = serde_json::to_string(&source)?;
         let _reason = reason.unwrap_or("");
         let affected = self.conn.execute(
-            "UPDATE knowledge_entries SET active = 0 WHERE source = ?",
-            rusqlite::params![_source],
+            "UPDATE knowledge_entries SET active = 0 WHERE source = ? AND metadata LIKE ?",
+            rusqlite::params![_source, format!("'%{}'", _provenance_id)],
         )?;
 
         Ok(affected)
     }
 
     pub fn verify(&self) -> StoreResult<Vec<i64>> {
-        let mut ids = Vec::new();
+        let mut bad_ids = Vec::new();
         let mut stmt = self.conn.prepare(
-            "SELECT id FROM knowledge_entries WHERE active = 1",
+            "SELECT id FROM knowledge_entries WHERE active = 1 AND (tags = '' OR metadata = '' OR content = '')",
         )?;
 
         let cursor = stmt.query_map(rusqlite::params![], |row| row.get(0))?;
         for id in cursor {
-            ids.push(id?);
+            bad_ids.push(id?);
         }
 
-        Ok(ids)
+        Ok(bad_ids)
     }
 
     pub fn deactivate(
