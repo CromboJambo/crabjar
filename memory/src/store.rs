@@ -82,7 +82,7 @@ impl Store {
 
     pub fn find_active_by_provenance(
         &self,
-        _source_type: &str,
+        source_type: &str,
         _provenance_id: &String,
     ) -> StoreResult<Option<KnowledgeRow>> {
         let mut stmt = self.conn.prepare(
