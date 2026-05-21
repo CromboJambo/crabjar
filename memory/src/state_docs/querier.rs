@@ -4,6 +4,7 @@
 use crate::state_docs::models::Section;
 use rusqlite::Connection;
 use serde_json::json;
+use std::fs;
 use std::path::PathBuf;
 
 /// Query interface for agents to search state-docs via SQLite.
@@ -122,6 +123,31 @@ impl StateDocQuerier {
         json!({
             "doc": doc_name,
             "sections": sections,
+        })
+    }
+
+    /// Compute drift status for a state-doc: coasting (checksum matches) vs resisting (checksum diverges).
+    ///
+    /// Returns the current file checksum, the indexed checksum, and a drift flag.
+    pub fn drift_status(&self, doc_name: &str) -> serde_json::Value {
+        let indexed_checksum = self.get_metadata(doc_name).and_then(|m| m["checksum"].as_str().map(|s| s.to_string()));
+
+        let doc_path = self._state_docs_dir.join(format!("{}.md", doc_name));
+
+        let current_checksum = if doc_path.exists() {
+            let content = fs::read_to_string(&doc_path).ok();
+            content.map(|c| compute_checksum(&c))
+        } else {
+            None
+        };
+
+        json!({
+            "doc": doc_name,
+            "indexed_checksum": indexed_checksum,
+            "current_checksum": current_checksum,
+            "drift": current_checksum != indexed_checksum,
+            "state_doc_path": doc_path.to_string_lossy(),
+            "exists": doc_path.exists(),
         })
     }
 
@@ -406,4 +432,12 @@ impl StateDocQuerier {
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default()
     }
+}
+
+fn compute_checksum(content: &str) -> String {
+    let mut hash = 0u64;
+    for byte in content.bytes() {
+        hash = hash.wrapping_add(byte as u64).wrapping_mul(31);
+    }
+    format!("{:x}", hash)
 }
