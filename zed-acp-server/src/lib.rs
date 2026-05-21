@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-use crabjar::knowledge_store::KnowledgeBridge;
+use crabjar_lib::knowledge_store::KnowledgeBridge;
 use crabjar_guard::{ExecutionGate, GateContext, GateResult, GuardDb, TrustScore};
 
 #[derive(Error, Debug)]
@@ -235,7 +235,7 @@ impl AcpAgentServer {
                                     "reason": reason,
                                     "status": "denied",
                                 }),
-                            })
+                            }),
                             Ok(GateResult::DryRun) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
