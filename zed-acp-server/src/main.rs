@@ -1,6 +1,6 @@
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use serde::Deserialize;
 use serde_json::json;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 use zed_acp_server::{AcpAgentServer, AcpResponse, ZedRequest};
@@ -12,8 +12,7 @@ struct AcpRequest {
 }
 
 fn parse_request(line: &str) -> Result<AcpRequest, anyhow::Error> {
-    serde_json::from_str(line)
-        .map_err(|e| anyhow::anyhow!("Failed to parse request: {}", e))
+    serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Failed to parse request: {}", e))
 }
 
 fn map_method(request: AcpRequest) -> Result<ZedRequest, anyhow::Error> {
@@ -26,7 +25,9 @@ fn map_method(request: AcpRequest) -> Result<ZedRequest, anyhow::Error> {
                 .get("cwd")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("missing cwd in session/new"))?;
-            Ok(ZedRequest::NewSession { cwd: cwd.to_string() })
+            Ok(ZedRequest::NewSession {
+                cwd: cwd.to_string(),
+            })
         }
         "session/load" => {
             let session_id = params
