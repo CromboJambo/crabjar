@@ -106,6 +106,24 @@ impl KnowledgeCommandExt for KnowledgeCommand {
                     }),
                 ))
             }
+            KnowledgeCommand::Verify => {
+                let bad_ids = bridge.verify()?;
+                Ok(knowledge_response(
+                    "knowledge store verified",
+                    json!({
+                        "active_ids": bad_ids,
+                    }),
+                ))
+            }
+            KnowledgeCommand::Events { limit } => {
+                let events = bridge.get_events(*limit)?;
+                Ok(knowledge_response(
+                    "knowledge events retrieved",
+                    json!({
+                        "events": events,
+                    }),
+                ))
+            }
         }
     }
 }

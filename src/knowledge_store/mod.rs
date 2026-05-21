@@ -102,7 +102,9 @@ impl<'a> KnowledgeBridge<'a> {
         project_root: impl Into<PathBuf>,
         mirror_log_db_path: Option<PathBuf>,
     ) -> Result<Self, agent_context::Error> {
-        let knowledge_store = Store::open(knowledge_store_path)?;
+        let conn = rusqlite::Connection::open(knowledge_store_path)?;
+        agent_context::schema::migrate(&conn)?;
+        let knowledge_store = Store { conn };
         let state_docs = StateDocsManager::new(project_root);
         let mirror_log_conn = mirror_log_db_path.map(Connection::open).transpose()?;
 
@@ -238,6 +240,9 @@ impl<'a> KnowledgeBridge<'a> {
     /// Get recent events from the knowledge store's event log
     pub fn get_events(&self, limit: usize) -> Result<Vec<serde_json::Value>, agent_context::Error> {
         let rows = self.knowledge_store.events(limit)?;
+        if rows.is_empty() {
+            return Ok(vec![]);
+        }
         Ok(rows
             .into_iter()
             .map(
@@ -252,12 +257,12 @@ impl<'a> KnowledgeBridge<'a> {
         annotation_id: &str,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        self.knowledge_store.deactivate_by_provenance(
+        Ok(self.knowledge_store.deactivate_by_provenance(
             Self::STATE_DOC_SOURCE_TYPE,
             annotation_id,
             Source::Agent,
             reason,
-        )
+        )?)
     }
 
     /// Deactivates knowledge derived from a resolved annotation entry.
@@ -266,12 +271,12 @@ impl<'a> KnowledgeBridge<'a> {
         resolved: &AnnotationEntry,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        self.knowledge_store.deactivate_by_provenance(
+        Ok(self.knowledge_store.deactivate_by_provenance(
             Self::STATE_DOC_SOURCE_TYPE,
             &resolved.id,
             Source::Agent,
             reason,
-        )
+        )?)
     }
 
     /// Deactivates all knowledge entries by provenance_id across all provenance sources.
@@ -280,8 +285,8 @@ impl<'a> KnowledgeBridge<'a> {
         provenance_id: &str,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        self.knowledge_store
-            .deactivate_by_provenance_id(provenance_id, Source::Agent, reason)
+        Ok(self.knowledge_store
+            .deactivate_by_provenance_id(provenance_id, Source::Agent, reason)?)
     }
 
     /// Resolve an annotation and deactivate derived knowledge entries.
@@ -311,12 +316,12 @@ impl<'a> KnowledgeBridge<'a> {
         let mut entry = KnowledgeEntry::new(content, kind);
         entry.source = Source::User;
         entry.tags = tags;
-        self.knowledge_store.insert(entry)
+        Ok(self.knowledge_store.insert(entry)?)
     }
 
     /// Verify knowledge store integrity.
     pub fn verify(&self) -> Result<Vec<i64>, agent_context::Error> {
-        self.knowledge_store.verify()
+        Ok(self.knowledge_store.verify()?)
     }
 
     /// Deactivate a knowledge entry by ID.
@@ -326,7 +331,7 @@ impl<'a> KnowledgeBridge<'a> {
         source: Source,
         reason: Option<&str>,
     ) -> Result<(), agent_context::Error> {
-        self.knowledge_store.deactivate(id, source, reason)
+        Ok(self.knowledge_store.deactivate(id, source, reason)?)
     }
 
     /// Promote a raw event from mirror-log to a knowledge entry
