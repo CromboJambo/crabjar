@@ -4,7 +4,7 @@ use axum::{
     response::sse::{Event as SseEvent, Sse},
     routing::post,
 };
-use crabjar_guard::{ActionStatus, ExecutionGate, GateContext};
+use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
 use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
@@ -121,9 +121,8 @@ enum AcpResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Gate concierge — provenance boundary enforcement
+// Gate concierge — provenance boundary enforcement (guard's GateConcierge is the sole gate layer)
 // ---------------------------------------------------------------------------
-mod concierge;
 
 // ---------------------------------------------------------------------------
 // Local SQLite event store (replaces mirror-log dependency)
@@ -497,7 +496,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
 
             let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
-            let mut concierge = concierge::GateConcierge::new().with_db(guard_db.clone());
+            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
             match gate.check(GateContext {
                 action_type: "tool_call",

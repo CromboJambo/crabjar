@@ -267,15 +267,41 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 
 2026-05-15 — workspace consolidation updated. `project_map.md` regenerated with current structure. `src/models/` confirmed empty. `clippy -- -D warnings` passes across all 13 crates. `skill-script-runner` and `skill-reference-store` confirmed as workspace members with source files. `state-docs/checkpoint file` noted.
 
+### Current Audit (2026-05-21)
+
+`project_map.md` generated May 15. Today is May 21 — 6 days approaching >7 day stale threshold. Divergence detected between documented structure and actual filesystem.
+
+### Divergence Items
+
+| Type | project_map.md | Actual |
+|---|---|---|
+| **Path mismatch** | `src/codeburn-provider/` | `src/codeburn-provider/src/` (nested src/) |
+| **Path mismatch** | `src/codeburn-classifier/` | `src/codeburn-classifier/src/` (nested src/) |
+| **Path mismatch** | `src/codeburn-pricing/` | `src/codeburn-pricing/src/` (nested src/) |
+| **Path mismatch** | `src/codeburn-config/` | `src/codeburn-config/src/` (nested src/) |
+| **Path mismatch** | `src/codeburn/` | `src/codeburn/src/` (nested src/) |
+| **Path mismatch** | `src/skill-script-runner/` | `src/skill-script-runner/src/` (nested src/) |
+| **Path mismatch** | `src/skill-reference-store/` | `src/skill-reference-store/src/` (nested src/) |
+| **Missing** | `src/models/` | not found |
+| **Missing** | `src/skill-script-runner/src/lib.rs` | not found |
+| **Naming mismatch** | `src/state-docs/` | `src/state_docs/` (underscore) |
+| **Unexpected** | `src/codeburn/tests/cli.rs` | present (not in map as `tests/cli.rs`) |
+| **Unexpected** | `src/codeburn/build.rs` | present (not in map) |
+| **Removed** | `orchestrator/src/concierge.rs` | removed — duplicate of guard's gate concierge |
+
+### Structural Correction Required
+
+All `src/`-nested crates must be documented with `src/<crate>/src/` pattern, not `src/<crate>/` flat pattern. The map declares 13 workspace members with flat paths but actual structure uses nested `src/` inside each crate under `src/`.
+
 ### Known Items
 
-- `src/models/` — empty directory, reserved for future model definitions
 - `state-docs/` checkpoint file — user checkpoint artifact awaiting resolution
 - Single Git repo — all nested `.git/` removed
 - Single `Cargo.lock` at workspace root
 - `reference_materials/` — excluded from Git (cloned reference repos, not authored code)
 - `pipelines/` — empty, reserved for future pipeline definitions
 - `ui-state-copy/` — UI state copy artifacts
+- `orchestrator/src/concierge.rs` — removed; guard's GateConcierge is the sole gate enforcement layer
 
 ### Provenance Entries
 
@@ -283,6 +309,10 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 |---|---|---|---|---|
 | `prov-map-drift-2026-05-15` | project_map.md regenerated with current structure | 2026-05-15 | Phase 1 structural alignment | crabjar/project_map.md |
 | `prov-clippy-fix-2026-05-15` | clippy fixes across sandbox, safetensors, tool_registry, telemetry, guard | 2026-05-15 | Phase 1 lint enforcement | crabjar |
+| `prov-map-drift-2026-05-21` | project_map.md stale — 6 days; structural divergence detected | 2026-05-21 | Phase 1 structural alignment refresh required | crabjar/project_map.md |
+| `prov-concierge-consolidate` | orchestrator/src/concierge.rs removed; guard's GateConcierge is sole gate layer | 2026-05-21 | pipeline collapse prevention | crabjar |
+| `prov-reversibility-bounded` | guard/src/reversibility.rs: ReversibilityScore → PerturbationSet | 2026-05-21 | bounded perturbations over single-point worst-case | crabjar |
+| `prov-querier-drift` | memory/src/state_docs/querier.rs: drift_status() added | 2026-05-21 | coasting/resisting checksum comparison | crabjar |
 
 ---
 

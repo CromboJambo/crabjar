@@ -822,18 +822,12 @@ fn query_one_tag_does_not_return_unrelated_rows() {
         "beta-state-md-456-0"
     );
 
-    let query_alpha_tag = run_in(
-        &temp,
-        &["knowledge", "query", "--tags=alpha"],
-    );
+    let query_alpha_tag = run_in(&temp, &["knowledge", "query", "--tags=alpha"]);
     assert!(query_alpha_tag.status.success());
     let query_alpha_tag_body = json_stdout(&query_alpha_tag);
     assert_eq!(query_alpha_tag_body["rows"].as_array().unwrap().len(), 1);
 
-    let query_beta_tag = run_in(
-        &temp,
-        &["knowledge", "query", "--tags=beta"],
-    );
+    let query_beta_tag = run_in(&temp, &["knowledge", "query", "--tags=beta"]);
     assert!(query_beta_tag.status.success());
     let query_beta_tag_body = json_stdout(&query_beta_tag);
     assert_eq!(query_beta_tag_body["rows"].as_array().unwrap().len(), 1);
