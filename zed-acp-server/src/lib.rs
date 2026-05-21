@@ -54,4 +54,8 @@ impl AcpAgentServer {
     pub fn default() -> Self {
         Self::new()
     }
+
+    pub async fn handle_request(&self, _request: ZedRequest) -> AcpResponse {
+        AcpResponse::Result { value: serde_json::Value::Null }
+    }
 }

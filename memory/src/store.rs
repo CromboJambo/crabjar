@@ -86,10 +86,10 @@ impl Store {
         _provenance_id: &String,
     ) -> StoreResult<Option<KnowledgeRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source = ? AND metadata LIKE ?",
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND metadata LIKE ?",
         )?;
 
-        let cursor = stmt.query_map(rusqlite::params![source_type, format!("'%{}'", _provenance_id)], |row| {
+        let cursor = stmt.query_map(rusqlite::params![format!("'%{}'", _provenance_id)], |row| {
             let tags_str: String = row.get(2)?;
             let metadata_str: String = row.get(3)?;
             Ok(KnowledgeRow {
