@@ -1,0 +1,39 @@
+[package]
+name = "codeburn"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["CrabJar Contributors"]
+description = "AI coding token usage tracker CLI"
+
+[[bin]]
+name = "codeburn"
+path = "src/main.rs"
+
+[lib]
+name = "codeburn_lib"
+path = "src/lib.rs"
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+chrono.workspace = true
+rusqlite.workspace = true
+reqwest.workspace = true
+tracing.workspace = true
+codeburn-config = { path = "../codeburn-config" }
+codeburn-provider = { path = "../codeburn-provider" }
+codeburn-classifier = { path = "../codeburn-classifier" }
+codeburn-pricing = { path = "../codeburn-pricing" }
+ratatui.workspace = true
+crossterm.workspace = true
+uuid.workspace = true
+
+[build-dependencies]
+clap = { workspace = true }
+clap_mangen = { workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true

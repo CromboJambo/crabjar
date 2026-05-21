@@ -1,0 +1,211 @@
+[workspace]
+members = [
+    "src/crabjar-config",
+    "memory",
+    "orchestrator",
+    "src/codeburn-provider",
+    "src/codeburn-config",
+    "src/codeburn-classifier",
+    "src/codeburn-pricing",
+    "src/codeburn",
+    "src/skill-script-runner",
+    "src/skill-reference-store",
+    "guard",
+    "telemetry",
+    "sandbox",
+    "safetensors",
+    "tool_registry",
+    "zed-acp-bridge",
+    "zed-acp-server",
+    "rust-sdk/crates/rmcp",
+    "rust-sdk/crates/rmcp-macros",
+    "candle/candle-core",
+    "candle/candle-nn",
+    "candle/candle-transformers",
+    "candle/candle-datasets",
+    "burn/crates/burn",
+    "burn/crates/burn-core",
+    "burn/crates/burn-candle",
+    "burn/crates/burn-nn",
+    "burn/crates/burn-autodiff",
+    "burn/crates/burn-train",
+    "burn/crates/burn-cpu",
+]
+
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+authors = ["CrabJar Contributors"]
+repository = "https://github.com/crabjar/crabjar"
+documentation = "https://docs.crabjar.io"
+homepage = "https://crabjar.io"
+description = "CrabJar workspace"
+keywords = ["ml", "mcp", "cli"]
+categories = ["science", "network-programming", "asynchronous"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.51.1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["time"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Database
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+# CLI parsing
+clap = { version = "4.5", features = ["derive", "env"] }
+clap_mangen = "0.2"
+
+# UI / TTY
+crossterm = "0.28"
+ratatui = "0.30.0"
+
+tempfile = "3.24.0"
+uuid = { version = "1.23.0", features = ["v4"] }
+chrono = { version = "0.4.38", default-features = false, features = ["serde", "now"] }
+
+# Networking
+reqwest = { version = "0.13.2", default-features = false, features = ["json", "stream"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tower-http = { version = "0.5", features = ["cors"] }
+futures-util = "0.3"
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Cargo tools
+cargo-declared = "0.1.3"
+
+# Security
+ignore = "0.4"
+path-absolutize = "3.1"
+sha2 = "0.10"
+hex = "0.4"
+
+# Zed extension API
+zed_extension_api = "0.2"
+
+# CrabJar lib
+crabjar_lib = { path = ".", package = "crabjar" }
+
+# ML inference
+candle = { path = "candle/candle-core", version = "0.10.2" }
+candle-nn = { path = "candle/candle-nn", version = "0.10.2" }
+candle-transformers = { path = "candle/candle-transformers", version = "0.10.2" }
+candle-datasets = { path = "candle/candle-datasets", version = "0.10.2" }
+cudarc = { version = "0.19.4", features = ["std", "cublas", "cublaslt", "curand", "driver", "nvrtc", "f16", "f8", "cuda-version-from-build-system", "dynamic-linking"], default-features = false }
+gemm = { version = "0.19.0", features = ["wasm-simd128-enable"] }
+half = { version = "2.7.1", features = ["num-traits", "use-intrinsics", "rand_distr"] }
+float8 = { version = "0.7.0", features = ["num-traits", "rand_distr"] }
+tokenizers = { version = "0.22.0", default-features = false }
+hf-hub = "0.4.1"
+rayon = "1.10.0"
+memmap2 = { version = "0.9.3", features = ["stable_deref_trait"] }
+num_cpus = "1.15.0"
+ug = "0.5.0"
+ug-cuda = "0.5.0"
+ug-metal = "0.5.0"
+yoke = { version = "0.8.1", features = ["derive"] }
+accelerate-src = { version = "0.3.2" }
+intel-mkl-src = { version = "0.8.1", features = ["mkl-static-lp64-iomp"] }
+
+# Burn framework
+burn = { path = "burn/crates/burn", version = "0.22.0-pre.1", default-features = false }
+burn-core = { path = "burn/crates/burn-core", version = "0.22.0-pre.1", default-features = false }
+burn-candle = { path = "burn/crates/burn-candle", version = "0.22.0-pre.1", default-features = false }
+burn-nn = { path = "burn/crates/burn-nn", version = "0.22.0-pre.1", default-features = false }
+burn-autodiff = { path = "burn/crates/burn-autodiff", version = "0.22.0-pre.1", default-features = false }
+burn-train = { path = "burn/crates/burn-train", version = "0.22.0-pre.1", default-features = false }
+burn-cpu = { path = "burn/crates/burn-cpu", version = "0.22.0-pre.1", default-features = false }
+burn-cuda = { path = "burn/crates/burn-cuda", version = "0.22.0-pre.1", default-features = false }
+burn-wgpu = { path = "burn/crates/burn-wgpu", version = "0.22.0-pre.1", default-features = false }
+burn-rocm = { path = "burn/crates/burn-rocm", version = "0.22.0-pre.1", default-features = false }
+burn-cubecl = { path = "burn/crates/burn-cubecl", version = "0.22.0-pre.1", default-features = false }
+burn-backend = { path = "burn/crates/burn-backend", version = "0.22.0-pre.1", default-features = false }
+burn-communication = { path = "burn/crates/burn-communication", version = "0.22.0-pre.1", default-features = false }
+burn-remote = { path = "burn/crates/burn-remote", version = "0.22.0-pre.1", default-features = false }
+burn-store = { path = "burn/crates/burn-store", version = "0.22.0-pre.1", default-features = false }
+cubecl = { git = "https://github.com/tracel-ai/cubecl", default-features = false, rev = "0751cf6a5005c1755c1cd44d1c9383e7b1de814c" }
+cubecl-common = { git = "https://github.com/tracel-ai/cubecl", default-features = false, rev = "0751cf6a5005c1755c1cd44d1c9383e7b1de814c" }
+cubecl-zspace = { git = "https://github.com/tracel-ai/cubecl", default-features = false, rev = "0751cf6a5005c1755c1cd44d1c9383e7b1de814c" }
+cubek = { git = "https://github.com/tracel-ai/cubek", default-features = false, rev = "0d259b53ff086b727dc1cdf001d064585bbc78bc" }
+
+# MCP protocol
+rmcp = { path = "rust-sdk/crates/rmcp", version = "1.7.0", features = ["server", "macros"] }
+rmcp-macros = { path = "rust-sdk/crates/rmcp-macros", version = "1.7.0" }
+schemars = { version = "1.0", features = ["chrono04"] }
+pastey = { version = "0.2.0" }
+
+# Shared ML deps
+safetensors = { version = "0.7.0", default-features = false }
+
+# rand — unified across candle/burn/rmcp
+rand = { version = "0.10.1", default-features = false, features = ["std_rng"] }
+rand_distr = { version = "0.6.0", default-features = false }
+
+[package]
+name = "crabjar"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "CLI for local state-docs management with project-scoped CrabJar config loading"
+repository.workspace = true
+documentation.workspace = true
+
+[[bin]]
+name = "crabjar"
+path = "src/main.rs"
+
+[lib]
+name = "crabjar_lib"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime
+tokio.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+
+# Project workspace configuration
+crabjar-config = { path = "src/crabjar-config" }
+
+# Knowledge store
+agent-context = { path = "memory" }
+crabjar-guard = { path = "guard" }
+crabjar-telemetry = { path = "telemetry" }
+
+# Database
+rusqlite.workspace = true
+
+# CLI parsing
+clap.workspace = true
+
+# UUID
+uuid.workspace = true
+cargo-declared = "0.1.3"
+tiktoken-rs = "0.11.0"
+chrono.workspace = true
+tempfile.workspace = true
+
+[build-dependencies]
+clap = { workspace = true }
+clap_mangen = { workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true

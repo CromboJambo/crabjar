@@ -1,0 +1,46 @@
+[package]
+name = "zed-acp-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "stdio ACP agent server: implements Agent Client Protocol via stdin/stdout JSON-RPC"
+repository.workspace = true
+documentation.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.51.1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["time"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# Security layer
+crabjar-guard = { path = "../guard" }
+
+# Telemetry
+crabjar-telemetry = { path = "../telemetry" }
+
+# Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# UUID
+uuid = { version = "1.10", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Knowledge bridge
+crabjar_lib = { workspace = true }
+
+[[bin]]
+name = "zed-acp-server"
+path = "src/main.rs"
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "skill-reference-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Manage and index skill reference materials for on-demand loading"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rusqlite.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+path-absolutize.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,21 @@
+[package]
+name = "crabjar-sandbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Agent sandbox isolation: per-agent Unix user creation, systemd-nspawn containers, cgroup resource limits"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+path-absolutize.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

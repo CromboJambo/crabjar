@@ -1,0 +1,32 @@
+[package]
+name = "zed-acp-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Zed Agent Panel bridge: exposes CrabJar ACP orchestrator as an agent server"
+repository.workspace = true
+documentation.workspace = true
+
+[dependencies]
+# Zed extension API
+zed_extension_api = "0.6.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# UUID
+uuid = { version = "1.10", features = ["v4", "js"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+zed-acp-server = { path = "../zed-acp-server" }
+
+[lib]
+crate-type = ["cdylib"]
+
+[dev-dependencies]
+tempfile.workspace = true

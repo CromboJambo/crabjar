@@ -1,0 +1,25 @@
+[package]
+name = "crabjar-telemetry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Flight recorder telemetry: append-only command transcript logging with stdout/stderr capture, exit codes, timestamps, and git diff snapshots"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+cargo-declared.workspace = true
+path-absolutize.workspace = true
+sha2.workspace = true
+hex.workspace = true
+ignore.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

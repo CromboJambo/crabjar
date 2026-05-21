@@ -1,0 +1,22 @@
+[package]
+name = "crabjar-tool-registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "MCP tool registry: structured agent tool registry with rig/mistral.rs patterns for tool discovery, registration, and execution policy"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+rusqlite.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+path-absolutize.workspace = true
+reqwest.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
