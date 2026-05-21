@@ -1,7 +1,12 @@
 id = "crabjar-acp"
 name = "CrabJar ACP"
-description = "Zed Agent Panel bridge exposing CrabJar ACP orchestrator with guard enforcement and session state management"
+description = "CrabJar agent server: knowledge store, state-docs, guard gate, and execution telemetry via ACP"
 version = "0.1.0"
 schema_version = 1
 authors = ["CrabJar Contributors"]
 repository = "https://github.com/crabjar/crabjar"
+
+[agent_server]
+type = "registry"
+command = "zed-acp-server"
+env = {}
