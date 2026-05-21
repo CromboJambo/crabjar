@@ -130,7 +130,9 @@ impl StateDocQuerier {
     ///
     /// Returns the current file checksum, the indexed checksum, and a drift flag.
     pub fn drift_status(&self, doc_name: &str) -> serde_json::Value {
-        let indexed_checksum = self.get_metadata(doc_name).and_then(|m| m["checksum"].as_str().map(|s| s.to_string()));
+        let indexed_checksum = self
+            .get_metadata(doc_name)
+            .and_then(|m| m["checksum"].as_str().map(|s| s.to_string()));
 
         let doc_path = self._state_docs_dir.join(format!("{}.md", doc_name));
 
