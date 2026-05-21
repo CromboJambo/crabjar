@@ -2,19 +2,19 @@ use crate::knowledge_store::{KnowledgeBridge, knowledge_response};
 use agent_context::KnowledgeKind;
 use serde_json::json;
 
-use crabjar_lib::KnowledgeCommand;
+use crate::KnowledgeCommand;
 
 pub trait KnowledgeCommandExt {
     async fn execute(
         &self,
-        bridge: &KnowledgeBridge<'_>,
+        bridge: &KnowledgeBridge,
     ) -> Result<serde_json::Value, agent_context::Error>;
 }
 
 impl KnowledgeCommandExt for KnowledgeCommand {
     async fn execute(
         &self,
-        bridge: &KnowledgeBridge<'_>,
+        bridge: &KnowledgeBridge,
     ) -> Result<serde_json::Value, agent_context::Error> {
         match self {
             Self::Index { doc } => {
@@ -101,7 +101,7 @@ impl KnowledgeCommandExt for KnowledgeCommand {
                         "deactivated": deactivated,
                         "resolved": {
                             "id": resolved.id,
-                            "status": format!("{}", resolved.status),
+                            "status": resolved.status,
                         }
                     }),
                 ))

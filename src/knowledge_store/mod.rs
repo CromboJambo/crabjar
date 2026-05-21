@@ -4,13 +4,13 @@
 pub mod commands;
 
 use agent_context::{KnowledgeEntry, KnowledgeKind, Source, Store};
+use agent_context::state_docs::Annotation;
+use chrono::Utc;
 use rusqlite::Connection;
 use serde_json::json;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
-
-use crate::state_docs::{AnnotationEntry, AnnotationKind, StateDocsManager};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -86,16 +86,15 @@ pub fn knowledge_response(
 
 /// Bridge between state-docs and knowledge store
 #[allow(dead_code)]
-pub struct KnowledgeBridge<'a> {
-    knowledge_store: agent_context::Store,
-    state_docs: StateDocsManager<'a>,
+pub struct KnowledgeBridge {
+    knowledge_store: Store,
+    project_root: PathBuf,
     mirror_log_conn: Option<Connection>,
 }
 
 #[allow(dead_code)]
-impl<'a> KnowledgeBridge<'a> {
+impl KnowledgeBridge {
     const STATE_DOC_SOURCE_TYPE: &'static str = "state_doc_annotation";
-    const MIRROR_LOG_SOURCE_TYPE: &'static str = "mirror_log_event";
 
     pub fn new(
         knowledge_store_path: &str,
@@ -105,48 +104,59 @@ impl<'a> KnowledgeBridge<'a> {
         let conn = rusqlite::Connection::open(knowledge_store_path)?;
         agent_context::schema::migrate(&conn)?;
         let knowledge_store = Store { conn };
-        let state_docs = StateDocsManager::new(project_root);
+        let project_root = project_root.into();
         let mirror_log_conn = mirror_log_db_path.map(Connection::open).transpose()?;
 
         Ok(Self {
             knowledge_store,
-            state_docs,
+            project_root,
             mirror_log_conn,
         })
     }
 
-    /// Convert state-docs annotation to knowledge entry
-    pub fn annotation_to_knowledge(
-        &self,
-        annotation: &AnnotationEntry,
-    ) -> Result<KnowledgeEntry, agent_context::Error> {
-        let kind = match annotation.kind {
-            AnnotationKind::Note => KnowledgeKind::Context,
-            AnnotationKind::Question => KnowledgeKind::Instruction,
+    /// Resolve a state-doc path from project root
+    pub fn resolve_doc_path(&self, doc_name: &str) -> Result<PathBuf, agent_context::Error> {
+        let docs_dir = self.project_root.join(agent_context::state_docs::STATE_DOCS_DIR);
+        Ok(docs_dir.join(format!("{}.md", doc_name)))
+    }
+
+    /// Load overlay JSON for a state-doc path
+    pub fn load_overlay_for_path(&self, path: &PathBuf) -> Result<serde_json::Value, agent_context::Error> {
+        let overlay_dir = path.parent().unwrap().join(agent_context::state_docs::OVERLAY_DIR);
+        let overlay_file = overlay_dir.join(format!("{}.overlay.json", path.file_name().unwrap().to_string_lossy()));
+        let content = std::fs::read_to_string(&overlay_file)
+            .map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
+        serde_json::from_str(&content)
+            .map_err(|e| agent_context::Error::Json(e))
+    }
+
+    /// Convert an annotation to a knowledge entry
+    pub fn annotation_to_knowledge(&self, annotation: &Annotation) -> Result<KnowledgeEntry, agent_context::Error> {
+        let kind = match annotation.kind.as_str() {
+            "note" => KnowledgeKind::Context,
+            "question" => KnowledgeKind::Instruction,
+            _ => KnowledgeKind::Context,
         };
 
         let defaults = ConfidenceDefaults::default();
         let confidence = annotation_confidence(annotation, &defaults);
         let provenance_id = Uuid::new_v4().to_string();
         let mut entry = KnowledgeEntry::new(&annotation.message, kind)
-            .meta("source_id", &annotation.id)
-            .meta("source_doc", &annotation.doc)
-            .meta(
-                "annotation_kind",
-                format!("{:?}", annotation.kind).to_lowercase(),
-            )
+            .meta("source_id", &annotation.id.to_string())
+            .meta("source_doc", &annotation.doc_name)
+            .meta("annotation_kind", annotation.kind.clone())
             .meta("confidence", confidence)
             .meta("derived_at_unix_ms", now_unix_ms())
-            .meta("status", "active")
+            .meta("status", annotation.status.clone())
             .meta("provenance_id", &provenance_id)
             .meta("provenance_source", Self::STATE_DOC_SOURCE_TYPE)
             .meta("provenance_set_at_unix_ms", now_unix_ms());
         entry.source_type = Self::STATE_DOC_SOURCE_TYPE.to_string();
-        entry.source_id = annotation.id.clone();
+        entry.source_id = annotation.id.to_string();
         entry.provenance_id = provenance_id;
         entry.source = Source::Agent;
         entry.weight = confidence;
-        let doc_name = annotation.doc.strip_suffix(".md").unwrap_or(&annotation.doc);
+        let doc_name = annotation.doc_name.strip_suffix(".md").unwrap_or(&annotation.doc_name);
         entry.tags = std::iter::once("state-doc".to_string())
             .chain(doc_name.split('_').map(|s| s.to_string()))
             .collect();
@@ -185,25 +195,57 @@ impl<'a> KnowledgeBridge<'a> {
     }
 
     /// Sync all open annotations for a state-doc into the knowledge store
-    pub fn sync_state_doc_annotations(
-        &self,
-        doc_name: &str,
-    ) -> Result<Vec<i64>, agent_context::Error> {
+    pub fn sync_state_doc_annotations(&self, doc_name: &str) -> Result<Vec<i64>, agent_context::Error> {
         let overlay = self
-            .state_docs
-            .load_overlay_for_path(&self.state_docs.resolve_doc_path(doc_name)?)?;
+            .load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
 
         let mut ids = Vec::new();
-        for entry in overlay.entries {
-            if entry.status == crate::state_docs::AnnotationStatus::Open {
+        if let Some(entries) = overlay.get("entries").and_then(|v| v.as_array()) {
+            for entry in entries {
+                let status = entry.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                if status != "open" {
+                    continue;
+                }
+                let id_str = entry.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                if id_str.is_empty() {
+                    continue;
+                }
                 if self
                     .knowledge_store
-                    .find_active_by_source(Self::STATE_DOC_SOURCE_TYPE, &entry.id)?
+                    .find_active_by_source(Self::STATE_DOC_SOURCE_TYPE, id_str)?
                     .is_some()
                 {
                     continue;
                 }
-                let knowledge = self.annotation_to_knowledge(&entry)?;
+                let annotation_id = id_str.parse::<i64>().unwrap_or(0);
+                let message = entry
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let kind_str = entry
+                    .get("kind")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("note");
+                let kind = match kind_str {
+                    "note" => KnowledgeKind::Context,
+                    "question" => KnowledgeKind::Instruction,
+                    _ => KnowledgeKind::Context,
+                };
+                    let mut knowledge = KnowledgeEntry::new(message, kind)
+                    .meta("source_id", id_str)
+                    .meta("source_doc", doc_name)
+                    .meta("annotation_kind", kind_str)
+                    .meta("confidence", 0.80)
+                    .meta("derived_at_unix_ms", now_unix_ms())
+                    .meta("status", "active");
+                knowledge.source_type = Self::STATE_DOC_SOURCE_TYPE.to_string();
+                knowledge.source_id = id_str.to_string();
+                knowledge.provenance_id = Uuid::new_v4().to_string();
+                knowledge.source = Source::Agent;
+                knowledge.weight = 0.80;
+                knowledge.tags = std::iter::once("state-doc".to_string())
+                    .chain(doc_name.split('_').map(|s| s.to_string()))
+                    .collect();
                 let id = self.knowledge_store.insert(knowledge)?;
                 ids.push(id);
             }
@@ -214,29 +256,33 @@ impl<'a> KnowledgeBridge<'a> {
 
     /// List all state-docs that have synced annotations in the knowledge store
     pub fn list_synced_state_docs(&self) -> Result<Vec<String>, agent_context::Error> {
-        let docs = self.state_docs.list_docs()?;
+        let docs_dir = self.project_root.join(agent_context::state_docs::STATE_DOCS_DIR);
         let mut synced = Vec::new();
-        for summary in docs {
-            let overlay = self
-                .state_docs
-                .load_overlay_for_path(&self.state_docs.resolve_doc_path(&summary.doc)?)?;
-            if !overlay.entries.is_empty() {
-                synced.push(summary.doc);
+        if let Ok(entries) = std::fs::read_dir(&docs_dir) {
+            for entry in entries {
+                if let Ok(e) = entry
+                    && let Some(name) = e.file_name().to_string_lossy().strip_suffix(".md")
+                {
+                    let overlay_path = e.path().parent().unwrap().join(agent_context::state_docs::OVERLAY_DIR).join(format!("{}.overlay.json", name));
+                    if overlay_path.exists() {
+                        synced.push(name.to_string());
+                    }
+                }
             }
         }
         Ok(synced)
     }
 
     /// Get knowledge entries associated with a specific state-doc
-    pub fn get_state_doc_knowledge(
-        &self,
-        doc_name: &str,
-    ) -> Result<Vec<serde_json::Value>, agent_context::Error> {
+    pub fn get_state_doc_knowledge(&self, doc_name: &str) -> Result<Vec<serde_json::Value>, agent_context::Error> {
         let overlay = self
-            .state_docs
-            .load_overlay_for_path(&self.state_docs.resolve_doc_path(doc_name)?)?;
+            .load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
 
-        let tags: Vec<&str> = overlay.entries.iter().map(|e| e.doc.as_str()).collect();
+        let tags: Vec<&str> = overlay
+            .get("entries")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|e| e.get("doc").and_then(|v| v.as_str())).collect())
+            .unwrap_or_default();
 
         self.query_state_docs(&tags, 100, doc_name)
     }
@@ -256,11 +302,7 @@ impl<'a> KnowledgeBridge<'a> {
     }
 
     /// Deactivates knowledge derived from a resolved annotation.
-    pub fn deactivate_annotation_knowledge(
-        &self,
-        annotation_id: &str,
-        reason: Option<&str>,
-    ) -> Result<usize, agent_context::Error> {
+    pub fn deactivate_annotation_knowledge(&self, annotation_id: &str, reason: Option<&str>) -> Result<usize, agent_context::Error> {
         Ok(self.knowledge_store.deactivate_by_source(
             Self::STATE_DOC_SOURCE_TYPE,
             annotation_id,
@@ -269,26 +311,8 @@ impl<'a> KnowledgeBridge<'a> {
         )?)
     }
 
-    /// Deactivates knowledge derived from a resolved annotation entry.
-    pub fn deactivate_resolved_annotation_knowledge(
-        &self,
-        resolved: &AnnotationEntry,
-        reason: Option<&str>,
-    ) -> Result<usize, agent_context::Error> {
-        Ok(self.knowledge_store.deactivate_by_source(
-            Self::STATE_DOC_SOURCE_TYPE,
-            &resolved.id,
-            Source::Agent,
-            reason,
-        )?)
-    }
-
     /// Deactivates all knowledge entries by provenance_id across all provenance sources.
-    pub fn deactivate_by_provenance_id(
-        &self,
-        provenance_id: &str,
-        reason: Option<&str>,
-    ) -> Result<usize, agent_context::Error> {
+    pub fn deactivate_by_provenance_id(&self, provenance_id: &str, reason: Option<&str>) -> Result<usize, agent_context::Error> {
         Ok(self.knowledge_store.deactivate_by_provenance_id(
             provenance_id,
             Source::Agent,
@@ -296,30 +320,8 @@ impl<'a> KnowledgeBridge<'a> {
         )?)
     }
 
-    /// Resolve an annotation and deactivate derived knowledge entries.
-    pub fn resolve_annotation(
-        &self,
-        doc_name: &str,
-        annotation_id: &str,
-        reason: &str,
-    ) -> Result<(usize, AnnotationEntry), agent_context::Error> {
-        let resolved = self
-            .state_docs
-            .resolve_annotation(doc_name, annotation_id)?
-            .ok_or_else(|| {
-                agent_context::Error::Internal(format!("annotation not found: {}", annotation_id))
-            })?;
-        let deactivated = self.deactivate_resolved_annotation_knowledge(&resolved, Some(reason))?;
-        Ok((deactivated, resolved))
-    }
-
     /// Insert a standalone knowledge entry.
-    pub fn insert_entry(
-        &self,
-        content: &str,
-        kind: KnowledgeKind,
-        tags: Vec<String>,
-    ) -> Result<i64, agent_context::Error> {
+    pub fn insert_entry(&self, content: &str, kind: KnowledgeKind, tags: Vec<String>) -> Result<i64, agent_context::Error> {
         let mut entry = KnowledgeEntry::new(content, kind);
         entry.source = Source::User;
         entry.source_type = "user".to_string();
@@ -333,13 +335,45 @@ impl<'a> KnowledgeBridge<'a> {
     }
 
     /// Deactivate a knowledge entry by ID.
-    pub fn deactivate(
-        &self,
-        id: i64,
-        source: Source,
-        reason: Option<&str>,
-    ) -> Result<(), agent_context::Error> {
+    pub fn deactivate(&self, id: i64, source: Source, reason: Option<&str>) -> Result<(), agent_context::Error> {
         Ok(self.knowledge_store.deactivate(id, source, reason)?)
+    }
+
+    /// Resolve an annotation and deactivate derived knowledge entries.
+    pub fn resolve_annotation(&self, doc_name: &str, annotation_id: &str, reason: &str) -> Result<(usize, Annotation), agent_context::Error> {
+        let overlay = self
+            .load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
+        let resolved_entry = overlay
+            .get("entries")
+            .and_then(|v| v.as_array())
+            .and_then(|a| a.iter().find(|e| {
+                e.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id
+            }))
+            .ok_or_else(|| {
+                agent_context::Error::Internal(format!("annotation not found: {}", annotation_id))
+            })?;
+        let id = resolved_entry.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+        let doc_name = resolved_entry.get("doc").and_then(|v| v.as_str()).unwrap_or(doc_name);
+        let section_id = resolved_entry.get("section_id").and_then(|v| v.as_i64());
+        let line = resolved_entry.get("line").and_then(|v| v.as_u64()).map(|l| l as usize).unwrap_or(0);
+        let kind = resolved_entry.get("kind").and_then(|v| v.as_str()).unwrap_or("note").to_string();
+        let message = resolved_entry.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let author = resolved_entry.get("author").and_then(|v| v.as_str()).unwrap_or("agent").to_string();
+        let status = resolved_entry.get("status").and_then(|v| v.as_str()).unwrap_or("open").to_string();
+        let created_at = Utc::now();
+        let resolved = Annotation {
+            id,
+            doc_name: doc_name.to_string(),
+            section_id,
+            line,
+            kind,
+            message,
+            author,
+            status,
+            created_at,
+        };
+        let deactivated = self.deactivate_annotation_knowledge(annotation_id, Some(reason))?;
+        Ok((deactivated, resolved))
     }
 
     /// Promote a raw event from mirror-log to a knowledge entry
@@ -361,7 +395,7 @@ impl<'a> KnowledgeBridge<'a> {
         let provenance_id = Uuid::new_v4().to_string();
         let defaults = ConfidenceDefaults::default();
         let mut entry = KnowledgeEntry::new(&content, KnowledgeKind::Context);
-        entry.source_type = Self::MIRROR_LOG_SOURCE_TYPE.to_string();
+        entry.source_type = "mirror_log_event".to_string();
         entry.source_id = event_id.to_string();
         entry.source = Source::Agent;
         entry = entry
@@ -369,7 +403,7 @@ impl<'a> KnowledgeBridge<'a> {
             .meta("derived_at_unix_ms", now_unix_ms())
             .meta("status", "active")
             .meta("provenance_id", provenance_id)
-            .meta("provenance_source", Self::MIRROR_LOG_SOURCE_TYPE)
+            .meta("provenance_source", "mirror_log_event")
             .meta("provenance_set_at_unix_ms", now_unix_ms());
         if let Some(m) = meta {
             entry = entry.meta("event-meta", json!(m));
@@ -387,10 +421,11 @@ fn now_unix_ms() -> u128 {
         .unwrap_or(0)
 }
 
-fn annotation_confidence(annotation: &AnnotationEntry, defaults: &ConfidenceDefaults) -> f64 {
-    let base = match annotation.kind {
-        AnnotationKind::Note => defaults.note_confidence,
-        AnnotationKind::Question => defaults.question_confidence,
+fn annotation_confidence(annotation: &Annotation, defaults: &ConfidenceDefaults) -> f64 {
+    let base = match annotation.kind.as_str() {
+        "note" => defaults.note_confidence,
+        "question" => defaults.question_confidence,
+        _ => defaults.note_confidence,
     };
 
     let message = annotation.message.to_ascii_lowercase();
@@ -416,7 +451,6 @@ fn annotation_confidence(annotation: &AnnotationEntry, defaults: &ConfidenceDefa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state_docs::AnnotationStatus;
     use std::fs;
     use tempfile::tempdir;
 
@@ -435,7 +469,7 @@ mod tests {
             r#"{
   "entries": [
     {
-      "id": "alpha-md-123-0",
+      "id": 123,
       "kind": "note",
       "message": "Keep this",
       "author": "agent",
@@ -471,7 +505,7 @@ mod tests {
             r#"{
   "entries": [
     {
-      "id": "beta-md-456-0",
+      "id": 456,
       "kind": "question",
       "message": "Decided yes",
       "author": "agent",
@@ -488,19 +522,8 @@ mod tests {
         let ids = bridge.sync_state_doc_annotations("beta").unwrap();
         assert_eq!(ids.len(), 1);
 
-        let resolved_entry = AnnotationEntry {
-            id: "beta-md-456-0".to_string(),
-            kind: AnnotationKind::Question,
-            message: "Decided yes".to_string(),
-            author: "agent".to_string(),
-            doc: "beta.md".to_string(),
-            line: None,
-            status: AnnotationStatus::Resolved,
-            created_at_unix_ms: 456,
-        };
-
         let deactivated = bridge
-            .deactivate_resolved_annotation_knowledge(&resolved_entry, Some("answered"))
+            .deactivate_annotation_knowledge("456", Some("answered"))
             .unwrap();
         assert_eq!(deactivated, 1);
 
