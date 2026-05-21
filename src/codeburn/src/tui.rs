@@ -184,9 +184,9 @@ impl TuiDashboard {
             .metrics
             .daily
             .iter()
-            .map(|(_, c)| c)
+            .map(|(_, c)| c.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap_or(&0.0);
+            .unwrap_or(0.0);
 
         self.metrics
             .daily
@@ -194,7 +194,7 @@ impl TuiDashboard {
             .rev()
             .take(6)
             .map(|(date, cost)| {
-                let bar = self.render_ascii_bar(*cost, *max_cost);
+                let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_cost);
                 Line::from(vec![
                     Span::raw(format!("{}", date)).fg(Color::White),
                     Span::raw(" "),
@@ -231,6 +231,7 @@ impl TuiDashboard {
             .by_project
             .values()
             .cloned()
+            .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
 
@@ -238,7 +239,7 @@ impl TuiDashboard {
             .by_project
             .iter()
             .map(|(name, cost)| {
-                let bar = self.render_ascii_bar(*cost, max_cost);
+                let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_cost);
                 Line::from(vec![
                     Span::raw(name.to_string()).fg(Color::White),
                     Span::raw(" "),
@@ -274,16 +275,16 @@ impl TuiDashboard {
             .metrics
             .top_sessions
             .iter()
-            .map(|(_, c)| c)
+            .map(|(_, c)| c.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
-            .unwrap_or(&0.0);
+            .unwrap_or(0.0);
 
         self.metrics
             .top_sessions
             .iter()
             .take(5)
             .map(|(session_id, cost)| {
-                let bar = self.render_ascii_bar(*cost, *max_cost);
+                let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_cost);
                 Line::from(vec![
                     Span::raw(session_id.to_string()).fg(Color::White),
                     Span::raw(" "),
@@ -320,6 +321,7 @@ impl TuiDashboard {
             .by_activity
             .values()
             .cloned()
+            .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
 
@@ -327,7 +329,7 @@ impl TuiDashboard {
             .by_activity
             .iter()
             .map(|(name, cost)| {
-                let bar = self.render_ascii_bar(*cost, max_cost);
+                let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_cost);
                 Line::from(vec![
                     Span::raw(name.to_string()).fg(Color::White),
                     Span::raw(" "),
@@ -364,6 +366,7 @@ impl TuiDashboard {
             .by_model
             .values()
             .cloned()
+            .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
 
@@ -371,7 +374,7 @@ impl TuiDashboard {
             .by_model
             .iter()
             .map(|(name, cost)| {
-                let bar = self.render_ascii_bar(*cost, max_cost);
+                let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_cost);
                 Line::from(vec![
                     Span::raw(name.to_string()).fg(Color::White),
                     Span::raw(" "),
@@ -414,7 +417,7 @@ impl TuiDashboard {
             .by_tool
             .iter()
             .map(|(name, cost)| {
-                let bar = self.render_ascii_bar(*cost, max_calls as f64);
+                let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_calls as f64);
                 Line::from(vec![
                     Span::raw(name.to_string()).fg(Color::White),
                     Span::raw(" "),
@@ -451,6 +454,7 @@ impl TuiDashboard {
             .by_shell
             .values()
             .cloned()
+            .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
 
@@ -458,7 +462,7 @@ impl TuiDashboard {
             .by_shell
             .iter()
             .map(|(name, cost)| {
-                let bar = self.render_ascii_bar(*cost, max_cost);
+                let bar = self.render_ascii_bar(cost.as_f64().unwrap_or(0.0), max_cost);
                 Line::from(vec![
                     Span::raw(name.to_string()).fg(Color::White),
                     Span::raw(" "),
@@ -489,7 +493,7 @@ impl TuiDashboard {
                     Line::from(vec![
                         Span::raw(name.to_string()).fg(Color::White),
                         Span::raw(" "),
-                        Span::raw(format!("{:.2}", *cost)).fg(Color::Yellow),
+                        Span::raw(format!("{:.2}", cost.as_f64().unwrap_or(0.0))).fg(Color::Yellow),
                     ])
                 })
                 .collect::<Vec<Line>>();
