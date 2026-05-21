@@ -107,7 +107,7 @@ impl AcpAgentServer {
                             "cwd": session.cwd,
                             "status": "loaded",
                         }),
-                    },
+                    }),
                     None => Ok(AcpResponse::Error {
                         message: format!("session not found: {}", session_id),
                     }),
@@ -160,8 +160,8 @@ impl AcpAgentServer {
                                 "message": message,
                                 "context": context,
                                 "status": "processed",
-                            }),
-                        })
+                                }),
+                            })
                     }
                     None => Ok(AcpResponse::Error {
                         message: format!("session not found: {}", session_id),
@@ -215,7 +215,7 @@ impl AcpAgentServer {
                                     "gate_result": "proceed",
                                     "status": "authorized",
                                 }),
-                            },
+                            }),
                             Ok(GateResult::Pending) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
@@ -225,7 +225,7 @@ impl AcpAgentServer {
                                     "requires_review": true,
                                     "status": "queued",
                                 }),
-                            },
+                            }),
                             Ok(GateResult::Interrupted { reason }) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
@@ -235,7 +235,7 @@ impl AcpAgentServer {
                                     "reason": reason,
                                     "status": "denied",
                                 }),
-                            },
+                            })
                             Ok(GateResult::DryRun) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
@@ -244,7 +244,7 @@ impl AcpAgentServer {
                                     "gate_result": "dry_run",
                                     "status": "dry_run",
                                 }),
-                            },
+                            }),
                             Err(e) => Ok(AcpResponse::Error {
                                 message: format!("gate error: {}", e),
                             }),

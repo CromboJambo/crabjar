@@ -168,6 +168,8 @@ pub enum GuardCommand {
     },
 }
 
+pub mod knowledge_store;
+
 pub fn cli() -> clap::Command {
     Cli::command()
 }
