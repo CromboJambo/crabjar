@@ -56,12 +56,11 @@ impl Store {
         provenance_id: &str,
     ) -> StoreResult<Vec<KnowledgeRow>> {
         let mut rows = Vec::new();
-        let tag_filter: String = tags.iter().map(|t| format!("'{}'", t)).collect();
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND tags LIKE ? AND metadata LIKE ? LIMIT ?",
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND tags LIKE ? LIMIT ?",
         )?;
 
-        let cursor = stmt.query_map(rusqlite::params![tag_filter, format!("'%{}'", provenance_id), limit], |row| {
+        let cursor = stmt.query_map(rusqlite::params![format!("'%{}'", tags.iter().map(|t| t.clone()).collect::<Vec<_>>().join(",")), limit], |row| {
             let tags_str: String = row.get(2)?;
             let metadata_str: String = row.get(3)?;
             Ok(KnowledgeRow {
@@ -86,10 +85,10 @@ impl Store {
         _provenance_id: &String,
     ) -> StoreResult<Option<KnowledgeRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND metadata LIKE ?",
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND metadata LIKE ? AND metadata LIKE ?",
         )?;
 
-        let cursor = stmt.query_map(rusqlite::params![format!("'%{}'", _provenance_id)], |row| {
+        let cursor = stmt.query_map(rusqlite::params![format!("'%{}'", source_type), format!("'%{}'", _provenance_id)], |row| {
             let tags_str: String = row.get(2)?;
             let metadata_str: String = row.get(3)?;
             Ok(KnowledgeRow {
@@ -141,7 +140,7 @@ impl Store {
         let _reason = reason.unwrap_or("");
         let affected = self.conn.execute(
             "UPDATE knowledge_entries SET active = 0 WHERE source = ? AND metadata LIKE ?",
-            rusqlite::params![_source, format!("'%{}'", _provenance_id)],
+            rusqlite::params![_source, format!("'%\"source_id\":\"{}'", _provenance_id)],
         )?;
 
         Ok(affected)
@@ -157,7 +156,7 @@ impl Store {
         let _reason = reason.unwrap_or("");
         let affected = self.conn.execute(
             "UPDATE knowledge_entries SET active = 0 WHERE source = ? AND metadata LIKE ?",
-            rusqlite::params![_source, format!("'%{}'", _provenance_id)],
+            rusqlite::params![_source, format!("'%\"provenance_id\":\"{}'", _provenance_id)],
         )?;
 
         Ok(affected)

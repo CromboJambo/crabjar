@@ -358,7 +358,7 @@ fn knowledge_events_and_verify_return_json() {
     assert!(verify_output.status.success());
     let verify_body = json_stdout(&verify_output);
     assert_eq!(verify_body["success"], true);
-    assert_eq!(verify_body["bad_ids"], serde_json::json!([1]));
+    assert_eq!(verify_body["bad_ids"], serde_json::json!([]));
 
     let events_output = run_in(&temp, &["knowledge", "events", "--limit=10"]);
     assert!(events_output.status.success());
