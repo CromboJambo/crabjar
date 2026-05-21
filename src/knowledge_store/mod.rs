@@ -129,7 +129,6 @@ impl<'a> KnowledgeBridge<'a> {
         let confidence = annotation_confidence(annotation, &defaults);
         let provenance_id = Uuid::new_v4().to_string();
         let mut entry = KnowledgeEntry::new(&annotation.message, kind)
-            .meta("source_type", Self::STATE_DOC_SOURCE_TYPE)
             .meta("source_id", &annotation.id)
             .meta("source_doc", &annotation.doc)
             .meta(
@@ -142,6 +141,8 @@ impl<'a> KnowledgeBridge<'a> {
             .meta("provenance_id", provenance_id)
             .meta("provenance_source", Self::STATE_DOC_SOURCE_TYPE)
             .meta("provenance_set_at_unix_ms", now_unix_ms());
+        entry.source_type = Self::STATE_DOC_SOURCE_TYPE.to_string();
+        entry.source_id = annotation.id.clone();
         entry.source = Source::Agent;
         entry.weight = confidence;
         entry.tags = std::iter::once("state-doc".to_string())
@@ -318,6 +319,7 @@ impl<'a> KnowledgeBridge<'a> {
     ) -> Result<i64, agent_context::Error> {
         let mut entry = KnowledgeEntry::new(content, kind);
         entry.source = Source::User;
+        entry.source_type = "user".to_string();
         entry.tags = tags;
         Ok(self.knowledge_store.insert(entry)?)
     }
@@ -356,10 +358,10 @@ impl<'a> KnowledgeBridge<'a> {
         let provenance_id = Uuid::new_v4().to_string();
         let defaults = ConfidenceDefaults::default();
         let mut entry = KnowledgeEntry::new(&content, KnowledgeKind::Context);
+        entry.source_type = Self::MIRROR_LOG_SOURCE_TYPE.to_string();
+        entry.source_id = event_id.to_string();
         entry.source = Source::Agent;
         entry = entry
-            .meta("source_type", Self::MIRROR_LOG_SOURCE_TYPE)
-            .meta("source_id", event_id)
             .meta("confidence", defaults.promote_confidence)
             .meta("derived_at_unix_ms", now_unix_ms())
             .meta("status", "active")
