@@ -33,8 +33,8 @@ impl PerturbationSet {
 
     /// Compute the bounded set of perturbations for an action.
     pub fn compute_perturbations(
-        command: &str,
-        args: &[String],
+        _command: &str,
+        _args: &[String],
         undo_paths: Vec<String>,
         checksum_targets: Vec<String>,
         checkpoint_targets: Vec<String>,
@@ -97,7 +97,7 @@ impl PerturbationSet {
             });
         }
 
-        Self::new(perturbations, bound_from_perturbations(&perturbations))
+        Self::new(perturbations.clone(), bound_from_perturbations(&perturbations))
     }
 
     /// Determine whether any perturbation is unmitigable.
