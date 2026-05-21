@@ -138,16 +138,17 @@ impl<'a> KnowledgeBridge<'a> {
             .meta("confidence", confidence)
             .meta("derived_at_unix_ms", now_unix_ms())
             .meta("status", "active")
-            .meta("provenance_id", provenance_id)
+            .meta("provenance_id", &provenance_id)
             .meta("provenance_source", Self::STATE_DOC_SOURCE_TYPE)
             .meta("provenance_set_at_unix_ms", now_unix_ms());
         entry.source_type = Self::STATE_DOC_SOURCE_TYPE.to_string();
         entry.source_id = annotation.id.clone();
-        entry.provenance_id = provenance_id.clone();
+        entry.provenance_id = provenance_id;
         entry.source = Source::Agent;
         entry.weight = confidence;
+        let doc_name = annotation.doc.strip_suffix(".md").unwrap_or(&annotation.doc);
         entry.tags = std::iter::once("state-doc".to_string())
-            .chain(annotation.doc.split('.').map(|s| s.to_string()))
+            .chain(doc_name.split('_').map(|s| s.to_string()))
             .collect();
         Ok(entry)
     }
@@ -159,7 +160,7 @@ impl<'a> KnowledgeBridge<'a> {
         limit: usize,
         source_doc: &str,
     ) -> Result<Vec<serde_json::Value>, agent_context::Error> {
-        let rows = self.knowledge_store.query(tags, limit, source_doc)?;
+        let rows = self.knowledge_store.query(tags, limit, "", source_doc, "")?;
         Ok(rows
             .into_iter()
             .map(|row| {
@@ -197,7 +198,7 @@ impl<'a> KnowledgeBridge<'a> {
             if entry.status == crate::state_docs::AnnotationStatus::Open {
                 if self
                     .knowledge_store
-                    .find_active_by_provenance(Self::STATE_DOC_SOURCE_TYPE, &entry.id)?
+                    .find_active_by_source(Self::STATE_DOC_SOURCE_TYPE, &entry.id)?
                     .is_some()
                 {
                     continue;
@@ -260,7 +261,7 @@ impl<'a> KnowledgeBridge<'a> {
         annotation_id: &str,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        Ok(self.knowledge_store.deactivate_by_provenance(
+        Ok(self.knowledge_store.deactivate_by_source(
             Self::STATE_DOC_SOURCE_TYPE,
             annotation_id,
             Source::Agent,
@@ -274,7 +275,7 @@ impl<'a> KnowledgeBridge<'a> {
         resolved: &AnnotationEntry,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        Ok(self.knowledge_store.deactivate_by_provenance(
+        Ok(self.knowledge_store.deactivate_by_source(
             Self::STATE_DOC_SOURCE_TYPE,
             &resolved.id,
             Source::Agent,

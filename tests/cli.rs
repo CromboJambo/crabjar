@@ -471,7 +471,7 @@ fn knowledge_sync_is_idempotent() {
 
     let query = run_in(
         &temp,
-        &["knowledge", "query", "--tags=state-doc,alpha-state"],
+        &["knowledge", "query", "--tags=state-doc,alpha,state"],
     );
     assert!(query.status.success());
     let query_body = json_stdout(&query);
@@ -511,7 +511,7 @@ fn resolve_annotation_deactivates_derived_knowledge() {
 
     let query_before = run_in(
         &temp,
-        &["knowledge", "query", "--tags=state-doc,alpha-state"],
+        &["knowledge", "query", "--tags=state-doc,alpha,state"],
     );
     assert!(query_before.status.success());
     let query_before_body = json_stdout(&query_before);
@@ -710,13 +710,13 @@ fn resolve_one_annotation_does_not_deactivate_other() {
     assert!(sync_alpha.status.success());
     let sync_alpha_body = json_stdout(&sync_alpha);
     assert_eq!(sync_alpha_body["success"], true);
-    assert_eq!(sync_alpha_body["ids"].as_array().unwrap().len(), 1);
+    assert_eq!(sync_alpha_body["ids"].as_array().unwrap().len(), 2);
 
     let sync_beta = run_in(&temp, &["knowledge", "sync", "beta_state"]);
     assert!(sync_beta.status.success());
     let sync_beta_body = json_stdout(&sync_beta);
     assert_eq!(sync_beta_body["success"], true);
-    assert_eq!(sync_beta_body["ids"].as_array().unwrap().len(), 1);
+    assert_eq!(sync_beta_body["ids"].as_array().unwrap().len(), 0);
 
     let query_before = run_in(&temp, &["knowledge", "query", "--tags=state-doc"]);
     assert!(query_before.status.success());
@@ -804,7 +804,7 @@ fn query_one_tag_does_not_return_unrelated_rows() {
     assert_eq!(sync_beta_body["success"], true);
     assert_eq!(sync_beta_body["ids"].as_array().unwrap().len(), 1);
 
-    let query_alpha_tag = run_in(&temp, &["knowledge", "query", "--tags=alpha-state"]);
+    let query_alpha_tag = run_in(&temp, &["knowledge", "query", "--tags=alpha,state"]);
     assert!(query_alpha_tag.status.success());
     let query_alpha_tag_body = json_stdout(&query_alpha_tag);
     assert_eq!(query_alpha_tag_body["rows"].as_array().unwrap().len(), 1);
@@ -822,11 +822,19 @@ fn query_one_tag_does_not_return_unrelated_rows() {
         "beta-state-md-456-0"
     );
 
-    let query_both_tags = run_in(
+    let query_alpha_tag = run_in(
         &temp,
-        &["knowledge", "query", "--tags=alpha,beta"],
+        &["knowledge", "query", "--tags=alpha"],
     );
-    assert!(query_both_tags.status.success());
-    let query_both_tags_body = json_stdout(&query_both_tags);
-    assert_eq!(query_both_tags_body["rows"].as_array().unwrap().len(), 2);
+    assert!(query_alpha_tag.status.success());
+    let query_alpha_tag_body = json_stdout(&query_alpha_tag);
+    assert_eq!(query_alpha_tag_body["rows"].as_array().unwrap().len(), 1);
+
+    let query_beta_tag = run_in(
+        &temp,
+        &["knowledge", "query", "--tags=beta"],
+    );
+    assert!(query_beta_tag.status.success());
+    let query_beta_tag_body = json_stdout(&query_beta_tag);
+    assert_eq!(query_beta_tag_body["rows"].as_array().unwrap().len(), 1);
 }

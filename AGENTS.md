@@ -34,6 +34,11 @@ Run `cargo fmt` before submitting changes. Use `cargo clippy -- -D warnings` and
 
 Use `thiserror` for library errors and propagate failures with `?`. Avoid `unwrap()` outside tests. CLI commands should emit structured JSON to stdout; do not add plain-text success paths.
 
+## Naming Collision Pattern
+- Parameter names must match column names, not semantic intent. When renaming, audit all callers across the dependency graph.
+- Semantic naming drift: `provenance_id` parameter querying `source_id` column is a structural naming bug that causes every downstream caller to operate on the wrong column.
+- Always verify parameter-to-column alignment before implementing deactivate, filter, or query functions.
+
 ## Testing Guidelines
 
 Use `#[test]` and `#[tokio::test]`. Place unit tests beside the code under `#[cfg(test)]`; place CLI integration tests in `tests/cli.rs` using `std::process::Command`.

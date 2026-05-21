@@ -25,6 +25,7 @@ The agent operates as an "Expert Researcher" rather than a "Memorizing Student."
 ### 	3. Precision Engineering
 *   **Verification via Tooling**: Every code change must be followed by a `cargo check` or `cargo clippy` within the relevant crate's scope to ensure no regressions were introduced in the wider workspace.
 *   **Structural Integrity**: When refactoring, always verify that all references (imports, function calls) are updated across the entire dependency graph.
+*   **Indexed Provenance Gap**: `entry.provenance_id` must be set at creation time, not just in metadata. Any abstraction layer that writes provenance must propagate it to the indexed column. An empty indexed column renders deactivate-by-provenance queries ineffective.
 
 ## Workflow: "Dreaming Mode"
 The agent shall utilize a continuous "Dreaming/Refinement" loop during or after complex conversations to:

@@ -38,7 +38,7 @@ impl KnowledgeCommandExt for KnowledgeCommand {
                     .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
                     .collect();
-                let rows = bridge.query_state_docs(&flattened, 100)?;
+                let rows = bridge.query_state_docs(&flattened, 100, "")?;
                 Ok(knowledge_response(
                     "query complete",
                     json!({ "rows": rows }),
