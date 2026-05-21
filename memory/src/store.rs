@@ -32,8 +32,8 @@ impl Store {
         let source_str = serde_json::to_string(&entry.source)?;
 
         self.conn.execute(
-            "INSERT INTO knowledge_entries (content, kind, tags, metadata, weight, source, active) VALUES (?, ?, ?, ?, ?, ?, 1)",
-            rusqlite::params![entry.content, kind_str, tags_str, metadata_str, entry.weight, source_str],
+            "INSERT INTO knowledge_entries (content, kind, tags, metadata, weight, source, active, source_type, source_id, provenance_id) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)",
+            rusqlite::params![entry.content, kind_str, tags_str, metadata_str, entry.weight, source_str, entry.source_type, entry.source_id, entry.provenance_id],
         )?;
 
         let rowid = self.conn.last_insert_rowid();
@@ -53,15 +53,22 @@ impl Store {
         provenance_id: &str,
     ) -> StoreResult<Vec<KnowledgeRow>> {
         let mut rows = Vec::new();
-        let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1",
-        )?;
+        let sql = if provenance_id.is_empty() {
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1"
+        } else {
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND provenance_id = ?"
+        };
+        let mut stmt = self.conn.prepare(sql)?;
 
-        let cursor = stmt.query_map([], raw_knowledge_row)?;
+        let cursor = if provenance_id.is_empty() {
+            stmt.query_map([], raw_knowledge_row)?
+        } else {
+            stmt.query_map(rusqlite::params![provenance_id], raw_knowledge_row)?
+        };
 
         for row in cursor {
             let row = row?;
-            if row_matches_tags(&row, tags) && row_matches_provenance_id(&row, provenance_id) {
+            if row_matches_tags(&row, tags) {
                 rows.push(row);
             }
             if rows.len() >= limit {
@@ -78,16 +85,16 @@ impl Store {
         provenance_id: &str,
     ) -> StoreResult<Option<KnowledgeRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1",
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source_type = ? AND source_id = ?",
         )?;
 
-        let cursor = stmt.query_map([], raw_knowledge_row)?;
+        let mut cursor = stmt.query_map(
+            rusqlite::params![source_type, provenance_id],
+            raw_knowledge_row,
+        )?;
 
-        for row in cursor {
-            let row = row?;
-            if row_matches_source(&row, source_type, "source_id", provenance_id) {
-                return Ok(Some(row));
-            }
+        if let Some(row) = cursor.next() {
+            return Ok(Some(row?));
         }
 
         Ok(None)
@@ -119,15 +126,14 @@ impl Store {
 
     pub fn deactivate_by_provenance(
         &self,
-        _source_type: &str,
-        _provenance_id: &str,
+        source_type: &str,
+        provenance_id: &str,
         source: Source,
         reason: Option<&str>,
     ) -> StoreResult<usize> {
         let _source = serde_json::to_string(&source)?;
         let _reason = reason.unwrap_or("");
-        let ids =
-            self.matching_ids_by_metadata(source, Some(_source_type), "source_id", _provenance_id)?;
+        let ids = self.matching_ids_by_index(source_type, provenance_id)?;
         let mut affected = 0;
         for id in ids {
             affected += self.conn.execute(
@@ -141,12 +147,12 @@ impl Store {
 
     pub fn deactivate_by_provenance_id(
         &self,
-        _provenance_id: &str,
-        source: Source,
+        provenance_id: &str,
+        _source: Source,
         reason: Option<&str>,
     ) -> StoreResult<usize> {
         let _reason = reason.unwrap_or("");
-        let ids = self.matching_ids_by_metadata(source, None, "provenance_id", _provenance_id)?;
+        let ids = self.matching_ids_by_index("", provenance_id)?;
         let mut affected = 0;
         for id in ids {
             affected += self.conn.execute(
@@ -183,30 +189,21 @@ impl Store {
         Ok(())
     }
 
-    fn matching_ids_by_metadata(
+    fn matching_ids_by_index(
         &self,
-        source: Source,
-        source_type: Option<&str>,
-        metadata_key: &str,
-        metadata_value: &str,
+        source_type: &str,
+        provenance_id: &str,
     ) -> StoreResult<Vec<i64>> {
-        let source = serde_json::to_string(&source)?;
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source = ?",
+            "SELECT id FROM knowledge_entries WHERE active = 1 AND source_type = ? AND source_id = ?",
         )?;
-        let cursor = stmt.query_map(rusqlite::params![source], raw_knowledge_row)?;
+        let cursor = stmt.query_map(rusqlite::params![source_type, provenance_id], |row| {
+            row.get(0)
+        })?;
         let mut ids = Vec::new();
 
-        for row in cursor {
-            let row = row?;
-            let source_type_matches = source_type
-                .map(|value| metadata_string_eq(&row.metadata, "source_type", value))
-                .unwrap_or(true);
-            if source_type_matches
-                && metadata_string_eq(&row.metadata, metadata_key, metadata_value)
-            {
-                ids.push(row.id);
-            }
+        for id in cursor {
+            ids.push(id?);
         }
 
         Ok(ids)
@@ -230,26 +227,4 @@ fn row_matches_tags(row: &KnowledgeRow, tags: &[&str]) -> bool {
         || tags
             .iter()
             .any(|wanted| row.tags.iter().any(|tag| tag == wanted))
-}
-
-fn row_matches_provenance_id(row: &KnowledgeRow, provenance_id: &str) -> bool {
-    provenance_id.is_empty() || metadata_string_eq(&row.metadata, "provenance_id", provenance_id)
-}
-
-fn row_matches_source(
-    row: &KnowledgeRow,
-    source_type: &str,
-    source_key: &str,
-    source_id: &str,
-) -> bool {
-    metadata_string_eq(&row.metadata, "source_type", source_type)
-        && metadata_string_eq(&row.metadata, source_key, source_id)
-}
-
-fn metadata_string_eq(metadata: &serde_json::Value, key: &str, expected: &str) -> bool {
-    metadata
-        .get(key)
-        .and_then(serde_json::Value::as_str)
-        .map(|value| value == expected)
-        .unwrap_or(false)
 }

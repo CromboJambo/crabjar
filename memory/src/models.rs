@@ -26,6 +26,9 @@ pub struct KnowledgeEntry {
     pub metadata: serde_json::Value,
     pub weight: f64,
     pub source: Source,
+    pub source_type: String,
+    pub source_id: String,
+    pub provenance_id: String,
 }
 
 impl KnowledgeEntry {
@@ -37,6 +40,9 @@ impl KnowledgeEntry {
             metadata: serde_json::Value::Object(serde_json::Map::new()),
             weight: 1.0,
             source: Source::User,
+            source_type: String::new(),
+            source_id: String::new(),
+            provenance_id: String::new(),
         }
     }
 

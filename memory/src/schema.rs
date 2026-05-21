@@ -19,7 +19,10 @@ pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
             metadata TEXT NOT NULL,
             weight REAL NOT NULL,
             source TEXT NOT NULL,
-            active BOOLEAN NOT NULL DEFAULT 1
+            active BOOLEAN NOT NULL DEFAULT 1,
+            source_type TEXT NOT NULL DEFAULT '',
+            source_id TEXT NOT NULL DEFAULT '',
+            provenance_id TEXT NOT NULL DEFAULT ''
         )",
         [],
     )?;
@@ -128,7 +131,7 @@ mod tests {
         let conn = rusqlite::Connection::open(dir.path().join("test.db")).unwrap();
         schema::migrate(&conn).unwrap();
         conn.execute(
-            "INSERT INTO knowledge_entries (id, content, kind, tags, metadata, weight, source, active) VALUES (1, 'test', 'instruction', '[]', '{}', 1.0, 'user', 1)",
+            "INSERT INTO knowledge_entries (id, content, kind, tags, metadata, weight, source, active, source_type, source_id, provenance_id) VALUES (1, 'test', 'instruction', '[]', '{}', 1.0, 'user', 1, '', '', '')",
             [],
         ).unwrap();
         let count: i64 = conn
