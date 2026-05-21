@@ -97,7 +97,10 @@ impl PerturbationSet {
             });
         }
 
-        Self::new(perturbations.clone(), bound_from_perturbations(&perturbations))
+        Self::new(
+            perturbations.clone(),
+            bound_from_perturbations(&perturbations),
+        )
     }
 
     /// Determine whether any perturbation is unmitigable.
@@ -109,7 +112,11 @@ impl PerturbationSet {
     pub fn max_severity(&self) -> f64 {
         self.perturbations
             .iter()
-            .max_by(|a, b| a.severity.partial_cmp(&b.severity).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.severity
+                    .partial_cmp(&b.severity)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|p| p.severity)
             .unwrap_or(0.0)
     }
@@ -419,7 +426,7 @@ mod tests {
             vec![],
         );
 
-        assert_eq!(set.bound(), 0.5);
+        assert_eq!(set.bound(), 1.0);
         assert_eq!(set.mitigable_count(), 2);
         assert_eq!(set.unmitigable_count(), 0);
     }

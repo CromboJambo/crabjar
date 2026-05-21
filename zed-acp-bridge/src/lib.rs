@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use zed_acp_server::AcpSession;
 use agent_context::Store;
 use crabjar_guard::GuardDb;
+use zed_acp_server::AcpSession;
 
 #[derive(Error, Debug)]
 pub enum AcpBridgeError {
@@ -81,7 +81,11 @@ impl AcpBridge {
         });
     }
 
-    pub fn query_knowledge(&self, tags: &[&str], limit: usize) -> Result<Vec<serde_json::Value>, AcpBridgeError> {
+    pub fn query_knowledge(
+        &self,
+        tags: &[&str],
+        limit: usize,
+    ) -> Result<Vec<serde_json::Value>, AcpBridgeError> {
         let store = self
             .knowledge_store
             .as_ref()
@@ -103,22 +107,27 @@ impl AcpBridge {
             .collect())
     }
 
-    pub fn check_guard(&self, command: &str, args: &[String]) -> Result<zed_acp_server::GateResult, AcpBridgeError> {
+    pub fn check_guard(
+        &self,
+        command: &str,
+        args: &[String],
+    ) -> Result<zed_acp_server::GateResult, AcpBridgeError> {
         let guard_db = self
             .guard_db
             .as_ref()
             .ok_or_else(|| AcpBridgeError::GuardError("no guard db".into()))?;
         let gate = crabjar_guard::ExecutionGate::new(guard_db, false, ".");
-        let result = gate.check(crabjar_guard::GateContext {
-            action_type: "bridge_tool",
-            command,
-            args: args.to_vec(),
-            trust_layer: 3,
-            confidence: crabjar_guard::TrustScore::new(0.9),
-            source_event_id: None,
-            can_interrupt: true,
-        })
-        .map_err(|e| AcpBridgeError::GuardError(e.to_string()))?;
+        let result = gate
+            .check(crabjar_guard::GateContext {
+                action_type: "bridge_tool",
+                command,
+                args: args.to_vec(),
+                trust_layer: 3,
+                confidence: crabjar_guard::TrustScore::new(0.9),
+                source_event_id: None,
+                can_interrupt: true,
+            })
+            .map_err(|e| AcpBridgeError::GuardError(e.to_string()))?;
         Ok(result)
     }
 
