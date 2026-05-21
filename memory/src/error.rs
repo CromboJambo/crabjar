@@ -4,6 +4,8 @@ use thiserror::Error;
 pub enum Error {
     #[error("Database error: {0}")]
     Database(#[from] rusqlite::Error),
+    #[error("Store error: {0}")]
+    Store(#[from] crate::store::StoreError),
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

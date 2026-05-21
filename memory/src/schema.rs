@@ -129,11 +129,11 @@ mod tests {
     fn migrate_preserves_data() {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("test.db")).unwrap();
+        schema::migrate(&conn).unwrap();
         conn.execute(
             "INSERT INTO knowledge_entries (id, content, kind, tags, metadata, weight, source, active) VALUES (1, 'test', 'instruction', '[]', '{}', 1.0, 'user', 1)",
             [],
         ).unwrap();
-        schema::migrate(&conn).unwrap();
         let count: i64 = conn.query_row(
             "SELECT COUNT(*) FROM knowledge_entries",
             [],

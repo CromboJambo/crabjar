@@ -54,11 +54,13 @@ impl Store {
         )?;
 
         let cursor = stmt.query_map(rusqlite::params![limit], |row| {
+            let tags_str: String = row.get(2)?;
+            let metadata_str: String = row.get(3)?;
             Ok(KnowledgeRow {
                 id: row.get(0)?,
                 content: row.get(1)?,
-                tags: serde_json::from_str(&row.get(2)?)?,
-                metadata: serde_json::from_str(&row.get(3)?)?,
+                tags: serde_json::from_str(&tags_str).unwrap(),
+                metadata: serde_json::from_str(&metadata_str).unwrap(),
                 active: row.get(4)?,
             })
         })?;
@@ -73,18 +75,20 @@ impl Store {
     pub fn find_active_by_provenance(
         &self,
         _source_type: &str,
-        _provenance_id: &i64,
+        _provenance_id: &String,
     ) -> StoreResult<Option<KnowledgeRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 LIMIT 1",
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1",
         )?;
 
-        let cursor = stmt.query_map(rusqlite::params![1], |row| {
+        let cursor = stmt.query_map(rusqlite::params![], |row| {
+            let tags_str: String = row.get(2)?;
+            let metadata_str: String = row.get(3)?;
             Ok(KnowledgeRow {
                 id: row.get(0)?,
                 content: row.get(1)?,
-                tags: serde_json::from_str(&row.get::<&str, String>(2)?)?,
-                metadata: serde_json::from_str(&row.get::<&str, String>(3)?)?,
+                tags: serde_json::from_str(&tags_str).unwrap(),
+                metadata: serde_json::from_str(&metadata_str).unwrap(),
                 active: row.get(4)?,
             })
         })?;
@@ -107,7 +111,7 @@ impl Store {
             Ok(EventRow {
                 id: row.get(0)?,
                 event_type: row.get(1)?,
-                timestamp: chrono::DateTime::<chrono::Utc>::from_rfc3339(&ts_str)?,
+                timestamp: chrono::DateTime::<chrono::FixedOffset>::parse_from_rfc3339(&ts_str).unwrap().to_utc(),
             })
         })?;
 
