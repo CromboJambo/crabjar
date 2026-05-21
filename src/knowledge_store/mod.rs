@@ -3,8 +3,8 @@
 
 pub mod commands;
 
-use agent_context::{KnowledgeEntry, KnowledgeKind, Source, Store};
 use agent_context::state_docs::Annotation;
+use agent_context::{KnowledgeEntry, KnowledgeKind, Source, Store};
 use chrono::Utc;
 use rusqlite::Connection;
 use serde_json::json;
@@ -116,22 +116,35 @@ impl KnowledgeBridge {
 
     /// Resolve a state-doc path from project root
     pub fn resolve_doc_path(&self, doc_name: &str) -> Result<PathBuf, agent_context::Error> {
-        let docs_dir = self.project_root.join(agent_context::state_docs::STATE_DOCS_DIR);
+        let docs_dir = self
+            .project_root
+            .join(agent_context::state_docs::STATE_DOCS_DIR);
         Ok(docs_dir.join(format!("{}.md", doc_name)))
     }
 
     /// Load overlay JSON for a state-doc path
-    pub fn load_overlay_for_path(&self, path: &PathBuf) -> Result<serde_json::Value, agent_context::Error> {
-        let overlay_dir = path.parent().unwrap().join(agent_context::state_docs::OVERLAY_DIR);
-        let overlay_file = overlay_dir.join(format!("{}.overlay.json", path.file_name().unwrap().to_string_lossy()));
+    pub fn load_overlay_for_path(
+        &self,
+        path: &PathBuf,
+    ) -> Result<serde_json::Value, agent_context::Error> {
+        let overlay_dir = path
+            .parent()
+            .unwrap()
+            .join(agent_context::state_docs::OVERLAY_DIR);
+        let overlay_file = overlay_dir.join(format!(
+            "{}.overlay.json",
+            path.file_name().unwrap().to_string_lossy()
+        ));
         let content = std::fs::read_to_string(&overlay_file)
             .map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
-        serde_json::from_str(&content)
-            .map_err(|e| agent_context::Error::Json(e))
+        serde_json::from_str(&content).map_err(|e| agent_context::Error::Json(e))
     }
 
     /// Convert an annotation to a knowledge entry
-    pub fn annotation_to_knowledge(&self, annotation: &Annotation) -> Result<KnowledgeEntry, agent_context::Error> {
+    pub fn annotation_to_knowledge(
+        &self,
+        annotation: &Annotation,
+    ) -> Result<KnowledgeEntry, agent_context::Error> {
         let kind = match annotation.kind.as_str() {
             "note" => KnowledgeKind::Context,
             "question" => KnowledgeKind::Instruction,
@@ -156,7 +169,10 @@ impl KnowledgeBridge {
         entry.provenance_id = provenance_id;
         entry.source = Source::Agent;
         entry.weight = confidence;
-        let doc_name = annotation.doc_name.strip_suffix(".md").unwrap_or(&annotation.doc_name);
+        let doc_name = annotation
+            .doc_name
+            .strip_suffix(".md")
+            .unwrap_or(&annotation.doc_name);
         entry.tags = std::iter::once("state-doc".to_string())
             .chain(doc_name.split('_').map(|s| s.to_string()))
             .collect();
@@ -170,7 +186,9 @@ impl KnowledgeBridge {
         limit: usize,
         source_doc: &str,
     ) -> Result<Vec<serde_json::Value>, agent_context::Error> {
-        let rows = self.knowledge_store.query(tags, limit, "", source_doc, "")?;
+        let rows = self
+            .knowledge_store
+            .query(tags, limit, "", source_doc, "")?;
         Ok(rows
             .into_iter()
             .map(|row| {
@@ -195,9 +213,11 @@ impl KnowledgeBridge {
     }
 
     /// Sync all open annotations for a state-doc into the knowledge store
-    pub fn sync_state_doc_annotations(&self, doc_name: &str) -> Result<Vec<i64>, agent_context::Error> {
-        let overlay = self
-            .load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
+    pub fn sync_state_doc_annotations(
+        &self,
+        doc_name: &str,
+    ) -> Result<Vec<i64>, agent_context::Error> {
+        let overlay = self.load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
 
         let mut ids = Vec::new();
         if let Some(entries) = overlay.get("entries").and_then(|v| v.as_array()) {
@@ -218,20 +238,14 @@ impl KnowledgeBridge {
                     continue;
                 }
                 let annotation_id = id_str.parse::<i64>().unwrap_or(0);
-                let message = entry
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let kind_str = entry
-                    .get("kind")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("note");
+                let message = entry.get("message").and_then(|v| v.as_str()).unwrap_or("");
+                let kind_str = entry.get("kind").and_then(|v| v.as_str()).unwrap_or("note");
                 let kind = match kind_str {
                     "note" => KnowledgeKind::Context,
                     "question" => KnowledgeKind::Instruction,
                     _ => KnowledgeKind::Context,
                 };
-                    let mut knowledge = KnowledgeEntry::new(message, kind)
+                let mut knowledge = KnowledgeEntry::new(message, kind)
                     .meta("source_id", id_str)
                     .meta("source_doc", doc_name)
                     .meta("annotation_kind", kind_str)
@@ -256,14 +270,21 @@ impl KnowledgeBridge {
 
     /// List all state-docs that have synced annotations in the knowledge store
     pub fn list_synced_state_docs(&self) -> Result<Vec<String>, agent_context::Error> {
-        let docs_dir = self.project_root.join(agent_context::state_docs::STATE_DOCS_DIR);
+        let docs_dir = self
+            .project_root
+            .join(agent_context::state_docs::STATE_DOCS_DIR);
         let mut synced = Vec::new();
         if let Ok(entries) = std::fs::read_dir(&docs_dir) {
             for entry in entries {
                 if let Ok(e) = entry
                     && let Some(name) = e.file_name().to_string_lossy().strip_suffix(".md")
                 {
-                    let overlay_path = e.path().parent().unwrap().join(agent_context::state_docs::OVERLAY_DIR).join(format!("{}.overlay.json", name));
+                    let overlay_path = e
+                        .path()
+                        .parent()
+                        .unwrap()
+                        .join(agent_context::state_docs::OVERLAY_DIR)
+                        .join(format!("{}.overlay.json", name));
                     if overlay_path.exists() {
                         synced.push(name.to_string());
                     }
@@ -274,14 +295,20 @@ impl KnowledgeBridge {
     }
 
     /// Get knowledge entries associated with a specific state-doc
-    pub fn get_state_doc_knowledge(&self, doc_name: &str) -> Result<Vec<serde_json::Value>, agent_context::Error> {
-        let overlay = self
-            .load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
+    pub fn get_state_doc_knowledge(
+        &self,
+        doc_name: &str,
+    ) -> Result<Vec<serde_json::Value>, agent_context::Error> {
+        let overlay = self.load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
 
         let tags: Vec<&str> = overlay
             .get("entries")
             .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|e| e.get("doc").and_then(|v| v.as_str())).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|e| e.get("doc").and_then(|v| v.as_str()))
+                    .collect()
+            })
             .unwrap_or_default();
 
         self.query_state_docs(&tags, 100, doc_name)
@@ -302,7 +329,11 @@ impl KnowledgeBridge {
     }
 
     /// Deactivates knowledge derived from a resolved annotation.
-    pub fn deactivate_annotation_knowledge(&self, annotation_id: &str, reason: Option<&str>) -> Result<usize, agent_context::Error> {
+    pub fn deactivate_annotation_knowledge(
+        &self,
+        annotation_id: &str,
+        reason: Option<&str>,
+    ) -> Result<usize, agent_context::Error> {
         Ok(self.knowledge_store.deactivate_by_source(
             Self::STATE_DOC_SOURCE_TYPE,
             annotation_id,
@@ -312,7 +343,11 @@ impl KnowledgeBridge {
     }
 
     /// Deactivates all knowledge entries by provenance_id across all provenance sources.
-    pub fn deactivate_by_provenance_id(&self, provenance_id: &str, reason: Option<&str>) -> Result<usize, agent_context::Error> {
+    pub fn deactivate_by_provenance_id(
+        &self,
+        provenance_id: &str,
+        reason: Option<&str>,
+    ) -> Result<usize, agent_context::Error> {
         Ok(self.knowledge_store.deactivate_by_provenance_id(
             provenance_id,
             Source::Agent,
@@ -321,7 +356,12 @@ impl KnowledgeBridge {
     }
 
     /// Insert a standalone knowledge entry.
-    pub fn insert_entry(&self, content: &str, kind: KnowledgeKind, tags: Vec<String>) -> Result<i64, agent_context::Error> {
+    pub fn insert_entry(
+        &self,
+        content: &str,
+        kind: KnowledgeKind,
+        tags: Vec<String>,
+    ) -> Result<i64, agent_context::Error> {
         let mut entry = KnowledgeEntry::new(content, kind);
         entry.source = Source::User;
         entry.source_type = "user".to_string();
@@ -335,31 +375,67 @@ impl KnowledgeBridge {
     }
 
     /// Deactivate a knowledge entry by ID.
-    pub fn deactivate(&self, id: i64, source: Source, reason: Option<&str>) -> Result<(), agent_context::Error> {
+    pub fn deactivate(
+        &self,
+        id: i64,
+        source: Source,
+        reason: Option<&str>,
+    ) -> Result<(), agent_context::Error> {
         Ok(self.knowledge_store.deactivate(id, source, reason)?)
     }
 
     /// Resolve an annotation and deactivate derived knowledge entries.
-    pub fn resolve_annotation(&self, doc_name: &str, annotation_id: &str, reason: &str) -> Result<(usize, Annotation), agent_context::Error> {
-        let overlay = self
-            .load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
+    pub fn resolve_annotation(
+        &self,
+        doc_name: &str,
+        annotation_id: &str,
+        reason: &str,
+    ) -> Result<(usize, Annotation), agent_context::Error> {
+        let overlay = self.load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
         let resolved_entry = overlay
             .get("entries")
             .and_then(|v| v.as_array())
-            .and_then(|a| a.iter().find(|e| {
-                e.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id
-            }))
+            .and_then(|a| {
+                a.iter()
+                    .find(|e| e.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id)
+            })
             .ok_or_else(|| {
                 agent_context::Error::Internal(format!("annotation not found: {}", annotation_id))
             })?;
-        let id = resolved_entry.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-        let doc_name = resolved_entry.get("doc").and_then(|v| v.as_str()).unwrap_or(doc_name);
+        let id = resolved_entry
+            .get("id")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let doc_name = resolved_entry
+            .get("doc")
+            .and_then(|v| v.as_str())
+            .unwrap_or(doc_name);
         let section_id = resolved_entry.get("section_id").and_then(|v| v.as_i64());
-        let line = resolved_entry.get("line").and_then(|v| v.as_u64()).map(|l| l as usize).unwrap_or(0);
-        let kind = resolved_entry.get("kind").and_then(|v| v.as_str()).unwrap_or("note").to_string();
-        let message = resolved_entry.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let author = resolved_entry.get("author").and_then(|v| v.as_str()).unwrap_or("agent").to_string();
-        let status = resolved_entry.get("status").and_then(|v| v.as_str()).unwrap_or("open").to_string();
+        let line = resolved_entry
+            .get("line")
+            .and_then(|v| v.as_u64())
+            .map(|l| l as usize)
+            .unwrap_or(0);
+        let kind = resolved_entry
+            .get("kind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("note")
+            .to_string();
+        let message = resolved_entry
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let author = resolved_entry
+            .get("author")
+            .and_then(|v| v.as_str())
+            .unwrap_or("agent")
+            .to_string();
+        let status = resolved_entry
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("open")
+            .to_string();
         let created_at = Utc::now();
         let resolved = Annotation {
             id,
