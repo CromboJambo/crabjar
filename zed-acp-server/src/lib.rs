@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use thiserror::Error;
+
+use crabjar::knowledge_store::KnowledgeBridge;
+use crabjar_guard::{ExecutionGate, GateContext, GateResult, GuardDb, TrustScore};
 
 #[derive(Error, Debug)]
 pub enum AcpServerError {
@@ -7,6 +11,10 @@ pub enum AcpServerError {
     SessionNotFound(String),
     #[error("protocol error: {0}")]
     ProtocolError(String),
+    #[error("knowledge error: {0}")]
+    KnowledgeError(String),
+    #[error("guard error: {0}")]
+    GuardError(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,58 +28,112 @@ impl AcpSession {
         Self {
             cwd,
             session_id: uuid::Uuid::new_v4().to_string(),
-        }
-    }
-}
+                        }
+                    }
+                    None => Ok(AcpResponse::Error {
+                        message: format!("session not found: {}", session_id),
+                    }
+                }
+            }
+            ZedRequest::ToolCall {
+                session_id,
+                function_name,
+                arguments,
+            } => {
+                let session = self
+                    .sessions
+                    .iter()
+                    .find(|s| s.session_id == session_id);
+                match session {
+                    Some(s) => {
+                        let guard_db = self
+                            .guard_db
+                            .as_ref()
+                            .ok_or_else(|| AcpServerError::GuardError("no guard db".into()))?;
+                        let gate = ExecutionGate::new(guard_db, false, s.cwd.clone());
+                        let command = function_name;
+                        let args = arguments
+                            .get("args")
+                            .and_then(|v| v.as_array())
+                            .map(|a| a.iter().map(|v| v.as_str().unwrap_or("").to_string()).collect())
+                            .unwrap_or_default();
+                        let confidence = arguments
+                            .get("confidence")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(0.9);
+                        let source_event_id = arguments
+                            .get("provenance_id")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ZedRequest {
-    NewSession {
-        cwd: String,
-    },
-    LoadSession {
-        session_id: String,
-        cwd: String,
-    },
-    CloseSession {
-        session_id: String,
-    },
-    ListSessions,
-    Prompt {
-        session_id: String,
-        message: String,
-    },
-    ToolCall {
-        session_id: String,
-        function_name: String,
-        arguments: serde_json::Value,
-    },
-    Authenticate {
-        auth_method: String,
-    },
-}
+                        let gate_result = gate.check(GateContext {
+                            action_type: "tool_call",
+                            command: &command,
+                            args,
+                            trust_layer: 3,
+                            confidence: TrustScore::new(confidence),
+                            source_event_id: source_event_id.as_deref(),
+                            can_interrupt: true,
+                        });
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AcpResponse {
-    Result { value: serde_json::Value },
-    Error { message: String },
-}
-
-#[derive(Debug, Clone)]
-pub struct AcpAgentServer {
-    pub sessions: Vec<AcpSession>,
-}
-
-impl AcpAgentServer {
-    pub fn new() -> Self {
-        Self {
-            sessions: Vec::new(),
-        }
-    }
-
-    pub async fn handle_request(&self, _request: ZedRequest) -> AcpResponse {
-        AcpResponse::Result {
-            value: serde_json::Value::Null,
+                        match gate_result {
+                            Ok(GateResult::Proceed) => AcpResponse::Result {
+                                value: json!({
+                                    "session_id": session_id,
+                                    "tool": function_name,
+                                    "arguments": arguments,
+                                    "gate_result": "proceed",
+                                    "status": "authorized",
+                                }),
+                            },
+                            Ok(GateResult::Pending) => AcpResponse::Result {
+                                value: json!({
+                                    "session_id": session_id,
+                                    "tool": function_name,
+                                    "arguments": arguments,
+                                    "gate_result": "pending",
+                                    "requires_review": true,
+                                    "status": "queued",
+                                }),
+                            },
+                            Ok(GateResult::Interrupted { reason }) => AcpResponse::Result {
+                                value: json!({
+                                    "session_id": session_id,
+                                    "tool": function_name,
+                                    "arguments": arguments,
+                                    "gate_result": "interrupted",
+                                    "reason": reason,
+                                    "status": "denied",
+                                }),
+                            },
+                            Ok(GateResult::DryRun) => AcpResponse::Result {
+                                value: json!({
+                                    "session_id": session_id,
+                                    "tool": function_name,
+                                    "arguments": arguments,
+                                    "gate_result": "dry_run",
+                                    "status": "dry_run",
+                                }),
+                            },
+                            Err(e) => AcpResponse::Error {
+                                message: format!("gate error: {}", e),
+                            },
+                        }
+                    }
+                    None => AcpResponse::Error {
+                        message: format!("session not found: {}", session_id),
+                    }
+                }
+            }
+            ZedRequest::Authenticate { auth_method } => {
+                AcpResponse::Result {
+                    value: json!({
+                        "auth_method": auth_method,
+                        "status": "authenticated",
+                        "requires_api_key": auth_method != "local",
+                    }),
+                }
+            }
         }
     }
 }
@@ -79,5 +141,193 @@ impl AcpAgentServer {
 impl Default for AcpAgentServer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_new_session_creates_id() {
+        let server = AcpAgentServer::new();
+        let response = server.handle_request(ZedRequest::NewSession {
+            cwd: "/test/project".to_string(),
+        });
+        match response {
+            AcpResponse::Result { value } => {
+                assert!(value["session_id"].as_str().is_some());
+                assert_eq!(value["cwd"].as_str(), Some("/test/project"));
+                assert_eq!(value["status"].as_str(), Some("created"));
+            }
+            _ => panic!("expected result"),
+        }
+    }
+
+    #[test]
+    fn test_load_session_found() {
+        let server = AcpAgentServer::new();
+        let _ = server.handle_request(ZedRequest::NewSession {
+            cwd: "/test/project".to_string(),
+        });
+        let response = server.handle_request(ZedRequest::LoadSession {
+            session_id: server.sessions[0].session_id.clone(),
+            cwd: "/test/project".to_string(),
+        });
+        match response {
+            AcpResponse::Result { value } => {
+                assert_eq!(value["status"].as_str(), Some("loaded"));
+            }
+            _ => panic!("expected result"),
+        }
+    }
+
+    #[test]
+    fn test_load_session_not_found() {
+        let server = AcpAgentServer::new();
+        let response = server.handle_request(ZedRequest::LoadSession {
+            session_id: "nonexistent".to_string(),
+            cwd: "/test/project".to_string(),
+        });
+        match response {
+            AcpResponse::Error { message } => {
+                assert!(message.contains("nonexistent"));
+            }
+            _ => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn test_close_session() {
+        let server = AcpAgentServer::new();
+        let _ = server.handle_request(ZedRequest::NewSession {
+            cwd: "/test/project".to_string(),
+        });
+        let session_id = server.sessions[0].session_id.clone();
+        let response = server.handle_request(ZedRequest::CloseSession { session_id });
+        match response {
+            AcpResponse::Result { value } => {
+                assert_eq!(value["status"].as_str(), Some("closed"));
+            }
+            _ => panic!("expected result"),
+        }
+        assert!(server.sessions.is_empty());
+    }
+
+    #[test]
+    fn test_list_sessions() {
+        let server = AcpAgentServer::new();
+        let _ = server.handle_request(ZedRequest::NewSession {
+            cwd: "/test/project".to_string(),
+        });
+        let response = server.handle_request(ZedRequest::ListSessions);
+        match response {
+            AcpResponse::Result { value } => {
+                assert_eq!(value["count"].as_i64(), Some(1));
+            }
+            _ => panic!("expected result"),
+        }
+    }
+
+    #[test]
+    fn test_prompt_with_session() {
+        let server = AcpAgentServer::new();
+        let _ = server.handle_request(ZedRequest::NewSession {
+            cwd: "/test/project".to_string(),
+        });
+        let session_id = server.sessions[0].session_id.clone();
+        let response = server.handle_request(ZedRequest::Prompt {
+            session_id,
+            message: "test prompt".to_string(),
+        });
+        match response {
+            AcpResponse::Result { value } => {
+                assert_eq!(value["status"].as_str(), Some("processed"));
+            }
+            _ => panic!("expected result"),
+        }
+    }
+
+    #[test]
+    fn test_prompt_without_session() {
+        let server = AcpAgentServer::new();
+        let response = server.handle_request(ZedRequest::Prompt {
+            session_id: "nonexistent".to_string(),
+            message: "test prompt".to_string(),
+        });
+        match response {
+            AcpResponse::Error { message } => {
+                assert!(message.contains("nonexistent"));
+            }
+            _ => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn test_authenticate() {
+        let server = AcpAgentServer::new();
+        let response = server.handle_request(ZedRequest::Authenticate {
+            auth_method: "api_key".to_string(),
+        });
+        match response {
+            AcpResponse::Result { value } => {
+                assert_eq!(value["status"].as_str(), Some("authenticated"));
+                assert_eq!(value["requires_api_key"].as_bool(), Some(true));
+            }
+            _ => panic!("expected result"),
+        }
+    }
+
+    #[test]
+    fn test_tool_call_with_guard() {
+        let dir = tempdir().unwrap();
+        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let server = AcpAgentServer::new().with_guard_db(db);
+        let _ = server.handle_request(ZedRequest::NewSession {
+            cwd: dir.path().to_string_lossy().into_owned(),
+        });
+        let session_id = server.sessions[0].session_id.clone();
+
+        let response = server.handle_request(ZedRequest::ToolCall {
+            session_id,
+            function_name: "echo".to_string(),
+            arguments: json!({
+                "args": ["hello"],
+                "confidence": 0.9,
+            }),
+        });
+        match response {
+            AcpResponse::Result { value } => {
+                assert_eq!(value["gate_result"].as_str(), Some("proceed"));
+            }
+            _ => panic!("expected result"),
+        }
+    }
+
+    #[test]
+    fn test_tool_call_high_risk_blocked() {
+        let dir = tempdir().unwrap();
+        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let server = AcpAgentServer::new().with_guard_db(db);
+        let _ = server.handle_request(ZedRequest::NewSession {
+            cwd: dir.path().to_string_lossy().into_owned(),
+        });
+        let session_id = server.sessions[0].session_id.clone();
+
+        let response = server.handle_request(ZedRequest::ToolCall {
+            session_id,
+            function_name: "rm".to_string(),
+            arguments: json!({
+                "args": ["-rf", "/tmp"],
+                "confidence": 0.9,
+            }),
+        });
+        match response {
+            AcpResponse::Result { value } => {
+                assert_eq!(value["gate_result"].as_str(), Some("interrupted"));
+            }
+            _ => panic!("expected result"),
+        }
     }
 }
