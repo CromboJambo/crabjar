@@ -34,12 +34,12 @@ impl Store {
         let kind_str = serde_json::to_string(&entry.kind)?;
         let source_str = serde_json::to_string(&entry.source)?;
 
-        let id = self.conn.execute(
+        self.conn.execute(
             "INSERT INTO knowledge_entries (content, kind, tags, metadata, weight, source, active) VALUES (?, ?, ?, ?, ?, ?, 1)",
             rusqlite::params![entry.content, kind_str, tags_str, metadata_str, entry.weight, source_str],
         )?;
 
-        Ok(id as i64)
+        Ok(self.conn.last_insert_rowid())
     }
 
     pub fn query(
@@ -49,11 +49,12 @@ impl Store {
         provenance_id: &str,
     ) -> StoreResult<Vec<KnowledgeRow>> {
         let mut rows = Vec::new();
+        let tag_filter: String = tags.iter().map(|t| format!("'{}'", t)).collect();
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 LIMIT ?",
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND tags LIKE ? AND metadata LIKE ? LIMIT ?",
         )?;
 
-        let cursor = stmt.query_map(rusqlite::params![limit], |row| {
+        let cursor = stmt.query_map(rusqlite::params![tag_filter, format!("'%{}'", provenance_id), limit], |row| {
             let tags_str: String = row.get(2)?;
             let metadata_str: String = row.get(3)?;
             Ok(KnowledgeRow {
@@ -78,10 +79,10 @@ impl Store {
         _provenance_id: &String,
     ) -> StoreResult<Option<KnowledgeRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1",
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries WHERE active = 1 AND source = ? AND metadata LIKE ?",
         )?;
 
-        let cursor = stmt.query_map(rusqlite::params![], |row| {
+        let cursor = stmt.query_map(rusqlite::params![source_type, format!("'%{}'", _provenance_id)], |row| {
             let tags_str: String = row.get(2)?;
             let metadata_str: String = row.get(3)?;
             Ok(KnowledgeRow {
