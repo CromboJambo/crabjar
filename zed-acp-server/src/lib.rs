@@ -28,11 +28,144 @@ impl AcpSession {
         Self {
             cwd,
             session_id: uuid::Uuid::new_v4().to_string(),
-                        }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ZedRequest {
+    NewSession {
+        cwd: String,
+    },
+    LoadSession {
+        session_id: String,
+        cwd: String,
+    },
+    CloseSession {
+        session_id: String,
+    },
+    ListSessions,
+    Prompt {
+        session_id: String,
+        message: String,
+    },
+    ToolCall {
+        session_id: String,
+        function_name: String,
+        arguments: serde_json::Value,
+    },
+    Authenticate {
+        auth_method: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AcpResponse {
+    Result { value: serde_json::Value },
+    Error { message: String },
+}
+
+#[derive(Clone)]
+pub struct AcpAgentServer {
+    pub sessions: Vec<AcpSession>,
+    pub guard_db: Option<GuardDb>,
+    pub knowledge_bridge: Option<KnowledgeBridge<'static>>,
+}
+
+impl AcpAgentServer {
+    pub fn new() -> Self {
+        Self {
+            sessions: Vec::new(),
+            guard_db: None,
+            knowledge_bridge: None,
+        }
+    }
+
+    pub fn with_guard_db(mut self, db: GuardDb) -> Self {
+        self.guard_db = Some(db);
+        self
+    }
+
+    pub async fn handle_request(&self, request: ZedRequest) -> Result<AcpResponse, AcpServerError> {
+        match request {
+            ZedRequest::NewSession { cwd } => {
+                let session = AcpSession::new(cwd);
+                Ok(AcpResponse::Result {
+                    value: json!({
+                        "session_id": session.session_id,
+                        "cwd": session.cwd,
+                        "status": "created",
+                    }),
+                })
+            }
+            ZedRequest::LoadSession { session_id, cwd } => {
+                let found = self.sessions.iter().find(|s| s.session_id == session_id);
+                match found {
+                    Some(session) => Ok(AcpResponse::Result {
+                        value: json!({
+                            "session_id": session.session_id,
+                            "cwd": session.cwd,
+                            "status": "loaded",
+                        }),
+                    },
+                    None => Ok(AcpResponse::Error {
+                        message: format!("session not found: {}", session_id),
+                    }),
+                }
+            }
+            ZedRequest::CloseSession { session_id } => {
+                let before = self.sessions.len();
+                self.sessions.retain(|s| s.session_id != session_id);
+                let after = self.sessions.len();
+                if before > after {
+                    Ok(AcpResponse::Result {
+                        value: json!({
+                            "session_id": session_id,
+                            "status": "closed",
+                        }),
+                    })
+                } else {
+                    Ok(AcpResponse::Error {
+                        message: format!("session not found: {}", session_id),
+                    })
+                }
+            }
+            ZedRequest::ListSessions => {
+                Ok(AcpResponse::Result {
+                    value: json!({
+                        "sessions": self
+                            .sessions
+                            .iter()
+                            .map(|s| json!({ "session_id": s.session_id, "cwd": s.cwd }))
+                            .collect::<Vec<_>>(),
+                        "count": self.sessions.len(),
+                    }),
+                })
+            }
+            ZedRequest::Prompt { session_id, message } => {
+                let session = self.sessions.iter().find(|s| s.session_id == session_id);
+                match session {
+                    Some(_) => {
+                        let context = self
+                            .knowledge_bridge
+                            .as_ref()
+                            .map(|bridge| {
+                                let tags = ["state-doc", "pattern", "rule"];
+                                bridge.query_state_docs(&tags, 50, "").ok()
+                            })
+                            .flatten();
+                        Ok(AcpResponse::Result {
+                            value: json!({
+                                "session_id": session_id,
+                                "message": message,
+                                "context": context,
+                                "status": "processed",
+                            }),
+                        })
                     }
                     None => Ok(AcpResponse::Error {
                         message: format!("session not found: {}", session_id),
-                    }
+                    }),
                 }
             }
             ZedRequest::ToolCall {
@@ -40,10 +173,7 @@ impl AcpSession {
                 function_name,
                 arguments,
             } => {
-                let session = self
-                    .sessions
-                    .iter()
-                    .find(|s| s.session_id == session_id);
+                let session = self.sessions.iter().find(|s| s.session_id == session_id);
                 match session {
                     Some(s) => {
                         let guard_db = self
@@ -77,7 +207,7 @@ impl AcpSession {
                         });
 
                         match gate_result {
-                            Ok(GateResult::Proceed) => AcpResponse::Result {
+                            Ok(GateResult::Proceed) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
                                     "tool": function_name,
@@ -86,7 +216,7 @@ impl AcpSession {
                                     "status": "authorized",
                                 }),
                             },
-                            Ok(GateResult::Pending) => AcpResponse::Result {
+                            Ok(GateResult::Pending) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
                                     "tool": function_name,
@@ -96,7 +226,7 @@ impl AcpSession {
                                     "status": "queued",
                                 }),
                             },
-                            Ok(GateResult::Interrupted { reason }) => AcpResponse::Result {
+                            Ok(GateResult::Interrupted { reason }) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
                                     "tool": function_name,
@@ -106,7 +236,7 @@ impl AcpSession {
                                     "status": "denied",
                                 }),
                             },
-                            Ok(GateResult::DryRun) => AcpResponse::Result {
+                            Ok(GateResult::DryRun) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
                                     "tool": function_name,
@@ -115,24 +245,24 @@ impl AcpSession {
                                     "status": "dry_run",
                                 }),
                             },
-                            Err(e) => AcpResponse::Error {
+                            Err(e) => Ok(AcpResponse::Error {
                                 message: format!("gate error: {}", e),
-                            },
+                            }),
                         }
                     }
-                    None => AcpResponse::Error {
+                    None => Ok(AcpResponse::Error {
                         message: format!("session not found: {}", session_id),
-                    }
+                    }),
                 }
             }
             ZedRequest::Authenticate { auth_method } => {
-                AcpResponse::Result {
+                Ok(AcpResponse::Result {
                     value: json!({
                         "auth_method": auth_method,
                         "status": "authenticated",
                         "requires_api_key": auth_method != "local",
                     }),
-                }
+                })
             }
         }
     }
@@ -156,12 +286,12 @@ mod tests {
             cwd: "/test/project".to_string(),
         });
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert!(value["session_id"].as_str().is_some());
                 assert_eq!(value["cwd"].as_str(), Some("/test/project"));
                 assert_eq!(value["status"].as_str(), Some("created"));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
     }
 
@@ -176,10 +306,10 @@ mod tests {
             cwd: "/test/project".to_string(),
         });
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("loaded"));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
     }
 
@@ -191,10 +321,10 @@ mod tests {
             cwd: "/test/project".to_string(),
         });
         match response {
-            AcpResponse::Error { message } => {
+            Ok(AcpResponse::Error { message }) => {
                 assert!(message.contains("nonexistent"));
             }
-            _ => panic!("expected error"),
+            Err(_) => panic!("expected error"),
         }
     }
 
@@ -207,10 +337,10 @@ mod tests {
         let session_id = server.sessions[0].session_id.clone();
         let response = server.handle_request(ZedRequest::CloseSession { session_id });
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("closed"));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
         assert!(server.sessions.is_empty());
     }
@@ -223,10 +353,10 @@ mod tests {
         });
         let response = server.handle_request(ZedRequest::ListSessions);
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["count"].as_i64(), Some(1));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
     }
 
@@ -242,10 +372,10 @@ mod tests {
             message: "test prompt".to_string(),
         });
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("processed"));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
     }
 
@@ -257,10 +387,10 @@ mod tests {
             message: "test prompt".to_string(),
         });
         match response {
-            AcpResponse::Error { message } => {
+            Ok(AcpResponse::Error { message }) => {
                 assert!(message.contains("nonexistent"));
             }
-            _ => panic!("expected error"),
+            Err(_) => panic!("expected error"),
         }
     }
 
@@ -271,11 +401,11 @@ mod tests {
             auth_method: "api_key".to_string(),
         });
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("authenticated"));
                 assert_eq!(value["requires_api_key"].as_bool(), Some(true));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
     }
 
@@ -298,10 +428,10 @@ mod tests {
             }),
         });
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["gate_result"].as_str(), Some("proceed"));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
     }
 
@@ -324,10 +454,10 @@ mod tests {
             }),
         });
         match response {
-            AcpResponse::Result { value } => {
+            Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["gate_result"].as_str(), Some("interrupted"));
             }
-            _ => panic!("expected result"),
+            Err(_) => panic!("expected result"),
         }
     }
 }
