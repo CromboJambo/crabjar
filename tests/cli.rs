@@ -651,3 +651,182 @@ tool_execution_enabled = true
     assert_eq!(body["success"], true);
     assert_eq!(body["workspace"]["tool_execution_enabled"], true);
 }
+
+#[test]
+fn resolve_one_annotation_does_not_deactivate_other() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
+    fs::create_dir_all(docs_dir.join("overlay")).unwrap();
+    fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
+    fs::write(
+        docs_dir.join("overlay").join("alpha_state.overlay.json"),
+        r#"{
+  "entries": [
+    {
+      "id": "alpha-state-md-123-0",
+      "kind": "question",
+      "message": "Should this stay here?",
+      "author": "agent",
+      "doc": "alpha_state.md",
+      "line": null,
+      "status": "open",
+      "created_at_unix_ms": 123
+    },
+    {
+      "id": "beta-state-md-456-0",
+      "kind": "note",
+      "message": "Beta decision",
+      "author": "agent",
+      "doc": "beta_state.md",
+      "line": null,
+      "status": "open",
+      "created_at_unix_ms": 456
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+    fs::write(docs_dir.join("beta_state.md"), "# Beta\n").unwrap();
+    fs::write(
+        docs_dir.join("overlay").join("beta_state.overlay.json"),
+        r#"{
+  "entries": [
+    {
+      "id": "beta-state-md-456-0",
+      "kind": "note",
+      "message": "Beta decision",
+      "author": "agent",
+      "doc": "beta_state.md",
+      "line": null,
+      "status": "open",
+      "created_at_unix_ms": 456
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+
+    let sync_alpha = run_in(&temp, &["knowledge", "sync", "alpha_state"]);
+    assert!(sync_alpha.status.success());
+    let sync_alpha_body = json_stdout(&sync_alpha);
+    assert_eq!(sync_alpha_body["success"], true);
+    assert_eq!(sync_alpha_body["ids"].as_array().unwrap().len(), 1);
+
+    let sync_beta = run_in(&temp, &["knowledge", "sync", "beta_state"]);
+    assert!(sync_beta.status.success());
+    let sync_beta_body = json_stdout(&sync_beta);
+    assert_eq!(sync_beta_body["success"], true);
+    assert_eq!(sync_beta_body["ids"].as_array().unwrap().len(), 1);
+
+    let query_before = run_in(&temp, &["knowledge", "query", "--tags=state-doc"]);
+    assert!(query_before.status.success());
+    let query_before_body = json_stdout(&query_before);
+    assert_eq!(query_before_body["rows"].as_array().unwrap().len(), 2);
+
+    let resolve = run_in(
+        &temp,
+        &[
+            "knowledge",
+            "resolve-annotation",
+            "alpha_state",
+            "--annotation-id=alpha-state-md-123-0",
+            "--reason=answered",
+        ],
+    );
+    assert!(resolve.status.success());
+    let resolve_body = json_stdout(&resolve);
+    assert_eq!(resolve_body["success"], true);
+    assert_eq!(resolve_body["deactivated"], 1);
+
+    let query_after = run_in(&temp, &["knowledge", "query", "--tags=state-doc"]);
+    assert!(query_after.status.success());
+    let query_after_body = json_stdout(&query_after);
+    assert_eq!(query_after_body["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_after_body["rows"][0]["meta"]["annotation_id"],
+        "beta-state-md-456-0"
+    );
+}
+
+#[test]
+fn query_one_tag_does_not_return_unrelated_rows() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
+    fs::create_dir_all(docs_dir.join("overlay")).unwrap();
+    fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
+    fs::write(
+        docs_dir.join("overlay").join("alpha_state.overlay.json"),
+        r#"{
+  "entries": [
+    {
+      "id": "alpha-state-md-123-0",
+      "kind": "note",
+      "message": "Alpha note",
+      "author": "agent",
+      "doc": "alpha_state.md",
+      "line": null,
+      "status": "open",
+      "created_at_unix_ms": 123
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+    fs::write(docs_dir.join("beta_state.md"), "# Beta\n").unwrap();
+    fs::write(
+        docs_dir.join("overlay").join("beta_state.overlay.json"),
+        r#"{
+  "entries": [
+    {
+      "id": "beta-state-md-456-0",
+      "kind": "note",
+      "message": "Beta note",
+      "author": "agent",
+      "doc": "beta_state.md",
+      "line": null,
+      "status": "open",
+      "created_at_unix_ms": 456
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+
+    let sync_alpha = run_in(&temp, &["knowledge", "sync", "alpha_state"]);
+    assert!(sync_alpha.status.success());
+    let sync_alpha_body = json_stdout(&sync_alpha);
+    assert_eq!(sync_alpha_body["success"], true);
+    assert_eq!(sync_alpha_body["ids"].as_array().unwrap().len(), 1);
+
+    let sync_beta = run_in(&temp, &["knowledge", "sync", "beta_state"]);
+    assert!(sync_beta.status.success());
+    let sync_beta_body = json_stdout(&sync_beta);
+    assert_eq!(sync_beta_body["success"], true);
+    assert_eq!(sync_beta_body["ids"].as_array().unwrap().len(), 1);
+
+    let query_alpha_tag = run_in(&temp, &["knowledge", "query", "--tags=alpha-state"]);
+    assert!(query_alpha_tag.status.success());
+    let query_alpha_tag_body = json_stdout(&query_alpha_tag);
+    assert_eq!(query_alpha_tag_body["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_alpha_tag_body["rows"][0]["meta"]["annotation_id"],
+        "alpha-state-md-123-0"
+    );
+
+    let query_beta_tag = run_in(&temp, &["knowledge", "query", "--tags=beta"]);
+    assert!(query_beta_tag.status.success());
+    let query_beta_tag_body = json_stdout(&query_beta_tag);
+    assert_eq!(query_beta_tag_body["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_beta_tag_body["rows"][0]["meta"]["annotation_id"],
+        "beta-state-md-456-0"
+    );
+
+    let query_both_tags = run_in(
+        &temp,
+        &["knowledge", "query", "--tags=alpha,beta"],
+    );
+    assert!(query_both_tags.status.success());
+    let query_both_tags_body = json_stdout(&query_both_tags);
+    assert_eq!(query_both_tags_body["rows"].as_array().unwrap().len(), 2);
+}
