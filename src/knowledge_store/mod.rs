@@ -143,21 +143,23 @@ impl<'a> KnowledgeBridge<'a> {
             .meta("provenance_set_at_unix_ms", now_unix_ms());
         entry.source_type = Self::STATE_DOC_SOURCE_TYPE.to_string();
         entry.source_id = annotation.id.clone();
+        entry.provenance_id = provenance_id.clone();
         entry.source = Source::Agent;
         entry.weight = confidence;
         entry.tags = std::iter::once("state-doc".to_string())
-            .chain(annotation.doc.split('_').map(|s| s.to_string()))
+            .chain(annotation.doc.split('.').map(|s| s.to_string()))
             .collect();
         Ok(entry)
     }
 
-    /// Query knowledge entries by tags
+    /// Query knowledge entries by tags and optional source_doc filter
     pub fn query_state_docs(
         &self,
         tags: &[&str],
         limit: usize,
+        source_doc: &str,
     ) -> Result<Vec<serde_json::Value>, agent_context::Error> {
-        let rows = self.knowledge_store.query(tags, limit, "")?;
+        let rows = self.knowledge_store.query(tags, limit, source_doc)?;
         Ok(rows
             .into_iter()
             .map(|row| {
@@ -235,7 +237,7 @@ impl<'a> KnowledgeBridge<'a> {
 
         let tags: Vec<&str> = overlay.entries.iter().map(|e| e.doc.as_str()).collect();
 
-        self.query_state_docs(&tags, 100)
+        self.query_state_docs(&tags, 100, doc_name)
     }
 
     /// Get recent events from the knowledge store's event log
@@ -502,7 +504,7 @@ mod tests {
         assert_eq!(deactivated, 1);
 
         let rows = bridge
-            .query_state_docs(&["state-doc", "beta"], 100)
+            .query_state_docs(&["state-doc", "beta"], 100, "beta.md")
             .unwrap();
         assert_eq!(rows.len(), 0);
     }
