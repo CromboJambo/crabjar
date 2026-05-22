@@ -329,3 +329,56 @@ impl RetrievalBand {
         self
     }
 }
+
+/// Model inference provenance type for guard gate tracking.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModelInferenceKind {
+    Prompt,
+    ContextAugmented,
+    SkillAugmented,
+    EmergentSkill,
+}
+
+impl fmt::Display for ModelInferenceKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ModelInferenceKind::Prompt => write!(f, "prompt"),
+            ModelInferenceKind::ContextAugmented => write!(f, "context-augmented"),
+            ModelInferenceKind::SkillAugmented => write!(f, "skill-augmented"),
+            ModelInferenceKind::EmergentSkill => write!(f, "emergent-skill"),
+        }
+    }
+}
+
+/// Model inference request gated by trust layer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelInferenceRequest {
+    pub id: String,
+    pub provenance_id: String,
+    pub model_name: String,
+    pub weight_id: String,
+    pub inference_kind: ModelInferenceKind,
+    pub prompt: String,
+    pub context: Vec<String>,
+    pub skill_refs: Vec<String>,
+    pub trust_layer: u32,
+    pub confidence: TrustScore,
+    pub status: ActionStatus,
+    pub gate_result: Option<String>,
+    pub requested_at: i64,
+    pub resolved_at: Option<i64>,
+}
+
+/// Model inference outcome for confidence tracking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelInferenceOutcome {
+    pub id: String,
+    pub inference_id: String,
+    pub model_name: String,
+    pub weight_id: String,
+    pub output_hash: String,
+    pub skill_residue: Option<String>,
+    pub confidence_delta: f64,
+    pub success: bool,
+    pub created_at: i64,
+}
