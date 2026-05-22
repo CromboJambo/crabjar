@@ -106,26 +106,10 @@ zed_extension_api = "0.2"
 crabjar_lib = { path = ".", package = "crabjar" }
 
 # ML inference
-candle = { path = "candle/candle-core", version = "0.10.2", package = "candle-core" }
+candle-core = { path = "candle/candle-core", version = "0.10.2", package = "candle-core" }
 candle-nn = { version = "0.10.2", path = "candle/candle-nn" }
 candle-transformers = { path = "candle/candle-transformers", version = "0.10.2" }
 candle-datasets = { path = "candle/candle-datasets", version = "0.10.2" }
-candle-ug = { version = "0.10.2", path = "candle/candle-ug" }
-cudarc = { version = "0.19.4", features = ["std", "cublas", "cublaslt", "curand", "driver", "nvrtc", "f16", "f8", "cuda-version-from-build-system", "dynamic-linking"], default-features = false }
-gemm = { version = "0.19.0", features = ["wasm-simd128-enable"] }
-half = { version = "2.7.1", features = ["num-traits", "use-intrinsics", "rand_distr"] }
-float8 = { version = "0.7.0", features = ["num-traits", "rand_distr"] }
-tokenizers = { version = "0.22.0", default-features = false }
-hf-hub = "0.4.1"
-rayon = "1.10.0"
-memmap2 = { version = "0.9.3", features = ["stable_deref_trait"] }
-num_cpus = "1.15.0"
-ug = "0.5.0"
-ug-cuda = "0.5.0"
-ug-metal = "0.5.0"
-yoke = { version = "0.8.1", features = ["derive"] }
-accelerate-src = { version = "0.3.2" }
-intel-mkl-src = { version = "0.8.1", features = ["mkl-static-lp64-iomp"] }
 
 # Burn framework
 burn = { path = "burn/crates/burn", version = "0.22.0-pre.1", default-features = false }
@@ -135,18 +119,6 @@ burn-nn = { version = "0.10.2", path = "burn/crates/burn-nn" }
 burn-autodiff = { version = "0.10.2", path = "burn/crates/burn-autodiff" }
 burn-train = { path = "burn/crates/burn-train", version = "0.22.0-pre.1", default-features = false }
 burn-cpu = { version = "0.10.2", path = "burn/crates/burn-cpu" }
-burn-cuda = { version = "0.10.2", path = "burn/crates/burn-cuda" }
-burn-wgpu = { path = "burn/crates/burn-wgpu", version = "0.22.0-pre.1", default-features = false }
-burn-rocm = { version = "0.10.2", path = "burn/crates/burn-rocm" }
-burn-cubecl = { path = "burn/crates/burn-cubecl", version = "0.22.0-pre.1", default-features = false }
-burn-backend = { path = "burn/crates/burn-backend", version = "0.22.0-pre.1", default-features = false }
-burn-communication = { path = "burn/crates/burn-communication", version = "0.22.0-pre.1", default-features = false }
-burn-remote = { version = "0.10.2", path = "burn/crates/burn-remote" }
-burn-store = { path = "burn/crates/burn-store", version = "0.22.0-pre.1", default-features = false }
-cubecl = { git = "https://github.com/tracel-ai/cubecl", default-features = false, rev = "0751cf6a5005c1755c1cd44d1c9383e7b1de814c" }
-cubecl-common = { git = "https://github.com/tracel-ai/cubecl", default-features = false, rev = "0751cf6a5005c1755c1cd44d1c9383e7b1de814c" }
-cubecl-zspace = { git = "https://github.com/tracel-ai/cubecl", default-features = false, rev = "0751cf6a5005c1755c1cd44d1c9383e7b1de814c" }
-cubek = { git = "https://github.com/tracel-ai/cubek", default-features = false, rev = "0d259b53ff086b727dc1cdf001d064585bbc78bc" }
 
 # MCP protocol
 rmcp = { path = "rust-sdk/crates/rmcp", version = "1.7.0", features = ["server", "macros"] }
@@ -156,128 +128,6 @@ pastey = { version = "0.2.0" }
 
 # Shared ML deps
 safetensors = { version = "0.7.0", default-features = false }
-
-# rand — unified across candle/burn/rmcp
-rand = { version = "0.10.1", default-features = false, features = ["std_rng"] }
-rand_distr = { version = "0.6.0", default-features = false }
-
-# candle workspace deps
-byteorder = { version = "1.4.3", default-features = false }
-ciborium = { version = "0.2", default-features = false }
-lzma-rust2 = "0.16.2"
-textdistance = { version = "1.1.1", default-features = false }
-nvml-wrapper = "0.12.0"
-sysinfo = "0.38.0"
-systemstat = "0.2.6"
-bon = "3.8.2"
-fancy-regex = "0.18.0"
-libm = "0.2.15"
-log = "0.4"
-num-traits = { version = "0.2.19", default-features = false, features = ["libm"] }
-parquet = "58"
-serde_plain = "1.0.2"
-objc2-metal = "0.3.1"
-objc2-foundation = "0.3.1"
-candle-kernels = { path = "candle/candle-kernels", version = "0.10.2" }
-candle-metal-kernels = { path = "candle/candle-metal-kernels", version = "0.10.2" }
-candle-onnx = { path = "candle/candle-onnx", version = "0.10.2" }
-libc = { version = "0.2.186" }
-zip = { version = "8.6.0", default-features = false }
-criterion = { version = "0.8", default-features = false }
-candle-flash-attn = { path = "candle/candle-flash-attn", version = "0.10.2" }
-candle-flash-attn-v3 = { path = "candle/candle-flash-attn-v3", version = "0.10.2" }
-image = { version = "0.25.9", default-features = false, features = ["jpeg", "png"] }
-imageproc = { version = "0.26.0", features = ["text"], default-features = false }
-hound = "3.5.1"
-ab_glyph = "0.2.23"
-
-# burn workspace deps
-burn-dispatch = { version = "0.10.2", path = "burn/crates/burn-dispatch" }
-burn-derive = { path = "burn/crates/burn-derive", version = "0.22.0-pre.1", default-features = false }
-burn-ir = { version = "0.10.2", path = "burn/crates/burn-ir" }
-burn-fusion = { path = "burn/crates/burn-fusion", version = "0.22.0-pre.1", default-features = false }
-burn-flex = { version = "0.10.2", path = "burn/crates/burn-flex" }
-burn-ndarray = { version = "0.10.2", path = "burn/crates/burn-ndarray" }
-burn-rl = { version = "0.10.2", path = "burn/crates/burn-rl" }
-burn-tch = { path = "burn/crates/burn-tch", version = "0.22.0-pre.1", default-features = false }
-burn-tensor-testgen = { path = "burn/crates/burn-tensor-testgen", version = "0.22.0-pre.1", default-features = false }
-burn-backend-extension = { path = "burn/crates/burn-backend-extension", version = "0.22.0-pre.1", default-features = false }
-burn-backend-tests = { path = "burn/crates/burn-backend-tests", version = "0.22.0-pre.1", default-features = false }
-burn-no-std-tests = { path = "burn/crates/burn-no-std-tests", version = "0.22.0-pre.1", default-features = false }
-derive-new = { version = "0.7.0", default-features = false }
-cfg-if = "1.0.1"
-hashbrown = "0.16"
-parking_lot = { version = "0.12.5", default-features = false }
-portable-atomic = { version = "1.13.1" }
-portable-atomic-util = { version = "0.2.6", features = ["alloc"] }
-spin = { version = "0.10.0", features = ["mutex", "spin_mutex", "portable-atomic"] }
-bytemuck = "1.25.0"
-enumset = { version = "1.1.13", default-features = false }
-paste = "1"
-serial_test = "3.2.0"
-ahash = { version = "0.8.12", default-features = false }
-aligned-vec = { version = "0.6", default-features = false }
-bytes = { version = "1.11.1", default-features = false }
-indicatif = "0.18.0"
-smallvec = { version = "1", features = ["const_generics", "const_new"] }
-dashmap = "6.1.0"
-candle-core = { version = "0.10.2", package = "candle-core" }
-tch = "0.22.0"
-torch-sys = "0.22.0"
-bincode = { version = "2.0.1", features = ["alloc", "serde"], default-features = false }
-burn-dataset = { path = "burn/crates/burn-dataset", version = "0.22.0-pre.1", default-features = false }
-burn-tensor = { path = "burn/crates/burn-tensor", version = "0.22.0-pre.1", default-features = false }
-data-encoding = { version = "2.11.0", default-features = false, features = ["alloc"] }
-flate2 = "1.1.9"
-rmp-serde = { version = "1.3.1", default-features = false }
-rstest = "0.26.1"
-regex = { version = "1.12.3", default-features = false, features = ["perf", "unicode"] }
-proc-macro2 = "1.0.106"
-quote = "1.0.45"
-syn = { version = "2.0.111", features = ["full", "extra-traits"] }
-csv = "1.3.1"
-dirs = "6.0.0"
-encoding_rs = "0.8.33"
-fake = "5.1.0"
-gix-tempfile = { version = "23.0.0", features = ["signals"] }
-globwalk = "0.9.1"
-planus = { version = "=1.1" }
-polars = { version = "0.53.0", features = ["lazy"] }
-r2d2 = "0.8.10"
-r2d2_sqlite = "0.31.0"
-sanitize-filename = "0.6.0"
-serde_rusqlite = "0.40.0"
-strum = { version = "0.28.0", features = ["derive"] }
-tar = "0.4.45"
-burn-cubecl-fusion = { path = "burn/crates/burn-cubecl-fusion", version = "0.22.0-pre.1", default-features = false }
-futures-lite = { version = "2.6.1", default-features = false }
-text_placeholder = "0.5.1"
-macerator = { version = "0.3.3" }
-once_cell = { version = "1", default-features = false }
-realfft = "3"
-atomic_float = "1"
-blas-src = { version = "0.14.0", default-features = false }
-const-random = "0.1"
-matrixmultiply = { version = "0.3.10", default-features = false }
-ndarray = { version = "0.17.2", default-features = false }
-openblas-src = "0.10.16"
-colored = "3.0.0"
-async-channel = "2.5"
-serde_bytes = { version = "0.11.18", default-features = false, features = ["alloc"] }
-tokio-tungstenite = "0.29"
-tokio-util = "0.7"
-tracing-core = { version = "0.1.36", default-features = false }
-tracing-appender = "0.2.3"
-tracing-opentelemetry = "0.32.0"
-opentelemetry = "0.31.0"
-opentelemetry-aws = "0.19.0"
-opentelemetry-otlp = "0.31.1"
-opentelemetry_sdk = "0.31.0"
-futures = "0.3"
-burn-optim = { version = "0.10.2", path = "burn/crates/burn-optim" }
-burn-router = { version = "0.10.2", path = "burn/crates/burn-router" }
-burn-std = { path = "burn/crates/burn-std", version = "0.22.0-pre.1", default-features = false }
-burn-vision = { path = "burn/crates/burn-vision", version = "0.22.0-pre.1", default-features = false }
 
 [profile.profiling]
 inherits = "release"
