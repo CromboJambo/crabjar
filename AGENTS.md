@@ -1,77 +1,88 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Build & Test
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI:
+Use `just` for workflows:
 
-```text
-src/main.rs                  # CLI entry point and command dispatch
-src/lib.rs                   # shared library surface for the binary
-src/project_loader.rs        # config loading
-src/state_docs.rs            # state-doc and overlay handling
-src/knowledge_store/         # knowledge-store command bridge
-src/crabjar-config/          # workspace config crate
-memory/                      # agent-context crate, SQLite-backed storage
-orchestrator/, guard/        # supporting workspace crates
-tests/cli.rs                 # integration tests against the compiled binary
-state-docs/                  # project state documentation and overlays
-```
+- `just check`: `cargo check --workspace`
+- `just build`: `cargo build -p crabjar`
+- `just run state list`: `cargo run -p crabjar -- state list` (args replaceable)
+- `just test`: `cargo test --workspace`
+- `just clean`: removes build artifacts
 
-## Build, Test, and Development Commands
+Narrow scope: `cargo check/clippy/test -p <crate>`
 
-Use `just` for common workflows:
+## CLI Output Contract
 
-- `just check`: runs `cargo check --workspace`.
-- `just build`: runs `cargo build -p crabjar` to compile the CLI.
-- `just run state list`: runs the binary with replaceable arguments.
-- `just test`: runs `cargo test --workspace`.
-- `just clean`: removes Cargo build artifacts.
-Use raw Cargo for narrower scope, for example `cargo test -p crabjar`.
+All command responses are structured JSON on stdout:
 
-## Coding Style & Naming Conventions
+- Success: `"success": true`
+- Error: `"success": false`, `"error"` string, `"usage"` array
+- `workspace status` returns `"workspace": null` when `.crabjar_config.toml` is missing or malformed
+- `knowledge` subcommands return structured fields (`rows`, `events`, `docs`, `ids`) — no plain-text summaries
 
-Run `cargo fmt` before submitting changes. Use `cargo clippy -- -D warnings` and fix warnings. Follow standard Rust naming: `snake_case` for functions, variables, and modules; `PascalCase` for types and traits; `SCREAMING_SNAKE_CASE` for constants.
+Every derived output must include a `doubt` block: `assumptions`, `blind_spots`, `last_validation`, `stale_after`.
 
-Use `thiserror` for library errors and propagate failures with `?`. Avoid `unwrap()` outside tests. CLI commands should emit structured JSON to stdout; do not add plain-text success paths.
+## Architecture
 
-## Naming Collision Pattern
-- Parameter names must match column names, not semantic intent. When renaming, audit all callers across the dependency graph.
-- Semantic naming drift: `provenance_id` parameter querying `source_id` column is a structural naming bug that causes every downstream caller to operate on the wrong column.
-- Always verify parameter-to-column alignment before implementing deactivate, filter, or query functions.
+- `src/main.rs`: CLI entry point
+- `src/lib.rs`: shared library surface
+- `src/crabjar-config/`: TOML config crate
+- `memory/`: agent-context SQLite storage (knowledge.db)
+- `guard/`: execution gate (guard.db)
+- `telemetry/`: flight recorder
+- `orchestrator/`: Axum SSE server
+- `state-docs/`: durable Markdown docs; overlays in `state-docs/overlay/*.overlay.json`
 
-## Testing Guidelines
+Workspace config from `.crabjar_config.toml`; missing/malformed → `workspace: null`.
 
-Use `#[test]` and `#[tokio::test]`. Place unit tests beside the code under `#[cfg(test)]`; place CLI integration tests in `tests/cli.rs` using `std::process::Command`.
+## Execution Pipeline
 
-Filesystem fixtures must use `tempfile::tempdir()` and must not write into the repository. New CLI subcommands and state-doc operations need happy-path and error-path tests. Test names should describe behavior, for example `state_list_returns_json`.
-
-## Commit & Pull Request Guidelines
-
-Recent commits use imperative subjects such as `Add comprehensive guides for bounded agent workflows` and `Update REPRO.md with current project details`. Start with a capital verb, keep the subject under about 72 characters, and add a body when context matters.
-
-Pull requests should explain what changed and why, link relevant context, and keep refactors separate from features. Before review, run `just check`, `just test`, `cargo fmt --check`, and `cargo clippy -- -D warnings`.
-
-## Architecture Notes
-
-Workspace config comes from `.crabjar_config.toml`; missing or malformed config is a soft failure and should leave `workspace: null`. State docs live under `state-docs/`, with overlay JSON sidecars in `state-docs/overlay/`. Detection is not authorization: observer crates may report, but must not execute actions.
+`crabjar exec` passes through: `request → guard → concierge → telemetry → outcome → trust update`.
+Execution is opt-in via `.crabjar_config.toml` `tool_execution_enabled`. All actions require real provenance lookup. Pending actions persist to GuardDb.
 
 ## Agent Autonomy Constraints
-- Agent should never execute sudo commands — present them as user-run actions
+
+- Never execute sudo commands — present as user-run actions
 - Detection ≠ authorization: observer reports must not trigger execution
 - Reversibility gating: destructive actions require user permission
 - Commands requiring root access are categorical user-run only
 
-## Tool Override
-- Content search: Use Bash with `rg` (ripgrep) instead of the Grep tool
-- File search: Use Glob (NOT find or ls)
-- Read files: Use Read (NOT cat/head/tail)
-- Edit files: Use Edit (NOT sed/awk)
-- Write files: Use Write (NOT echo >/cat <<EOF)
-- Communication: Output text directly (NOT echo/printf)
+## Naming Collision Pattern
 
-## Wasm Dependency Stripping
-- `zed-acp-bridge` Wasm compilation requires minimal dependency set: `zed_extension_api`, `serde`, `uuid(js)` only
-- `tokio` pulls `mio` (wasm incompatible) — must disable net feature or exclude entirely
-- `rusqlite` pulls `libsqlite3-sys` (C compilation fails on wasm) — incompatible with Wasm
-- `uuid` requires `js` feature for wasm-compatible RNG (v4 disabled on wasm)
-- HTTP (axum) cannot be adapted to stdio — requires dedicated stdio server for Zed agent protocol
+Parameter names must match column names, not semantic intent. Semantic naming drift causes structural bugs: `provenance_id` parameter querying `source_id` column is a known bug that makes every downstream caller operate on the wrong column. Always verify parameter-to-column alignment before implementing deactivate, filter, or query functions.
+
+## Workspace Members
+
+Declared in Cargo.toml `[workspace.members]`:
+- `src/crabjar-config`, `memory`, `orchestrator`, `guard`, `telemetry`, `sandbox`, `safetensors`, `tool_registry`, `src/codeburn-provider`, `src/skill-script-runner`, `src/skill-reference-store`
+
+Nested crates use `src/<crate>/src/` pattern (not flat `src/<crate>/`).
+
+## Coding Style
+
+- `cargo fmt` before changes; `cargo clippy -- -D warnings`
+- `snake_case` functions/variables/modules; `PascalCase` types/traits; `SCREAMING_SNAKE_CASE` constants
+- `thiserror` for library errors; `?` propagation; no `unwrap()` outside tests
+
+## Testing
+
+- `#[test]` and `#[tokio::test]`; unit tests beside code under `#[cfg(test)]`
+- CLI integration tests in `tests/cli.rs` using `std::process::Command`
+- Filesystem fixtures: `tempfile::tempdir()`; never write into repository
+- Test names: descriptive snake_case stating behaviour, e.g. `state_list_returns_json`
+
+## Drift Governance
+
+`project_map.md` stale after >7 days without modification. Divergence between documented structure and actual filesystem is a structural integrity concern.
+
+## Zed Agent Protocol
+
+- Zed agent servers require stdin/stdout JSON-RPC
+- `zed-acp-bridge` (Wasm extension) + `zed-acp-server` (stdio binary)
+- Wasm deps: `zed_extension_api`, `serde`, `uuid(js)` only
+- `tokio` pulls `mio` (wasm incompatible); `rusqlite` pulls `libsqlite3-sys` (C compilation fails on wasm); `uuid` requires `js` feature; HTTP (axum) cannot be adapted to stdio
+
+## Navigation
+
+Use `project_map.md` and `AGENTS.md` as primary navigation tools. Verify paths before assuming they exist.
