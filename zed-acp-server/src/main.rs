@@ -126,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
     let mut reader = BufReader::new(stdin);
     let mut writer = stdout;
 
-    let server = AcpAgentServer::default();
+    let mut server = AcpAgentServer::default();
 
     loop {
         let mut line = String::new();
@@ -143,7 +143,11 @@ async fn main() -> anyhow::Result<()> {
         let zed_request = map_method(request)?;
 
         let response = server.handle_request(zed_request).await;
-        let response_json = format_response(response);
+        let response_json = match response {
+            Ok(AcpResponse::Result { value }) => json!({ "type": "result", "value": value }),
+            Ok(AcpResponse::Error { message }) => json!({ "type": "error", "message": message }),
+            Err(e) => json!({ "type": "error", "message": format!("ACP server error: {}", e) }),
+        };
 
         let output = serde_json::to_string(&response_json)
             .map_err(|e| anyhow::anyhow!("Failed to serialize response: {}", e))?;

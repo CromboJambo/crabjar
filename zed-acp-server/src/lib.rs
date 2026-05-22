@@ -65,11 +65,10 @@ pub enum AcpResponse {
     Error { message: String },
 }
 
-#[derive(Clone)]
 pub struct AcpAgentServer {
     pub sessions: Vec<AcpSession>,
     pub guard_db: Option<GuardDb>,
-    pub knowledge_bridge: Option<KnowledgeBridge<'static>>,
+    pub knowledge_bridge: Option<KnowledgeBridge>,
 }
 
 impl AcpAgentServer {
@@ -86,7 +85,7 @@ impl AcpAgentServer {
         self
     }
 
-    pub async fn handle_request(&self, request: ZedRequest) -> Result<AcpResponse, AcpServerError> {
+    pub async fn handle_request(&mut self, request: ZedRequest) -> Result<AcpResponse, AcpServerError> {
         match request {
             ZedRequest::NewSession { cwd } => {
                 let session = AcpSession::new(cwd);
@@ -181,7 +180,7 @@ impl AcpAgentServer {
                             .as_ref()
                             .ok_or_else(|| AcpServerError::GuardError("no guard db".into()))?;
                         let gate = ExecutionGate::new(guard_db, false, s.cwd.clone());
-                        let command = function_name;
+                        let command = function_name.clone();
                         let args = arguments
                             .get("args")
                             .and_then(|v| v.as_array())
