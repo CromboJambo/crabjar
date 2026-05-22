@@ -17,19 +17,6 @@ members = [
     "tool_registry",
     "zed-acp-bridge",
     "zed-acp-server",
-    "rust-sdk/crates/rmcp",
-    "rust-sdk/crates/rmcp-macros",
-    "candle/candle-core",
-    "candle/candle-nn",
-    "candle/candle-transformers",
-    "candle/candle-datasets",
-    "burn/crates/burn",
-    "burn/crates/burn-core",
-    "burn/crates/burn-candle",
-    "burn/crates/burn-nn",
-    "burn/crates/burn-autodiff",
-    "burn/crates/burn-train",
-    "burn/crates/burn-cpu",
 ]
 
 resolver = "2"
@@ -106,28 +93,88 @@ zed_extension_api = "0.2"
 crabjar_lib = { path = ".", package = "crabjar" }
 
 # ML inference
-candle-core = { path = "candle/candle-core", version = "0.10.2", package = "candle-core" }
-candle-nn = { version = "0.10.2", path = "candle/candle-nn" }
-candle-transformers = { path = "candle/candle-transformers", version = "0.10.2" }
-candle-datasets = { path = "candle/candle-datasets", version = "0.10.2" }
+candle-core = { version = "0.10.2", package = "candle-core" }
+candle-nn = { version = "0.10.2" }
+candle-transformers = { version = "0.10.2" }
+candle-datasets = { version = "0.10.2" }
 
 # Burn framework
-burn = { path = "burn/crates/burn", version = "0.22.0-pre.1", default-features = false }
-burn-core = { version = "0.10.2", path = "burn/crates/burn-core" }
-burn-candle = { version = "0.10.2", path = "burn/crates/burn-candle" }
-burn-nn = { version = "0.10.2", path = "burn/crates/burn-nn" }
-burn-autodiff = { version = "0.10.2", path = "burn/crates/burn-autodiff" }
-burn-train = { path = "burn/crates/burn-train", version = "0.22.0-pre.1", default-features = false }
-burn-cpu = { version = "0.10.2", path = "burn/crates/burn-cpu" }
+burn = { version = "0.21.0", default-features = false }
+burn-core = { version = "0.21.0" }
+burn-nn = { version = "0.21.0" }
+burn-autodiff = { version = "0.21.0" }
+burn-train = { version = "0.21.0", default-features = false }
+burn-cpu = { version = "0.21.0" }
 
 # MCP protocol
-rmcp = { path = "rust-sdk/crates/rmcp", version = "1.7.0", features = ["server", "macros"] }
-rmcp-macros = { version = "0.10.2", path = "rust-sdk/crates/rmcp-macros" }
+rmcp = { version = "1.7.0", features = ["server", "macros"] }
+rmcp-macros = { version = "1.7.0" }
 schemars = { version = "1.0", features = ["chrono04"] }
 pastey = { version = "0.2.0" }
 
 # Shared ML deps
 safetensors = { version = "0.7.0", default-features = false }
+
+# Candle deps
+accelerate-src = { version = "0.3.2" }
+byteorder = { version = "1.4.3", default-features = false }
+cudarc = { version = "0.19.4", features = ["std", "cublas", "cublaslt", "curand", "driver", "nvrtc", "f16", "f8", "cuda-version-from-build-system", "dynamic-linking"], default-features = false }
+gemm = { version = "0.19.0", features = ["wasm-simd128-enable"] }
+half = { version = "2.7.1", features = ["num-traits", "use-intrinsics", "rand_distr"] }
+float8 = { version = "0.7.0", features = ["num-traits", "rand_distr"] }
+intel-mkl-src = { version = "0.8.1", features = ["mkl-static-lp64-iomp"] }
+libc = { version = "0.2.186" }
+libm = "0.2.15"
+memmap2 = { version = "0.9.3", features = ["stable_deref_trait"] }
+num-traits = { version = "0.2.19", default-features = false, features = ["libm"] }
+num_cpus = "1.15.0"
+rayon = "1.10.0"
+tokenizers = { version = "0.22.0", default-features = false }
+yoke = { version = "0.8.1", features = ["derive"] }
+zip = { version = "8.6.0", default-features = false }
+hf-hub = "0.4.1"
+parquet = "58"
+image = { version = "0.25.9", default-features = false, features = ["jpeg", "png"] }
+objc2-metal = "0.3.1"
+objc2-foundation = "0.3.1"
+criterion = { version = "0.8", default-features = false }
+rand = { version = "0.10.1", default-features = false, features = ["std_rng"] }
+rand_distr = { version = "0.6.0", default-features = false }
+
+# Burn deps
+burn-std = { version = "0.21.0", default-features = false }
+burn-dataset = { version = "0.21.0", default-features = false }
+burn-derive = { version = "0.21.0", default-features = false }
+burn-tensor = { version = "0.21.0", default-features = false }
+burn-backend = { version = "0.21.0", default-features = false }
+burn-dispatch = { version = "0.21.0" }
+burn-backend-extension = { version = "0.21.0", default-features = false }
+burn-ir = { version = "0.21.0" }
+data-encoding = { version = "2.11.0", default-features = false, features = ["alloc"] }
+derive-new = { version = "0.7.0", default-features = false }
+log = "0.4"
+hashbrown = "0.16"
+flate2 = "1.1.9"
+ahash = { version = "0.8.12", default-features = false }
+bincode = { version = "2.0.1", features = ["alloc", "serde"], default-features = false }
+spin = { version = "0.10.0", features = ["mutex", "spin_mutex", "portable-atomic"] }
+regex = { version = "1.12.3", default-features = false, features = ["perf", "unicode"] }
+portable-atomic = { version = "1.13.1" }
+portable-atomic-util = { version = "0.2.6", features = ["alloc"] }
+rstest = "0.26.1"
+serial_test = "3.2.0"
+burn-fusion = { version = "0.21.0", default-features = false }
+burn-cubecl = { version = "0.21.0", default-features = false }
+burn-optim = { version = "0.21.0" }
+burn-rl = { version = "0.21.0" }
+dirs = "6.0.0"
+tracing-appender = "0.2.3"
+tracing-core = { version = "0.1.36", default-features = false }
+nvml-wrapper = "0.12.0"
+sysinfo = "0.38.0"
+systemstat = "0.2.6"
+async-channel = "2.5"
+burn-flex = { version = "0.21.0" }
 
 [profile.profiling]
 inherits = "release"
