@@ -4,6 +4,7 @@ use serde_json::json;
 
 use crate::KnowledgeCommand;
 
+#[allow(async_fn_in_trait)]
 pub trait KnowledgeCommandExt {
     async fn execute(
         &self,
@@ -12,6 +13,7 @@ pub trait KnowledgeCommandExt {
 }
 
 impl KnowledgeCommandExt for KnowledgeCommand {
+    #[allow(async_fn_in_trait)]
     async fn execute(
         &self,
         bridge: &KnowledgeBridge,

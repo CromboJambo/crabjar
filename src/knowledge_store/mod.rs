@@ -3,6 +3,8 @@
 
 pub mod commands;
 
+use std::path::Path;
+
 use agent_context::state_docs::Annotation;
 use agent_context::{KnowledgeEntry, KnowledgeKind, Source, Store};
 use chrono::Utc;
@@ -125,7 +127,7 @@ impl KnowledgeBridge {
     /// Load overlay JSON for a state-doc path
     pub fn load_overlay_for_path(
         &self,
-        path: &PathBuf,
+        path: &Path,
     ) -> Result<serde_json::Value, agent_context::Error> {
         let overlay_dir = path
             .parent()
@@ -137,7 +139,7 @@ impl KnowledgeBridge {
         ));
         let content = std::fs::read_to_string(&overlay_file)
             .map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
-        serde_json::from_str(&content).map_err(|e| agent_context::Error::Json(e))
+        serde_json::from_str(&content).map_err(agent_context::Error::Json)
     }
 
     /// Convert an annotation to a knowledge entry
@@ -155,7 +157,7 @@ impl KnowledgeBridge {
         let confidence = annotation_confidence(annotation, &defaults);
         let provenance_id = Uuid::new_v4().to_string();
         let mut entry = KnowledgeEntry::new(&annotation.message, kind)
-            .meta("source_id", &annotation.id.to_string())
+            .meta("source_id", annotation.id.to_string())
             .meta("source_doc", &annotation.doc_name)
             .meta("annotation_kind", annotation.kind.clone())
             .meta("confidence", confidence)
@@ -237,7 +239,7 @@ impl KnowledgeBridge {
                 {
                     continue;
                 }
-                let annotation_id = id_str.parse::<i64>().unwrap_or(0);
+                let _annotation_id = id_str.parse::<i64>().unwrap_or(0);
                 let message = entry.get("message").and_then(|v| v.as_str()).unwrap_or("");
                 let kind_str = entry.get("kind").and_then(|v| v.as_str()).unwrap_or("note");
                 let kind = match kind_str {
