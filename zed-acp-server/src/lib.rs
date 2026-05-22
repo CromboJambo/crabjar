@@ -97,7 +97,7 @@ impl AcpAgentServer {
                     }),
                 })
             }
-            ZedRequest::LoadSession { session_id, cwd } => {
+            ZedRequest::LoadSession { session_id, cwd: _ } => {
                 let found = self.sessions.iter().find(|s| s.session_id == session_id);
                 match found {
                     Some(session) => Ok(AcpResponse::Result {
@@ -148,11 +148,10 @@ impl AcpAgentServer {
                         let context = self
                             .knowledge_bridge
                             .as_ref()
-                            .map(|bridge| {
+                            .and_then(|bridge| {
                                 let tags = ["state-doc", "pattern", "rule"];
                                 bridge.query_state_docs(&tags, 50, "").ok()
-                            })
-                            .flatten();
+                            });
                         Ok(AcpResponse::Result {
                             value: json!({
                                 "session_id": session_id,
@@ -281,9 +280,9 @@ mod tests {
     #[test]
     fn test_new_session_creates_id() {
         let server = AcpAgentServer::new();
-        let response = server.handle_request(ZedRequest::NewSession {
+        let response = tokio::runtime::Runtime::new().unwrap().block_on(server.handle_request(ZedRequest::NewSession {
             cwd: "/test/project".to_string(),
-        });
+        }));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert!(value["session_id"].as_str().is_some());
@@ -297,13 +296,14 @@ mod tests {
     #[test]
     fn test_load_session_found() {
         let server = AcpAgentServer::new();
-        let _ = server.handle_request(ZedRequest::NewSession {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(server.handle_request(ZedRequest::NewSession {
             cwd: "/test/project".to_string(),
-        });
-        let response = server.handle_request(ZedRequest::LoadSession {
+        }));
+        let response = rt.block_on(server.handle_request(ZedRequest::LoadSession {
             session_id: server.sessions[0].session_id.clone(),
             cwd: "/test/project".to_string(),
-        });
+        }));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("loaded"));
@@ -315,10 +315,11 @@ mod tests {
     #[test]
     fn test_load_session_not_found() {
         let server = AcpAgentServer::new();
-        let response = server.handle_request(ZedRequest::LoadSession {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let response = rt.block_on(server.handle_request(ZedRequest::LoadSession {
             session_id: "nonexistent".to_string(),
             cwd: "/test/project".to_string(),
-        });
+        }));
         match response {
             Ok(AcpResponse::Error { message }) => {
                 assert!(message.contains("nonexistent"));
@@ -330,11 +331,12 @@ mod tests {
     #[test]
     fn test_close_session() {
         let server = AcpAgentServer::new();
-        let _ = server.handle_request(ZedRequest::NewSession {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(server.handle_request(ZedRequest::NewSession {
             cwd: "/test/project".to_string(),
-        });
+        }));
         let session_id = server.sessions[0].session_id.clone();
-        let response = server.handle_request(ZedRequest::CloseSession { session_id });
+        let response = rt.block_on(server.handle_request(ZedRequest::CloseSession { session_id }));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("closed"));
@@ -347,10 +349,11 @@ mod tests {
     #[test]
     fn test_list_sessions() {
         let server = AcpAgentServer::new();
-        let _ = server.handle_request(ZedRequest::NewSession {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(server.handle_request(ZedRequest::NewSession {
             cwd: "/test/project".to_string(),
-        });
-        let response = server.handle_request(ZedRequest::ListSessions);
+        }));
+        let response = rt.block_on(server.handle_request(ZedRequest::ListSessions));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["count"].as_i64(), Some(1));
@@ -362,14 +365,15 @@ mod tests {
     #[test]
     fn test_prompt_with_session() {
         let server = AcpAgentServer::new();
-        let _ = server.handle_request(ZedRequest::NewSession {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(server.handle_request(ZedRequest::NewSession {
             cwd: "/test/project".to_string(),
-        });
+        }));
         let session_id = server.sessions[0].session_id.clone();
-        let response = server.handle_request(ZedRequest::Prompt {
+        let response = rt.block_on(server.handle_request(ZedRequest::Prompt {
             session_id,
             message: "test prompt".to_string(),
-        });
+        }));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("processed"));
@@ -381,10 +385,11 @@ mod tests {
     #[test]
     fn test_prompt_without_session() {
         let server = AcpAgentServer::new();
-        let response = server.handle_request(ZedRequest::Prompt {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let response = rt.block_on(server.handle_request(ZedRequest::Prompt {
             session_id: "nonexistent".to_string(),
             message: "test prompt".to_string(),
-        });
+        }));
         match response {
             Ok(AcpResponse::Error { message }) => {
                 assert!(message.contains("nonexistent"));
@@ -396,9 +401,10 @@ mod tests {
     #[test]
     fn test_authenticate() {
         let server = AcpAgentServer::new();
-        let response = server.handle_request(ZedRequest::Authenticate {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let response = rt.block_on(server.handle_request(ZedRequest::Authenticate {
             auth_method: "api_key".to_string(),
-        });
+        }));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("authenticated"));
@@ -413,19 +419,20 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
         let server = AcpAgentServer::new().with_guard_db(db);
-        let _ = server.handle_request(ZedRequest::NewSession {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(server.handle_request(ZedRequest::NewSession {
             cwd: dir.path().to_string_lossy().into_owned(),
-        });
+        }));
         let session_id = server.sessions[0].session_id.clone();
 
-        let response = server.handle_request(ZedRequest::ToolCall {
+        let response = rt.block_on(server.handle_request(ZedRequest::ToolCall {
             session_id,
             function_name: "echo".to_string(),
             arguments: json!({
                 "args": ["hello"],
                 "confidence": 0.9,
             }),
-        });
+        }));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["gate_result"].as_str(), Some("proceed"));
@@ -439,19 +446,20 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
         let server = AcpAgentServer::new().with_guard_db(db);
-        let _ = server.handle_request(ZedRequest::NewSession {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _ = rt.block_on(server.handle_request(ZedRequest::NewSession {
             cwd: dir.path().to_string_lossy().into_owned(),
-        });
+        }));
         let session_id = server.sessions[0].session_id.clone();
 
-        let response = server.handle_request(ZedRequest::ToolCall {
+        let response = rt.block_on(server.handle_request(ZedRequest::ToolCall {
             session_id,
             function_name: "rm".to_string(),
             arguments: json!({
                 "args": ["-rf", "/tmp"],
                 "confidence": 0.9,
             }),
-        });
+        }));
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["gate_result"].as_str(), Some("interrupted"));

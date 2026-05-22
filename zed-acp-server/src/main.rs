@@ -98,18 +98,7 @@ fn map_method(request: AcpRequest) -> Result<ZedRequest, anyhow::Error> {
     }
 }
 
-fn format_response(response: AcpResponse) -> serde_json::Value {
-    match response {
-        AcpResponse::Result { value } => json!({
-            "type": "result",
-            "value": value,
-        }),
-        AcpResponse::Error { message } => json!({
-            "type": "error",
-            "message": message,
-        }),
-    }
-}
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
