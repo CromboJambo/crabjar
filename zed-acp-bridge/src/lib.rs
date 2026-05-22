@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use thiserror::Error;
 
 use agent_context::Store;
-use crabjar_guard::GuardDb;
+use crabjar_guard::{GuardDb, GateResult};
 use zed_acp_server::AcpSession;
 
 #[derive(Error, Debug)]
@@ -39,7 +40,6 @@ pub struct TrajectoryEvent {
     pub data: serde_json::Value,
 }
 
-#[derive(Debug, Clone)]
 pub struct AcpBridge {
     pub session: Option<AcpSession>,
     pub events: Vec<TrajectoryEvent>,
@@ -111,7 +111,7 @@ impl AcpBridge {
         &self,
         command: &str,
         args: &[String],
-    ) -> Result<zed_acp_server::GateResult, AcpBridgeError> {
+    ) -> Result<GateResult, AcpBridgeError> {
         let guard_db = self
             .guard_db
             .as_ref()
