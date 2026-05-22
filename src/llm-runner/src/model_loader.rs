@@ -1,5 +1,5 @@
-use crabjar_llm_plug_in::manifest::{WeightManifest, ModelWeightRow, TensorMetadataRow};
-use crabjar_safetensors::schema::{query_model_weights, query_tensor_metadata};
+use crabjar_llm_plug_in::manifest::WeightManifest;
+
 use crabjar_safetensors::error::SafetensorsSchemaError;
 use crate::error::RunnerError;
 use tracing::debug;
@@ -91,7 +91,7 @@ impl ModelLoader {
     /// Verify weight checksum integrity.
     pub fn verify_checksum(&self, weight_id: &str, expected: &str) -> Result<bool, RunnerError> {
         crabjar_safetensors::schema::verify_weight_checksum(&self.conn, weight_id, expected)
-            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite( rusqlite::Error::QueryReturnedNoRows ))
+            .map_err(|_: SafetensorsSchemaError| RunnerError::Sqlite( rusqlite::Error::QueryReturnedNoRows ))
     }
 
     /// List active weights for model selection.

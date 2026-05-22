@@ -1,8 +1,6 @@
 use candle_core::{Tensor, DType, Device};
-use candle_core::op::Op;
 use candle_nn::Module;
 use crate::error::RunnerError;
-use tracing::debug;
 
 /// Inference engine for tensor computation.
 ///
@@ -23,7 +21,7 @@ impl InferenceEngine {
     }
 
     /// Materialize lazy-loaded tensor from manifest.
-    pub fn materialize_tensor(&self, file_path: &str, tensor_name: &str) -> Result<Tensor, RunnerError> {
+    pub fn materialize_tensor(&self, file_path: &str, _tensor_name: &str) -> Result<Tensor, RunnerError> {
         let data = std::fs::read(file_path).map_err(|e: std::io::Error| RunnerError::Asset(e.to_string()))?;
         Tensor::from_raw_buffer(&data, self.dtype, &[1], &self.device).map_err(|e: candle_core::Error| RunnerError::Tensor(e.to_string()))
     }

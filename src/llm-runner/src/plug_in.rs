@@ -3,7 +3,7 @@ use crabjar_llm_plug_in::protocol::{InferenceRequest, InferenceResponse, RunnerC
 use crabjar_safetensors::schema::query_model_weights;
 use crabjar_safetensors::error::SafetensorsSchemaError;
 use crate::error::RunnerError;
-use tracing::debug;
+
 
 /// Plug-in protocol implementation for llm-runner → crabjar interface.
 ///

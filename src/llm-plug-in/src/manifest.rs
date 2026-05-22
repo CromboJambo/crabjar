@@ -51,8 +51,7 @@ pub struct ModelWeightRow {
 }
 
 use crate::PlugInError;
-use crabjar_safetensors::schema::query_model_weights;
-use crabjar_safetensors::schema::query_tensor_metadata;
+
 use tracing::debug;
 
 /// Generate a weight manifest from safetensors DB for external runner consumption.
