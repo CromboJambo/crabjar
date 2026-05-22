@@ -19,42 +19,35 @@ impl InferenceEngine {
 
     /// Run inference on a loaded model.
     pub fn infer(&self, model: &impl Module, input: Tensor) -> Result<Tensor, RunnerError> {
-        model.forward(&input).map_err(RunnerError::Tensor)
+        model.forward(&input).map_err(|e: candle_core::Error| RunnerError::Tensor(e.to_string()))
     }
 
     /// Materialize lazy-loaded tensor from manifest.
     pub fn materialize_tensor(&self, file_path: &str, tensor_name: &str) -> Result<Tensor, RunnerError> {
-        let data = std::fs::read(file_path).map_err(RunnerError::Asset)?;
-        Tensor::from_raw_buffer(&data, self.dtype, &[1], &self.device).map_err(RunnerError::Tensor)
-    }
-
-    /// Compute tensor operations.
-    pub fn compute(&self, a: Tensor, b: Tensor, op: Op) -> Result<Tensor, RunnerError> {
-        op.apply(&a, &b).map_err(RunnerError::Tensor)
+        let data = std::fs::read(file_path).map_err(|e: std::io::Error| RunnerError::Asset(e.to_string()))?;
+        Tensor::from_raw_buffer(&data, self.dtype, &[1], &self.device).map_err(|e: candle_core::Error| RunnerError::Tensor(e.to_string()))
     }
 
     /// Get device info.
     pub fn device_info(&self) -> Result<String, RunnerError> {
-        Ok(match self.device {
+        Ok(match &self.device {
             Device::Cpu => "cpu".to_string(),
-            Device::Cuda(ordinal) => format!("cuda:{ordinal}"),
+            Device::Cuda(ordinal) => format!("cuda:{ordinal:?}"),
+            Device::Metal(_) => "metal".to_string(),
         })
     }
 
+
+
+    /// Get dtype info.
     pub fn dtype_info(&self) -> Result<String, RunnerError> {
         Ok(match self.dtype {
             DType::F32 => "F32".to_string(),
             DType::F16 => "F16".to_string(),
             DType::I64 => "I64".to_string(),
             DType::I32 => "I32".to_string(),
-            DType::I8 => "I8".to_string(),
             DType::U8 => "U8".to_string(),
             _ => "unknown".to_string(),
         })
-    }
-
-    /// Get dtype info.
-    pub fn dtype_info(&self) -> Result<String, RunnerError> {
-        Ok(self.dtype.to_string())
     }
 }

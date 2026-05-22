@@ -21,7 +21,7 @@ impl PlugInProtocol {
 
     /// Generate weight manifest for external runner.
     pub fn generate_manifest(&self, model_name: &str) -> Result<WeightManifest, crabjar_llm_plug_in::PlugInError> {
-        crate::manifest::generate_weight_manifest(&self.conn, model_name)
+        crabjar_llm_plug_in::manifest::generate_weight_manifest(&self.conn, model_name)
     }
 
     /// Create inference request from model manifest.
@@ -43,9 +43,9 @@ impl PlugInProtocol {
     }
 
     /// Query active weights for model selection.
-    pub fn query_weights(&self, model_name: &str, limit: usize) -> Result<Vec<crabjar_llm_plug_in::manifest::ModelWeightRow>, RunnerError> {
+    pub fn query_weights(&self, model_name: &str, limit: usize) -> Result<Vec<crabjar_safetensors::schema::ModelWeightRow>, RunnerError> {
         query_model_weights(&self.conn, model_name, limit)
-            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite(e.into()))
+            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite(match e { SafetensorsSchemaError::Sqlite(r) => r, _ => rusqlite::Error::QueryReturnedNoRows }))
     }
 
     /// Update runner config.

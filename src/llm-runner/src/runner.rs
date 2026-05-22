@@ -37,7 +37,7 @@ impl RunnerBridge {
 
     /// Update runner config.
     pub fn update_config(&mut self, config: RunnerConfig) -> Result<(), RunnerError> {
-        self.config = config;
+        self.config = config.clone();
         self.endpoint = config.endpoint.clone();
         Ok(())
     }

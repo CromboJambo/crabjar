@@ -8,7 +8,7 @@ use tracing::debug;
 /// supports BPE models (GPT-2, GPT-3) and tokenizers library.
 pub struct Tokenizer {
     pub model: String,
-    pub bpe: Option<tiktoken_rs::Bpe>,
+
     pub tokenizer: Option<TokenizerImpl>,
 }
 
@@ -23,7 +23,7 @@ impl Tokenizer {
 
     /// Initialize BPE from model name.
     pub fn init_bpe(&mut self) -> Result<(), RunnerError> {
-        let bpe = bpe_for_model(&self.model).map_err(RunnerError::Tokenizer)?;
+        let bpe = bpe_for_model(&self.model).map_err(|e: anyhow::Error| RunnerError::Tokenizer(e.to_string()))?;
         self.bpe = Some(bpe);
         debug!(model = %self.model, "Tokenizer: BPE initialized");
         Ok(())
@@ -32,9 +32,9 @@ impl Tokenizer {
     /// Encode prompt to token IDs.
     pub fn encode(&self, prompt: &str) -> Result<Vec<u32>, RunnerError> {
         if let Some(ref bpe) = self.bpe {
-            bpe.encode(prompt).map_err(RunnerError::Tokenizer)
+            bpe.encode(prompt).map_err(|e: Box<dyn std::error::Error + Send + Sync>| RunnerError::Tokenizer(e.to_string()))
         } else if let Some(ref tok) = self.tokenizer {
-            tok.encode(prompt, false).map_err(RunnerError::Tokenizer).map(|e| e.get_ids().to_vec())
+            tok.encode(prompt, false).map_err(|e: Box<dyn std::error::Error + Send + Sync>| RunnerError::Tokenizer(e.to_string())).map(|e| e.get_ids().to_vec())
         } else {
             Err(RunnerError::Tokenizer("tokenizer not initialized".to_string()))
         }
@@ -43,7 +43,7 @@ impl Tokenizer {
     /// Decode token IDs to text.
     pub fn decode(&self, tokens: &[u32]) -> Result<String, RunnerError> {
         if let Some(ref tok) = self.tokenizer {
-            tok.decode(tokens, false).map_err(RunnerError::Tokenizer)
+            tok.decode(tokens, false).map_err(|e: Box<dyn std::error::Error + Send + Sync>| RunnerError::Tokenizer(e.to_string()))
         } else {
             Err(RunnerError::Tokenizer("tokenizer not initialized".to_string()))
         }
@@ -54,7 +54,7 @@ impl Tokenizer {
         if let Some(ref bpe) = self.bpe {
             Ok(bpe.encode(prompt).map_err(RunnerError::Tokenizer)?.len())
         } else if let Some(ref tok) = self.tokenizer {
-            Ok(tok.encode(prompt, false).map_err(RunnerError::Tokenizer)?.get_ids().len())
+            Ok(tok.encode(prompt, false).map_err(|e: Box<dyn std::error::Error + Send + Sync>| RunnerError::Tokenizer(e.to_string()))?.get_ids().len())
         } else {
             Err(RunnerError::Tokenizer("tokenizer not initialized".to_string()))
         }

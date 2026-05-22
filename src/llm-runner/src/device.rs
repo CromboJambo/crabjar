@@ -22,7 +22,7 @@ impl DeviceBackend {
     pub fn select(&mut self) -> Result<(), RunnerError> {
         match self.preference.as_str() {
             "cuda" => {
-                Device::cuda_if_available().map_err(RunnerError::Device)?
+                self.device = Device::cuda_if_available(0).map_err(|e: candle_core::Error| RunnerError::Device(e.to_string()))?
             }
             "cpu" => {
                 self.device = Device::Cpu;
@@ -37,15 +37,16 @@ impl DeviceBackend {
                 self.device = Device::Cpu;
             }
         }
-        debug!(preference = %self.preference, device = %self.device_info().unwrap_or_default(), "Device backend: selected");
+        debug!(preference = %self.preference, device = %self.info().unwrap_or_default(), "Device backend: selected");
         Ok(())
     }
 
     /// Get device info.
     pub fn info(&self) -> Result<String, RunnerError> {
-        Ok(match self.device {
+        Ok(match &self.device {
             Device::Cpu => "cpu".to_string(),
-            Device::Cuda(ordinal) => format!("cuda:{ordinal}"),
+            Device::Cuda(ordinal) => format!("cuda:{ordinal:?}"),
+            Device::Metal(_) => "metal".to_string(),
         })
     }
 
@@ -53,11 +54,7 @@ impl DeviceBackend {
         Ok(match self.device {
             Device::Cpu => true,
             Device::Cuda(_) => false, // cuda check requires runtime
+            Device::Metal(_) => false, // metal requires macOS
         })
-    }
-
-    /// Check device availability.
-    pub fn is_available(&self) -> Result<bool, RunnerError> {
-        Ok(self.device.is_available())
     }
 }

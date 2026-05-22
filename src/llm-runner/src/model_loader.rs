@@ -28,7 +28,7 @@ impl ModelLoader {
             let metadata_str: String = row.get(9)?;
             let metadata: serde_json::Value = serde_json::from_str(&metadata_str).unwrap_or_default();
 
-            Ok(crate::plug_in::ModelWeightRow {
+            Ok(crabjar_llm_plug_in::manifest::ModelWeightRow {
                 id: row.get(0)?,
                 model_name: row.get(1)?,
                 repo_id: row.get(2)?,
@@ -50,9 +50,9 @@ impl ModelLoader {
              WHERE weight_id = ?1",
         )?;
 
-        let tensors: Vec(crate::plug_in::TensorMetadataRow) = tensor_stmt
+        let tensors: Vec<crabjar_llm_plug_in::manifest::TensorMetadataRow> = tensor_stmt
             .query_map(rusqlite::params![row.id], |row| {
-                Ok(crate::plug_in::TensorMetadataRow {
+                Ok(crabjar_llm_plug_in::manifest::TensorMetadataRow {
                     id: row.get(0)?,
                     weight_id: row.get(1)?,
                     tensor_name: row.get(2)?,
@@ -91,12 +91,12 @@ impl ModelLoader {
     /// Verify weight checksum integrity.
     pub fn verify_checksum(&self, weight_id: &str, expected: &str) -> Result<bool, RunnerError> {
         crabjar_safetensors::schema::verify_weight_checksum(&self.conn, weight_id, expected)
-            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite(e.into()))
+            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite( rusqlite::Error::QueryReturnedNoRows ))
     }
 
     /// List active weights for model selection.
-    pub fn list_active(&self, limit: usize) -> Result<Vec<ModelWeightRow>, RunnerError> {
+    pub fn list_active(&self, limit: usize) -> Result<Vec<crabjar_safetensors::schema::ModelWeightRow>, RunnerError> {
         crabjar_safetensors::schema::list_active_weights(&self.conn, limit)
-            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite(e.into()))
+            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite(match e { SafetensorsSchemaError::Sqlite(r) => r, _ => rusqlite::Error::QueryReturnedNoRows }))
     }
 }

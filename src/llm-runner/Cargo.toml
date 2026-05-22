@@ -32,6 +32,7 @@ tracing-appender.workspace = true
 
 # Error handling
 thiserror.workspace = true
+anyhow.workspace = true
 
 # CrabJar plug-in
 crabjar-llm-plug-in = { path = "../llm-plug-in" }
