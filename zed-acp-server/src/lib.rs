@@ -289,6 +289,7 @@ mod tests {
                 assert_eq!(value["cwd"].as_str(), Some("/test/project"));
                 assert_eq!(value["status"].as_str(), Some("created"));
             }
+            Ok(_) => panic!("unexpected error response"),
             Err(_) => panic!("expected result"),
         }
     }
@@ -308,6 +309,7 @@ mod tests {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("loaded"));
             }
+            Ok(_) => panic!("unexpected error response"),
             Err(_) => panic!("expected result"),
         }
     }
@@ -324,6 +326,7 @@ mod tests {
             Ok(AcpResponse::Error { message }) => {
                 assert!(message.contains("nonexistent"));
             }
+            Ok(_) => panic!("unexpected result response"),
             Err(_) => panic!("expected error"),
         }
     }
@@ -341,6 +344,7 @@ mod tests {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("closed"));
             }
+            Ok(_) => panic!("unexpected error response"),
             Err(_) => panic!("expected result"),
         }
         assert!(server.sessions.is_empty());
