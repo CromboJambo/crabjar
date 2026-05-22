@@ -16,6 +16,7 @@ tracing.workspace = true
 thiserror.workspace = true
 safetensors.workspace = true
 crabjar-guard = { path = "../../guard" }
+crabjar-safetensors = { path = "../../safetensors" }
 
 [dev-dependencies]
 tempfile.workspace = true

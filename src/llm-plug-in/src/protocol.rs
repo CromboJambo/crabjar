@@ -55,6 +55,21 @@ impl InferenceRequest {
         self.device = device.into();
         self
     }
+
+    pub fn dtype(mut self, dtype: impl Into<String>) -> Self {
+        self.dtype = dtype.into();
+        self
+    }
+
+    pub fn max_tokens(mut self, tokens: u32) -> Self {
+        self.max_tokens = tokens;
+        self
+    }
+
+    pub fn temperature(mut self, temp: f64) -> Self {
+        self.temperature = temp.clamp(0.0, 2.0);
+        self
+    }
 }
 
 /// Inference response from external LLM runner.
