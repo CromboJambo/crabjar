@@ -24,6 +24,8 @@ uuid = { version = "1.10", features = ["v4", "js"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 zed-acp-server = { path = "../zed-acp-server" }
+agent-context = { path = "../memory" }
+crabjar-guard = { path = "../guard" }
 
 [lib]
 crate-type = ["cdylib"]
