@@ -1,4 +1,7 @@
 # CrabJar
+```
+/home/crombo/crabjar/assets/ChatGPT Image May 20, 2026, 01_50_00 PM.png
+```
 
 CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), safetensors (model weight storage), tool registry, codeburn CLI, skill script runner, skill reference store, and Zed agent protocol bridge.
 
