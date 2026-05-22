@@ -98,8 +98,6 @@ fn map_method(request: AcpRequest) -> Result<ZedRequest, anyhow::Error> {
     }
 }
 
-
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
