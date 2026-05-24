@@ -4,11 +4,12 @@ use path_absolutize::Absolutize;
 use rusqlite::Connection;
 use tracing::debug;
 
-/// Agent isolation tooling for per-agent Unix user creation, systemd-nspawn containers, and cgroup resource limits.
+/// Agent isolation tooling for per-agent Unix user creation, systemd-nspawn containers,
+/// dinit-container configurations, and cgroup resource limits.
 ///
 /// Practical hierarchy:
 /// 1. Separate Unix user — best default. Gives real filesystem/user separation.
-/// 2. Container or systemd-nspawn — stronger than a user account, lighter than a full VM.
+/// 2. Container or systemd-nspawn / dinit-container — stronger than a user account, lighter than a full VM.
 /// 3. VM — best for high-risk autonomous work.
 pub struct AgentIsolation<'a> {
     conn: &'a Connection,
@@ -90,6 +91,35 @@ impl<'a> AgentIsolation<'a> {
         debug!(
             agent_name = %agent_name,
             "Agent isolation: systemd-nspawn config generated"
+        );
+
+        Ok(config)
+    }
+
+    /// Generate dinit-container configuration.
+    pub fn generate_dinit_config(
+        &self,
+        agent_name: &str,
+        mount_scopes: &[String],
+        resource_limits: &str,
+    ) -> Result<String, SandboxError> {
+        let mut config = String::new();
+        config.push_str(&format!("name = {}\n", agent_name));
+        config.push_str("type = container\n");
+
+        for mount in mount_scopes {
+            config.push_str(&format!("mount = {}\n", mount));
+        }
+
+        let parts: Vec<&str> = resource_limits.split(',').collect();
+        for part in parts {
+            let (key, value) = part.split_once('=').unwrap_or((part, ""));
+            config.push_str(&format!("{} = {}\n", key, value));
+        }
+
+        debug!(
+            agent_name = %agent_name,
+            "Agent isolation: dinit-container config generated"
         );
 
         Ok(config)
@@ -197,6 +227,27 @@ mod tests {
 
         assert!(config.contains("[Container]"));
         assert!(config.contains("HostName = test-agent"));
+    }
+
+    #[test]
+    fn test_generate_dinit_config() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("sandbox.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let isolation = AgentIsolation::new(&conn);
+        isolation.init().unwrap();
+
+        let config = isolation
+            .generate_dinit_config(
+                "test-agent",
+                &[dir.path().to_string_lossy().to_string(), "/tmp".to_string()],
+                "cpu=1,memory=2g",
+            )
+            .unwrap();
+
+        assert!(config.contains("name = test-agent"));
+        assert!(config.contains("type = container"));
     }
 
     #[test]

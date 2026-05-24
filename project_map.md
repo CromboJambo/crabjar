@@ -41,7 +41,7 @@ crabjar/
 ├── orchestrator/            # Axum SSE server (ACP-compliant orchestrator)
 ├── guard/                   # Trust layers, annealing, execution gate
 ├── telemetry/               # Flight recorder, command executor
-├── sandbox/                 # Agent isolation (Unix user, systemd-nspawn, cgroup)
+├── sandbox/                 # Agent isolation (Unix user, systemd-nspawn / dinit-container, cgroup)
 ├── safetensors/             # Model weight storage (SQLite, checksum verification)
 ├── tool_registry/           # MCP tool registry (rig/aur patterns)
 ├── src/codeburn-provider/   # ProviderRegistry (Claude/Cursor/OpenCode etc.)
@@ -74,7 +74,7 @@ crabjar/
 | `orchestrator` | Axum SSE server (ACP orchestrator) | Orchestrator | Active |
 | `guard` | Trust layers, annealing, execution gate | Authorization | Active |
 | `telemetry` | Flight recorder, command executor | Telemetry | Active |
-| `sandbox` | Agent isolation tooling | Isolation | Active |
+| `sandbox` | Agent isolation tooling (Unix user, systemd-nspawn / dinit-container, cgroup) | Isolation | Active |
 | `safetensors` | Model weight storage | Storage | Active |
 | `tool_registry` | MCP tool registry | Registry | Active |
 | `codeburn-provider` | ProviderRegistry (Claude/Cursor/OpenCode etc.) | Provider | Active |

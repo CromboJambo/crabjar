@@ -8,7 +8,7 @@
 
 ## Common issues
 
-- **Duplicate entries**: same UUID or path listed multiple times — systemd-fstab-generator fails
+- **Duplicate entries**: same UUID or path listed multiple times — systemd-fstab-generator / dinit-fstab fails
 - **Swapfile entries**: `/home/swapfile none swap defaults 0 0` — btrfs swapfile needs `compress=no` option
 - **UUID stale**: filesystem reformat changed UUID — entry won't mount
 - **Missing mount**: path doesn't exist — generator creates unit but mount fails

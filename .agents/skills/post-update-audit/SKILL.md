@@ -24,17 +24,17 @@ rg "transaction completed" /var/log/pacman.log | grep recent timestamps
 
 ### 2. Check boot logs
 
-Run `journalctl --boot=0` for current boot and `journalctl --boot=-1` for pre-reboot boot. Filter:
+Run `journalctl --boot=0` for current boot and `journalctl --boot=-1` for pre-reboot boot (systemd). On Artix/Dinit, use `dinitctl status` or `/var/log/dinit` equivalents. Filter:
 - kernel messages (e820/BIOS/ACPI — skip these, they're verbose noise)
 - powerdevil udev events (drm device changes during kernel update)
-- systemd-fstab-generator errors (duplicate entries)
+- systemd-fstab-generator / dinit-fstab errors (duplicate entries)
 - kwin_wayland DRM device failures (nvidia modules not loaded yet)
 - D-Bus reload events (hooks triggered mid-session)
 - tailscaled connection timeouts (post-reboot network state)
 
 ### 3. Check failed services
 
-Run `diagnose_system(action='failed_services')` to confirm no failed systemd units.
+Run `diagnose_system(action='failed_services')` to confirm no failed systemd units. On Artix/Dinit, use `dinitctl status` to check service state.
 
 ### 4. Check fstab duplicates
 
@@ -76,7 +76,7 @@ BIOS settings (UEFI Network Boot / WOL) and EFI boot order are separate. Disabli
 Report:
 - upgrade duration (start to end timestamps)
 - kernel update + mkinitcpio rebuild time
-- systemd-fstab-generator errors
+- systemd-fstab-generator / dinit-fstab errors
 - kwin_wayland DRM failures (temporary, resolved post-reboot)
 - current boot status (failed services count)
 - fstab issues found
@@ -86,7 +86,7 @@ Report:
 
 - kernel update triggers mkinitcpio (2 images: default + fallback) + depmod — adds 2-3 minutes
 - nvidia-open-dkms depmod runs during kernel update — DRM devices unavailable until reboot
-- systemd-fstab-generator fails on duplicate entries — fix fstab before next update
+- systemd-fstab-generator / dinit-fstab fails on duplicate entries — fix fstab before next update
 - D-Bus reload mid-session — hooks triggered, normal behavior
 - tailscaled connection timeouts post-reboot — network state settling, normal
 

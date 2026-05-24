@@ -29,6 +29,9 @@ pub enum SandboxError {
     #[error("systemd-nspawn failed: {0}")]
     SystemdSpawn(String),
 
+    #[error("dinit-container failed: {0}")]
+    DinitSpawn(String),
+
     #[error("cgroup setup failed: {0}")]
     Cgroup(String),
 
