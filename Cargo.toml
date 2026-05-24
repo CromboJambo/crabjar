@@ -123,7 +123,7 @@ safetensors = { version = "0.7.0", default-features = false }
 # Candle deps
 accelerate-src = { version = "0.3.2" }
 byteorder = { version = "1.4.3", default-features = false }
-cudarc = { version = "0.19.4", features = ["std", "cublas", "cublaslt", "curand", "driver", "nvrtc", "f16", "f8", "cuda-version-from-build-system", "dynamic-linking"], default-features = false }
+cudarc = { version = "0.19.4", features = ["std", "cublas", "cublaslt", "curand", "driver", "nvrtc", "f16", "f8", "cuda-12050", "dynamic-linking"], default-features = false }
 gemm = { version = "0.19.0", features = ["wasm-simd128-enable"] }
 half = { version = "2.7.1", features = ["num-traits", "use-intrinsics", "rand_distr"] }
 float8 = { version = "0.7.0", features = ["num-traits", "rand_distr"] }

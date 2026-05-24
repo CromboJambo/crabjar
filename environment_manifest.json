@@ -2,7 +2,7 @@
   "system": {
     "user": "crombo",
     "hostname": "jambo",
-    "kernel": "6.19.11-zen1-1-zen",
+    "kernel": "7.0.8-zen1-1-zen",
     "architecture": "x86_64",
     "platform": "linux",
     "shell": "zsh",
@@ -19,12 +19,16 @@
     },
     "ram": {
       "total": "62 GiB",
-      "available": "43 GiB",
-      "buff_cache": "41 GiB",
+      "available": "48 GiB",
+      "buff_cache": "27 GiB",
       "swap": {
-        "type": "zram (/dev/zram0)",
-        "size": "4 GiB",
-        "used": "244 MiB"
+      "type": "file swap (/mnt/data/swapfile) + zswap (kernel)",
+        "swapfile_size": "32 GiB",
+        "swapfile_used": "0 GiB",
+        "zswap_enabled": true,
+        "zswap_compressor": "zstd",
+        "zswap_zpool": "z3fold",
+        "zswap_limit": "kernel default (no max_pool_size in boot params)"
       }
     },
     "storage": {
@@ -61,10 +65,12 @@
   },
   "constraints": [
     "Root (/) is ext4 — no CoW concern",
-    "Home and /mnt/data are btrfs — avoid CoW for swap files on those mounts",
-    "zram swap (4 GiB) already using ~244 MiB — memory compression active under pressure",
+    "Home and /mnt/data are btrfs — swapfile on btrfs needs `compress=no` option",
+    "zram removed — replaced with file swapfile on /mnt/data (btrfs) + kernel zswap",
+    "zswap enabled (zstd compressor, z3fold zpool) — kernel-level compression on 62 GiB RAM pool",
+    "Swapfile on btrfs: verify `compress=no` in fstab entry to avoid CoW overhead",
     "GPU VRAM heavily consumed by LM Studio (~11.7 GiB) + desktop compositing (~2 GiB) — ~2.3 GiB available for AI workloads",
     "Manifest is ground truth — update when stale (> 7 days)"
   ],
-  "last_updated": "2026-04-25T13:55:59Z"
+  "last_updated": "2026-05-24T00:00:00Z"
 }
