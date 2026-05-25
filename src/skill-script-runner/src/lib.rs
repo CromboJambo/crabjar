@@ -74,19 +74,37 @@ pub async fn execute_script(
         anyhow::bail!("script not in allowlist: {}", script_path.display());
     }
 
-    let output = if script_path.extension().map(|ext| ext == "lua").unwrap_or(false) {
+    let output = if script_path
+        .extension()
+        .map(|ext| ext == "lua")
+        .unwrap_or(false)
+    {
         // Handle Lua scripts by calling the 'lua' interpreter and passing the script path as argument
         let command = &["lua", script_path.to_str().unwrap()];
-        time::timeout(timeout, tokio::process::Command::new("lua").args(command).current_dir(work_dir).envs(&env).output())
-            .await
-            .map_err(|e| anyhow::anyhow!("Lua script timed out: {}", e))?
-            .map_err(|e| anyhow::anyhow!("Lua script output failed: {}", e))?
+        time::timeout(
+            timeout,
+            tokio::process::Command::new("lua")
+                .args(command)
+                .current_dir(work_dir)
+                .envs(&env)
+                .output(),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Lua script timed out: {}", e))?
+        .map_err(|e| anyhow::anyhow!("Lua script output failed: {}", e))?
     } else {
         // Original logic for non-lua scripts (assumed executables)
-        time::timeout(timeout, tokio::process::Command::new(script_path).args(args).current_dir(work_dir).envs(&env).output())
-            .await
-            .map_err(|e| anyhow::anyhow!("script timed out: {}", e))?
-            .map_err(|e| anyhow::anyhow!("script output failed: {}", e))?
+        time::timeout(
+            timeout,
+            tokio::process::Command::new(script_path)
+                .args(args)
+                .current_dir(work_dir)
+                .envs(&env)
+                .output(),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("script timed out: {}", e))?
+        .map_err(|e| anyhow::anyhow!("script output failed: {}", e))?
     };
 
     if !output.status.success() {

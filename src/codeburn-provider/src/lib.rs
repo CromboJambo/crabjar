@@ -12,7 +12,7 @@ pub enum ProviderError {
     DatabaseError(#[from] rusqlite::Error),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DataFormat {
     Jsonl,
     Sqlite,
@@ -163,7 +163,6 @@ impl Default for ProviderRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
 
     #[test]
     fn provider_registry_new_is_empty() {
@@ -240,28 +239,26 @@ mod tests {
     fn provider_registry_today_usage_json() {
         let mut registry = ProviderRegistry::new();
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        registry.providers = vec![
-            SessionData {
-                provider_name: "claude".into(),
-                provider: "anthropic".into(),
-                format: DataFormat::Jsonl,
-                model: "claude-3".into(),
-                date: today.clone(),
-                input_tokens: 100,
-                output_tokens: 50,
-                task_category: "test".into(),
-                project: "proj".into(),
-                message_id: "msg-1".into(),
-                provenance: ProvenanceEntry {
-                    source: "t".into(),
-                    provenance_id: "p1".into(),
-                    provider_id: "id1".into(),
-                    data_path: "p".into(),
-                    format: "f".into(),
-                    ingestion_timestamp: 0,
-                },
+        registry.providers = vec![SessionData {
+            provider_name: "claude".into(),
+            provider: "anthropic".into(),
+            format: DataFormat::Jsonl,
+            model: "claude-3".into(),
+            date: today.clone(),
+            input_tokens: 100,
+            output_tokens: 50,
+            task_category: "test".into(),
+            project: "proj".into(),
+            message_id: "msg-1".into(),
+            provenance: ProvenanceEntry {
+                source: "t".into(),
+                provenance_id: "p1".into(),
+                provider_id: "id1".into(),
+                data_path: "p".into(),
+                format: "f".into(),
+                ingestion_timestamp: 0,
             },
-        ];
+        }];
 
         let usage = registry.today_usage_json().unwrap();
         assert_eq!(usage["date"], today);
@@ -272,28 +269,26 @@ mod tests {
     fn provider_registry_month_usage_json() {
         let mut registry = ProviderRegistry::new();
         let month = chrono::Utc::now().format("%Y-%m").to_string();
-        registry.providers = vec![
-            SessionData {
-                provider_name: "claude".into(),
-                provider: "anthropic".into(),
-                format: DataFormat::Jsonl,
-                model: "claude-3".into(),
-                date: format!("{}-15", month),
-                input_tokens: 100,
-                output_tokens: 50,
-                task_category: "test".into(),
-                project: "proj".into(),
-                message_id: "msg-1".into(),
-                provenance: ProvenanceEntry {
-                    source: "t".into(),
-                    provenance_id: "p1".into(),
-                    provider_id: "id1".into(),
-                    data_path: "p".into(),
-                    format: "f".into(),
-                    ingestion_timestamp: 0,
-                },
+        registry.providers = vec![SessionData {
+            provider_name: "claude".into(),
+            provider: "anthropic".into(),
+            format: DataFormat::Jsonl,
+            model: "claude-3".into(),
+            date: format!("{}-15", month),
+            input_tokens: 100,
+            output_tokens: 50,
+            task_category: "test".into(),
+            project: "proj".into(),
+            message_id: "msg-1".into(),
+            provenance: ProvenanceEntry {
+                source: "t".into(),
+                provenance_id: "p1".into(),
+                provider_id: "id1".into(),
+                data_path: "p".into(),
+                format: "f".into(),
+                ingestion_timestamp: 0,
             },
-        ];
+        }];
 
         let usage = registry.month_usage_json().unwrap();
         assert_eq!(usage["month"], month);
@@ -347,7 +342,8 @@ mod tests {
         ];
 
         let export = registry.multi_period_export_json().unwrap();
-        let by_date: serde_json::Map<String, serde_json::Value> = export["by_date"].as_object().unwrap().clone();
+        let by_date: serde_json::Map<String, serde_json::Value> =
+            export["by_date"].as_object().unwrap().clone();
         assert_eq!(by_date.len(), 2);
         assert!(by_date.contains_key("2026-05-20"));
         assert!(by_date.contains_key("2026-05-21"));
@@ -358,28 +354,26 @@ mod tests {
     fn provider_registry_today_usage_numeric() {
         let mut registry = ProviderRegistry::new();
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        registry.providers = vec![
-            SessionData {
-                provider_name: "claude".into(),
-                provider: "anthropic".into(),
-                format: DataFormat::Jsonl,
-                model: "claude-3".into(),
-                date: today.clone(),
-                input_tokens: 100,
-                output_tokens: 50,
-                task_category: "test".into(),
-                project: "proj".into(),
-                message_id: "msg-1".into(),
-                provenance: ProvenanceEntry {
-                    source: "t".into(),
-                    provenance_id: "p1".into(),
-                    provider_id: "id1".into(),
-                    data_path: "p".into(),
-                    format: "f".into(),
-                    ingestion_timestamp: 0,
-                },
+        registry.providers = vec![SessionData {
+            provider_name: "claude".into(),
+            provider: "anthropic".into(),
+            format: DataFormat::Jsonl,
+            model: "claude-3".into(),
+            date: today.clone(),
+            input_tokens: 100,
+            output_tokens: 50,
+            task_category: "test".into(),
+            project: "proj".into(),
+            message_id: "msg-1".into(),
+            provenance: ProvenanceEntry {
+                source: "t".into(),
+                provenance_id: "p1".into(),
+                provider_id: "id1".into(),
+                data_path: "p".into(),
+                format: "f".into(),
+                ingestion_timestamp: 0,
             },
-        ];
+        }];
 
         let usage = registry.today_usage().unwrap();
         assert_eq!(usage, "150");
@@ -389,14 +383,14 @@ mod tests {
     fn data_format_serde_jsonl() {
         let fmt = DataFormat::Jsonl;
         let json = serde_json::to_string(&fmt).unwrap();
-        assert_eq!(json, "\"jsonl\"");
+        assert_eq!(json, "\"Jsonl\"");
     }
 
     #[test]
     fn data_format_serde_sqlite() {
         let fmt = DataFormat::Sqlite;
         let json = serde_json::to_string(&fmt).unwrap();
-        assert_eq!(json, "\"sqlite\"");
+        assert_eq!(json, "\"Sqlite\"");
     }
 
     #[test]
@@ -551,7 +545,8 @@ mod tests {
         ];
 
         let export = registry.multi_period_export_json().unwrap();
-        let by_date: serde_json::Map<String, serde_json::Value> = export["by_date"].as_object().unwrap().clone();
+        let by_date: serde_json::Map<String, serde_json::Value> =
+            export["by_date"].as_object().unwrap().clone();
         assert_eq!(by_date.len(), 1); // only one unique date
         let total_on_20: u64 = by_date["2026-05-20"].as_u64().unwrap();
         assert_eq!(total_on_20, 450); // 100+50+200+100
