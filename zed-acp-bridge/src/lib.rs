@@ -3,7 +3,7 @@ use serde_json::json;
 use thiserror::Error;
 
 use agent_context::Store;
-use crabjar_guard::{GuardDb, GateResult};
+use crabjar_guard::{GateResult, GuardDb};
 use zed_acp_server::AcpSession;
 
 #[derive(Error, Debug)]

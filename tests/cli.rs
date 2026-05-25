@@ -295,11 +295,11 @@ tool_execution_enabled = true
     assert_eq!(body["workspace"]["tool_execution_enabled"], true);
 }
 
-    #[test]
-    #[ignore]
-    fn knowledge_sync_and_query_return_json() {
-        let temp = tempfile::tempdir().unwrap();
-        let docs_dir = temp.path().join("state-docs");
+#[test]
+#[ignore]
+fn knowledge_sync_and_query_return_json() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(docs_dir.join("overlay")).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
     fs::write(
@@ -407,11 +407,11 @@ fn knowledge_deactivate_updates_query_results() {
     assert_eq!(query_body["rows"], serde_json::json!([]));
 }
 
-    #[test]
-    #[ignore]
-    fn knowledge_sync_with_malformed_overlay_exits_nonzero() {
-        let temp = tempfile::tempdir().unwrap();
-        let docs_dir = temp.path().join("state-docs");
+#[test]
+#[ignore]
+fn knowledge_sync_with_malformed_overlay_exits_nonzero() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(docs_dir.join("overlay")).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
     fs::write(
@@ -434,11 +434,11 @@ fn knowledge_deactivate_updates_query_results() {
     assert!(body["usage"].is_array());
 }
 
-    #[test]
-    #[ignore]
-    fn knowledge_sync_is_idempotent() {
-        let temp = tempfile::tempdir().unwrap();
-        let docs_dir = temp.path().join("state-docs");
+#[test]
+#[ignore]
+fn knowledge_sync_is_idempotent() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(docs_dir.join("overlay")).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
     fs::write(
@@ -481,11 +481,11 @@ fn knowledge_deactivate_updates_query_results() {
     assert_eq!(query_body["rows"].as_array().unwrap().len(), 1);
 }
 
-    #[test]
-    #[ignore]
-    fn resolve_annotation_deactivates_derived_knowledge() {
-        let temp = tempfile::tempdir().unwrap();
-        let docs_dir = temp.path().join("state-docs");
+#[test]
+#[ignore]
+fn resolve_annotation_deactivates_derived_knowledge() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(docs_dir.join("overlay")).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
     fs::write(
@@ -656,11 +656,11 @@ tool_execution_enabled = true
     assert_eq!(body["workspace"]["tool_execution_enabled"], true);
 }
 
-    #[test]
-    #[ignore]
-    fn resolve_one_annotation_does_not_deactivate_other() {
-        let temp = tempfile::tempdir().unwrap();
-        let docs_dir = temp.path().join("state-docs");
+#[test]
+#[ignore]
+fn resolve_one_annotation_does_not_deactivate_other() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(docs_dir.join("overlay")).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
     fs::write(
@@ -753,11 +753,11 @@ tool_execution_enabled = true
     );
 }
 
-    #[test]
-    #[ignore]
-    fn query_one_tag_does_not_return_unrelated_rows() {
-        let temp = tempfile::tempdir().unwrap();
-        let docs_dir = temp.path().join("state-docs");
+#[test]
+#[ignore]
+fn query_one_tag_does_not_return_unrelated_rows() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(docs_dir.join("overlay")).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
     fs::write(
