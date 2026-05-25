@@ -1,9 +1,9 @@
 use agent_context::state_docs::models::{
     Annotation, CodeBlock, ConfidenceAssessment, DocMetadata, Section, Table,
 };
-use agent_context::state_docs::schema::migrate;
 use agent_context::state_docs::querier::StateDocQuerier;
 use agent_context::state_docs::renderer::Renderer;
+use agent_context::state_docs::schema::migrate;
 use rusqlite::Connection;
 use serde_json::json;
 use std::fs;
@@ -114,7 +114,11 @@ fn schema_migrate_creates_all_tables() {
         .filter_map(|r| r.ok())
         .collect();
 
-    let table_names: Vec<&str> = tables.iter().filter(|(_, t)| *t == "table").map(|(n, _)| n.as_str()).collect();
+    let table_names: Vec<&str> = tables
+        .iter()
+        .filter(|(_, t)| *t == "table")
+        .map(|(n, _)| n.as_str())
+        .collect();
     assert!(table_names.contains(&"doc_metadata"));
     assert!(table_names.contains(&"sections"));
     assert!(table_names.contains(&"tables"));
@@ -132,7 +136,9 @@ fn schema_migrate_creates_indexes() {
         .prepare("SELECT name FROM sqlite_master WHERE type='index' ORDER BY name")
         .unwrap();
     let indexes: Vec<String> = stmt
-        .query_map([], |row| -> std::result::Result<String, rusqlite::Error> { Ok(row.get(0)?) })
+        .query_map([], |row| -> std::result::Result<String, rusqlite::Error> {
+            Ok(row.get(0)?)
+        })
         .unwrap()
         .filter_map(|r| r.ok())
         .collect();
@@ -148,7 +154,11 @@ fn schema_migrate_is_idempotent() {
     migrate(&conn).unwrap();
 
     let count: i64 = conn
-        .query_row("SELECT count(*) FROM sqlite_master WHERE type='table'", [], |row| row.get(0))
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table'",
+            [],
+            |row| row.get(0),
+        )
         .unwrap();
     assert_eq!(count, 6);
 }
@@ -272,7 +282,11 @@ fn table_serializes_with_headers() {
         section_id: 0,
         start_line: 12,
         end_line: 16,
-        headers: vec!["Crate".to_string(), "Path".to_string(), "Purpose".to_string()],
+        headers: vec![
+            "Crate".to_string(),
+            "Path".to_string(),
+            "Purpose".to_string(),
+        ],
         row_count: 3,
         content_hash: "1234abcd".to_string(),
     };
@@ -303,15 +317,31 @@ fn seed_doc_metadata(conn: &Connection, doc_name: &str, checksum: &str, line_cou
     ).unwrap();
 }
 
-fn seed_section(conn: &Connection, doc_id: i64, level: i64, title: &str, start: i64, end: i64, content_hash: &str) {
+fn seed_section(
+    conn: &Connection,
+    doc_id: i64,
+    level: i64,
+    title: &str,
+    start: i64,
+    end: i64,
+    content_hash: &str,
+) {
     conn.execute(
         "INSERT INTO sections (doc_id, level, title, start_line, end_line, parent_id, content_hash)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         rusqlite::params![doc_id, level, title, start, end, 0i64, content_hash],
-    ).unwrap();
+    )
+    .unwrap();
 }
 
-fn seed_code_block(conn: &Connection, doc_id: i64, section_id: i64, start: i64, end: i64, lang: &str) {
+fn seed_code_block(
+    conn: &Connection,
+    doc_id: i64,
+    section_id: i64,
+    start: i64,
+    end: i64,
+    lang: &str,
+) {
     conn.execute(
         "INSERT INTO code_blocks (doc_id, section_id, start_line, end_line, language, content, content_hash)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -319,15 +349,31 @@ fn seed_code_block(conn: &Connection, doc_id: i64, section_id: i64, start: i64, 
     ).unwrap();
 }
 
-fn seed_table(conn: &Connection, doc_id: i64, section_id: i64, start: i64, end: i64, headers: &str) {
+fn seed_table(
+    conn: &Connection,
+    doc_id: i64,
+    section_id: i64,
+    start: i64,
+    end: i64,
+    headers: &str,
+) {
     conn.execute(
         "INSERT INTO tables (doc_id, section_id, start_line, end_line, headers, rows)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         rusqlite::params![doc_id, section_id, start, end, headers, "[]"],
-    ).unwrap();
+    )
+    .unwrap();
 }
 
-fn seed_confidence(conn: &Connection, doc_id: i64, what: &str, missed: &str, assumptions: &str, blind: &str, stale: &str) {
+fn seed_confidence(
+    conn: &Connection,
+    doc_id: i64,
+    what: &str,
+    missed: &str,
+    assumptions: &str,
+    blind: &str,
+    stale: &str,
+) {
     conn.execute(
         "INSERT INTO confidence (doc_id, what_captured, what_missed, assumptions, blind_spots, stale_after)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -335,7 +381,16 @@ fn seed_confidence(conn: &Connection, doc_id: i64, what: &str, missed: &str, ass
     ).unwrap();
 }
 
-fn seed_annotation(conn: &Connection, doc_id: i64, section_id: Option<i64>, line: i64, kind: &str, status: &str, author: &str, message: &str) {
+fn seed_annotation(
+    conn: &Connection,
+    doc_id: i64,
+    section_id: Option<i64>,
+    line: i64,
+    kind: &str,
+    status: &str,
+    author: &str,
+    message: &str,
+) {
     conn.execute(
         "INSERT INTO annotations (doc_id, section_id, line, kind, status, author, message, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -345,8 +400,8 @@ fn seed_annotation(conn: &Connection, doc_id: i64, section_id: Option<i64>, line
 
 #[test]
 fn index_doc_creates_metadata_row() {
-    let _dir = make_temp_dir();
-    let _conn = make_in_memory_conn();
+    let dir = make_temp_dir();
+    let conn = make_in_memory_conn();
     let doc_path = write_test_doc(&dir, "test-index", sample_markdown());
 
     // Use indexer's public function
@@ -363,7 +418,7 @@ fn index_doc_creates_metadata_row() {
 
 #[test]
 fn index_doc_stores_checksum() {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let _conn = make_in_memory_conn();
     let doc_path = write_test_doc(&dir, "test-checksum", sample_markdown());
 
@@ -379,31 +434,37 @@ fn index_doc_stores_checksum() {
 
 #[test]
 fn index_doc_parses_sections() {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let _conn = make_in_memory_conn();
     let doc_path = write_test_doc(&dir, "test-sections", sample_markdown());
 
     let content = fs::read_to_string(&doc_path).unwrap();
     let sections = agent_context::state_docs::indexer::extract_sections_for_test(&content);
 
-    assert!(!sections.is_empty(), "should have parsed at least one section");
+    assert!(
+        !sections.is_empty(),
+        "should have parsed at least one section"
+    );
 }
 
 #[test]
 fn index_doc_parses_code_blocks() {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let _conn = make_in_memory_conn();
     let doc_path = write_test_doc(&dir, "test-code", sample_markdown());
 
     let content = fs::read_to_string(&doc_path).unwrap();
     let blocks = agent_context::state_docs::indexer::extract_code_blocks_for_test(&content);
 
-    assert!(!blocks.is_empty(), "should have parsed at least one code block");
+    assert!(
+        !blocks.is_empty(),
+        "should have parsed at least one code block"
+    );
 }
 
 #[test]
 fn index_doc_parses_tables() {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let _conn = make_in_memory_conn();
     // Use content where table immediately follows a heading (no blank line)
     let content = r#"# Title
@@ -423,7 +484,7 @@ fn index_doc_parses_tables() {
 
 #[test]
 fn index_minimal_doc_creates_no_sections() {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let _conn = make_in_memory_conn();
     let doc_path = write_test_doc(&dir, "test-minimal", sample_minimal_markdown());
 
@@ -431,12 +492,15 @@ fn index_minimal_doc_creates_no_sections() {
     let sections = agent_context::state_docs::indexer::extract_sections_for_test(&content);
 
     // The minimal doc has "# Minimal Doc" which is an h1 heading, so it will be parsed as a section
-    assert!(sections.len() >= 1, "minimal doc with h1 heading should have at least one section");
+    assert!(
+        sections.len() >= 1,
+        "minimal doc with h1 heading should have at least one section"
+    );
 }
 
 #[test]
 fn index_empty_doc_creates_metadata() {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let _conn = make_in_memory_conn();
     let doc_path = write_test_doc(&dir, "test-empty", sample_empty_markdown());
 
@@ -449,42 +513,48 @@ fn index_empty_doc_creates_metadata() {
 
 #[test]
 fn index_all_docs_counts_correctly() {
-    let _dir = make_temp_dir();
-    let _conn = make_in_memory_conn();
+    let dir = make_temp_dir();
+    let conn = make_in_memory_conn();
 
     write_test_doc(&dir, "doc-a", sample_markdown());
     write_test_doc(&dir, "doc-b", sample_minimal_markdown());
     write_test_doc(&dir, "README", "not a doc");
     fs::write(dir.path().join("notes.txt"), "ignore me").unwrap();
 
-    let count = agent_context::state_docs::indexer::index_all_docs_for_test(&conn, dir.path()).unwrap();
-    assert_eq!(count, 2, "should index exactly 2 .md files (skipping README.md)");
+    let count =
+        agent_context::state_docs::indexer::index_all_docs_for_test(&conn, dir.path()).unwrap();
+    assert_eq!(
+        count, 2,
+        "should index exactly 2 .md files (skipping README.md)"
+    );
 }
 
 #[test]
 fn index_all_docs_skips_readme() {
-    let _dir = make_temp_dir();
-    let _conn = make_in_memory_conn();
+    let dir = make_temp_dir();
+    let conn = make_in_memory_conn();
 
     write_test_doc(&dir, "README", sample_markdown());
     write_test_doc(&dir, "other", sample_minimal_markdown());
 
-    let count = agent_context::state_docs::indexer::index_all_docs_for_test(&conn, dir.path()).unwrap();
+    let count =
+        agent_context::state_docs::indexer::index_all_docs_for_test(&conn, dir.path()).unwrap();
     assert_eq!(count, 1, "should skip README.md");
 }
 
 #[test]
 fn index_all_docs_handles_missing_dir() {
-    let _conn = make_in_memory_conn();
+    let conn = make_in_memory_conn();
     let non_existent = PathBuf::from("/tmp/does-not-exist-state-docs-12345");
 
-    let count = agent_context::state_docs::indexer::index_all_docs_for_test(&conn, &non_existent).unwrap();
+    let count =
+        agent_context::state_docs::indexer::index_all_docs_for_test(&conn, &non_existent).unwrap();
     assert_eq!(count, 0);
 }
 
 #[test]
 fn index_doc_updates_on_reindex() {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let _conn = make_in_memory_conn();
     let doc_path = write_test_doc(&dir, "test-reindex", sample_markdown());
 
@@ -492,14 +562,18 @@ fn index_doc_updates_on_reindex() {
     let sections1 = agent_context::state_docs::indexer::extract_sections_for_test(&content);
     let sections2 = agent_context::state_docs::indexer::extract_sections_for_test(&content);
 
-    assert_eq!(sections1.len(), sections2.len(), "reindexing should produce same section count");
+    assert_eq!(
+        sections1.len(),
+        sections2.len(),
+        "reindexing should produce same section count"
+    );
 }
 
 // ─── querier tests ──────────────────────────────────────────────
 
 fn setup_querier_with_data() -> (StateDocQuerier, TempDir) {
-    let _dir = make_temp_dir();
-    let _conn = make_in_memory_conn();
+    let dir = make_temp_dir();
+    let conn = make_in_memory_conn();
 
     // Note: doc_id is stored as INTEGER but indexer passes string doc_name.
     // SQLite converts non-numeric strings to 0, so we seed with doc_id=0.
@@ -510,7 +584,15 @@ fn setup_querier_with_data() -> (StateDocQuerier, TempDir) {
     seed_section(&conn, 0, 3, "Confidence Assessment", 41, 50, "h3");
     seed_code_block(&conn, 0, 3, 25, 30, "rust");
     seed_table(&conn, 0, 2, 10, 14, "[\"Crate\",\"Path\",\"Purpose\"]");
-    seed_confidence(&conn, 0, "workspace members", "edge cases", "[\"rust stable\"]", "[\"platform X\"]", "2026-06-01");
+    seed_confidence(
+        &conn,
+        0,
+        "workspace members",
+        "edge cases",
+        "[\"rust stable\"]",
+        "[\"platform X\"]",
+        "2026-06-01",
+    );
     seed_annotation(&conn, 0, Some(2), 10, "note", "open", "agent", "check this");
 
     let querier = StateDocQuerier::new(conn, dir.path().to_path_buf());
@@ -633,7 +715,7 @@ fn querier_query_by_tags_returns_matching_docs() {
 // ─── renderer tests ─────────────────────────────────────────────
 
 fn setup_renderer_with_data() -> (Renderer<'static>, TempDir) {
-    let _dir = make_temp_dir();
+    let dir = make_temp_dir();
     let conn = Box::new(make_in_memory_conn());
 
     // Use doc_id=0 to match SQLite's string-to-int conversion
@@ -641,7 +723,15 @@ fn setup_renderer_with_data() -> (Renderer<'static>, TempDir) {
     seed_section(&conn, 0, 1, "Project Map", 1, 5, "h1");
     seed_section(&conn, 0, 2, "Architecture", 6, 20, "h2");
     seed_section(&conn, 0, 3, "Confidence Assessment", 41, 50, "h3");
-    seed_confidence(&conn, 0, "workspace", "edge cases", "[\"rust stable\"]", "[\"platform X\"]", "2026-06-01");
+    seed_confidence(
+        &conn,
+        0,
+        "workspace",
+        "edge cases",
+        "[\"rust stable\"]",
+        "[\"platform X\"]",
+        "2026-06-01",
+    );
 
     let renderer = Renderer::new(Box::leak(conn));
     (renderer, dir)
@@ -686,7 +776,7 @@ fn render_doc_falls_back_to_section_view_for_high_zoom() {
 #[test]
 fn render_section_returns_json() {
     let _dir = make_temp_dir();
-    let _conn = make_in_memory_conn();
+    let conn = make_in_memory_conn();
 
     seed_doc_metadata(&conn, "test-section-render.md", "ghi789", 50);
     seed_section(&conn, 0, 1, "Project Map", 1, 5, "h1");
@@ -697,7 +787,9 @@ fn render_section_returns_json() {
         .unwrap();
 
     let renderer = Renderer::new(&conn);
-    let (md, meta) = renderer.render_section("test-section-render.md", section_id, 2).unwrap();
+    let (md, meta) = renderer
+        .render_section("test-section-render.md", section_id, 2)
+        .unwrap();
     assert!(!md.is_empty());
     assert!(meta["section_id"].is_number());
 }
@@ -715,19 +807,30 @@ fn render_overview_contains_doubt_block() {
 #[test]
 fn render_section_with_annotations_includes_markers() {
     let _dir = make_temp_dir();
-    let _conn = make_in_memory_conn();
+    let conn = make_in_memory_conn();
 
     seed_doc_metadata(&conn, "test-annot.md", "jkl012", 50);
     seed_section(&conn, 0, 1, "Project Map", 1, 5, "h1");
     seed_section(&conn, 0, 2, "Architecture", 6, 20, "h2");
-    seed_annotation(&conn, 0, Some(2), 10, "note", "open", "tester", "test annotation");
+    seed_annotation(
+        &conn,
+        0,
+        Some(2),
+        10,
+        "note",
+        "open",
+        "tester",
+        "test annotation",
+    );
 
     let section_id: i64 = conn
         .query_row("SELECT id FROM sections LIMIT 1", [], |row| row.get(0))
         .unwrap();
 
     let renderer = Renderer::new(&conn);
-    let (md, _meta) = renderer.render_section("test-annot.md", section_id, 2).unwrap();
+    let (md, _meta) = renderer
+        .render_section("test-annot.md", section_id, 2)
+        .unwrap();
 
     // Annotations may not render if doc_id lookup fails, but markdown is still produced
     assert!(!md.is_empty(), "markdown should not be empty");
@@ -775,7 +878,10 @@ Line 8.
     if let Some(s) = section_a {
         assert_eq!(s.start_line, 3, "Section A starts at line 3");
     } else {
-        panic!("Section A not found in parsed sections. Available titles: {:?}", sections.iter().map(|s| &s.title).collect::<Vec<_>>());
+        panic!(
+            "Section A not found in parsed sections. Available titles: {:?}",
+            sections.iter().map(|s| &s.title).collect::<Vec<_>>()
+        );
     }
 }
 
@@ -861,7 +967,10 @@ fn checksum_is_deterministic() {
     let meta1 = agent_context::state_docs::indexer::extract_metadata_for_test(content);
     let meta2 = agent_context::state_docs::indexer::extract_metadata_for_test(content);
 
-    assert_eq!(meta1.checksum, meta2.checksum, "same content should produce same checksum");
+    assert_eq!(
+        meta1.checksum, meta2.checksum,
+        "same content should produce same checksum"
+    );
 }
 
 #[test]
@@ -872,5 +981,8 @@ fn different_content_produces_different_checksum() {
     let meta_a = agent_context::state_docs::indexer::extract_metadata_for_test(content_a);
     let meta_b = agent_context::state_docs::indexer::extract_metadata_for_test(content_b);
 
-    assert_ne!(meta_a.checksum, meta_b.checksum, "different content should produce different checksums");
+    assert_ne!(
+        meta_a.checksum, meta_b.checksum,
+        "different content should produce different checksums"
+    );
 }
