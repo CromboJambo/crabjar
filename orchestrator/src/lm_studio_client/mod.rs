@@ -1226,3 +1226,1165 @@ pub enum LmStudioError {
 /// an error.
 pub async fn detect_available_endpoints(
     basee
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn endpoint_native_path() {
+        let ep = LmStudioEndpoint::Native;
+        assert_eq!(ep.path(), "/api/v1/chat");
+    }
+
+    #[test]
+    fn endpoint_openai_path() {
+        let ep = LmStudioEndpoint::Openai;
+        assert_eq!(ep.path(), "/v1/chat/completions");
+    }
+
+    #[test]
+    fn endpoint_anthropic_path() {
+        let ep = LmStudioEndpoint::Anthropic;
+        assert_eq!(ep.path(), "/v1/messages");
+    }
+
+    #[test]
+    fn endpoint_native_name() {
+        let ep = LmStudioEndpoint::Native;
+        assert_eq!(ep.name(), "native");
+    }
+
+    #[test]
+    fn endpoint_openai_name() {
+        let ep = LmStudioEndpoint::Openai;
+        assert_eq!(ep.name(), "openai-compat");
+    }
+
+    #[test]
+    fn endpoint_anthropic_name() {
+        let ep = LmStudioEndpoint::Anthropic;
+        assert_eq!(ep.name(), "anthropic-compat");
+    }
+
+    #[test]
+    fn endpoint_from_env_default() {
+        std::env::remove_var("LM_STUDIO_ENDPOINT");
+        let ep = LmStudioEndpoint::from_env();
+        assert_eq!(ep, LmStudioEndpoint::Openai);
+    }
+
+    #[test]
+    fn endpoint_from_env_native() {
+        std::env::set_var("LM_STUDIO_ENDPOINT", "native");
+        let ep = LmStudioEndpoint::from_env();
+        assert_eq!(ep, LmStudioEndpoint::Native);
+        std::env::remove_var("LM_STUDIO_ENDPOINT");
+    }
+
+    #[test]
+    fn endpoint_from_env_openai() {
+        std::env::set_var("LM_STUDIO_ENDPOINT", "openai");
+        let ep = LmStudioEndpoint::from_env();
+        assert_eq!(ep, LmStudioEndpoint::Openai);
+        std::env::remove_var("LM_STUDIO_ENDPOINT");
+    }
+
+    #[test]
+    fn endpoint_from_env_anthropic() {
+        std::env::set_var("LM_STUDIO_ENDPOINT", "anthropic");
+        let ep = LmStudioEndpoint::from_env();
+        assert_eq!(ep, LmStudioEndpoint::Anthropic);
+        std::env::remove_var("LM_STUDIO_ENDPOINT");
+    }
+
+    #[test]
+    fn endpoint_from_env_invalid_defaults_to_openai() {
+        std::env::set_var("LM_STUDIO_ENDPOINT", "invalid");
+        let ep = LmStudioEndpoint::from_env();
+        assert_eq!(ep, LmStudioEndpoint::Openai);
+        std::env::remove_var("LM_STUDIO_ENDPOINT");
+    }
+
+    #[test]
+    fn config_from_env_defaults() {
+        std::env::remove_var("LM_STUDIO_URL");
+        std::env::remove_var("LM_STUDIO_MODEL");
+        std::env::remove_var("LM_STUDIO_CONTEXT_LENGTH");
+        std::env::remove_var("LM_STUDIO_TEMPERATURE");
+        std::env::remove_var("LM_STUDIO_MAX_OUTPUT_TOKENS");
+        std::env::remove_var("LM_API_TOKEN");
+
+        let config = LmStudioConfig::from_env();
+        assert_eq!(config.base_url, "http://127.0.0.1:1234");
+        assert_eq!(config.default_model, "local-model");
+        assert!(config.api_token.is_none());
+        assert!(config.default_context_length.is_none());
+        assert!(config.default_temperature.is_none());
+        assert!(config.default_max_output_tokens.is_none());
+    }
+
+    #[test]
+    fn config_endpoint_url_constructed() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: None,
+            default_model: "test-model".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        assert_eq!(
+            config.endpoint_url(),
+            "http://localhost:1234/v1/chat/completions"
+        );
+    }
+
+    #[test]
+    fn config_endpoint_url_native() {
+        let config = LmStudioConfig {
+            base_url: "http://example.com:8080".to_string(),
+            endpoint: LmStudioEndpoint::Native,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        assert_eq!(config.endpoint_url(), "http://example.com:8080/api/v1/chat");
+    }
+
+    #[test]
+    fn config_endpoint_url_anthropic() {
+        let config = LmStudioConfig {
+            base_url: "http://example.com:8080".to_string(),
+            endpoint: LmStudioEndpoint::Anthropic,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        assert_eq!(config.endpoint_url(), "http://example.com:8080/v1/messages");
+    }
+
+    #[test]
+    fn message_role_serde_user() {
+        let role = MessageRole::User;
+        let json = serde_json::to_string(&role).unwrap();
+        assert_eq!(json, "\"user\"");
+    }
+
+    #[test]
+    fn message_role_serde_system() {
+        let role = MessageRole::System;
+        let json = serde_json::to_string(&role).unwrap();
+        assert_eq!(json, "\"system\"");
+    }
+
+    #[test]
+    fn message_role_serde_assistant() {
+        let role = MessageRole::Assistant;
+        let json = serde_json::to_string(&role).unwrap();
+        assert_eq!(json, "\"assistant\"");
+    }
+
+    #[test]
+    fn message_role_serde_roundtrip_user() {
+        let role = MessageRole::User;
+        let json = serde_json::to_string(&role).unwrap();
+        let restored: MessageRole = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, role);
+    }
+
+    #[test]
+    fn unified_message_clone_works() {
+        let msg = UnifiedMessage {
+            role: MessageRole::User,
+            content: "hello".to_string(),
+        };
+        let cloned = msg.clone();
+        assert_eq!(cloned.role, msg.role);
+        assert_eq!(cloned.content, msg.content);
+    }
+
+    #[test]
+    fn unified_chat_request_from_config() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: Some("token".to_string()),
+            default_model: "test-model".to_string(),
+            default_context_length: Some(4096),
+            default_temperature: Some(0.7),
+            default_max_output_tokens: Some(1024),
+        };
+        let req = UnifiedChatRequest::from_config(&config, "hello".to_string(), None);
+        assert_eq!(req.model, "test-model");
+        assert_eq!(req.input.content, "hello");
+        assert_eq!(req.input.role, MessageRole::User);
+        assert_eq!(req.temperature, Some(0.7));
+        assert_eq!(req.max_output_tokens, Some(1024));
+        assert_eq!(req.context_length, Some(4096));
+        assert_eq!(req.store, Some(true));
+    }
+
+    #[test]
+    fn reasoning_level_serde_off() {
+        let level = ReasoningLevel::Off;
+        let json = serde_json::to_string(&level).unwrap();
+        assert_eq!(json, "\"off\"");
+    }
+
+    #[test]
+    fn reasoning_level_serde_low() {
+        let level = ReasoningLevel::Low;
+        let json = serde_json::to_string(&level).unwrap();
+        assert_eq!(json, "\"low\"");
+    }
+
+    #[test]
+    fn reasoning_level_serde_medium() {
+        let level = ReasoningLevel::Medium;
+        let json = serde_json::to_string(&level).unwrap();
+        assert_eq!(json, "\"medium\"");
+    }
+
+    #[test]
+    fn reasoning_level_serde_high() {
+        let level = ReasoningLevel::High;
+        let json = serde_json::to_string(&level).unwrap();
+        assert_eq!(json, "\"high\"");
+    }
+
+    #[test]
+    fn reasoning_level_serde_on() {
+        let level = ReasoningLevel::On;
+        let json = serde_json::to_string(&level).unwrap();
+        assert_eq!(json, "\"on\"");
+    }
+
+    #[test]
+    fn reasoning_level_serde_roundtrip() {
+        let level = ReasoningLevel::High;
+        let json = serde_json::to_string(&level).unwrap();
+        let restored: ReasoningLevel = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, level);
+    }
+
+    #[test]
+    fn session_state_new_is_empty() {
+        let state = SessionState::new();
+        assert!(state.response_id.is_none());
+        assert!(state.message_history.is_empty());
+    }
+
+    #[test]
+    fn session_state_with_system_prompt() {
+        let state = SessionState::with_system_prompt("You are helpful".to_string());
+        assert!(state.response_id.is_none());
+        assert_eq!(state.message_history.len(), 1);
+        assert_eq!(state.message_history[0].role, MessageRole::System);
+        assert_eq!(state.message_history[0].content, "You are helpful");
+    }
+
+    #[test]
+    fn session_state_add_user_message() {
+        let mut state = SessionState::new();
+        state.add_user_message("hello".to_string());
+        assert_eq!(state.message_history.len(), 1);
+        assert_eq!(state.message_history[0].role, MessageRole::User);
+        assert_eq!(state.message_history[0].content, "hello");
+    }
+
+    #[test]
+    fn session_state_has_response_id_false() {
+        let state = SessionState::new();
+        assert!(!state.has_response_id());
+    }
+
+    #[test]
+    fn session_state_has_response_id_true() {
+        let mut state = SessionState::new();
+        state.response_id = Some("resp-123".to_string());
+        assert!(state.has_response_id());
+    }
+
+    #[test]
+    fn session_state_update_with_message_response() {
+        let mut state = SessionState::new();
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::Message {
+                content: "Hello there!".to_string(),
+            }],
+            stats: None,
+            response_id: Some("resp-1".to_string()),
+        };
+        state.update_with_response(&response);
+        assert_eq!(state.response_id, Some("resp-1".to_string()));
+        assert_eq!(state.message_history.len(), 1);
+        assert_eq!(state.message_history[0].role, MessageRole::Assistant);
+        assert_eq!(state.message_history[0].content, "Hello there!");
+    }
+
+    #[test]
+    fn session_state_update_with_tool_call_response() {
+        let mut state = SessionState::new();
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::ToolCall {
+                tool: "echo".to_string(),
+                arguments: serde_json::json!({"msg": "hi"}),
+                output: Some("echoed!".to_string()),
+                provider_info: None,
+            }],
+            stats: None,
+            response_id: None,
+        };
+        state.update_with_response(&response);
+        assert_eq!(state.message_history.len(), 1);
+        assert_eq!(
+            state.message_history[0].content,
+            "Tool 'echo' executed: echoed!"
+        );
+    }
+
+    #[test]
+    fn session_state_update_with_reasoning_response() {
+        let mut state = SessionState::new();
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::Reasoning {
+                content: "Let me think about this...".to_string(),
+            }],
+            stats: None,
+            response_id: None,
+        };
+        state.update_with_response(&response);
+        assert_eq!(state.message_history.len(), 1);
+        assert_eq!(
+            state.message_history[0].content,
+            "[reasoning] Let me think about this..."
+        );
+    }
+
+    #[test]
+    fn session_state_update_with_invalid_tool_call_ignored() {
+        let mut state = SessionState::new();
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::InvalidToolCall {
+                reason: "invalid".to_string(),
+                metadata: None,
+                tool_name: None,
+                provider_info: None,
+            }],
+            stats: None,
+            response_id: None,
+        };
+        state.update_with_response(&response);
+        assert!(state.message_history.is_empty());
+    }
+
+    #[test]
+    fn session_state_update_preserves_existing_history() {
+        let mut state = SessionState::new();
+        state.add_user_message("first".to_string());
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::Message {
+                content: "second".to_string(),
+            }],
+            stats: None,
+            response_id: None,
+        };
+        state.update_with_response(&response);
+        assert_eq!(state.message_history.len(), 2);
+        assert_eq!(state.message_history[0].content, "first");
+        assert_eq!(state.message_history[1].content, "second");
+    }
+
+    #[test]
+    fn session_store_new() {
+        let store = SessionStore::new("/tmp/sessions.db".to_string());
+        assert_eq!(store.db_path, "/tmp/sessions.db");
+    }
+
+    #[test]
+    fn session_store_create_session_returns_uuid() {
+        let store = SessionStore::new(":memory:".to_string());
+        let session_id = store.create_session(None).unwrap();
+        assert!(!session_id.is_empty());
+    }
+
+    #[test]
+    fn session_store_create_session_with_system_prompt() {
+        let store = SessionStore::new(":memory:".to_string());
+        let session_id = store.create_session(Some("You are helpful".to_string())).unwrap();
+        assert!(!session_id.is_empty());
+    }
+
+    #[test]
+    fn session_store_get_session_returns_empty_for_stub() {
+        let store = SessionStore::new(":memory:".to_string());
+        let state = store.get_session("any-id").unwrap();
+        assert!(state.message_history.is_empty());
+    }
+
+    #[test]
+    fn session_store_update_session_succeeds() {
+        let store = SessionStore::new(":memory:".to_string());
+        let state = SessionState::new();
+        assert!(store.update_session("session-1", &state).is_ok());
+    }
+
+    #[test]
+    fn session_store_delete_session_succeeds() {
+        let store = SessionStore::new(":memory:".to_string());
+        assert!(store.delete_session("session-1").is_ok());
+    }
+
+    #[test]
+    fn native_to_native_request_includes_model() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Native,
+            api_token: None,
+            default_model: "my-model".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let req = UnifiedChatRequest::from_config(&config, "test".to_string(), None);
+        let native = native::to_native_request(&req);
+        assert_eq!(native["model"], "my-model");
+    }
+
+    #[test]
+    fn native_to_native_request_includes_input() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Native,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let req = UnifiedChatRequest::from_config(&config, "hello world".to_string(), None);
+        let native = native::to_native_request(&req);
+        assert_eq!(native["input"][0]["content"], "hello world");
+    }
+
+    #[test]
+    fn openai_to_request_includes_messages() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let req = UnifiedChatRequest::from_config(&config, "hello".to_string(), None);
+        let openai = openai::to_openai_request(&req);
+        assert_eq!(openai["model"], "test");
+        assert_eq!(openai["messages"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn openai_to_request_includes_system_prompt() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let mut req = UnifiedChatRequest::from_config(&config, "hello".to_string(), None);
+        req.system_prompt = Some("You are helpful".to_string());
+        let openai = openai::to_openai_request(&req);
+        let messages = openai["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0]["role"], "system");
+    }
+
+    #[test]
+    fn anthropic_to_request_includes_messages() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Anthropic,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let req = UnifiedChatRequest::from_config(&config, "hello".to_string(), None);
+        let anthropic = anthropic::to_anthropic_request(&req);
+        assert_eq!(anthropic["model"], "test");
+        assert_eq!(anthropic["messages"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn anthropic_to_request_with_system_prompt_prepends() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Anthropic,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let mut req = UnifiedChatRequest::from_config(&config, "hello".to_string(), None);
+        req.system_prompt = Some("You are helpful".to_string());
+        let anthropic = anthropic::to_anthropic_request(&req);
+        let messages = anthropic["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 2);
+        assert!(messages[0]["content"].as_str().unwrap().starts_with("[System prompt:"));
+    }
+
+    #[test]
+    fn unified_output_item_message_clone() {
+        let item = UnifiedOutputItem::Message {
+            content: "hello".to_string(),
+        };
+        let cloned = item.clone();
+        match cloned {
+            UnifiedOutputItem::Message { content } => assert_eq!(content, "hello"),
+            _ => panic!("expected Message variant"),
+        }
+    }
+
+    #[test]
+    fn unified_output_item_tool_call_clone() {
+        let item = UnifiedOutputItem::ToolCall {
+            tool: "echo".to_string(),
+            arguments: serde_json::json!({"x": 1}),
+            output: Some("result".to_string()),
+            provider_info: None,
+        };
+        let cloned = item.clone();
+        match cloned {
+            UnifiedOutputItem::ToolCall { tool, arguments, output, .. } => {
+                assert_eq!(tool, "echo");
+                assert_eq!(arguments["x"], 1);
+                assert_eq!(output, Some("result".to_string()));
+            }
+            _ => panic!("expected ToolCall variant"),
+        }
+    }
+
+    #[test]
+    fn unified_output_item_reasoning_clone() {
+        let item = UnifiedOutputItem::Reasoning {
+            content: "thinking...".to_string(),
+        };
+        let cloned = item.clone();
+        match cloned {
+            UnifiedOutputItem::Reasoning { content } => assert_eq!(content, "thinking..."),
+            _ => panic!("expected Reasoning variant"),
+        }
+    }
+
+    #[test]
+    fn unified_output_item_invalid_tool_call_clone() {
+        let item = UnifiedOutputItem::InvalidToolCall {
+            reason: "bad".to_string(),
+            metadata: None,
+            tool_name: None,
+            provider_info: None,
+        };
+        let cloned = item.clone();
+        match cloned {
+            UnifiedOutputItem::InvalidToolCall { reason, .. } => assert_eq!(reason, "bad"),
+            _ => panic!("expected InvalidToolCall variant"),
+        }
+    }
+
+    #[test]
+    fn unified_stats_clone_works() {
+        let stats = UnifiedStats {
+            input_tokens: 100,
+            total_output_tokens: 50,
+            reasoning_output_tokens: Some(10),
+            tokens_per_second: Some(5.0),
+            time_to_first_token_seconds: Some(0.1),
+            model_load_time_seconds: Some(1.5),
+        };
+        let cloned = stats.clone();
+        assert_eq!(cloned.input_tokens, 100);
+        assert_eq!(cloned.total_output_tokens, 50);
+    }
+
+    #[test]
+    fn tool_provider_info_serde_roundtrip() {
+        let info = ToolProviderInfo {
+            provider_type: "plugin".to_string(),
+            plugin_id: Some("plugin-1".to_string()),
+            server_label: None,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let restored: ToolProviderInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.provider_type, "plugin");
+        assert_eq!(restored.plugin_id, Some("plugin-1".to_string()));
+    }
+
+    #[test]
+    fn lm_studio_error_request_error() {
+        let err = LmStudioError::RequestError("connection failed".to_string());
+        assert!(err.to_string().contains("connection failed"));
+    }
+
+    #[test]
+    fn lm_studio_error_parse_error() {
+        let err = LmStudioError::ParseError("bad response".to_string());
+        assert!(err.to_string().contains("bad response"));
+    }
+
+    #[test]
+    fn lm_studio_error_http_error() {
+        let err = LmStudioError::HttpError {
+            status: 500,
+            body: "internal server error".to_string(),
+            endpoint: "test".to_string(),
+        };
+        assert!(err.to_string().contains("500"));
+        assert!(err.to_string().contains("internal server error"));
+    }
+
+    #[test]
+    fn lm_studio_error_session_error() {
+        let err = LmStudioError::SessionError("session lost".to_string());
+        assert!(err.to_string().contains("session lost"));
+    }
+
+    #[test]
+    fn lm_studio_error_debug_format() {
+        let err = LmStudioError::RequestError("test".to_string());
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("RequestError"));
+    }
+
+    #[test]
+    fn session_error_not_found() {
+        let err = SessionError::NotFound("session-1".to_string());
+        assert!(err.to_string().contains("session-1"));
+    }
+
+    #[test]
+    fn session_error_database() {
+        let err = SessionError::Database("disk full".to_string());
+        assert!(err.to_string().contains("disk full"));
+    }
+
+    #[test]
+    fn session_error_debug_format() {
+        let err = SessionError::NotFound("s1".to_string());
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("NotFound"));
+    }
+
+    #[test]
+    fn client_from_env_uses_defaults() {
+        std::env::remove_var("LM_STUDIO_URL");
+        std::env::remove_var("LM_STUDIO_ENDPOINT");
+        std::env::remove_var("LM_STUDIO_MODEL");
+        std::env::remove_var("LM_API_TOKEN");
+
+        let client = LmStudioClient::from_env();
+        assert_eq!(client.config.base_url, "http://127.0.0.1:1234");
+        assert_eq!(client.config.default_model, "local-model");
+    }
+
+    #[test]
+    fn client_new_with_config() {
+        let config = LmStudioConfig {
+            base_url: "http://custom:9999".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: Some("secret".to_string()),
+            default_model: "custom-model".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let client = LmStudioClient::new(config);
+        assert_eq!(client.config.base_url, "http://custom:9999");
+        assert_eq!(client.config.default_model, "custom-model");
+    }
+
+    #[test]
+    fn client_with_session_store() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let store = SessionStore::new("/tmp/sessions.db".to_string());
+        let client = LmStudioClient::new(config).with_session_store(store);
+        assert!(client.session_store.is_some());
+    }
+
+    #[test]
+    fn client_create_session_returns_id() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let mut client = LmStudioClient::new(config);
+        let session_id = client.create_session(None).unwrap();
+        assert!(!session_id.is_empty());
+    }
+
+    #[test]
+    fn client_create_session_with_system_prompt() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: None,
+            default_temperature: None,
+            default_max_output_tokens: None,
+        };
+        let mut client = LmStudioClient::new(config);
+        let session_id = client.create_session(Some("You are helpful".to_string())).unwrap();
+        assert!(!session_id.is_empty());
+        assert_eq!(client.session.message_history.len(), 1);
+        assert_eq!(client.session.message_history[0].role, MessageRole::System);
+    }
+
+    #[test]
+    fn client_load_session_no_store_returns_empty() {
+        let mut client = LmStudioClient::from_env();
+        let result = client.load_session("any-session");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn client_save_session_no_store_is_ok() {
+        let mut client = LmStudioClient::from_env();
+        assert!(client.save_session().is_ok());
+    }
+
+    #[test]
+    fn client_extract_tool_calls_finds_tool_calls() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![
+                UnifiedOutputItem::Message {
+                    content: "Let me call a tool".to_string(),
+                },
+                UnifiedOutputItem::ToolCall {
+                    tool: "echo".to_string(),
+                    arguments: serde_json::json!({"msg": "hello"}),
+                    output: None,
+                    provider_info: None,
+                },
+            ],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let calls = client.extract_tool_calls(&response);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].tool, "echo");
+    }
+
+    #[test]
+    fn client_extract_tool_calls_empty_when_none() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::Message {
+                content: "Just text".to_string(),
+            }],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let calls = client.extract_tool_calls(&response);
+        assert!(calls.is_empty());
+    }
+
+    #[test]
+    fn client_extract_text_finds_messages() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![
+                UnifiedOutputItem::Message {
+                    content: "Hello".to_string(),
+                },
+                UnifiedOutputItem::Message {
+                    content: "World".to_string(),
+                },
+            ],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let text = client.extract_text(&response);
+        assert!(text.contains("Hello"));
+        assert!(text.contains("World"));
+    }
+
+    #[test]
+    fn client_extract_text_includes_reasoning() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::Reasoning {
+                content: "thinking...".to_string(),
+            }],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let text = client.extract_text(&response);
+        assert!(text.contains("[reasoning]"));
+        assert!(text.contains("thinking..."));
+    }
+
+    #[test]
+    fn client_extract_text_excludes_tool_calls() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::ToolCall {
+                tool: "echo".to_string(),
+                arguments: serde_json::json!({}),
+                output: None,
+                provider_info: None,
+            }],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let text = client.extract_text(&response);
+        assert!(text.is_empty());
+    }
+
+    #[test]
+    fn client_extract_text_excludes_invalid_tool_calls() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::InvalidToolCall {
+                reason: "bad".to_string(),
+                metadata: None,
+                tool_name: None,
+                provider_info: None,
+            }],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let text = client.extract_text(&response);
+        assert!(text.is_empty());
+    }
+
+    #[test]
+    fn native_from_native_response_parses_message() {
+        let json = serde_json::json!({
+            "model_instance_id": "model-1",
+            "output": [{"type": "message", "content": "hello"}],
+            "stats": null,
+            "response_id": "resp-1"
+        });
+        let response = native::from_native_response(&json).unwrap();
+        assert_eq!(response.model_instance_id, "model-1");
+        assert_eq!(response.response_id, Some("resp-1".to_string()));
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::Message { content } => assert_eq!(content, "hello"),
+            _ => panic!("expected Message"),
+        }
+    }
+
+    #[test]
+    fn native_from_native_response_parses_tool_call() {
+        let json = serde_json::json!({
+            "model_instance_id": "model-1",
+            "output": [{"type": "tool_call", "tool": "echo", "arguments": {"msg": "hi"}, "output": "echoed", "provider_info": null}],
+            "stats": null,
+            "response_id": null
+        });
+        let response = native::from_native_response(&json).unwrap();
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::ToolCall { tool, output, .. } => {
+                assert_eq!(tool, "echo");
+                assert_eq!(output, Some("echoed".to_string()));
+            }
+            _ => panic!("expected ToolCall"),
+        }
+    }
+
+    #[test]
+    fn native_from_native_response_parses_reasoning() {
+        let json = serde_json::json!({
+            "model_instance_id": "model-1",
+            "output": [{"type": "reasoning", "content": "thinking..."}],
+            "stats": null,
+            "response_id": null
+        });
+        let response = native::from_native_response(&json).unwrap();
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::Reasoning { content } => assert_eq!(content, "thinking..."),
+            _ => panic!("expected Reasoning"),
+        }
+    }
+
+    #[test]
+    fn native_from_native_response_parses_invalid_tool_call() {
+        let json = serde_json::json!({
+            "model_instance_id": "model-1",
+            "output": [{"type": "invalid_tool_call", "reason": "bad", "metadata": null, "tool_name": null, "provider_info": null}],
+            "stats": null,
+            "response_id": null
+        });
+        let response = native::from_native_response(&json).unwrap();
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::InvalidToolCall { reason, .. } => assert_eq!(reason, "bad"),
+            _ => panic!("expected InvalidToolCall"),
+        }
+    }
+
+    #[test]
+    fn native_from_native_response_empty_output() {
+        let json = serde_json::json!({
+            "model_instance_id": "model-1",
+            "output": [],
+            "stats": null,
+            "response_id": null
+        });
+        let response = native::from_native_response(&json).unwrap();
+        assert_eq!(response.output.len(), 0);
+    }
+
+    #[test]
+    fn native_from_native_response_unknown_output_type_ignored() {
+        let json = serde_json::json!({
+            "model_instance_id": "model-1",
+            "output": [{"type": "unknown_type"}],
+            "stats": null,
+            "response_id": null
+        });
+        let response = native::from_native_response(&json).unwrap();
+        assert_eq!(response.output.len(), 0);
+    }
+
+    #[test]
+    fn openai_from_response_parses_message() {
+        let json = serde_json::json!({
+            "model": "gpt-4",
+            "choices": [{"message": {"content": "hello", "role": "assistant"}}],
+            "usage": null
+        });
+        let response = openai::from_openai_response(&json).unwrap();
+        assert_eq!(response.model_instance_id, "gpt-4");
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::Message { content } => assert_eq!(content, "hello"),
+            _ => panic!("expected Message"),
+        }
+    }
+
+    #[test]
+    fn openai_from_response_parses_tool_call() {
+        let json = serde_json::json!({
+            "model": "gpt-4",
+            "choices": [{
+                "message": {
+                    "content": "",
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "function": {"name": "echo", "arguments": "{\"msg\": \"hi\"}"}
+                    }]
+                }
+            }],
+            "usage": null
+        });
+        let response = openai::from_openai_response(&json).unwrap();
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::ToolCall { tool, .. } => assert_eq!(tool, "echo"),
+            _ => panic!("expected ToolCall"),
+        }
+    }
+
+    #[test]
+    fn openai_from_response_missing_choices_returns_error() {
+        let json = serde_json::json!({
+            "model": "gpt-4",
+            "usage": null
+        });
+        let result = openai::from_openai_response(&json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn openai_from_response_empty_choices_returns_error() {
+        let json = serde_json::json!({
+            "model": "gpt-4",
+            "choices": [],
+            "usage": null
+        });
+        let result = openai::from_openai_response(&json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn openai_from_response_missing_message_returns_error() {
+        let json = serde_json::json!({
+            "model": "gpt-4",
+            "choices": [{}],
+            "usage": null
+        });
+        let result = openai::from_openai_response(&json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn anthropic_from_response_parses_text() {
+        let json = serde_json::json!({
+            "model": "claude-3",
+            "content": [{"type": "text", "text": "hello"}],
+            "usage": null
+        });
+        let response = anthropic::from_anthropic_response(&json).unwrap();
+        assert_eq!(response.model_instance_id, "claude-3");
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::Message { content } => assert_eq!(content, "hello"),
+            _ => panic!("expected Message"),
+        }
+    }
+
+    #[test]
+    fn anthropic_from_response_parses_tool_use() {
+        let json = serde_json::json!({
+            "model": "claude-3",
+            "content": [{"type": "tool_use", "name": "echo", "input": {"msg": "hi"}}],
+            "usage": null
+        });
+        let response = anthropic::from_anthropic_response(&json).unwrap();
+        assert_eq!(response.output.len(), 1);
+        match &response.output[0] {
+            UnifiedOutputItem::ToolCall { tool, .. } => assert_eq!(tool, "echo"),
+            _ => panic!("expected ToolCall"),
+        }
+    }
+
+    #[test]
+    fn anthropic_from_response_missing_content_returns_error() {
+        let json = serde_json::json!({
+            "model": "claude-3",
+            "usage": null
+        });
+        let result = anthropic::from_anthropic_response(&json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn unified_chat_request_clone_works() {
+        let config = LmStudioConfig {
+            base_url: "http://localhost:1234".to_string(),
+            endpoint: LmStudioEndpoint::Openai,
+            api_token: None,
+            default_model: "test".to_string(),
+            default_context_length: Some(4096),
+            default_temperature: Some(0.7),
+            default_max_output_tokens: Some(1024),
+        };
+        let req = UnifiedChatRequest::from_config(&config, "test".to_string(), None);
+        let cloned = req.clone();
+        assert_eq!(cloned.model, req.model);
+        assert_eq!(cloned.input.content, req.input.content);
+    }
+
+    #[test]
+    fn unified_chat_response_clone_works() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![UnifiedOutputItem::Message {
+                content: "hello".to_string(),
+            }],
+            stats: None,
+            response_id: Some("resp-1".to_string()),
+        };
+        let cloned = response.clone();
+        assert_eq!(cloned.model_instance_id, response.model_instance_id);
+        assert_eq!(cloned.response_id, response.response_id);
+    }
+
+    #[test]
+    fn tool_call_info_clone_works() {
+        let info = ToolCallInfo {
+            tool: "echo".to_string(),
+            arguments: serde_json::json!({"x": 1}),
+            output: Some("result".to_string()),
+            provider_info: None,
+        };
+        let cloned = info.clone();
+        assert_eq!(cloned.tool, info.tool);
+        assert_eq!(cloned.output, info.output);
+    }
+
+    #[test]
+    fn client_extract_text_mixed_output() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![
+                UnifiedOutputItem::Message {
+                    content: "Hello".to_string(),
+                },
+                UnifiedOutputItem::ToolCall {
+                    tool: "echo".to_string(),
+                    arguments: serde_json::json!({}),
+                    output: None,
+                    provider_info: None,
+                },
+                UnifiedOutputItem::Reasoning {
+                    content: "thinking".to_string(),
+                },
+            ],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let text = client.extract_text(&response);
+        assert!(text.contains("Hello"));
+        assert!(text.contains("[reasoning]"));
+        assert!(!text.contains("echo"));
+    }
+
+    #[test]
+    fn client_extract_text_empty_output_returns_empty() {
+        let response = UnifiedChatResponse {
+            model_instance_id: "model-1".to_string(),
+            output: vec![],
+            stats: None,
+            response_id: None,
+        };
+        let client = LmStudioClient::from_env();
+        let text = client.extract_text(&response);
+        assert!(text.is_empty());
+    }
+}
