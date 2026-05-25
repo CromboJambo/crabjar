@@ -65,26 +65,29 @@ pub fn generate_weight_manifest(
          ORDER BY loaded_at DESC LIMIT 1",
     )?;
 
-    let row = stmt.query_row(rusqlite::params![model_name], |row| {
-        let metadata_str: String = row.get(9)?;
-        let metadata: serde_json::Value = serde_json::from_str(&metadata_str).unwrap_or_default();
+    let row = stmt
+        .query_row(rusqlite::params![model_name], |row| {
+            let metadata_str: String = row.get(9)?;
+            let metadata: serde_json::Value =
+                serde_json::from_str(&metadata_str).unwrap_or_default();
 
-        Ok(ModelWeightRow {
-            id: row.get(0)?,
-            model_name: row.get(1)?,
-            repo_id: row.get(2)?,
-            file_path: row.get(3)?,
-            tensor_count: row.get(4)?,
-            dtype: row.get(5)?,
-            device: row.get(6)?,
-            size_bytes: row.get(7)?,
-            checksum: row.get(8)?,
-            metadata,
-            loaded_at: row.get(10)?,
-            created_at: row.get(11)?,
-            active: row.get(12)?,
+            Ok(ModelWeightRow {
+                id: row.get(0)?,
+                model_name: row.get(1)?,
+                repo_id: row.get(2)?,
+                file_path: row.get(3)?,
+                tensor_count: row.get(4)?,
+                dtype: row.get(5)?,
+                device: row.get(6)?,
+                size_bytes: row.get(7)?,
+                checksum: row.get(8)?,
+                metadata,
+                loaded_at: row.get(10)?,
+                created_at: row.get(11)?,
+                active: row.get(12)?,
+            })
         })
-    }).map_err(PlugInError::Sqlite)?;
+        .map_err(PlugInError::Sqlite)?;
 
     let mut tensor_stmt = conn.prepare(
         "SELECT id, weight_id, tensor_name, shape, dtype, size_bytes, checksum FROM tensor_metadata

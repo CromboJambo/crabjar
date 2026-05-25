@@ -20,7 +20,11 @@ pub struct InferenceRequest {
 }
 
 impl InferenceRequest {
-    pub fn new(provenance_id: impl Into<String>, model_name: impl Into<String>, prompt: impl Into<String>) -> Self {
+    pub fn new(
+        provenance_id: impl Into<String>,
+        model_name: impl Into<String>,
+        prompt: impl Into<String>,
+    ) -> Self {
         Self {
             provenance_id: provenance_id.into(),
             model_name: model_name.into(),
@@ -91,7 +95,11 @@ pub struct InferenceResponse {
 }
 
 impl InferenceResponse {
-    pub fn new(provenance_id: impl Into<String>, model_name: impl Into<String>, output: impl Into<String>) -> Self {
+    pub fn new(
+        provenance_id: impl Into<String>,
+        model_name: impl Into<String>,
+        output: impl Into<String>,
+    ) -> Self {
         Self {
             provenance_id: provenance_id.into(),
             model_name: model_name.into(),

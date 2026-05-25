@@ -21,6 +21,7 @@ pub use protocol::{InferenceRequest, InferenceResponse, RunnerConfig};
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::manifest::generate_weight_manifest;
     use crabjar_safetensors::schema;
     use tempfile::tempdir;
 
@@ -63,17 +64,15 @@ mod tests {
             device: "cuda".into(),
             size_bytes: 8_000_000_000,
             checksum: "sha256:def456".into(),
-            tensors: vec![
-                crabjar_llm_plug_in::manifest::TensorMetadataRow {
-                    id: "t-1".into(),
-                    weight_id: "w-2".into(),
-                    tensor_name: "tok_embeddings.weight".into(),
-                    shape: "(4096, 4096)".into(),
-                    dtype: "F16".into(),
-                    size_bytes: 32_768,
-                    checksum: "sha256:tensor1".into(),
-                },
-            ],
+            tensors: vec![crate::manifest::TensorMetadataRow {
+                id: "t-1".into(),
+                weight_id: "w-2".into(),
+                tensor_name: "tok_embeddings.weight".into(),
+                shape: "(4096, 4096)".into(),
+                dtype: "F16".into(),
+                size_bytes: 32_768,
+                checksum: "sha256:tensor1".into(),
+            }],
             metadata: serde_json::json!({}),
             lazy_loading: false,
         };
@@ -98,7 +97,7 @@ mod tests {
 
     #[test]
     fn tensor_metadata_row_serializes() {
-        let row = crabjar_llm_plug_in::manifest::TensorMetadataRow {
+        let row = crate::manifest::TensorMetadataRow {
             id: "t-1".into(),
             weight_id: "w-1".into(),
             tensor_name: "w".into(),
@@ -108,7 +107,8 @@ mod tests {
             checksum: "sha256:x".into(),
         };
         let json = serde_json::to_string(&row).unwrap();
-        let restored: crabjar_llm_plug_in::manifest::TensorMetadataRow = serde_json::from_str(&json).unwrap();
+        let restored: crate::manifest::TensorMetadataRow =
+            serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "t-1");
     }
 
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn model_weight_row_serializes() {
-        let row = crabjar_llm_plug_in::manifest::ModelWeightRow {
+        let row = crate::manifest::ModelWeightRow {
             id: "w-1".into(),
             model_name: "qwen".into(),
             repo_id: "Qwen/Qwen".into(),
@@ -132,7 +132,8 @@ mod tests {
             active: 1,
         };
         let json = serde_json::to_string(&row).unwrap();
-        let restored: crabjar_llm_plug_in::manifest::ModelWeightRow = serde_json::from_str(&json).unwrap();
+        let restored: crate::manifest::ModelWeightRow =
+            serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "w-1");
         assert_eq!(restored.loaded_at, 1234567890);
     }
