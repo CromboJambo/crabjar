@@ -107,8 +107,7 @@ mod tests {
             checksum: "sha256:x".into(),
         };
         let json = serde_json::to_string(&row).unwrap();
-        let restored: crate::manifest::TensorMetadataRow =
-            serde_json::from_str(&json).unwrap();
+        let restored: crate::manifest::TensorMetadataRow = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "t-1");
     }
 
@@ -132,8 +131,7 @@ mod tests {
             active: 1,
         };
         let json = serde_json::to_string(&row).unwrap();
-        let restored: crate::manifest::ModelWeightRow =
-            serde_json::from_str(&json).unwrap();
+        let restored: crate::manifest::ModelWeightRow = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "w-1");
         assert_eq!(restored.loaded_at, 1234567890);
     }
