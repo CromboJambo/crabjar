@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-use crabjar_lib::knowledge_store::KnowledgeBridge;
 use crabjar_guard::{ExecutionGate, GateContext, GateResult, GuardDb, TrustScore};
+use crabjar_lib::knowledge_store::KnowledgeBridge;
 
 #[derive(Error, Debug)]
 pub enum AcpServerError {
@@ -85,7 +85,10 @@ impl AcpAgentServer {
         self
     }
 
-    pub async fn handle_request(&mut self, request: ZedRequest) -> Result<AcpResponse, AcpServerError> {
+    pub async fn handle_request(
+        &mut self,
+        request: ZedRequest,
+    ) -> Result<AcpResponse, AcpServerError> {
         match request {
             ZedRequest::NewSession { cwd } => {
                 let session = AcpSession::new(cwd);
@@ -129,37 +132,35 @@ impl AcpAgentServer {
                     })
                 }
             }
-            ZedRequest::ListSessions => {
-                Ok(AcpResponse::Result {
-                    value: json!({
-                        "sessions": self
-                            .sessions
-                            .iter()
-                            .map(|s| json!({ "session_id": s.session_id, "cwd": s.cwd }))
-                            .collect::<Vec<_>>(),
-                        "count": self.sessions.len(),
-                    }),
-                })
-            }
-            ZedRequest::Prompt { session_id, message } => {
+            ZedRequest::ListSessions => Ok(AcpResponse::Result {
+                value: json!({
+                    "sessions": self
+                        .sessions
+                        .iter()
+                        .map(|s| json!({ "session_id": s.session_id, "cwd": s.cwd }))
+                        .collect::<Vec<_>>(),
+                    "count": self.sessions.len(),
+                }),
+            }),
+            ZedRequest::Prompt {
+                session_id,
+                message,
+            } => {
                 let session = self.sessions.iter().find(|s| s.session_id == session_id);
                 match session {
                     Some(_) => {
-                        let context = self
-                            .knowledge_bridge
-                            .as_ref()
-                            .and_then(|bridge| {
-                                let tags = ["state-doc", "pattern", "rule"];
-                                bridge.query_state_docs(&tags, 50, "").ok()
-                            });
+                        let context = self.knowledge_bridge.as_ref().and_then(|bridge| {
+                            let tags = ["state-doc", "pattern", "rule"];
+                            bridge.query_state_docs(&tags, 50, "").ok()
+                        });
                         Ok(AcpResponse::Result {
                             value: json!({
-                                "session_id": session_id,
-                                "message": message,
-                                "context": context,
-                                "status": "processed",
-                                }),
-                            })
+                            "session_id": session_id,
+                            "message": message,
+                            "context": context,
+                            "status": "processed",
+                            }),
+                        })
                     }
                     None => Ok(AcpResponse::Error {
                         message: format!("session not found: {}", session_id),
@@ -183,7 +184,11 @@ impl AcpAgentServer {
                         let args = arguments
                             .get("args")
                             .and_then(|v| v.as_array())
-                            .map(|a| a.iter().map(|v| v.as_str().unwrap_or("").to_string()).collect())
+                            .map(|a| {
+                                a.iter()
+                                    .map(|v| v.as_str().unwrap_or("").to_string())
+                                    .collect()
+                            })
                             .unwrap_or_default();
                         let confidence = arguments
                             .get("confidence")
@@ -243,9 +248,9 @@ impl AcpAgentServer {
                                     "status": "dry_run",
                                 }),
                             }),
-                             Err(e) => Ok(AcpResponse::Error {
-                                 message: format!("gate error: {}", e),
-                             }),
+                            Err(e) => Ok(AcpResponse::Error {
+                                message: format!("gate error: {}", e),
+                            }),
                         }
                     }
                     None => Ok(AcpResponse::Error {
@@ -253,17 +258,15 @@ impl AcpAgentServer {
                     }),
                 }
             }
-            ZedRequest::Authenticate { auth_method } => {
-                Ok(AcpResponse::Result {
-                    value: json!({
-                        "auth_method": auth_method,
-                        "status": "authenticated",
-                        "requires_api_key": auth_method != "local",
-                    }),
-                })
+            ZedRequest::Authenticate { auth_method } => Ok(AcpResponse::Result {
+                value: json!({
+                    "auth_method": auth_method,
+                    "status": "authenticated",
+                    "requires_api_key": auth_method != "local",
+                }),
+            }),
         }
     }
-}
 }
 
 impl Default for AcpAgentServer {
@@ -280,9 +283,11 @@ mod tests {
     #[tokio::test]
     async fn test_authenticate() {
         let mut server = AcpAgentServer::new();
-        let response = server.handle_request(ZedRequest::Authenticate {
-            auth_method: "api_key".to_string(),
-        }).await;
+        let response = server
+            .handle_request(ZedRequest::Authenticate {
+                auth_method: "api_key".to_string(),
+            })
+            .await;
         match response {
             Ok(AcpResponse::Result { value }) => {
                 assert_eq!(value["status"].as_str(), Some("authenticated"));
