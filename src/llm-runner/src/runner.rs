@@ -1,5 +1,5 @@
-use crabjar_llm_plug_in::protocol::{InferenceRequest, InferenceResponse, RunnerConfig};
 use crate::error::RunnerError;
+use crabjar_llm_plug_in::protocol::{InferenceRequest, InferenceResponse, RunnerConfig};
 use tracing::debug;
 
 /// Runner bridge for external LLM runtime.
@@ -19,7 +19,10 @@ impl RunnerBridge {
     }
 
     /// Send inference request to external runner.
-    pub fn send_request(&self, request: InferenceRequest) -> Result<InferenceResponse, RunnerError> {
+    pub fn send_request(
+        &self,
+        request: InferenceRequest,
+    ) -> Result<InferenceResponse, RunnerError> {
         // External runner endpoint bridge
         // protocol: JSON via HTTP or local pipe
         debug!(
@@ -27,12 +30,16 @@ impl RunnerBridge {
             model_name = %request.model_name,
             "Runner bridge: sending inference request"
         );
-        Err(RunnerError::Internal("external runner not implemented".to_string()))
+        Err(RunnerError::Internal(
+            "external runner not implemented".to_string(),
+        ))
     }
 
     /// Receive inference response from external runner.
     pub fn receive_response(&self) -> Result<InferenceResponse, RunnerError> {
-        Err(RunnerError::Internal("external runner not implemented".to_string()))
+        Err(RunnerError::Internal(
+            "external runner not implemented".to_string(),
+        ))
     }
 
     /// Update runner config.

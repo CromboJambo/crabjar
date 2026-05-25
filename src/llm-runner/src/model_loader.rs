@@ -1,7 +1,7 @@
 use crabjar_llm_plug_in::manifest::WeightManifest;
 
-use crabjar_safetensors::error::SafetensorsSchemaError;
 use crate::error::RunnerError;
+use crabjar_safetensors::error::SafetensorsSchemaError;
 use tracing::debug;
 
 /// Model loader that consumes WeightManifest from safetensors DB.
@@ -24,26 +24,29 @@ impl ModelLoader {
              ORDER BY loaded_at DESC LIMIT 1",
         )?;
 
-        let row = stmt.query_row(rusqlite::params![model_name], |row| {
-            let metadata_str: String = row.get(9)?;
-            let metadata: serde_json::Value = serde_json::from_str(&metadata_str).unwrap_or_default();
+        let row = stmt
+            .query_row(rusqlite::params![model_name], |row| {
+                let metadata_str: String = row.get(9)?;
+                let metadata: serde_json::Value =
+                    serde_json::from_str(&metadata_str).unwrap_or_default();
 
-            Ok(crabjar_llm_plug_in::manifest::ModelWeightRow {
-                id: row.get(0)?,
-                model_name: row.get(1)?,
-                repo_id: row.get(2)?,
-                file_path: row.get(3)?,
-                tensor_count: row.get(4)?,
-                dtype: row.get(5)?,
-                device: row.get(6)?,
-                size_bytes: row.get(7)?,
-                checksum: row.get(8)?,
-                metadata,
-                loaded_at: row.get(10)?,
-                created_at: row.get(11)?,
-                active: row.get(12)?,
+                Ok(crabjar_llm_plug_in::manifest::ModelWeightRow {
+                    id: row.get(0)?,
+                    model_name: row.get(1)?,
+                    repo_id: row.get(2)?,
+                    file_path: row.get(3)?,
+                    tensor_count: row.get(4)?,
+                    dtype: row.get(5)?,
+                    device: row.get(6)?,
+                    size_bytes: row.get(7)?,
+                    checksum: row.get(8)?,
+                    metadata,
+                    loaded_at: row.get(10)?,
+                    created_at: row.get(11)?,
+                    active: row.get(12)?,
+                })
             })
-        }).map_err(RunnerError::Sqlite)?;
+            .map_err(RunnerError::Sqlite)?;
 
         let mut tensor_stmt = self.conn.prepare(
             "SELECT id, weight_id, tensor_name, shape, dtype, size_bytes, checksum FROM tensor_metadata
@@ -91,12 +94,23 @@ impl ModelLoader {
     /// Verify weight checksum integrity.
     pub fn verify_checksum(&self, weight_id: &str, expected: &str) -> Result<bool, RunnerError> {
         crabjar_safetensors::schema::verify_weight_checksum(&self.conn, weight_id, expected)
-            .map_err(|_: SafetensorsSchemaError| RunnerError::Sqlite( rusqlite::Error::QueryReturnedNoRows ))
+            .map_err(|_: SafetensorsSchemaError| {
+                RunnerError::Sqlite(rusqlite::Error::QueryReturnedNoRows)
+            })
     }
 
     /// List active weights for model selection.
-    pub fn list_active(&self, limit: usize) -> Result<Vec<crabjar_safetensors::schema::ModelWeightRow>, RunnerError> {
-        crabjar_safetensors::schema::list_active_weights(&self.conn, limit)
-            .map_err(|e: SafetensorsSchemaError| RunnerError::Sqlite(match e { SafetensorsSchemaError::Sqlite(r) => r, _ => rusqlite::Error::QueryReturnedNoRows }))
+    pub fn list_active(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<crabjar_safetensors::schema::ModelWeightRow>, RunnerError> {
+        crabjar_safetensors::schema::list_active_weights(&self.conn, limit).map_err(
+            |e: SafetensorsSchemaError| {
+                RunnerError::Sqlite(match e {
+                    SafetensorsSchemaError::Sqlite(r) => r,
+                    _ => rusqlite::Error::QueryReturnedNoRows,
+                })
+            },
+        )
     }
 }

@@ -1,6 +1,6 @@
-use candle_core::{Tensor, DType, Device};
-use candle_nn::Module;
 use crate::error::RunnerError;
+use candle_core::{DType, Device, Tensor};
+use candle_nn::Module;
 
 /// Inference engine for tensor computation.
 ///
@@ -17,13 +17,21 @@ impl InferenceEngine {
 
     /// Run inference on a loaded model.
     pub fn infer(&self, model: &impl Module, input: Tensor) -> Result<Tensor, RunnerError> {
-        model.forward(&input).map_err(|e: candle_core::Error| RunnerError::Tensor(e.to_string()))
+        model
+            .forward(&input)
+            .map_err(|e: candle_core::Error| RunnerError::Tensor(e.to_string()))
     }
 
     /// Materialize lazy-loaded tensor from manifest.
-    pub fn materialize_tensor(&self, file_path: &str, _tensor_name: &str) -> Result<Tensor, RunnerError> {
-        let data = std::fs::read(file_path).map_err(|e: std::io::Error| RunnerError::Asset(e.to_string()))?;
-        Tensor::from_raw_buffer(&data, self.dtype, &[1], &self.device).map_err(|e: candle_core::Error| RunnerError::Tensor(e.to_string()))
+    pub fn materialize_tensor(
+        &self,
+        file_path: &str,
+        _tensor_name: &str,
+    ) -> Result<Tensor, RunnerError> {
+        let data = std::fs::read(file_path)
+            .map_err(|e: std::io::Error| RunnerError::Asset(e.to_string()))?;
+        Tensor::from_raw_buffer(&data, self.dtype, &[1], &self.device)
+            .map_err(|e: candle_core::Error| RunnerError::Tensor(e.to_string()))
     }
 
     /// Get device info.
@@ -34,8 +42,6 @@ impl InferenceEngine {
             Device::Metal(_) => "metal".to_string(),
         })
     }
-
-
 
     /// Get dtype info.
     pub fn dtype_info(&self) -> Result<String, RunnerError> {

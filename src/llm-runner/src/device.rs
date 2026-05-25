@@ -1,5 +1,5 @@
-use candle_core::Device;
 use crate::error::RunnerError;
+use candle_core::Device;
 use tracing::debug;
 
 /// Device backend for tensor computation.
@@ -22,7 +22,8 @@ impl DeviceBackend {
     pub fn select(&mut self) -> Result<(), RunnerError> {
         match self.preference.as_str() {
             "cuda" => {
-                self.device = Device::cuda_if_available(0).map_err(|e: candle_core::Error| RunnerError::Device(e.to_string()))?
+                self.device = Device::cuda_if_available(0)
+                    .map_err(|e: candle_core::Error| RunnerError::Device(e.to_string()))?
             }
             "cpu" => {
                 self.device = Device::Cpu;
@@ -53,7 +54,7 @@ impl DeviceBackend {
     pub fn is_available(&self) -> Result<bool, RunnerError> {
         Ok(match self.device {
             Device::Cpu => true,
-            Device::Cuda(_) => false, // cuda check requires runtime
+            Device::Cuda(_) => false,  // cuda check requires runtime
             Device::Metal(_) => false, // metal requires macOS
         })
     }
