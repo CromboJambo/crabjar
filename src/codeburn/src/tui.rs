@@ -230,7 +230,6 @@ impl TuiDashboard {
             .metrics
             .by_project
             .values()
-            .cloned()
             .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
@@ -320,7 +319,6 @@ impl TuiDashboard {
             .metrics
             .by_activity
             .values()
-            .cloned()
             .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
@@ -365,7 +363,6 @@ impl TuiDashboard {
             .metrics
             .by_model
             .values()
-            .cloned()
             .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
@@ -453,7 +450,6 @@ impl TuiDashboard {
             .metrics
             .by_shell
             .values()
-            .cloned()
             .map(|v| v.as_f64().unwrap_or(0.0))
             .max_by(|a, b| a.partial_cmp(b).unwrap())
             .unwrap_or(0.0);
