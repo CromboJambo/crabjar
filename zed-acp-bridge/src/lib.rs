@@ -141,3 +141,135 @@ impl Default for AcpBridge {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn new_creates_empty_bridge() {
+        let bridge = AcpBridge::new();
+        assert!(bridge.session.is_none());
+        assert!(bridge.events.is_empty());
+        assert!(bridge.knowledge_store.is_none());
+        assert!(bridge.guard_db.is_none());
+    }
+
+    #[test]
+    fn default_creates_empty_bridge() {
+        let bridge: AcpBridge = Default::default();
+        assert!(bridge.events.is_empty());
+    }
+
+    #[test]
+    fn with_session_sets_session() {
+        let session = AcpSession::new("/test".to_string());
+        let bridge = AcpBridge::new().with_session(session);
+        assert!(bridge.session.is_some());
+    }
+
+    #[test]
+    fn with_knowledge_store_sets_store() {
+        let db = agent_context::Store::open(":memory:").unwrap();
+        let bridge = AcpBridge::new().with_knowledge_store(db);
+        assert!(bridge.knowledge_store.is_some());
+    }
+
+    #[test]
+    fn with_guard_db_sets_db() {
+        let dir = tempdir().unwrap();
+        let guard_db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+        let bridge = AcpBridge::new().with_guard_db(guard_db);
+        assert!(bridge.guard_db.is_some());
+    }
+
+    #[test]
+    fn record_event_adds_to_trajectory() {
+        let mut bridge = AcpBridge::new();
+        bridge.record_event("test_event", serde_json::json!({"key": "value"}));
+        assert_eq!(bridge.events.len(), 1);
+        assert_eq!(bridge.events[0].event_type, "test_event");
+        assert_eq!(bridge.events[0].data["key"], "value");
+    }
+
+    #[test]
+    fn record_event_sets_timestamp() {
+        let mut bridge = AcpBridge::new();
+        bridge.record_event("event", serde_json::json!({}));
+        assert!(!bridge.events[0].timestamp.is_empty());
+        assert!(bridge.events[0].timestamp.contains('-'));
+    }
+
+    #[test]
+    fn trajectory_returns_reference() {
+        let mut bridge = AcpBridge::new();
+        bridge.record_event("e1", serde_json::json!({}));
+        let traj = bridge.trajectory();
+        assert_eq!(traj.len(), 1);
+    }
+
+    #[test]
+    fn trajectory_empty_returns_empty_slice() {
+        let bridge = AcpBridge::new();
+        assert!(bridge.trajectory().is_empty());
+    }
+
+    #[test]
+    fn tool_schema_from_function_call_valid() {
+        let schema = ToolSchema::from_function_call("echo", r#"{"msg": "hello"}"#).unwrap();
+        assert_eq!(schema.function_name, "echo");
+        assert_eq!(schema.arguments["msg"], "hello");
+    }
+
+    #[test]
+    fn tool_schema_from_function_call_invalid_json_fails() {
+        let result = ToolSchema::from_function_call("echo", "not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn query_knowledge_without_store_returns_error() {
+        let bridge = AcpBridge::new();
+        let result = bridge.query_knowledge(&["test"], 10);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("no knowledge store"));
+    }
+
+    #[test]
+    fn check_guard_without_guard_db_returns_error() {
+        let bridge = AcpBridge::new();
+        let result = bridge.check_guard("echo", &["hello".to_string()]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("no guard db"));
+    }
+
+    #[test]
+    fn multiple_event_types_preserved() {
+        let mut bridge = AcpBridge::new();
+        bridge.record_event("start", serde_json::json!({"step": 1}));
+        bridge.record_event("middle", serde_json::json!({"step": 2}));
+        bridge.record_event("end", serde_json::json!({"step": 3}));
+        assert_eq!(bridge.trajectory().len(), 3);
+        assert_eq!(bridge.trajectory()[0].event_type, "start");
+        assert_eq!(bridge.trajectory()[1].event_type, "middle");
+        assert_eq!(bridge.trajectory()[2].event_type, "end");
+    }
+
+    #[test]
+    fn tool_schema_arguments_can_be_nested() {
+        let json = r#"{"nested": {"key": "value"}, "list": [1, 2, 3]}"#;
+        let schema = ToolSchema::from_function_call("complex", json).unwrap();
+        assert_eq!(schema.arguments["nested"]["key"], "value");
+        assert_eq!(schema.arguments["list"][0], 1);
+    }
+
+    #[test]
+    fn trajectory_event_clone_works() {
+        let mut bridge = AcpBridge::new();
+        bridge.record_event("test", serde_json::json!({"data": 42}));
+        let event = bridge.events[0].clone();
+        assert_eq!(event.event_type, "test");
+        assert_eq!(event.data["data"], 42);
+    }
+}
