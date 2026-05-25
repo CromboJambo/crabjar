@@ -15,3 +15,5 @@ reqwest = { version = "0.12", features = ["json"] }
 tracing = "0.1"
 codeburn-classifier = { path = "../codeburn-classifier" }
 codeburn-provider = { path = "../codeburn-provider" }
+[dev-dependencies]
+futures = "0.3"
