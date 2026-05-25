@@ -791,3 +791,251 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::local_log;
+
+    fn temp_db() -> (rusqlite::Connection, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("events.db");
+        let conn = local_log::init_db(path.to_str().unwrap()).unwrap();
+        (conn, dir)
+    }
+
+    fn insert_event(conn: &rusqlite::Connection, timestamp: &str, source: &str, content: &str) {
+        conn.execute(
+            "INSERT INTO events (timestamp, source, content, preview) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![timestamp, source, content, "preview of: ".to_string() + content],
+        ).unwrap();
+    }
+
+    #[test]
+    fn init_db_creates_table() {
+        let (conn, _dir) = temp_db();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='events'",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn init_db_creates_indexes() {
+        let (conn, _dir) = temp_db();
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_events_%'",
+            [],
+            |row| row.get(0),
+        ).unwrap();
+        assert!(count >= 2);
+    }
+
+    #[test]
+    fn search_finds_exact_match() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "hello world");
+        let events = local_log::search(&conn, "hello").unwrap();
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn search_finds_partial_match() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "hello world");
+        let events = local_log::search(&conn, "world").unwrap();
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn search_no_match_returns_empty() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "hello world");
+        let events = local_log::search(&conn, "nonexistent").unwrap();
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn search_matches_preview() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "short");
+        let events = local_log::search(&conn, "preview").unwrap();
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn search_order_is_descending() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-22T10:00:00Z", "test-source", "old");
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "new");
+        let events = local_log::search(&conn, "").unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(events[0].content == "new" || events[0].timestamp > events[1].timestamp);
+    }
+
+    #[test]
+    fn recent_returns_ordered_by_descending() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-22T10:00:00Z", "test-source", "old");
+        insert_event(&conn, "2026-05-23T10:00:00Z", "test-source", "middle");
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "new");
+        let events = local_log::recent(&conn, Some(2)).unwrap();
+        assert_eq!(events.len(), 2);
+        // Newest first (ORDER BY timestamp DESC)
+        assert!(events[0].timestamp >= events[1].timestamp);
+    }
+
+    #[test]
+    fn recent_defaults_to_50() {
+        let (conn, _dir) = temp_db();
+        for i in 0..60u64 {
+            insert_event(&conn, &format!("2026-05-24T{:02}:00:00Z", i % 24), "test", &format!("event-{}", i));
+        }
+        let events = local_log::recent(&conn, None).unwrap();
+        assert_eq!(events.len(), 50);
+    }
+
+    #[test]
+    fn recent_empty_db_returns_empty() {
+        let (conn, _dir) = temp_db();
+        let events = local_log::recent(&conn, Some(10)).unwrap();
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn by_source_filters_by_source() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "auth-service", "login attempt");
+        insert_event(&conn, "2026-05-24T11:00:00Z", "api-gateway", "request received");
+        insert_event(&conn, "2026-05-24T12:00:00Z", "auth-service", "logout");
+        let events = local_log::by_source(&conn, "auth", Some(10)).unwrap();
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn by_source_with_limit() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test-src", "event-1");
+        insert_event(&conn, "2026-05-24T11:00:00Z", "test-src", "event-2");
+        insert_event(&conn, "2026-05-24T12:00:00Z", "test-src", "event-3");
+        let events = local_log::by_source(&conn, "test", Some(2)).unwrap();
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn by_source_empty_db_returns_empty() {
+        let (conn, _dir) = temp_db();
+        let events = local_log::by_source(&conn, "nonexistent", Some(10)).unwrap();
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn event_row_format_time_rfc3339() {
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-05-24T10:30:00Z".to_string(),
+            source: "test".to_string(),
+            content: "hello".to_string(),
+            preview: "".to_string(),
+        };
+        let formatted = row.format_time();
+        assert!(formatted.contains("2026-05-24"));
+        assert!(formatted.contains("10:30:00"));
+    }
+
+    #[test]
+    fn event_row_format_time_fallback() {
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "not-a-date".to_string(),
+            source: "test".to_string(),
+            content: "hello".to_string(),
+            preview: "".to_string(),
+        };
+        let formatted = row.format_time();
+        assert_eq!(formatted, "not-a-date");
+    }
+
+    #[test]
+    fn event_row_preview_content_short_content() {
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-05-24T10:00:00Z".to_string(),
+            source: "test".to_string(),
+            content: "short".to_string(),
+            preview: "".to_string(),
+        };
+        assert_eq!(row.preview_content(200), "short");
+    }
+
+    #[test]
+    fn event_row_preview_content_long_content_truncated() {
+        let long = "a".repeat(300);
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-05-24T10:00:00Z".to_string(),
+            source: "test".to_string(),
+            content: long,
+            preview: "".to_string(),
+        };
+        let preview = row.preview_content(100);
+        assert!(preview.len() <= 103); // 100 chars + "..."
+        assert!(preview.ends_with("..."));
+    }
+
+    #[test]
+    fn event_row_preview_content_uses_stored_preview() {
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-05-24T10:00:00Z".to_string(),
+            source: "test".to_string(),
+            content: "this is the full content".to_string(),
+            preview: "my custom preview".to_string(),
+        };
+        assert_eq!(row.preview_content(200), "my custom preview");
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "Hello World");
+        let events_lower = local_log::search(&conn, "hello").unwrap();
+        let events_upper = local_log::search(&conn, "Hello").unwrap();
+        // SQLite LIKE is case-insensitive for ASCII
+        assert_eq!(events_lower.len(), 1);
+        assert_eq!(events_upper.len(), 1);
+    }
+
+    #[test]
+    fn by_source_wildcard_match() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "auth-service", "login");
+        insert_event(&conn, "2026-05-24T11:00:00Z", "auth-gateway", "verify");
+        let events = local_log::by_source(&conn, "auth", None).unwrap();
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn event_row_clone_works() {
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-05-24T10:00:00Z".to_string(),
+            source: "test".to_string(),
+            content: "hello".to_string(),
+            preview: "preview".to_string(),
+        };
+        let cloned = row.clone();
+        assert_eq!(row.id, cloned.id);
+        assert_eq!(row.timestamp, cloned.timestamp);
+        assert_eq!(row.source, cloned.source);
+        assert_eq!(row.content, cloned.content);
+        assert_eq!(row.preview, cloned.preview);
+    }
+
+    #[test]
+    fn init_db_nonexistent_parent_fails() {
+        let result = local_log::init_db("/nonexistent/path/db.sqlite");
+        assert!(result.is_err());
+    }
+}
