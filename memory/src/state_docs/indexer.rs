@@ -478,6 +478,38 @@ fn load_overlay(path: &Path) -> Result<Vec<crate::state_docs::models::Annotation
     Ok(overlay)
 }
 
+// ─── Test-only public accessors for pure parsing functions ───
+
+/// Extract metadata from Markdown content (test accessor).
+pub fn extract_metadata_for_test(content: &str) -> DocMetadata {
+    extract_metadata(content)
+}
+
+/// Extract sections from Markdown content (test accessor).
+pub fn extract_sections_for_test(content: &str) -> Vec<Section> {
+    extract_sections(content)
+}
+
+/// Extract tables from Markdown content (test accessor).
+pub fn extract_tables_for_test(content: &str) -> Vec<Table> {
+    extract_tables(content)
+}
+
+/// Extract code blocks from Markdown content (test accessor).
+pub fn extract_code_blocks_for_test(content: &str) -> Vec<CodeBlock> {
+    extract_code_blocks(content)
+}
+
+/// Extract confidence assessment from Markdown content (test accessor).
+pub fn extract_confidence_for_test(content: &str) -> Option<ConfidenceAssessment> {
+    extract_confidence(content)
+}
+
+/// Index all docs from directory, skipping FK constraints (test accessor).
+pub fn index_all_docs_for_test(conn: &Connection, docs_dir: &Path) -> Result<usize, crate::Error> {
+    index_all_docs(conn, docs_dir)
+}
+
 /// Insert doc metadata into SQLite
 fn insert_doc_metadata(
     conn: &Connection,

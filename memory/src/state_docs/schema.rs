@@ -15,18 +15,18 @@ const STATE_DOCS_MIGRATIONS: &[&str] = &[
     )",
     "CREATE TABLE IF NOT EXISTS sections (
         id          INTEGER PRIMARY KEY,
-        doc_id      INTEGER NOT NULL REFERENCES doc_metadata(id),
+        doc_id      INTEGER NOT NULL,
         level       INTEGER NOT NULL,
         title       TEXT NOT NULL,
         start_line  INTEGER NOT NULL,
         end_line    INTEGER NOT NULL,
-        parent_id   INTEGER REFERENCES sections(id),
+        parent_id   INTEGER,
         content_hash TEXT NOT NULL DEFAULT ''
     )",
     "CREATE TABLE IF NOT EXISTS tables (
         id          INTEGER PRIMARY KEY,
-        doc_id      INTEGER NOT NULL REFERENCES doc_metadata(id),
-        section_id  INTEGER REFERENCES sections(id),
+        doc_id      INTEGER NOT NULL,
+        section_id  INTEGER,
         start_line  INTEGER NOT NULL,
         end_line    INTEGER NOT NULL,
         headers     TEXT NOT NULL DEFAULT '[]',
@@ -34,8 +34,8 @@ const STATE_DOCS_MIGRATIONS: &[&str] = &[
     )",
     "CREATE TABLE IF NOT EXISTS code_blocks (
         id          INTEGER PRIMARY KEY,
-        doc_id      INTEGER NOT NULL REFERENCES doc_metadata(id),
-        section_id  INTEGER REFERENCES sections(id),
+        doc_id      INTEGER NOT NULL,
+        section_id  INTEGER,
         start_line  INTEGER NOT NULL,
         end_line    INTEGER NOT NULL,
         language    TEXT NOT NULL DEFAULT '',
@@ -44,7 +44,7 @@ const STATE_DOCS_MIGRATIONS: &[&str] = &[
     )",
     "CREATE TABLE IF NOT EXISTS confidence (
         id          INTEGER PRIMARY KEY,
-        doc_id      INTEGER NOT NULL REFERENCES doc_metadata(id),
+        doc_id      INTEGER NOT NULL,
         what_captured TEXT NOT NULL DEFAULT '',
         what_missed TEXT NOT NULL DEFAULT '',
         assumptions TEXT NOT NULL DEFAULT '[]',
@@ -53,8 +53,8 @@ const STATE_DOCS_MIGRATIONS: &[&str] = &[
     )",
     "CREATE TABLE IF NOT EXISTS annotations (
         id          INTEGER PRIMARY KEY,
-        doc_id      INTEGER NOT NULL REFERENCES doc_metadata(id),
-        section_id  INTEGER REFERENCES sections(id),
+        doc_id      INTEGER NOT NULL,
+        section_id  INTEGER,
         line        INTEGER NOT NULL,
         kind        TEXT NOT NULL,
         status      TEXT NOT NULL,
