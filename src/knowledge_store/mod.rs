@@ -387,13 +387,29 @@ impl KnowledgeBridge {
     }
 
     /// Resolve an annotation and deactivate derived knowledge entries.
+    /// Updates the overlay file to mark the annotation as resolved.
     pub fn resolve_annotation(
         &self,
         doc_name: &str,
         annotation_id: &str,
         reason: &str,
     ) -> Result<(usize, Annotation), agent_context::Error> {
-        let overlay = self.load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
+        let overlay_path = self.resolve_doc_path(doc_name)?;
+        let overlay_dir = overlay_path
+            .parent()
+            .unwrap()
+            .join(agent_context::state_docs::OVERLAY_DIR);
+        let overlay_file = overlay_dir.join(format!(
+            "{}.overlay.json",
+            overlay_path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .trim_end_matches(".md")
+        ));
+
+        let mut overlay = self.load_overlay_for_path(&overlay_path)?;
+
         let resolved_entry = overlay
             .get("entries")
             .and_then(|v| v.as_array())
@@ -404,14 +420,16 @@ impl KnowledgeBridge {
             .ok_or_else(|| {
                 agent_context::Error::Internal(format!("annotation not found: {}", annotation_id))
             })?;
+
         let id = resolved_entry
             .get("id")
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
-        let doc_name = resolved_entry
+        let source_doc = resolved_entry
             .get("doc")
             .and_then(|v| v.as_str())
-            .unwrap_or(doc_name);
+            .unwrap_or(doc_name)
+            .to_string();
         let section_id = resolved_entry.get("section_id").and_then(|v| v.as_i64());
         let line = resolved_entry
             .get("line")
@@ -433,24 +451,49 @@ impl KnowledgeBridge {
             .and_then(|v| v.as_str())
             .unwrap_or("agent")
             .to_string();
-        let status = resolved_entry
-            .get("status")
-            .and_then(|v| v.as_str())
-            .unwrap_or("open")
-            .to_string();
-        let created_at = Utc::now();
+        let created_at = resolved_entry
+            .get("created_at_unix_ms")
+            .and_then(|v| v.as_u64())
+            .map(|ms| {
+                chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ms as i64)
+                    .unwrap_or(Utc::now())
+            })
+            .unwrap_or(Utc::now());
+
+        // Update overlay: mark as resolved, add reason
+        if let Some(entries) = overlay.get_mut("entries").and_then(|v| v.as_array_mut()) {
+            for entry in entries.iter_mut() {
+                if entry.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id {
+                    if let Some(obj) = entry.as_object_mut() {
+                        obj.insert("status".to_string(), serde_json::json!("resolved"));
+                        obj.insert("resolved_at_unix_ms".to_string(), serde_json::json!(now_unix_ms()));
+                        obj.insert("resolution_reason".to_string(), serde_json::json!(reason));
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Write updated overlay back
+        std::fs::create_dir_all(&overlay_dir).ok();
+        let json = serde_json::to_string_pretty(&overlay)
+            .map_err(agent_context::Error::Json)?;
+        std::fs::write(&overlay_file, json)
+            .map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
+
+        let deactivated = self.deactivate_annotation_knowledge(annotation_id, Some(reason))?;
+
         let resolved = Annotation {
             id,
-            doc_name: doc_name.to_string(),
+            doc_name: source_doc,
             section_id,
             line,
             kind,
             message,
             author,
-            status,
+            status: "resolved".to_string(),
             created_at,
         };
-        let deactivated = self.deactivate_annotation_knowledge(annotation_id, Some(reason))?;
         Ok((deactivated, resolved))
     }
 
