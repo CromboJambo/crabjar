@@ -28,3 +28,4 @@ state-docs/
 # Stakpak session files
 .stakpak/session*
 reference_materials/
+tarpaulin-report.html
