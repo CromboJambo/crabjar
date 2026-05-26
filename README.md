@@ -23,6 +23,8 @@ Declared in Cargo.toml `[workspace.members]`:
 - `sandbox`
 - `safetensors`
 - `tool_registry`
+- `src/llm-plug-in`
+- `src/llm-runner`
 - `zed-acp-bridge`
 - `zed-acp-server`
 
@@ -50,6 +52,8 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 | `codeburn` | codeburn CLI binary |
 | `skill-script-runner` | Skill script discovery and execution |
 | `skill-reference-store` | Skill reference indexing and staleness |
+| `llm-plug-in` | LLM plugin protocol |
+| `llm-runner` | LLM runner (Candle/Burn backends) |
 | `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) |
 | `zed-acp-server` | stdio JSON-RPC server (ACP protocol) |
 
@@ -57,7 +61,7 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 19 members, shared deps
+├── Cargo.toml               # Workspace root — 20 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── AGENTS.md               # Repository guidelines
 ├── README.md               # Project overview
@@ -86,6 +90,10 @@ crabjar/
 ├── src/codeburn/            # codeburn CLI binary
 ├── src/skill-script-runner/ # Skill script discovery
 ├── src/skill-reference-store/ # Skill reference indexing
+│
+│  LLM inference crates
+├── src/llm-plug-in/         # LLM plugin protocol
+├── src/llm-runner/          # LLM runner (Candle/Burn backends)
 │
 │  Documentation
 ├── state-docs/              # Durable Markdown state documentation
@@ -219,7 +227,7 @@ Parameter names must match column names, not semantic intent. Semantic naming dr
 
 ## Version
 
-0.10.2
+0.11.0
 
 ## Repository
 

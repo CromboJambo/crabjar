@@ -47,7 +47,8 @@ pub async fn execute_parallel(scripts: &[(std::path::PathBuf, Vec<String>)]) -> 
         handles.push(tokio::spawn(async move {
             let allowlist = std::collections::HashSet::from_iter([path.clone()]);
             let timeout = std::time::Duration::from_secs(30);
-            execute_script(&path, &args, env, &path, timeout, &allowlist).await
+            let work_dir = path.parent().unwrap_or(std::path::Path::new(""));
+            execute_script(&path, &args, env, work_dir, timeout, &allowlist).await
         }));
     }
 
@@ -88,7 +89,7 @@ mod tests {
         let script_path = dir.path().join("args.sh");
         std::fs::write(
             &script_path,
-            "#!/bin/bash\necho '{\"arg1\":\"$1\",\"arg2\":\"$2\"}'",
+            "#!/bin/bash\necho \"{\\\"arg1\\\":\\\"$1\\\",\\\"arg2\\\":\\\"$2\\\"}\"",
         )
         .unwrap();
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();

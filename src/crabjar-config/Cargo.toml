@@ -1,5 +1,6 @@
 [package]
 name = "crabjar-config"
+publish = false
 version = "0.1.0"
 edition = "2024"
 description = "Project workspace configuration for CrabJar agent toolboxes"

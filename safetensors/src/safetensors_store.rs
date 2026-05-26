@@ -248,6 +248,18 @@ impl<'a> SafetensorsStore<'a> {
             row.weight_id = weight_id.clone();
         }
 
+        for row in &tensor_rows {
+            insert_tensor_metadata(
+                self.conn,
+                &weight_id,
+                &row.tensor_name,
+                &row.shape,
+                &row.dtype,
+                row.size_bytes,
+                &row.checksum,
+            )?;
+        }
+
         debug!(
             model_name = %model_name,
             tensor_count = total_tensors,

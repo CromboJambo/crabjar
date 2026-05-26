@@ -29,3 +29,6 @@ state-docs/
 .stakpak/session*
 reference_materials/
 tarpaulin-report.html
+
+# Generated manifests
+*.manifest.json

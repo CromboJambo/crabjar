@@ -198,7 +198,7 @@ mod tests {
         let dt = Utc::now();
         let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern).stale(dt);
         let stale = entry.metadata["stale_after"].as_str().unwrap();
-        assert!(stale.contains("2026-05-25"));
+        assert!(stale.contains(&Utc::now().format("%Y-%m-%d").to_string()));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: May 24 2026
+> Generated: May 26 2026
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -373,7 +373,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 
 ### Last Audit
 
-2026-05-24 — workspace refreshed. All paths corrected to nested `src/` pattern. Two new crates (`llm-plug-in`, `llm-runner`) added. Two new workspace members (`zed-acp-bridge`, `zed-acp-server`) confirmed. `pipelines/` confirmed removed. `src/models/` confirmed empty. `src/state-docs/` → `src/state_docs/` underscore convention applied.
+2026-05-26 — crates.io prep. Version bumped to 0.11.0. `publish = true` on root package, `publish = false` on all 20 workspace members. `src/models/` removed (empty dir). `.manifest.json` files removed from root. gitignore updated for `*.manifest.json`. All paths verified against filesystem.
 
 ### Known Items
 
@@ -399,6 +399,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 | `prov-concierge-consolidate` | orchestrator/src/concierge.rs removed; guard's GateConcierge is sole gate layer | 2026-05-21 | pipeline collapse prevention | crabjar |
 | `prov-reversibility-bounded` | guard/src/reversibility.rs: ReversibilityScore → PerturbationSet | 2026-05-21 | bounded perturbations over single-point worst-case | crabjar |
 | `prov-querier-drift` | memory/src/state_docs/querier.rs: drift_status() added | 2026-05-21 | coasting/resisting checksum comparison | crabjar |
+| `prov-crates-io-0110` | version 0.10.2 → 0.11.0, publish config added to all crates, stale artifacts removed | 2026-05-26 | crates.io publication prep | crabjar |
 
 ---
 
