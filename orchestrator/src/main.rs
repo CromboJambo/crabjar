@@ -1038,4 +1038,131 @@ mod tests {
         let result = local_log::init_db("/nonexistent/path/db.sqlite");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn local_log_search_matches_content() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "unique-content-xyz");
+        let events = local_log::search(&conn, "unique-content-xyz").unwrap();
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn local_log_recent_with_limit_zero() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "event");
+        let events = local_log::recent(&conn, Some(0)).unwrap();
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn local_log_by_source_with_none_limit() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "auth-service", "login");
+        let events = local_log::by_source(&conn, "auth", None).unwrap();
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn local_log_event_row_format_time_utc() {
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-01-15T08:30:45Z".to_string(),
+            source: "test".to_string(),
+            content: "hello".to_string(),
+            preview: "".to_string(),
+        };
+        let formatted = row.format_time();
+        assert!(formatted.contains("2026-01-15"));
+        assert!(formatted.contains("08:30:45"));
+    }
+
+    #[test]
+    fn local_log_preview_content_empty_preview_short_content() {
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-05-24T10:00:00Z".to_string(),
+            source: "test".to_string(),
+            content: "short".to_string(),
+            preview: "".to_string(),
+        };
+        assert_eq!(row.preview_content(10), "short");
+    }
+
+    #[test]
+    fn local_log_preview_content_empty_preview_exact_length() {
+        let content = "1234567890".to_string();
+        let row = local_log::EventRow {
+            id: 1,
+            timestamp: "2026-05-24T10:00:00Z".to_string(),
+            source: "test".to_string(),
+            content,
+            preview: "".to_string(),
+        };
+        assert_eq!(row.preview_content(10), "1234567890");
+    }
+
+    #[test]
+    fn local_log_search_both_content_and_preview() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "main-content");
+        let by_content = local_log::search(&conn, "main-content").unwrap();
+        let by_preview = local_log::search(&conn, "preview").unwrap();
+        assert_eq!(by_content.len(), 1);
+        assert_eq!(by_preview.len(), 1);
+    }
+
+    #[test]
+    fn local_log_recent_order_correct() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-20T10:00:00Z", "test", "older");
+        insert_event(&conn, "2026-05-23T10:00:00Z", "test", "newer");
+        let events = local_log::recent(&conn, Some(10)).unwrap();
+        assert_eq!(events.len(), 2);
+        assert!(events[0].timestamp > events[1].timestamp);
+    }
+
+    #[test]
+    fn local_log_by_source_case_insensitive() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "AuthService", "login");
+        let events_lower = local_log::by_source(&conn, "authservice", Some(10)).unwrap();
+        let events_upper = local_log::by_source(&conn, "AUTHSERVICE", Some(10)).unwrap();
+        assert_eq!(events_lower.len(), 1);
+        assert_eq!(events_upper.len(), 1);
+    }
+
+    #[test]
+    fn local_log_event_row_clone_fields() {
+        let row = local_log::EventRow {
+            id: 42,
+            timestamp: "2026-05-24T10:00:00Z".to_string(),
+            source: "test-source".to_string(),
+            content: "test-content".to_string(),
+            preview: "test-preview".to_string(),
+        };
+        let cloned = row.clone();
+        assert_eq!(cloned.id, 42);
+        assert_eq!(cloned.source, "test-source");
+        assert_eq!(cloned.content, "test-content");
+        assert_eq!(cloned.preview, "test-preview");
+    }
+
+    #[test]
+    fn local_log_search_wildcard_in_term() {
+        let (conn, _dir) = temp_db();
+        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "hello world");
+        let events = local_log::search(&conn, "hello%").unwrap();
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn local_log_recent_large_limit() {
+        let (conn, _dir) = temp_db();
+        for i in 0..100u64 {
+            insert_event(&conn, &format!("2026-05-24T{:02}:00:00Z", i % 24), "test", &format!("event-{}", i));
+        }
+        let events = local_log::recent(&conn, Some(1000)).unwrap();
+        assert_eq!(events.len(), 100);
+    }
 }
