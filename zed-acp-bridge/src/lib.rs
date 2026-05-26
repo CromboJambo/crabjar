@@ -126,6 +126,7 @@ impl AcpBridge {
                 confidence: crabjar_guard::TrustScore::new(0.9),
                 source_event_id: None,
                 can_interrupt: true,
+                pid: None,
             })
             .map_err(|e| AcpBridgeError::GuardError(e.to_string()))?;
         Ok(result)
