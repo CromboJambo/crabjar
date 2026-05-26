@@ -21,11 +21,25 @@ The agent operates as an "Expert Researcher" rather than a "Memorizing Student."
 *   **Avoid Exhaustive Reading**: Do not read entire files unless necessary for understanding the context of a specific bug or feature.
 *   **Prefer Indexing**: Use the project's `project_map.md` and `AGENTS.md` as primary navigation tools to decide which files deserve a deep dive.
 *   **Summarization**: When processing large amounts of information, summarize the findings into the `crabjar` configuration or documentation to preserve long-term knowledge without bloating the active context window.
+### 3. Precision Engineering
 
-### 	3. Precision Engineering
 *   **Verification via Tooling**: Every code change must be followed by a `cargo check` or `cargo clippy` within the relevant crate's scope to ensure no regressions were introduced in the wider workspace.
 *   **Structural Integrity**: When refactoring, always verify that all references (imports, function calls) are updated across the entire dependency graph.
 *   **Indexed Provenance Gap**: `entry.provenance_id` must be set at creation time, not just in metadata. Any abstraction layer that writes provenance must propagate it to the indexed column. An empty indexed column renders deactivate-by-provenance queries ineffective.
+
+### 4. Symlink Graph (The Borrow Checker for Filesystems)
+
+*   **Owner = Mutable**: `~/.dotfiles/.config/` is the only writable location. All mutations go here.
+*   **Symlinks = Immutable Borrows**: `~/.config/X -> ~/.dotfiles/.config/X` is a read-only reference. Never write through a symlink.
+*   **graph.toml = Type System**: `~/.dotfiles/manifest/graph.toml` declares the access graph. It replaces `access.toml` and `structure.md`.
+*   **enforce = cargo check**: `symlink-enforce.sh` validates reality against the graph.
+*   **apply = cargo install/uninstall**: `symlink-apply.sh --grant/--revoke` manages access.
+
+When adding agent access:
+1. Add entry to `graph.toml` (owner dir → dest path)
+2. Ensure source exists in owner dir
+3. Run `symlink-apply.sh` to create the symlink
+4. Verify with `symlink-enforce.sh`
 
 ## Workflow: "Dreaming Mode"
 The agent shall utilize a continuous "Dreaming/Refinement" loop during or after complex conversations to:
