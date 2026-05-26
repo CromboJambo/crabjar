@@ -161,7 +161,7 @@ log = "0.4"
 hashbrown = "0.16"
 flate2 = "1.1.9"
 ahash = { version = "0.8.12", default-features = false }
-bincode = { version = "2.0.1", features = ["alloc", "serde"], default-features = false }
+bincode = { version = "2.0.1", features = ["alloc", "serde", "std"] }
 spin = { version = "0.10.0", features = ["mutex", "spin_mutex", "portable-atomic"] }
 regex = { version = "1.12.3", default-features = false, features = ["perf", "unicode"] }
 portable-atomic = { version = "1.13.1" }
