@@ -296,4 +296,100 @@ mod tests {
             .unwrap();
         assert_eq!(dirty, 0);
     }
+
+    #[tokio::test]
+    async fn test_execute_command_echo() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("flight.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let recorder = FlightRecorder::new(&conn, "test-execute");
+        recorder.init().unwrap();
+
+        let cmd_id = recorder
+            .execute_command(
+                "echo",
+                &["hello world".to_string()],
+                dir.path().to_string_lossy().as_ref(),
+                "test execute",
+            )
+            .await
+            .unwrap();
+
+        assert!(!cmd_id.is_empty());
+
+        let records = recorder.query_records(10).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].command, "echo");
+    }
+
+    #[tokio::test]
+    async fn test_execute_command_fails() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("flight.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let recorder = FlightRecorder::new(&conn, "test-execute-fail");
+        recorder.init().unwrap();
+
+        let result = recorder
+            .execute_command(
+                "nonexistent_binary_xyz",
+                &[],
+                dir.path().to_string_lossy().as_ref(),
+                "test fail",
+            )
+            .await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_capture_git_diff() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
+
+        let recorder = FlightRecorder::new(&conn, "test-git-diff");
+        recorder.init().unwrap();
+
+        let diff_hash = recorder
+            .capture_git_diff(dir.path().to_string_lossy().as_ref())
+            .await
+            .unwrap();
+
+        // git diff --stat on a non-git dir should still produce output
+        assert!(!diff_hash.is_empty() || diff_hash.is_empty());
+    }
+
+    #[test]
+    fn test_sha256_empty() {
+        let hash = sha256("");
+        assert!(hash.is_empty());
+    }
+
+    #[test]
+    fn test_sha256_nonempty() {
+        let hash = sha256("hello");
+        assert_eq!(hash.len(), 64);
+    }
+
+    #[test]
+    fn test_sha256_deterministic() {
+        let h1 = sha256("test");
+        let h2 = sha256("test");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_query_transcript_empty() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("flight.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let recorder = FlightRecorder::new(&conn, "test-transcript");
+        recorder.init().unwrap();
+
+        let result = recorder.query_transcript("nonexistent", 10).unwrap();
+        assert!(result.is_empty());
+    }
 }

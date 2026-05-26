@@ -137,4 +137,64 @@ mod tests {
         assert_eq!(outcome.exit_code, -1);
         assert_eq!(outcome.source, "dry-run");
     }
+
+    #[tokio::test]
+    async fn test_structured_executor_run_echo() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
+
+        let recorder = FlightRecorder::new(&conn, "test-session-run");
+        recorder.init().unwrap();
+
+        let executor = StructuredCommandExecutor::new(recorder);
+
+        let outcome = executor
+            .run(
+                "echo",
+                &["hello".to_string()],
+                dir.path().to_string_lossy().as_ref(),
+                "test run",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(outcome.exit_code, 0);
+        assert_eq!(outcome.command, "echo");
+        assert_eq!(outcome.source, "agent");
+    }
+
+    #[tokio::test]
+    async fn test_structured_executor_run_fails() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
+
+        let recorder = FlightRecorder::new(&conn, "test-session-fail");
+        recorder.init().unwrap();
+
+        let executor = StructuredCommandExecutor::new(recorder);
+
+        let outcome = executor
+            .run(
+                "nonexistent_binary_xyz",
+                &[],
+                dir.path().to_string_lossy().as_ref(),
+                "test fail",
+            )
+            .await;
+
+        assert!(outcome.is_err());
+    }
+
+    #[test]
+    fn test_query_outcomes_empty() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
+
+        let recorder = FlightRecorder::new(&conn, "test-session-q");
+        recorder.init().unwrap();
+
+        let executor = StructuredCommandExecutor::new(recorder);
+        let outcomes = executor.query_outcomes(10).unwrap();
+        assert!(outcomes.is_empty());
+    }
 }
