@@ -193,3 +193,35 @@ CREATE TABLE IF NOT EXISTS interrupted_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_interrupted_log_time ON interrupted_log(logged_at DESC);
+
+-- ============================================================================
+-- PID Trust: per-process trust layers (Option B)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS pid_trust (
+    pid INTEGER PRIMARY KEY,
+    trust_layer INTEGER NOT NULL DEFAULT 0,
+    use_count INTEGER NOT NULL DEFAULT 0,
+    last_use INTEGER NOT NULL DEFAULT (unixepoch()),
+    auto_grant BOOLEAN NOT NULL DEFAULT 0,
+    decay_interval INTEGER NOT NULL DEFAULT 3600,
+    decay_rate REAL NOT NULL DEFAULT 0.02
+);
+
+CREATE INDEX IF NOT EXISTS idx_pid_trust_layer ON pid_trust(trust_layer);
+CREATE INDEX IF NOT EXISTS idx_pid_trust_last_use ON pid_trust(last_use DESC);
+
+-- ============================================================================
+-- Revoked Log: guided exits from revocation
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS revoked_log (
+    id INTEGER PRIMARY KEY,
+    pid INTEGER NOT NULL,
+    command TEXT NOT NULL,
+    revoked_at INTEGER NOT NULL DEFAULT (unixepoch()),
+    reason TEXT NOT NULL,
+    old_layer INTEGER NOT NULL,
+    new_layer INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_revoked_log_time ON revoked_log(revoked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_revoked_log_pid ON revoked_log(pid);

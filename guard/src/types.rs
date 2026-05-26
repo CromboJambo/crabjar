@@ -383,6 +383,44 @@ pub struct ModelInferenceOutcome {
     pub created_at: i64,
 }
 
+/// PID trust record for per-process authorization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PidTrustRecord {
+    pub pid: i32,
+    pub trust_layer: u32,
+    pub use_count: u64,
+    pub last_use: i64,
+    pub auto_grant: bool,
+    pub decay_interval: i64,
+    pub decay_rate: f64,
+}
+
+impl Default for PidTrustRecord {
+    fn default() -> Self {
+        Self {
+            pid: 0,
+            trust_layer: 0,
+            use_count: 0,
+            last_use: 0,
+            auto_grant: false,
+            decay_interval: 3600,
+            decay_rate: 0.02,
+        }
+    }
+}
+
+/// Record of a guided revocation exit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevokedLogEntry {
+    pub id: i64,
+    pub pid: i32,
+    pub command: String,
+    pub revoked_at: i64,
+    pub reason: String,
+    pub old_layer: u32,
+    pub new_layer: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

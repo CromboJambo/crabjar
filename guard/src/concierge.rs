@@ -140,6 +140,29 @@ impl GateConcierge {
                 );
                 (ActionStatus::Denied, None, None)
             }
+            GateResult::Revoked { reason } => {
+                let entry = InterruptedLogEntry {
+                    id: Uuid::new_v4().to_string(),
+                    gate_result_id: gate_result_id.clone(),
+                    action_type: action_type.to_string(),
+                    command: command.to_string(),
+                    args: args.to_vec(),
+                    trust_layer,
+                    source_event_id: source_event_id.clone(),
+                    reason: reason.clone(),
+                    logged_at: chrono::Utc::now().timestamp(),
+                };
+                if let Some(db) = &self.db {
+                    db.persist_revoked_entry(&entry).ok();
+                }
+                info!(
+                    gate_result_id = %gate_result_id,
+                    action_type = %action_type,
+                    reason = %reason,
+                    "Gate concierge: Revoked — guided exit"
+                );
+                (ActionStatus::Denied, None, Some(entry))
+            }
         }
     }
 

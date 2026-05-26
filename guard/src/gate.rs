@@ -14,6 +14,8 @@ pub enum GateResult {
     Interrupted { reason: String },
     Pending,
     DryRun,
+    /// Process was revoked — guide out gracefully, don't block hard.
+    Revoked { reason: String },
 }
 
 /// Execution gate that combines trust-layer gating with command security checks.
@@ -118,7 +120,13 @@ impl<'a> ExecutionGate<'a> {
             return Ok(GateResult::Interrupted { reason });
         }
 
-        // 6. Command risk assessment
+        // 6. PID trust check (Option B: per-process trust layers)
+        if let Some(pid) = ctx.pid
+            && let Some(gate_result) = self.check_pid_trust(pid, ctx.command)? {
+            return Ok(gate_result);
+        }
+
+        // 7. Command risk assessment
         let risk = self.assess_command_risk(ctx.command, &ctx.args);
         match risk {
             CommandRisk::High => {
@@ -160,6 +168,58 @@ impl<'a> ExecutionGate<'a> {
         Ok(exists)
     }
 
+    /// Check PID trust layer (Option B).
+    /// Returns Revoked if trust has decayed below the action's trust layer.
+    fn check_pid_trust(&self, pid: i32, command: &str) -> Result<Option<GateResult>, GuardDbError> {
+        let conn = self.trust.conn();
+
+        let row = conn.query_row(
+            "SELECT trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate
+             FROM pid_trust WHERE pid = ?1",
+            rusqlite::params![pid],
+            |row| Ok((
+                row.get::<_, u32>(0)?,
+                row.get::<_, u64>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, bool>(3)?,
+                row.get::<_, i64>(4)?,
+                row.get::<_, f64>(5)?,
+            )),
+        );
+
+        let (current_layer, _use_count, last_use, auto_grant, decay_interval, decay_rate) =
+            match row {
+                Ok(r) => r,
+                Err(rusqlite::Error::QueryReturnedNoRows) => {
+                    // No PID record — treat as layer 0 (raw, requires review)
+                    return Ok(Some(GateResult::Pending));
+                }
+                Err(e) => return Err(GuardDbError::Sqlite(e)),
+            };
+
+        // Compute decayed trust layer
+        let elapsed = chrono::Utc::now().timestamp() - last_use;
+        let effective_layer = if elapsed > decay_interval {
+            let decayed = (decay_rate * elapsed as f64).min(1.0);
+            let new_confidence = (current_layer as f64 / 3.0) * (1.0 - decayed);
+            (new_confidence * 3.0) as u32
+        } else {
+            current_layer
+        };
+
+        // If trust has dropped below the action's layer, revoke
+        if effective_layer < (self.risk_config.confidence_floor * 3.0) as u32 {
+            let reason = format!(
+                "PID {} trust decayed from layer {} to {} (auto_grant={})",
+                pid, current_layer, effective_layer, auto_grant
+            );
+            warn!(pid, command, %reason, "PID trust revoked");
+            return Ok(Some(GateResult::Revoked { reason }));
+        }
+
+        Ok(None)
+    }
+
     /// Assess command risk based on name and arguments.
     fn assess_command_risk(&self, command: &str, args: &[String]) -> CommandRisk {
         let basename = command.split('/').next_back().unwrap_or(command);
@@ -193,6 +253,8 @@ pub struct GateContext<'a> {
     pub confidence: TrustScore,
     pub source_event_id: Option<&'a str>,
     pub can_interrupt: bool,
+    /// PID of the calling process (for pid_trust lookup)
+    pub pid: Option<i32>,
 }
 
 /// Risk level for a command. Higher risk means more scrutiny.
@@ -338,6 +400,7 @@ mod tests {
             confidence: TrustScore::new(0.9),
             source_event_id: Some("evt-1"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -376,6 +439,7 @@ mod tests {
             confidence: TrustScore::new(0.65),
             source_event_id: Some("evt-2"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -414,6 +478,7 @@ mod tests {
             confidence: TrustScore::new(0.65),
             source_event_id: Some("evt-4"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -434,6 +499,7 @@ mod tests {
             confidence: TrustScore::new(0.65),
             source_event_id: Some("evt-dry-run"),
             can_interrupt: false,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -472,6 +538,7 @@ mod tests {
             confidence: TrustScore::new(0.9),
             source_event_id: Some("evt-5"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -510,6 +577,7 @@ mod tests {
             confidence: TrustScore::new(0.9),
             source_event_id: Some("evt-6"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -530,6 +598,7 @@ mod tests {
             confidence: TrustScore::new(0.1),
             source_event_id: Some("evt-7"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -550,6 +619,7 @@ mod tests {
             confidence: TrustScore::new(0.9),
             source_event_id: Some("nonexistent-provenance"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -588,6 +658,7 @@ mod tests {
             confidence: TrustScore::new(0.9),
             source_event_id: Some("evt-1"),
             can_interrupt: true,
+            pid: None,
         };
 
         let result = gate.check(ctx).unwrap();
