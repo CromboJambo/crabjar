@@ -871,9 +871,8 @@ Line 8.
 "#;
 
     let sections = agent_context::state_docs::indexer::extract_sections_for_test(content);
-    // The indexer's trim_start_matches("### ") only removes h3 prefix,
-    // so h1 titles retain the "# " prefix
-    let section_a = sections.iter().find(|s| s.title == "# Section A");
+    // Headings are correctly stripped of their prefix (#, ##, ###)
+    let section_a = sections.iter().find(|s| s.title == "Section A");
 
     if let Some(s) = section_a {
         assert_eq!(s.start_line, 3, "Section A starts at line 3");

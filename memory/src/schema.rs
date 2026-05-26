@@ -1,5 +1,8 @@
 use rusqlite::Connection;
 
+/// Current schema version. Increment when adding new tables/columns.
+pub const SCHEMA_VERSION: i64 = 1;
+
 pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS schema_versions (
@@ -9,6 +12,15 @@ pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         )",
         [],
     )?;
+
+    let current_version: i64 = conn
+        .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_versions", [], |row| {
+            row.get(0)
+        })?;
+
+    if current_version >= SCHEMA_VERSION {
+        return Ok(());
+    }
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS knowledge_entries (
@@ -34,6 +46,11 @@ pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
             timestamp TEXT NOT NULL
         )",
         [],
+    )?;
+
+    conn.execute(
+        "INSERT INTO schema_versions (version, applied_at) VALUES (?, datetime('now'))",
+        [SCHEMA_VERSION],
     )?;
 
     Ok(())
@@ -73,7 +90,7 @@ mod tests {
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM schema_versions", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(count, 0);
+        assert_eq!(count, 1);
     }
 
     #[test]
@@ -112,17 +129,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("test.db")).unwrap();
         schema::migrate(&conn).unwrap();
-        conn.execute(
-            "INSERT INTO schema_versions (id, version, applied_at) VALUES (1, 1, '2026-01-01')",
-            [],
-        )
-        .unwrap();
         let version: i64 = conn
             .query_row("SELECT MAX(version) FROM schema_versions", [], |row| {
                 row.get(0)
             })
             .unwrap();
-        assert_eq!(version, 1);
+        assert_eq!(version, schema::SCHEMA_VERSION);
     }
 
     #[test]

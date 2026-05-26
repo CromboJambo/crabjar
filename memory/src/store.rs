@@ -159,12 +159,13 @@ impl Store {
 
         let cursor = stmt.query_map(rusqlite::params![limit], |row| {
             let ts_str: String = row.get(2)?;
+            let ts = chrono::DateTime::<chrono::FixedOffset>::parse_from_rfc3339(&ts_str)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now());
             Ok(EventRow {
                 id: row.get(0)?,
                 event_type: row.get(1)?,
-                timestamp: chrono::DateTime::<chrono::FixedOffset>::parse_from_rfc3339(&ts_str)
-                    .unwrap()
-                    .to_utc(),
+                timestamp: ts,
             })
         })?;
 

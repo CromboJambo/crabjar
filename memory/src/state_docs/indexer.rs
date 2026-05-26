@@ -154,7 +154,19 @@ fn compute_checksum(content: &str) -> String {
     format!("{:x}", hash)
 }
 
-fn doc_path_to_string(_content: &str) -> String {
+fn doc_path_to_string(content: &str) -> String {
+    // Extract path from frontmatter if available, otherwise use content as hint
+    if content.starts_with("---") {
+        let parts: Vec<&str> = content.split("---").collect();
+        if parts.len() >= 3 {
+            let frontmatter = parts[1];
+            for line in frontmatter.lines() {
+                if let Some(("path", val)) = line.split_once(':') {
+                    return val.trim().to_string();
+                }
+            }
+        }
+    }
     "unknown".to_string()
 }
 
@@ -168,33 +180,45 @@ fn extract_sections(content: &str) -> Vec<Section> {
     for (i, line) in lines.iter().enumerate() {
         let line_num = i + 1; // 1-indexed
 
-        if line.starts_with("# ") {
-            // Start new h1 section
+        // Detect heading level by counting leading '#'
+        let heading_level = if line.starts_with("### ") {
+            Some(3)
+        } else if line.starts_with("## ") {
+            Some(2)
+        } else if line.starts_with("# ") {
+            Some(1)
+        } else {
+            None
+        };
+
+        if let Some(level) = heading_level {
+            // Close previous section
             if let Some(mut s) = current_section.take() {
                 s.end_line = line_num - 1;
                 sections.push(s);
             }
 
-            // Start new h2 section
-            if let Some(mut s) = current_section.take() {
-                s.end_line = line_num - 1;
-                sections.push(s);
-            }
+            // Determine parent: find the most recent section at a lower level
+            let parent_id = sections
+                .iter()
+                .rev()
+                .find(|s| s.level < level)
+                .map(|s| s.id);
 
-            // Start new h3 section
-            if let Some(mut s) = current_section.take() {
-                s.end_line = line_num - 1;
-                sections.push(s);
-            }
-            let title = line.trim_start_matches("### ").trim();
+            let title = line
+                .trim_start_matches("### ")
+                .trim_start_matches("## ")
+                .trim_start_matches("# ")
+                .trim();
+
             current_section = Some(Section {
                 id: section_id_counter,
                 doc_name: String::new(),
-                level: 3,
+                level,
                 title: title.to_string(),
                 start_line: line_num,
                 end_line: 0,
-                parent_id: current_section.as_ref().map(|s| s.id),
+                parent_id,
                 child_count: 0,
                 content_hash: String::new(),
                 is_confidence_section: false,
