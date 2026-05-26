@@ -506,6 +506,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                 confidence: crabjar_guard::TrustScore::new(0.5),
                 source_event_id: Some("orchestrator-tc"),
                 can_interrupt: true,
+                pid: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
