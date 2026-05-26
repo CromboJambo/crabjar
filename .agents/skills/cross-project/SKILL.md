@@ -22,6 +22,14 @@ for version-controlled changes.
 | LinuxFromCrates | `/home/crombo/LinuxFromCrates/` | `AGENTS.md`, `agent_config.md`, `lfc.toml`, `Justfile` |
 | .dotfiles | `/home/crombo/.dotfiles/` | `AGENTS.md`, `environment_manifest.json`, `state-docs/`, `symlinks/` |
 
+## Access Control
+
+Agent access is declared in `~/.dotfiles/manifest/graph.toml`. All mutations go to the owner dir (`~/.dotfiles/.config/`). Symlinks in `~/.config/` are immutable borrows — you never write through them.
+
+- `symlink-enforce.sh` — validates the graph (`cargo check` equivalent)
+- `symlink-apply.sh --grant NAME` — adds a new symlink (`cargo install` equivalent)
+- `symlink-apply.sh --revoke NAME` — removes a symlink (`cargo uninstall` equivalent)
+
 ## Methods
 
 ### 1. Add to opencode.json `instruction_paths`
@@ -43,11 +51,19 @@ Files are loaded at session start. Paths can be absolute or relative.
 
 ### 2. Symlink from dotfiles repo
 
-Create a symlink in `~/.config/opencode/` pointing to the external file:
+Add an entry to `~/.dotfiles/manifest/graph.toml` and run `symlink-apply.sh`:
+
+```toml
+[[entries]]
+name = "lfc-rules"
+source = "/home/crombo/LinuxFromCrates/AGENTS.md"
+dest = "/home/crombo/.config/opencode/lfc-rules.md"
+type = "immutable"
+notes = "LinuxFromCrates agent rules"
+```
 
 ```bash
-ln -s /home/crombo/LinuxFromCrates/AGENTS.md ~/.config/opencode/lfc-rules.md
-ln -s /home/crombo/.dotfiles/AGENTS.md ~/.config/opencode/dotfiles-rules.md
+~/.dotfiles/symlinks/tools/symlink-apply.sh  # creates the symlink
 ```
 
 Then add the symlink path to `instruction_paths`.
