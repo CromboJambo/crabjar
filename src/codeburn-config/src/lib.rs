@@ -58,7 +58,7 @@ impl Default for CodeBurnConfig {
 
 #[cfg(test)]
 mod tests {
-    use crate::CodeBurnConfig;
+    use crate::{CodeBurnConfig, CodeBurnConfigError};
 
     use tempfile::tempdir;
 
@@ -84,5 +84,60 @@ mod tests {
         let config = CodeBurnConfig::load(dir.path()).unwrap_or_else(|_| CodeBurnConfig::new());
         assert!(config.workspace.is_none());
         assert_eq!(config.currency, "USD");
+    }
+
+    #[test]
+    fn codeburn_config_load_valid_file() {
+        let dir = tempdir().unwrap();
+        let config_content = r#"
+workspace = "my-workspace"
+currency = "EUR"
+plan = "pro"
+
+[model_aliases]
+"gpt4" = "gpt-4"
+"gpt35" = "gpt-3.5"
+"#;
+        std::fs::write(dir.path().join(".crabjar_config.toml"), config_content).unwrap();
+
+        let config = CodeBurnConfig::load(dir.path()).unwrap();
+        assert_eq!(config.workspace, Some("my-workspace".to_string()));
+        assert_eq!(config.currency, "EUR");
+        assert_eq!(config.plan, Some("pro".to_string()));
+        assert_eq!(config.model_aliases.len(), 2);
+        assert_eq!(config.model_aliases.get("gpt4"), Some(&"gpt-4".to_string()));
+    }
+
+    #[test]
+    fn codeburn_config_load_malformed_toml() {
+        let dir = tempdir().unwrap();
+        std::fs::write(
+            dir.path().join(".crabjar_config.toml"),
+            "this is not valid toml {{{",
+        )
+        .unwrap();
+
+        let result = CodeBurnConfig::load(dir.path());
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            CodeBurnConfigError::ParseError { .. } => {}
+            _ => panic!("expected ParseError"),
+        }
+    }
+
+    #[test]
+    fn codeburn_config_plan_usage_returns_default() {
+        let config = CodeBurnConfig::new();
+        let usage = config.plan_usage("any-model").unwrap();
+        assert_eq!(usage, "default");
+    }
+
+    #[test]
+    fn codeburn_config_serialize_deserialize() {
+        let config = CodeBurnConfig::new();
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: CodeBurnConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.workspace, config.workspace);
+        assert_eq!(deserialized.currency, config.currency);
     }
 }
