@@ -64,6 +64,12 @@ pub enum CliCommand {
         #[arg(short, long, default_value = "false")]
         dry_run: bool,
     },
+
+    /// Manage bitwarden credentials
+    Bitwarden {
+        #[command(subcommand)]
+        command: BitwardenCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -136,6 +142,42 @@ pub enum WorkspaceCommand {
 }
 
 #[derive(Debug, Subcommand, Clone)]
+pub enum BitwardenCommand {
+    /// Check bitwarden CLI status
+    Status,
+    /// List bitwarden items
+    List {
+        #[arg(long)]
+        folder: Option<String>,
+        #[arg(long)]
+        collection: Option<String>,
+    },
+    /// Get a bitwarden item by ID
+    Get {
+        #[arg(long)]
+        id: String,
+    },
+    /// Search bitwarden items by name
+    Search {
+        #[arg(long)]
+        query: String,
+    },
+    /// Generate a password
+    Generate {
+        #[arg(long, default_value = "32")]
+        length: u32,
+        #[arg(long, default_value = "true")]
+        uppercase: bool,
+        #[arg(long, default_value = "true")]
+        lowercase: bool,
+        #[arg(long, default_value = "true")]
+        numbers: bool,
+        #[arg(long, default_value = "true")]
+        special: bool,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
 pub enum GuardCommand {
     /// List pending queue entries
     Queue {
@@ -165,6 +207,20 @@ pub enum GuardCommand {
     Provenance {
         #[arg(long)]
         source_event_id: String,
+    },
+    /// Grant PID trust access
+    Grant {
+        #[arg(long)]
+        pid: i32,
+        #[arg(long, default_value = "0")]
+        trust_layer: u32,
+        #[arg(long, default_value = "false")]
+        auto_grant: bool,
+    },
+    /// Revoke PID trust access
+    Revoke {
+        #[arg(long)]
+        pid: i32,
     },
 }
 

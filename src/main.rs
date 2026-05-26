@@ -6,8 +6,9 @@ mod dotfile_manager;
 mod knowledge_store;
 mod project_loader;
 mod state_docs;
+mod bitwarden;
 
-use crabjar_lib::{DotfileCommand, GuardCommand, KnowledgeCommand};
+use crabjar_lib::{BitwardenCommand, DotfileCommand, GuardCommand, KnowledgeCommand};
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
@@ -59,6 +60,8 @@ async fn main() {
             dry_run,
         }) => handle_exec(&command, &args, &cwd, &reason, dry_run)
             .await
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Bitwarden { command }) => handle_bitwarden_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         None => {
             print_json(&error_response("missing command", true));
@@ -254,6 +257,7 @@ async fn handle_exec(
         confidence: crabjar_guard::TrustScore::new(0.9),
         source_event_id: Some(reason),
         can_interrupt: true,
+        pid: None,
     })?;
 
     // Concierge layer: persist gate result to GuardDb
@@ -442,6 +446,143 @@ fn handle_guard_command(
                 },
             }))
         }
+        GuardCommand::Grant { pid, trust_layer, auto_grant } => {
+            guard_db.grant_pid_trust(pid, trust_layer, auto_grant)?;
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "grant": {
+                        "pid": pid,
+                        "trust_layer": trust_layer,
+                        "auto_grant": auto_grant,
+                    },
+                },
+            }))
+        }
+        GuardCommand::Revoke { pid } => {
+            let result = guard_db.revoke_pid_trust(pid)?;
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "revoke": {
+                        "pid": pid,
+                        "old_layer": result.map(|(l, _)| l),
+                        "status": "revoked",
+                    },
+                },
+            }))
+        }
+    }
+}
+
+/// Handle bitwarden commands
+fn handle_bitwarden_command(
+    command: BitwardenCommand,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    match command {
+        BitwardenCommand::Status => {
+            if !bitwarden::cli::is_available() {
+                return Ok(json!({
+                    "success": false,
+                    "bitwarden": {
+                        "status": "not_available",
+                        "error": "bitwarden CLI not found",
+                    },
+                }));
+            }
+
+            let status = bitwarden::cli::status()?;
+            Ok(json!({
+                "success": true,
+                "bitwarden": {
+                    "status": "available",
+                    "session": status,
+                },
+            }))
+        }
+        BitwardenCommand::List { folder, collection } => {
+            if !bitwarden::cli::is_available() {
+                return Ok(json!({
+                    "success": false,
+                    "bitwarden": {
+                        "items": [],
+                        "error": "bitwarden CLI not found",
+                    },
+                }));
+            }
+
+            let items = bitwarden::cli::list_items(folder.as_deref(), collection.as_deref())?;
+            Ok(json!({
+                "success": true,
+                "bitwarden": {
+                    "items": items,
+                },
+            }))
+        }
+        BitwardenCommand::Get { id } => {
+            if !bitwarden::cli::is_available() {
+                return Ok(json!({
+                    "success": false,
+                    "bitwarden": {
+                        "item": null,
+                        "error": "bitwarden CLI not found",
+                    },
+                }));
+            }
+
+            let item = bitwarden::cli::get_item(&id)?;
+            Ok(json!({
+                "success": true,
+                "bitwarden": {
+                    "item": item,
+                },
+            }))
+        }
+        BitwardenCommand::Search { query } => {
+            if !bitwarden::cli::is_available() {
+                return Ok(json!({
+                    "success": false,
+                    "bitwarden": {
+                        "items": [],
+                        "error": "bitwarden CLI not found",
+                    },
+                }));
+            }
+
+            let items = bitwarden::cli::search_items(&query)?;
+            Ok(json!({
+                "success": true,
+                "bitwarden": {
+                    "items": items,
+                    "query": query,
+                },
+            }))
+        }
+        BitwardenCommand::Generate { length, uppercase, lowercase, numbers, special } => {
+            if !bitwarden::cli::is_available() {
+                return Ok(json!({
+                    "success": false,
+                    "bitwarden": {
+                        "password": null,
+                        "error": "bitwarden CLI not found",
+                    },
+                }));
+            }
+
+            let password = bitwarden::cli::generate_password(
+                length,
+                uppercase,
+                lowercase,
+                numbers,
+                special,
+            )?;
+            Ok(json!({
+                "success": true,
+                "bitwarden": {
+                    "password": password,
+                },
+            }))
+        }
     }
 }
 
@@ -484,5 +625,8 @@ fn usage_lines() -> &'static [&'static str] {
         "crabjar knowledge <subcommand>",
         "crabjar dotfile <subcommand>",
         "crabjar workspace status",
+        "crabjar guard grant --pid=<pid>",
+        "crabjar guard revoke --pid=<pid>",
+        "crabjar bitwarden <subcommand>",
     ]
 }
