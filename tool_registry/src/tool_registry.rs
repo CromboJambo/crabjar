@@ -316,4 +316,100 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].call_count, 5);
     }
+
+    #[test]
+    fn test_list_by_type() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("tool_registry.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+        registry.register_tool("cargo_check", "command", "Run cargo check", "{}", "low_risk", 3, 0.9, "{}").unwrap();
+        registry.register_tool("openai_chat", "llm", "OpenAI chat", "{}", "medium_risk", 2, 0.7, "{}").unwrap();
+        let rows = registry.list_by_type("command", 10).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "cargo_check");
+    }
+
+    #[test]
+    fn test_list_by_type_no_match() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("tool_registry.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+        registry.register_tool("cargo_check", "command", "Run cargo check", "{}", "low_risk", 3, 0.9, "{}").unwrap();
+        let rows = registry.list_by_type("nonexistent", 10).unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_record_and_query_discovery() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("tool_registry.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+        let id = registry.record_discovery("test-source", "cargo_check").unwrap();
+        assert!(!id.is_empty());
+        let rows = registry.query_discovery("test-source", 10).unwrap();
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_discover_tools_no_skills_dir() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+        let result = registry.discover_tools("test", dir.path()).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_discover_tools_with_manifest() {
+        let dir = tempdir().unwrap();
+        let skills_dir = dir.path().join(".agents/skills/test-skill");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        std::fs::write(
+            skills_dir.join("manifest.json"),
+            r#"{"tools": [{"name": "cargo_check"}, {"name": "lint"}]}"#
+        ).unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+        let tools = registry.discover_tools("test", dir.path()).await.unwrap();
+        assert!(tools.contains(&"cargo_check".to_string()));
+        assert!(tools.contains(&"lint".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_discover_tools_skips_duplicate() {
+        let dir = tempdir().unwrap();
+        let skills1 = dir.path().join(".agents/skills/skill-a");
+        let skills2 = dir.path().join(".agents/skills/skill-b");
+        std::fs::create_dir_all(&skills1).unwrap();
+        std::fs::create_dir_all(&skills2).unwrap();
+        std::fs::write(skills1.join("manifest.json"), r#"{"tools": [{"name": "cargo_check"}]}"#).unwrap();
+        std::fs::write(skills2.join("manifest.json"), r#"{"tools": [{"name": "cargo_check"}, {"name": "lint"}]}"#).unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+        let tools = registry.discover_tools("test", dir.path()).await.unwrap();
+        assert_eq!(tools.iter().filter(|t| *t == "cargo_check").count(), 1);
+        assert!(tools.contains(&"lint".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_discover_tools_invalid_manifest() {
+        let dir = tempdir().unwrap();
+        let skills_dir = dir.path().join(".agents/skills/bad-skill");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+        std::fs::write(skills_dir.join("manifest.json"), "not valid json").unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+        let result = registry.discover_tools("test", dir.path()).await;
+        assert!(result.is_err());
+    }
 }
