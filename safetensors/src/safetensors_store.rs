@@ -382,4 +382,373 @@ mod tests {
         assert!(config.contains("format = safetensors"));
         assert!(config.contains("lazy_loading = true"));
     }
+
+    #[test]
+    fn test_verify_file_path_exists() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("safetensors.db")).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let path = dir.path().join("test.txt");
+        std::fs::write(&path, "test").unwrap();
+
+        assert!(store.verify_file_path(path.to_str().unwrap()).unwrap());
+    }
+
+    #[test]
+    fn test_verify_file_path_not_exists() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("safetensors.db")).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let result = store.verify_file_path("/nonexistent/path/file.txt").unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_parse_weights_invalid_file() {
+        let dir = tempdir().unwrap();
+        let conn = rusqlite::Connection::open(dir.path().join("safetensors.db")).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let result = store.parse_weights(
+            "/nonexistent/model.safetensors",
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_weights_too_short() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let model_path = dir.path().join("short.safetensors");
+        std::fs::write(&model_path, "too short").unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_query_tensors_empty() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let rows = store.query_tensors("nonexistent-weight").unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_insert_and_query_tensors() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let id = store
+            .insert_weights(
+                "qwen3-4b",
+                "Qwen/Qwen3-4B",
+                "/tmp/model.safetensors",
+                150,
+                "F32",
+                "CPU",
+                2000000000,
+                "abc123",
+                "{}",
+            )
+            .unwrap();
+
+        store
+            .insert_tensor_metadata(
+                &id,
+                "weight_0",
+                "[100, 200]",
+                "F32",
+                80000,
+                "hash1",
+            )
+            .unwrap();
+
+        let rows = store.query_tensors(&id).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].tensor_name, "weight_0");
+    }
+
+    #[test]
+    fn test_list_active_empty() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let rows = store.list_active(10).unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_parse_weights_success() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let header = serde_json::json!({
+            "tensors": {
+                "weight_0": {
+                    "dtype": "F32",
+                    "shape": [100, 200],
+                    "data_type": "f32"
+                },
+                "weight_1": {
+                    "dtype": "F16",
+                    "shape": [50, 60],
+                    "data_type": "f16"
+                }
+            }
+        });
+        let header_bytes = header.to_string().into_bytes();
+        let header_len = (header_bytes.len() as u64).to_le_bytes();
+        let mut file_data: Vec<u8> = header_len.to_vec();
+        file_data.extend(header_bytes);
+
+        let model_path = dir.path().join("model.safetensors");
+        std::fs::write(&model_path, &file_data).unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_ok());
+
+        let (weight_id, tensors) = result.unwrap();
+        assert!(!weight_id.is_empty());
+        assert_eq!(tensors.len(), 2);
+        assert_eq!(tensors[0].tensor_name, "weight_0");
+        assert_eq!(tensors[1].tensor_name, "weight_1");
+        assert_eq!(tensors[0].dtype, "F32");
+        assert_eq!(tensors[1].dtype, "F16");
+
+        let queried = store.query_tensors(&weight_id).unwrap();
+        assert_eq!(queried.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_weights_empty_tensors() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let header = serde_json::json!({
+            "tensors": {}
+        });
+        let header_bytes = header.to_string().into_bytes();
+        let header_len = (header_bytes.len() as u64).to_le_bytes();
+        let mut file_data: Vec<u8> = header_len.to_vec();
+        file_data.extend(header_bytes);
+
+        let model_path = dir.path().join("empty.safetensors");
+        std::fs::write(&model_path, &file_data).unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "empty-model",
+            "test-repo",
+        );
+        assert!(result.is_ok());
+
+        let (_, tensors) = result.unwrap();
+        assert_eq!(tensors.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_weights_missing_tensors_field() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let header = serde_json::json!({
+            "other_field": "value"
+        });
+        let header_bytes = header.to_string().into_bytes();
+        let header_len = (header_bytes.len() as u64).to_le_bytes();
+        let mut file_data: Vec<u8> = header_len.to_vec();
+        file_data.extend(header_bytes);
+
+        let model_path = dir.path().join("no-tensors.safetensors");
+        std::fs::write(&model_path, &file_data).unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_weights_tensor_missing_shape() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let header = serde_json::json!({
+            "tensors": {
+                "weight_0": {
+                    "dtype": "F32"
+                }
+            }
+        });
+        let header_bytes = header.to_string().into_bytes();
+        let header_len = (header_bytes.len() as u64).to_le_bytes();
+        let mut file_data: Vec<u8> = header_len.to_vec();
+        file_data.extend(header_bytes);
+
+        let model_path = dir.path().join("no-shape.safetensors");
+        std::fs::write(&model_path, &file_data).unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_weights_tensor_missing_dtype() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let header = serde_json::json!({
+            "tensors": {
+                "weight_0": {
+                    "shape": [10, 20]
+                }
+            }
+        });
+        let header_bytes = header.to_string().into_bytes();
+        let header_len = (header_bytes.len() as u64).to_le_bytes();
+        let mut file_data: Vec<u8> = header_len.to_vec();
+        file_data.extend(header_bytes);
+
+        let model_path = dir.path().join("no-dtype.safetensors");
+        std::fs::write(&model_path, &file_data).unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_weights_header_not_valid_json() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let header_len = 5u64;
+        let header_bytes = b"not json";
+        let mut file_data: Vec<u8> = header_len.to_le_bytes().to_vec();
+        file_data.extend(header_bytes);
+
+        let model_path = dir.path().join("bad-json.safetensors");
+        std::fs::write(&model_path, &file_data).unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_weights_header_exceeds_file() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        // Claim header is 1000 bytes but only provide 5 bytes
+        let header_len = 1000u64;
+        let file_data = header_len.to_le_bytes();
+
+        let model_path = dir.path().join("overflow.safetensors");
+        std::fs::write(&model_path, &file_data).unwrap();
+
+        let result = store.parse_weights(
+            model_path.to_str().unwrap(),
+            "test-model",
+            "test-repo",
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_generate_load_config_output() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("safetensors.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let store = SafetensorsStore::new(&conn);
+        store.init().unwrap();
+
+        let config = store
+            .generate_load_config("llama-3", "F16", "CUDA")
+            .unwrap();
+
+        assert!(config.contains("model = llama-3"));
+        assert!(config.contains("format = safetensors"));
+        assert!(config.contains("dtype = F16"));
+        assert!(config.contains("device = CUDA"));
+        assert!(config.contains("lazy_loading = true"));
+    }
 }
