@@ -74,3 +74,135 @@ impl DotfileManager {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_new_creates_manager() {
+        let dir = tempdir().unwrap();
+        let manager = DotfileManager::new(dir.path().to_path_buf());
+        assert_eq!(manager.project_root, dir.path());
+    }
+
+    #[test]
+    fn test_propose_success() {
+        let dir = tempdir().unwrap();
+        let staging = dir.path().join("staging");
+        let target = dir.path().join("target");
+        std::fs::create_dir_all(&staging).unwrap();
+
+        let manager = DotfileManager::new(dir.path().to_path_buf());
+        let result = manager.propose(
+            staging.to_str().unwrap(),
+            target.to_str().unwrap(),
+        );
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert_eq!(value["success"], true);
+        assert_eq!(value["action"], "promote_via_rsync");
+        assert!(value["command"].is_string());
+        assert!(value["command"].as_str().unwrap().contains("rsync"));
+        assert!(value["description"].is_string());
+        assert!(value["safety_check"].is_string());
+    }
+
+    #[test]
+    fn test_propose_staging_not_found() {
+        let dir = tempdir().unwrap();
+        let manager = DotfileManager::new(dir.path().to_path_buf());
+        let result = manager.propose(
+            "/nonexistent/staging/path",
+            dir.path().join("target").to_str().unwrap(),
+        );
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("does not exist"));
+    }
+
+    #[test]
+    fn test_verify_both_exist() {
+        let dir = tempdir().unwrap();
+        let staging = dir.path().join("staging");
+        let target = dir.path().join("target");
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::create_dir_all(&target).unwrap();
+
+        let manager = DotfileManager::new(dir.path().to_path_buf());
+        let result = manager.verify(
+            staging.to_str().unwrap(),
+            target.to_str().unwrap(),
+        );
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert_eq!(value["success"], true);
+        assert_eq!(value["status"]["staging_exists"], true);
+        assert_eq!(value["status"]["target_exists"], true);
+        assert_eq!(value["status"]["drift_detected"], false);
+        assert_eq!(
+            value["message"],
+            "Both paths are accessible. Ready for promotion."
+        );
+    }
+
+    #[test]
+    fn test_verify_staging_missing() {
+        let dir = tempdir().unwrap();
+        let target = dir.path().join("target");
+        std::fs::create_dir_all(&target).unwrap();
+
+        let manager = DotfileManager::new(dir.path().to_path_buf());
+        let result = manager.verify(
+            "/nonexistent/staging",
+            target.to_str().unwrap(),
+        );
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert_eq!(value["status"]["staging_exists"], false);
+        assert_eq!(value["status"]["target_exists"], true);
+        assert_eq!(value["status"]["drift_detected"], true);
+    }
+
+    #[test]
+    fn test_verify_target_missing() {
+        let dir = tempdir().unwrap();
+        let staging = dir.path().join("staging");
+        std::fs::create_dir_all(&staging).unwrap();
+
+        let manager = DotfileManager::new(dir.path().to_path_buf());
+        let result = manager.verify(
+            staging.to_str().unwrap(),
+            "/nonexistent/target",
+        );
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert_eq!(value["status"]["staging_exists"], true);
+        assert_eq!(value["status"]["target_exists"], false);
+        assert_eq!(value["status"]["drift_detected"], true);
+    }
+
+    #[test]
+    fn test_verify_both_missing() {
+        let manager = DotfileManager::new("/tmp".into());
+        let result = manager.verify(
+            "/nonexistent/staging1",
+            "/nonexistent/staging2",
+        );
+        assert!(result.is_ok());
+
+        let value = result.unwrap();
+        assert_eq!(value["status"]["staging_exists"], false);
+        assert_eq!(value["status"]["target_exists"], false);
+        assert_eq!(value["status"]["drift_detected"], true);
+        assert_eq!(
+            value["message"],
+            "One or both paths are missing. Verification failed."
+        );
+    }
+}
