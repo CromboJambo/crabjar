@@ -207,6 +207,7 @@ impl AcpAgentServer {
                             confidence: TrustScore::new(confidence),
                             source_event_id: source_event_id.as_deref(),
                             can_interrupt: true,
+                            pid: None,
                         });
 
                         match gate_result {
@@ -246,6 +247,17 @@ impl AcpAgentServer {
                                     "arguments": arguments,
                                     "gate_result": "dry_run",
                                     "status": "dry_run",
+                                }),
+                            }),
+                            Ok(GateResult::Revoked { reason }) => Ok(AcpResponse::Result {
+                                value: json!({
+                                    "session_id": session_id,
+                                    "tool": function_name,
+                                    "arguments": arguments,
+                                    "gate_result": "revoked",
+                                    "reason": reason,
+                                    "status": "revoked",
+                                    "guided_exit": true,
                                 }),
                             }),
                             Err(e) => Ok(AcpResponse::Error {
