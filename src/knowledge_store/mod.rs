@@ -533,7 +533,6 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    #[ignore]
     fn sync_is_idempotent_on_open_annotations() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("knowledge.db");
@@ -546,7 +545,7 @@ mod tests {
         fs::create_dir_all(&overlay).unwrap();
         fs::write(state_docs.join("alpha.md"), "# Alpha\n").unwrap();
         fs::write(
-            overlay.join("alpha.overlay.json"),
+            overlay.join("alpha.md.overlay.json"),
             r#"{
   "entries": [
     {
@@ -572,7 +571,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn deactivate_resolved_annotation_knowledge_returns_count() {
         let dir = tempdir().unwrap();
         let db_path = dir.path().join("knowledge.db");
@@ -585,7 +583,7 @@ mod tests {
         fs::create_dir_all(&overlay).unwrap();
         fs::write(state_docs.join("beta.md"), "# Beta\n").unwrap();
         fs::write(
-            overlay.join("beta.overlay.json"),
+            overlay.join("beta.md.overlay.json"),
             r#"{
   "entries": [
     {
