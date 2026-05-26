@@ -1,7 +1,7 @@
 use crate::error::{FlightRecorderError, TelemetryError};
 use crate::schema::{
     checkpoint_session, init_db, query_flight_records, query_session_checkpoints, query_transcript,
-    record_command, record_transcript_line,
+    record_command, record_transcript_line, CheckpointRow, FlightRecordRow,
 };
 use rusqlite::Connection;
 use sha2::Digest;
@@ -177,6 +177,36 @@ impl<'a> FlightRecorder<'a> {
         limit: usize,
     ) -> Result<Vec<crate::schema::CheckpointRow>, FlightRecorderError> {
         query_session_checkpoints(self.conn, &self.session_id, limit)
+    }
+
+    /// Serialize a checkpoint row to bitcode bytes.
+    pub fn serialize_checkpoint_bincode(
+        checkpoint: &CheckpointRow,
+    ) -> Vec<u8> {
+        bitcode::encode(checkpoint)
+    }
+
+    /// Deserialize a checkpoint row from bitcode bytes.
+    pub fn deserialize_checkpoint_bincode(
+        bytes: &[u8],
+    ) -> Result<CheckpointRow, FlightRecorderError> {
+        bitcode::decode(bytes)
+            .map_err(|e| FlightRecorderError::BincodeDecode(e.to_string()))
+    }
+
+    /// Serialize a flight record row to bitcode bytes.
+    pub fn serialize_flight_record_bincode(
+        record: &FlightRecordRow,
+    ) -> Vec<u8> {
+        bitcode::encode(record)
+    }
+
+    /// Deserialize a flight record row from bitcode bytes.
+    pub fn deserialize_flight_record_bincode(
+        bytes: &[u8],
+    ) -> Result<FlightRecordRow, FlightRecorderError> {
+        bitcode::decode(bytes)
+            .map_err(|e| FlightRecorderError::BincodeDecode(e.to_string()))
     }
 
     /// Query transcript lines for a specific command.
@@ -391,5 +421,54 @@ mod tests {
 
         let result = recorder.query_transcript("nonexistent", 10).unwrap();
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_serialize_checkpoint_bincode() {
+        let checkpoint = CheckpointRow {
+            id: "chk-1".to_string(),
+            session_id: "session-1".to_string(),
+            repo_state_hash: "abc123".to_string(),
+            dirty_tree_count: 5,
+            checkpointed_at: "2024-01-01T00:00:00Z".to_string(),
+        };
+
+        let bytes = FlightRecorder::serialize_checkpoint_bincode(&checkpoint);
+        assert!(!bytes.is_empty());
+
+        let deserialized = FlightRecorder::deserialize_checkpoint_bincode(&bytes).unwrap();
+        assert_eq!(deserialized.id, checkpoint.id);
+        assert_eq!(deserialized.repo_state_hash, checkpoint.repo_state_hash);
+        assert_eq!(deserialized.dirty_tree_count, checkpoint.dirty_tree_count);
+    }
+
+    #[test]
+    fn test_serialize_flight_record_bincode() {
+        let record = FlightRecordRow {
+            id: "cmd-1".to_string(),
+            session_id: "session-1".to_string(),
+            timestamp: "2024-01-01T00:00:00Z".to_string(),
+            command: "cargo check".to_string(),
+            cwd: "/repo".to_string(),
+            args: vec!["--workspace".to_string()],
+            exit_code: 0,
+            stdout_hash: "hash1".to_string(),
+            stderr_hash: "hash2".to_string(),
+            stdout_len: 100,
+            stderr_len: 0,
+            git_dirty: 3,
+            git_diff_count: 2,
+            git_diff_hash: "diff_hash".to_string(),
+            reason: "test: check workspace".to_string(),
+            source: "agent".to_string(),
+        };
+
+        let bytes = FlightRecorder::serialize_flight_record_bincode(&record);
+        assert!(!bytes.is_empty());
+
+        let deserialized = FlightRecorder::deserialize_flight_record_bincode(&bytes).unwrap();
+        assert_eq!(deserialized.command, record.command);
+        assert_eq!(deserialized.exit_code, record.exit_code);
+        assert_eq!(deserialized.args, record.args);
     }
 }

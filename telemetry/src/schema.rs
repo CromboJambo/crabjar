@@ -1,4 +1,5 @@
 use crate::error::FlightRecorderError;
+use bitcode::{Decode, Encode};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
@@ -301,7 +302,7 @@ pub fn list_all_records(
 }
 
 /// A single flight record row.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct FlightRecordRow {
     pub id: String,
     pub session_id: String,
@@ -322,7 +323,7 @@ pub struct FlightRecordRow {
 }
 
 /// A single session checkpoint row.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct CheckpointRow {
     pub id: String,
     pub session_id: String,
@@ -332,7 +333,7 @@ pub struct CheckpointRow {
 }
 
 /// A single transcript line row.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct TranscriptRow {
     pub id: String,
     pub session_id: String,

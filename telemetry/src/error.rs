@@ -11,6 +11,12 @@ pub enum FlightRecorderError {
     #[error("JSON serialization failed: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("bincode serialization failed: {0}")]
+    BincodeEncode(String),
+
+    #[error("bincode deserialization failed: {0}")]
+    BincodeDecode(String),
+
     #[error("git diff capture failed: {0}")]
     GitDiff(String),
 
