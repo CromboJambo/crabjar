@@ -107,3 +107,148 @@ pub enum EventType {
     Query,
     Promote,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn knowledge_kind_serde() {
+        let kind = KnowledgeKind::Instruction;
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"instruction\"");
+        let de: KnowledgeKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(de, KnowledgeKind::Instruction);
+    }
+
+    #[test]
+    fn knowledge_kind_pattern_serde() {
+        let kind = KnowledgeKind::Pattern;
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"pattern\"");
+    }
+
+    #[test]
+    fn knowledge_kind_example_serde() {
+        let kind = KnowledgeKind::Example;
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"example\"");
+    }
+
+    #[test]
+    fn knowledge_kind_context_serde() {
+        let kind = KnowledgeKind::Context;
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"context\"");
+    }
+
+    #[test]
+    fn source_serde_user() {
+        let source = Source::User;
+        let json = serde_json::to_string(&source).unwrap();
+        assert_eq!(json, "\"user\"");
+    }
+
+    #[test]
+    fn source_serde_agent() {
+        let source = Source::Agent;
+        let json = serde_json::to_string(&source).unwrap();
+        assert_eq!(json, "\"agent\"");
+    }
+
+    #[test]
+    fn source_serde_system() {
+        let source = Source::System;
+        let json = serde_json::to_string(&source).unwrap();
+        assert_eq!(json, "\"system\"");
+    }
+
+    #[test]
+    fn knowledge_entry_new_defaults() {
+        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern);
+        assert_eq!(entry.content, "test");
+        assert_eq!(entry.kind, KnowledgeKind::Pattern);
+        assert!(entry.tags.is_empty());
+        assert_eq!(entry.weight, 1.0);
+        assert_eq!(entry.source, Source::User);
+    }
+
+    #[test]
+    fn knowledge_entry_tags() {
+        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern)
+            .tags(["rust", "pattern"]);
+        assert_eq!(entry.tags, vec!["rust", "pattern"]);
+    }
+
+    #[test]
+    fn knowledge_entry_weight() {
+        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern).weight(2.5);
+        assert_eq!(entry.weight, 2.5);
+    }
+
+    #[test]
+    fn knowledge_entry_meta() {
+        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern)
+            .meta("key", "value");
+        assert_eq!(entry.metadata["key"], "value");
+    }
+
+    #[test]
+    fn knowledge_entry_stale() {
+        let dt = Utc::now();
+        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern).stale(dt);
+        let stale = entry.metadata["stale_after"].as_str().unwrap();
+        assert!(stale.contains("2026-05-25"));
+    }
+
+    #[test]
+    fn knowledge_row_clone() {
+        let row = KnowledgeRow {
+            id: 1,
+            content: "test".to_string(),
+            tags: vec!["rust".to_string()],
+            metadata: serde_json::json!({}),
+            active: true,
+        };
+        let cloned = row.clone();
+        assert_eq!(row.id, cloned.id);
+        assert_eq!(row.content, cloned.content);
+    }
+
+    #[test]
+    fn event_kind_clone() {
+        let kind = EventKind {
+            kind: "test".to_string(),
+            target_id: Some(1),
+            payload: Some(serde_json::json!({"a": 1})),
+            source: "user".to_string(),
+            ts: "2026-01-01T00:00:00Z".to_string(),
+        };
+        let cloned = kind.clone();
+        assert_eq!(kind.kind, cloned.kind);
+    }
+
+    #[test]
+    fn event_type_serde_insert() {
+        let json = serde_json::to_string(&EventType::Insert).unwrap();
+        assert_eq!(json, "\"Insert\"");
+    }
+
+    #[test]
+    fn event_type_serde_deactivate() {
+        let json = serde_json::to_string(&EventType::Deactivate).unwrap();
+        assert_eq!(json, "\"Deactivate\"");
+    }
+
+    #[test]
+    fn event_type_serde_query() {
+        let json = serde_json::to_string(&EventType::Query).unwrap();
+        assert_eq!(json, "\"Query\"");
+    }
+
+    #[test]
+    fn event_type_serde_promote() {
+        let json = serde_json::to_string(&EventType::Promote).unwrap();
+        assert_eq!(json, "\"Promote\"");
+    }
+}

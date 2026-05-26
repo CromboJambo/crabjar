@@ -282,3 +282,256 @@ fn row_matches_tags(row: &KnowledgeRow, tags: &[&str]) -> bool {
             .iter()
             .all(|wanted| row.tags.iter().any(|tag| tag == wanted))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::KnowledgeKind;
+
+    fn temp_store() -> (Store, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("knowledge.db");
+        let conn = Connection::open(path).unwrap();
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS knowledge_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                tags TEXT NOT NULL DEFAULT '[]',
+                metadata TEXT NOT NULL DEFAULT '{}',
+                weight REAL NOT NULL DEFAULT 1.0,
+                source TEXT NOT NULL DEFAULT 'user',
+                active INTEGER NOT NULL DEFAULT 1,
+                source_type TEXT NOT NULL DEFAULT '',
+                source_id TEXT NOT NULL DEFAULT '',
+                provenance_id TEXT NOT NULL DEFAULT ''
+            )",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS event_rows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            )",
+            [],
+        )
+        .unwrap();
+        let store = Store { conn };
+        (store, dir)
+    }
+
+    fn insert_entry(store: &Store, content: &str, tags: &[&str]) -> i64 {
+        let entry = KnowledgeEntry {
+            content: content.to_string(),
+            kind: KnowledgeKind::Pattern,
+            tags: tags.iter().map(|s| s.to_string()).collect(),
+            metadata: serde_json::json!({"source_doc": "test.md"}),
+            weight: 1.0,
+            source: Source::User,
+            source_type: "file".to_string(),
+            source_id: "test-file".to_string(),
+            provenance_id: "prov-1".to_string(),
+        };
+        store.insert(entry).unwrap()
+    }
+
+    #[test]
+    fn test_open_and_insert() {
+        let (store, _dir) = temp_store();
+        let entry = KnowledgeEntry::new("test content", KnowledgeKind::Pattern);
+        let rowid = store.insert(entry).unwrap();
+        assert!(rowid > 0);
+    }
+
+    #[test]
+    fn test_query_all_empty() {
+        let (store, _dir) = temp_store();
+        let rows = store.query(&[], 10, "", "", "").unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_query_with_tags() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "rust pattern", &["rust", "pattern"]);
+        insert_entry(&store, "python pattern", &["python", "pattern"]);
+        let rows = store.query(&["rust"], 10, "", "", "").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].content.contains("rust"));
+    }
+
+    #[test]
+    fn test_query_with_provenance_id() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "content with provenance", &["test"]);
+        let rows = store.query(&[], 10, "prov-1", "", "").unwrap();
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn test_query_with_source_id() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "content with source", &["test"]);
+        let rows = store.query(&[], 10, "", "test-file", "").unwrap();
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn test_query_with_source_doc() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "content with doc", &["test"]);
+        let rows = store.query(&[], 10, "", "", "test.md").unwrap();
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn test_query_with_all_filters() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "filtered content", &["test"]);
+        let rows = store.query(&[], 10, "prov-1", "test-file", "test.md").unwrap();
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn test_query_limit() {
+        let (store, _dir) = temp_store();
+        for i in 0..5 {
+            store.insert(KnowledgeEntry {
+                content: format!("entry-{}", i),
+                kind: KnowledgeKind::Pattern,
+                tags: vec!["test".to_string()],
+                metadata: serde_json::json!({}),
+                weight: 1.0,
+                source: Source::User,
+                source_type: "file".to_string(),
+                source_id: "test".to_string(),
+                provenance_id: "prov-1".to_string(),
+            }).unwrap();
+        }
+        let rows = store.query(&[], 3, "", "", "").unwrap();
+        assert!(rows.len() <= 3);
+    }
+
+    #[test]
+    fn test_find_active_by_source() {
+        let (store, _dir) = temp_store();
+        store.insert(KnowledgeEntry {
+            content: "found content".to_string(),
+            kind: KnowledgeKind::Pattern,
+            tags: vec!["test".to_string()],
+            metadata: serde_json::json!({}),
+            weight: 1.0,
+            source: Source::User,
+            source_type: "file".to_string(),
+            source_id: "unique-id".to_string(),
+            provenance_id: "prov-1".to_string(),
+        }).unwrap();
+        let row = store.find_active_by_source("file", "unique-id").unwrap();
+        assert!(row.is_some());
+        assert_eq!(row.unwrap().content, "found content");
+    }
+
+    #[test]
+    fn test_find_active_by_source_not_found() {
+        let (store, _dir) = temp_store();
+        let row = store.find_active_by_source("file", "nonexistent").unwrap();
+        assert!(row.is_none());
+    }
+
+    #[test]
+    fn test_events() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "test", &["test"]);
+        let events = store.events(10).unwrap();
+        assert!(!events.is_empty());
+        assert_eq!(events[0].event_type, "insert");
+    }
+
+    #[test]
+    fn test_events_limit() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "test1", &["test"]);
+        insert_entry(&store, "test2", &["test"]);
+        insert_entry(&store, "test3", &["test"]);
+        let events = store.events(2).unwrap();
+        assert!(events.len() <= 2);
+    }
+
+    #[test]
+    fn test_deactivate() {
+        let (store, _dir) = temp_store();
+        let id = insert_entry(&store, "deactivate me", &["test"]);
+        store.deactivate(id, Source::User, Some("reason")).unwrap();
+        let rows = store.query(&[], 10, "", "", "").unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_deactivate_by_source() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "keep this", &["other"]);
+        insert_entry(&store, "remove this", &["test"]);
+        let affected = store.deactivate_by_source("file", "test-file", Source::User, Some("reason")).unwrap();
+        assert!(affected >= 1);
+    }
+
+    #[test]
+    fn test_deactivate_by_provenance_id() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "prov content", &["test"]);
+        let affected = store.deactivate_by_provenance_id("prov-1", Source::User, Some("reason")).unwrap();
+        assert!(affected >= 1);
+    }
+
+    #[test]
+    fn test_verify_empty() {
+        let (store, _dir) = temp_store();
+        let bad = store.verify().unwrap();
+        assert!(bad.is_empty());
+    }
+
+    #[test]
+    fn test_verify_bad_entries() {
+        let (store, _dir) = temp_store();
+        store.conn.execute(
+            "INSERT INTO knowledge_entries (content, kind, tags, metadata, weight, source, source_type, source_id, provenance_id) VALUES ('', 'pattern', '[\"test\"]', '{}', 1.0, 'user', 'file', 'test-id', 'prov-1')",
+            [],
+        ).unwrap();
+        let bad = store.verify().unwrap();
+        assert!(!bad.is_empty());
+    }
+
+    #[test]
+    fn test_query_tag_mismatch() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "rust content", &["rust"]);
+        let rows = store.query(&["python"], 10, "", "", "").unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_query_multiple_tag_match() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "both tags", &["rust", "pattern"]);
+        let rows = store.query(&["rust", "pattern"], 10, "", "", "").unwrap();
+        assert_eq!(rows.len(), 1);
+    }
+
+    #[test]
+    fn test_query_provenance_no_match() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "content", &["test"]);
+        let rows = store.query(&[], 10, "wrong-prov", "", "").unwrap();
+        assert!(rows.is_empty());
+    }
+
+    #[test]
+    fn test_query_source_doc_no_match() {
+        let (store, _dir) = temp_store();
+        insert_entry(&store, "content", &["test"]);
+        let rows = store.query(&[], 10, "", "", "wrong-doc.md").unwrap();
+        assert!(rows.is_empty());
+    }
+}
