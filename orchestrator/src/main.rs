@@ -487,7 +487,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                 .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", &guard_root),
+                format!("{}/mirror.db", guard_root),
             ))
             .unwrap_or_else(|_| {
                 warn!("Failed to open guard DB, using in-memory fallback");
@@ -643,7 +643,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                 .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", &guard_root),
+                format!("{}/mirror.db", guard_root),
             ))
             .unwrap_or_else(|_| {
                 warn!("Failed to open guard DB for search_logs, using in-memory fallback");
@@ -669,7 +669,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                         result,
                         "tool_call",
                         "search_logs",
-                        &args,
+                        args,
                         2,
                         0.5,
                         Some("orchestrator-sl".to_string()),
@@ -760,7 +760,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                 .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", &guard_root),
+                format!("{}/mirror.db", guard_root),
             ))
             .unwrap_or_else(|_| {
                 warn!("Failed to open guard DB for recent_events, using in-memory fallback");
@@ -786,7 +786,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                         result,
                         "tool_call",
                         "recent_events",
-                        &args,
+                        args,
                         2,
                         0.5,
                         Some("orchestrator-re".to_string()),
@@ -873,7 +873,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                 .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", &guard_root),
+                format!("{}/mirror.db", guard_root),
             ))
             .unwrap_or_else(|_| {
                 warn!("Failed to open guard DB for by_source, using in-memory fallback");
@@ -899,7 +899,7 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                         result,
                         "tool_call",
                         "by_source",
-                        &args,
+                        args,
                         2,
                         0.5,
                         Some("orchestrator-bs".to_string()),
@@ -1023,18 +1023,26 @@ mod tests {
     fn insert_event(conn: &rusqlite::Connection, timestamp: &str, source: &str, content: &str) {
         conn.execute(
             "INSERT INTO events (timestamp, source, content, preview) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![timestamp, source, content, "preview of: ".to_string() + content],
-        ).unwrap();
+            rusqlite::params![
+                timestamp,
+                source,
+                content,
+                "preview of: ".to_string() + content
+            ],
+        )
+        .unwrap();
     }
 
     #[test]
     fn init_db_creates_table() {
         let (conn, _dir) = temp_db();
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='events'",
-            [],
-            |row| row.get(0),
-        ).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='events'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -1107,7 +1115,12 @@ mod tests {
     fn recent_defaults_to_50() {
         let (conn, _dir) = temp_db();
         for i in 0..60u64 {
-            insert_event(&conn, &format!("2026-05-24T{:02}:00:00Z", i % 24), "test", &format!("event-{}", i));
+            insert_event(
+                &conn,
+                &format!("2026-05-24T{:02}:00:00Z", i % 24),
+                "test",
+                &format!("event-{}", i),
+            );
         }
         let events = local_log::recent(&conn, None).unwrap();
         assert_eq!(events.len(), 50);
@@ -1123,8 +1136,18 @@ mod tests {
     #[test]
     fn by_source_filters_by_source() {
         let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "auth-service", "login attempt");
-        insert_event(&conn, "2026-05-24T11:00:00Z", "api-gateway", "request received");
+        insert_event(
+            &conn,
+            "2026-05-24T10:00:00Z",
+            "auth-service",
+            "login attempt",
+        );
+        insert_event(
+            &conn,
+            "2026-05-24T11:00:00Z",
+            "api-gateway",
+            "request received",
+        );
         insert_event(&conn, "2026-05-24T12:00:00Z", "auth-service", "logout");
         let events = local_log::by_source(&conn, "auth", Some(10)).unwrap();
         assert_eq!(events.len(), 2);
@@ -1377,7 +1400,12 @@ mod tests {
     fn local_log_recent_large_limit() {
         let (conn, _dir) = temp_db();
         for i in 0..100u64 {
-            insert_event(&conn, &format!("2026-05-24T{:02}:00:00Z", i % 24), "test", &format!("event-{}", i));
+            insert_event(
+                &conn,
+                &format!("2026-05-24T{:02}:00:00Z", i % 24),
+                "test",
+                &format!("event-{}", i),
+            );
         }
         let events = local_log::recent(&conn, Some(1000)).unwrap();
         assert_eq!(events.len(), 100);
