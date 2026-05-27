@@ -324,8 +324,30 @@ mod tests {
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
-        registry.register_tool("cargo_check", "command", "Run cargo check", "{}", "low_risk", 3, 0.9, "{}").unwrap();
-        registry.register_tool("openai_chat", "llm", "OpenAI chat", "{}", "medium_risk", 2, 0.7, "{}").unwrap();
+        registry
+            .register_tool(
+                "cargo_check",
+                "command",
+                "Run cargo check",
+                "{}",
+                "low_risk",
+                3,
+                0.9,
+                "{}",
+            )
+            .unwrap();
+        registry
+            .register_tool(
+                "openai_chat",
+                "llm",
+                "OpenAI chat",
+                "{}",
+                "medium_risk",
+                2,
+                0.7,
+                "{}",
+            )
+            .unwrap();
         let rows = registry.list_by_type("command", 10).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "cargo_check");
@@ -338,7 +360,18 @@ mod tests {
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
-        registry.register_tool("cargo_check", "command", "Run cargo check", "{}", "low_risk", 3, 0.9, "{}").unwrap();
+        registry
+            .register_tool(
+                "cargo_check",
+                "command",
+                "Run cargo check",
+                "{}",
+                "low_risk",
+                3,
+                0.9,
+                "{}",
+            )
+            .unwrap();
         let rows = registry.list_by_type("nonexistent", 10).unwrap();
         assert!(rows.is_empty());
     }
@@ -350,7 +383,9 @@ mod tests {
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
-        let id = registry.record_discovery("test-source", "cargo_check").unwrap();
+        let id = registry
+            .record_discovery("test-source", "cargo_check")
+            .unwrap();
         assert!(!id.is_empty());
         let rows = registry.query_discovery("test-source", 10).unwrap();
         assert_eq!(rows.len(), 1);
@@ -373,8 +408,9 @@ mod tests {
         std::fs::create_dir_all(&skills_dir).unwrap();
         std::fs::write(
             skills_dir.join("manifest.json"),
-            r#"{"tools": [{"name": "cargo_check"}, {"name": "lint"}]}"#
-        ).unwrap();
+            r#"{"tools": [{"name": "cargo_check"}, {"name": "lint"}]}"#,
+        )
+        .unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
@@ -390,8 +426,16 @@ mod tests {
         let skills2 = dir.path().join(".agents/skills/skill-b");
         std::fs::create_dir_all(&skills1).unwrap();
         std::fs::create_dir_all(&skills2).unwrap();
-        std::fs::write(skills1.join("manifest.json"), r#"{"tools": [{"name": "cargo_check"}]}"#).unwrap();
-        std::fs::write(skills2.join("manifest.json"), r#"{"tools": [{"name": "cargo_check"}, {"name": "lint"}]}"#).unwrap();
+        std::fs::write(
+            skills1.join("manifest.json"),
+            r#"{"tools": [{"name": "cargo_check"}]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            skills2.join("manifest.json"),
+            r#"{"tools": [{"name": "cargo_check"}, {"name": "lint"}]}"#,
+        )
+        .unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
