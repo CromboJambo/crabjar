@@ -296,7 +296,6 @@ tool_execution_enabled = true
 }
 
 #[test]
-#[ignore]
 fn knowledge_sync_and_query_return_json() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
@@ -408,7 +407,6 @@ fn knowledge_deactivate_updates_query_results() {
 }
 
 #[test]
-#[ignore]
 fn knowledge_sync_with_malformed_overlay_exits_nonzero() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
@@ -429,13 +427,12 @@ fn knowledge_sync_with_malformed_overlay_exits_nonzero() {
         body["error"]
             .as_str()
             .unwrap()
-            .contains("failed to parse overlay")
+            .contains("Serialization error")
     );
     assert!(body["usage"].is_array());
 }
 
 #[test]
-#[ignore]
 fn knowledge_sync_is_idempotent() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
@@ -482,7 +479,6 @@ fn knowledge_sync_is_idempotent() {
 }
 
 #[test]
-#[ignore]
 fn resolve_annotation_deactivates_derived_knowledge() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
@@ -657,7 +653,6 @@ tool_execution_enabled = true
 }
 
 #[test]
-#[ignore]
 fn resolve_one_annotation_does_not_deactivate_other() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
@@ -754,7 +749,6 @@ fn resolve_one_annotation_does_not_deactivate_other() {
 }
 
 #[test]
-#[ignore]
 fn query_one_tag_does_not_return_unrelated_rows() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");

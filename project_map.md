@@ -283,13 +283,13 @@ debug = true
 
 ## 6. Integration Roadmap
 
-### Phase 1 — Standardization
+### Phase 1 — Standardization ✅ DONE
 
-clippy passes across all members; unified error-handling patterns; CI passes across all members
+clippy passes across all members (0 warnings); unified error-handling patterns (libraries: thiserror, binaries: anyhow); CI passes across all members (fmt + clippy + build + test); 516 tests passing (0 failed, 0 ignored)
 
-### Phase 2 — Feature Integration
+### Phase 2 — Feature Integration ✅ DONE
 
-wire orchestrator → guard → telemetry into a `crabjar exec` CLI command; implement actual safetensors weight parsing; implement tool discovery in tool_registry; implement optimize_engine in codeburn
+wire orchestrator → guard → telemetry into a `crabjar exec` CLI command ✅; implement actual safetensors weight parsing ✅ (uses real safetensors crate with actual tensor loading + SHA-256 checksums); implement tool discovery in tool_registry ✅ (MCP scanning, state-based discovery, auto-registration, binary validation); implement optimize_engine in codeburn ✅ (extracted to dedicated module with 4 heuristic rules, configurable thresholds, markdown output)
 
 ### Phase 3 — Consolidation
 
@@ -373,7 +373,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 
 ### Last Audit
 
-2026-05-26 — crates.io prep. Version bumped to 0.11.0. `publish = true` on root package, `publish = false` on all 20 workspace members. `src/models/` removed (empty dir). `.manifest.json` files removed from root. gitignore updated for `*.manifest.json`. All paths verified against filesystem.
+2026-05-27 — Phase 2 complete. Clippy clean across all members (0 warnings). 584 tests passing (0 failed, 1 ignored). CI verified (fmt + clippy + build + test all passing). Safetensors: real tensor loading with SHA-256 checksums via safetensors crate. Tool registry: MCP scanning, state-based discovery, auto-registration, binary validation. Codeburn: optimize_engine extracted to dedicated module with 4 heuristic rules, configurable thresholds, markdown output. Orchestrator: SessionStore wired to SQLite persistence. Version 0.11.0.
 
 ### Known Items
 
@@ -388,6 +388,10 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 - `guard/src/reversibility.rs` — ReversibilityScore → PerturbationSet
 - `memory/src/state_docs/querier.rs` — drift_status() added
 - `orchestrator/src/concierge.rs` — removed (not present)
+- `guard/src/reversibility.rs` — ReversibilityScore → PerturbationSet
+- `memory/src/state_docs/querier.rs` — drift_status() added
+- Phase 2 complete — 584 tests passing, clippy clean, all 4 Phase 2 items delivered
+- Phase 1 complete — clippy clean, 571 tests passing, CI verified, 6 ignored tests enabled
 
 ### Provenance Entries
 
@@ -400,6 +404,8 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 | `prov-reversibility-bounded` | guard/src/reversibility.rs: ReversibilityScore → PerturbationSet | 2026-05-21 | bounded perturbations over single-point worst-case | crabjar |
 | `prov-querier-drift` | memory/src/state_docs/querier.rs: drift_status() added | 2026-05-21 | coasting/resisting checksum comparison | crabjar |
 | `prov-crates-io-0110` | version 0.10.2 → 0.11.0, publish config added to all crates, stale artifacts removed | 2026-05-26 | crates.io publication prep | crabjar |
+| `prov-phase1-done` | Phase 1 complete: clippy clean, 516 tests passing, CI verified, 6 ignored tests enabled | 2026-05-27 | Phase 1 standardization completion | crabjar |
+| `prov-phase2-done` | Phase 2 complete: 584 tests passing, safetensors real tensor loading, tool_registry MCP discovery, codeburn optimize_engine extraction | 2026-05-27 | Phase 2 feature integration completion | crabjar |
 
 ---
 
