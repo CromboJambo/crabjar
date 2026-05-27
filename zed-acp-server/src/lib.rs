@@ -332,7 +332,9 @@ mod tests {
         let mut server = AcpAgentServer::new();
         let rt = tokio::runtime::Runtime::new().unwrap();
         // NewSession doesn't store in sessions vec, so we manually add one
-        server.sessions.push(AcpSession::new("/test/project".to_string()));
+        server
+            .sessions
+            .push(AcpSession::new("/test/project".to_string()));
         let session_id = server.sessions[0].session_id.clone();
         let response = rt.block_on(server.handle_request(ZedRequest::CloseSession { session_id }));
         match response {
@@ -350,7 +352,9 @@ mod tests {
         let mut server = AcpAgentServer::new();
         let rt = tokio::runtime::Runtime::new().unwrap();
         // NewSession doesn't store in sessions vec, so we manually add one
-        server.sessions.push(AcpSession::new("/test/project".to_string()));
+        server
+            .sessions
+            .push(AcpSession::new("/test/project".to_string()));
         let response = rt.block_on(server.handle_request(ZedRequest::ListSessions));
         match response {
             Ok(AcpResponse::Result { value }) => {
@@ -366,7 +370,9 @@ mod tests {
         let mut server = AcpAgentServer::new();
         let rt = tokio::runtime::Runtime::new().unwrap();
         // NewSession doesn't store in sessions vec, so we manually add one
-        server.sessions.push(AcpSession::new("/test/project".to_string()));
+        server
+            .sessions
+            .push(AcpSession::new("/test/project".to_string()));
         let session_id = server.sessions[0].session_id.clone();
         let response = rt.block_on(server.handle_request(ZedRequest::Prompt {
             session_id,
@@ -405,7 +411,9 @@ mod tests {
         let mut server = AcpAgentServer::new().with_guard_db(db);
         let rt = tokio::runtime::Runtime::new().unwrap();
         // NewSession doesn't store in sessions vec, so we manually add one
-        server.sessions.push(AcpSession::new(dir.path().to_string_lossy().into_owned()));
+        server
+            .sessions
+            .push(AcpSession::new(dir.path().to_string_lossy().into_owned()));
         let session_id = server.sessions[0].session_id.clone();
 
         let response = rt.block_on(server.handle_request(ZedRequest::ToolCall {

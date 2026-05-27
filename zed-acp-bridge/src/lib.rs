@@ -234,7 +234,12 @@ mod tests {
         let bridge = AcpBridge::new();
         let result = bridge.query_knowledge(&["test"], 10);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("no knowledge store"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("no knowledge store")
+        );
     }
 
     #[test]
