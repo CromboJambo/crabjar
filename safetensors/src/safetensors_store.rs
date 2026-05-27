@@ -417,7 +417,9 @@ mod tests {
         let store = SafetensorsStore::new(&conn);
         store.init().unwrap();
 
-        let result = store.verify_file_path("/nonexistent/path/file.txt").unwrap();
+        let result = store
+            .verify_file_path("/nonexistent/path/file.txt")
+            .unwrap();
         assert!(!result);
     }
 
@@ -429,11 +431,8 @@ mod tests {
         let store = SafetensorsStore::new(&conn);
         store.init().unwrap();
 
-        let result = store.parse_weights(
-            "/nonexistent/model.safetensors",
-            "test-model",
-            "test-repo",
-        );
+        let result =
+            store.parse_weights("/nonexistent/model.safetensors", "test-model", "test-repo");
         assert!(result.is_err());
     }
 
@@ -449,11 +448,7 @@ mod tests {
         let model_path = dir.path().join("short.safetensors");
         std::fs::write(&model_path, "too short").unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "test-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "test-model", "test-repo");
         assert!(result.is_err());
     }
 
@@ -494,14 +489,7 @@ mod tests {
             .unwrap();
 
         store
-            .insert_tensor_metadata(
-                &id,
-                "weight_0",
-                "[100, 200]",
-                "F32",
-                80000,
-                "hash1",
-            )
+            .insert_tensor_metadata(&id, "weight_0", "[100, 200]", "F32", 80000, "hash1")
             .unwrap();
 
         let rows = store.query_tensors(&id).unwrap();
@@ -553,11 +541,7 @@ mod tests {
         let model_path = dir.path().join("model.safetensors");
         std::fs::write(&model_path, &file_data).unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "test-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "test-model", "test-repo");
         assert!(result.is_ok());
 
         let (weight_id, tensors) = result.unwrap();
@@ -592,11 +576,7 @@ mod tests {
         let model_path = dir.path().join("empty.safetensors");
         std::fs::write(&model_path, &file_data).unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "empty-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "empty-model", "test-repo");
         assert!(result.is_ok());
 
         let (_, tensors) = result.unwrap();
@@ -623,11 +603,7 @@ mod tests {
         let model_path = dir.path().join("no-tensors.safetensors");
         std::fs::write(&model_path, &file_data).unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "test-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "test-model", "test-repo");
         assert!(result.is_err());
     }
 
@@ -655,11 +631,7 @@ mod tests {
         let model_path = dir.path().join("no-shape.safetensors");
         std::fs::write(&model_path, &file_data).unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "test-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "test-model", "test-repo");
         assert!(result.is_err());
     }
 
@@ -687,11 +659,7 @@ mod tests {
         let model_path = dir.path().join("no-dtype.safetensors");
         std::fs::write(&model_path, &file_data).unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "test-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "test-model", "test-repo");
         assert!(result.is_err());
     }
 
@@ -712,11 +680,7 @@ mod tests {
         let model_path = dir.path().join("bad-json.safetensors");
         std::fs::write(&model_path, &file_data).unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "test-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "test-model", "test-repo");
         assert!(result.is_err());
     }
 
@@ -734,13 +698,9 @@ mod tests {
         let file_data = header_len.to_le_bytes();
 
         let model_path = dir.path().join("overflow.safetensors");
-        std::fs::write(&model_path, &file_data).unwrap();
+        std::fs::write(&model_path, file_data).unwrap();
 
-        let result = store.parse_weights(
-            model_path.to_str().unwrap(),
-            "test-model",
-            "test-repo",
-        );
+        let result = store.parse_weights(model_path.to_str().unwrap(), "test-model", "test-repo");
         assert!(result.is_err());
     }
 
