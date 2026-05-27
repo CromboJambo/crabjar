@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use tracing::{debug, info, warn};
-use uuid::Uuid;
 
 use crate::guard_db::GuardDb;
 use crate::guard_db::GuardDbError;
@@ -30,16 +29,15 @@ pub struct ExecutionGate<'a> {
     trust: TrustManager<'a>,
     dry_run: bool,
     risk_config: RiskConfig,
-    _root: PathBuf,
 }
 
 impl<'a> ExecutionGate<'a> {
-    pub fn new(db: &'a GuardDb, dry_run: bool, root: impl Into<PathBuf>) -> Self {
+    pub fn new(db: &'a GuardDb, dry_run: bool, _root: impl Into<PathBuf>) -> Self {
+        let _ = _root;
         Self {
             trust: TrustManager::new(db),
             dry_run,
             risk_config: RiskConfig::default(),
-            _root: root.into(),
         }
     }
 
@@ -278,7 +276,6 @@ pub struct RiskConfig {
     pub high_risk: Vec<String>,
     pub medium_risk: Vec<String>,
     pub confidence_floor: f64,
-    pub provenance_id: String,
     pub set_at: i64,
     pub reason: String,
     pub source: String,
@@ -290,7 +287,6 @@ impl Default for RiskConfig {
             high_risk: HIGH_RISK_COMMANDS.iter().map(|s| s.to_string()).collect(),
             medium_risk: MEDIUM_RISK_COMMANDS.iter().map(|s| s.to_string()).collect(),
             confidence_floor: 0.6,
-            provenance_id: Uuid::new_v4().to_string(),
             set_at: chrono::Utc::now().timestamp(),
             reason: "default risk thresholds".to_string(),
             source: "mirror-guard".to_string(),
@@ -301,21 +297,18 @@ impl Default for RiskConfig {
 impl RiskConfig {
     pub fn with_high_risk(mut self, commands: Vec<String>) -> Self {
         self.high_risk = commands;
-        self.provenance_id = Uuid::new_v4().to_string();
         self.set_at = chrono::Utc::now().timestamp();
         self
     }
 
     pub fn with_medium_risk(mut self, commands: Vec<String>) -> Self {
         self.medium_risk = commands;
-        self.provenance_id = Uuid::new_v4().to_string();
         self.set_at = chrono::Utc::now().timestamp();
         self
     }
 
     pub fn with_confidence_floor(mut self, floor: f64) -> Self {
         self.confidence_floor = floor.clamp(0.0, 1.0);
-        self.provenance_id = Uuid::new_v4().to_string();
         self.set_at = chrono::Utc::now().timestamp();
         self
     }

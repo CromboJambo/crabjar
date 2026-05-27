@@ -97,8 +97,13 @@ impl GateConcierge {
                     queued_at: chrono::Utc::now().timestamp(),
                     reason,
                 };
-                if let Some(db) = &self.db {
-                    db.persist_pending_queue_entry(&entry).ok();
+                if let Some(db) = &self.db
+                    && let Err(e) = db.persist_pending_queue_entry(&entry)
+                {
+                    error!(
+                        gate_result_id = %gate_result_id,
+                        "Failed to persist pending queue entry: {}", e
+                    );
                 }
                 warn!(
                     gate_result_id = %gate_result_id,
@@ -120,8 +125,13 @@ impl GateConcierge {
                     reason: reason.clone(),
                     logged_at: chrono::Utc::now().timestamp(),
                 };
-                if let Some(db) = &self.db {
-                    db.persist_interrupted_log_entry(&entry).ok();
+                if let Some(db) = &self.db
+                    && let Err(e) = db.persist_interrupted_log_entry(&entry)
+                {
+                    error!(
+                        gate_result_id = %gate_result_id,
+                        "Failed to persist interrupted log entry: {}", e
+                    );
                 }
                 error!(
                     gate_result_id = %gate_result_id,
@@ -152,8 +162,13 @@ impl GateConcierge {
                     reason: reason.clone(),
                     logged_at: chrono::Utc::now().timestamp(),
                 };
-                if let Some(db) = &self.db {
-                    db.persist_revoked_entry(&entry).ok();
+                if let Some(db) = &self.db
+                    && let Err(e) = db.persist_revoked_entry(&entry)
+                {
+                    error!(
+                        gate_result_id = %gate_result_id,
+                        "Failed to persist revoked entry: {}", e
+                    );
                 }
                 info!(
                     gate_result_id = %gate_result_id,

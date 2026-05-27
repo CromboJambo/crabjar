@@ -61,7 +61,9 @@ impl<'a> AnnealingPipeline<'a> {
                 let new_score = node.confidence.decay(decay_amount);
                 if new_score.get() < node.confidence.get() {
                     result.nodes_decayed += 1;
-                    let _ = self.trust.update_node_trust_layer(&node.id, new_score);
+                    if let Err(e) = self.trust.update_node_trust_layer(&node.id, new_score) {
+                        warn!(node = %node.id, %e, "Failed to update trust layer during decay");
+                    }
                 }
             }
         }
@@ -72,7 +74,9 @@ impl<'a> AnnealingPipeline<'a> {
             if effective.get() > node.confidence.get() + 0.05 {
                 let delta = (effective.get() - node.confidence.get()) * 0.3;
                 let new_score = node.confidence.reinforce(delta);
-                let _ = self.trust.update_node_trust_layer(&node.id, new_score);
+                if let Err(e) = self.trust.update_node_trust_layer(&node.id, new_score) {
+                    warn!(node = %node.id, %e, "Failed to update trust layer during reinforcement");
+                }
             }
         }
 
