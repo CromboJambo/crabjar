@@ -60,6 +60,24 @@ pub enum CliCommand {
     Optimize {
         #[arg(short, long)]
         period: Option<String>,
+
+        #[arg(short = 't', long, default_value = "500000")]
+        threshold: u64,
+
+        #[arg(short = 'r', long, default_value = "10.0")]
+        ratio_threshold: f64,
+
+        #[arg(short = 'n', long, default_value = "10")]
+        top_n: usize,
+
+        #[arg(short = 'm', long)]
+        model: Option<String>,
+
+        #[arg(short = 'p', long)]
+        project: Option<String>,
+
+        #[arg(short = 'f', long, default_value = "json")]
+        format: String,
     },
 
     /// Side-by-side model comparison
@@ -94,3 +112,5 @@ pub enum PlanAction {
 pub fn cli() -> clap::Command {
     Cli::command()
 }
+
+pub mod optimize;

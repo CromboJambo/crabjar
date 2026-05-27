@@ -6,6 +6,7 @@ mod tui;
 
 use codeburn_classifier::TaskClassifier;
 use codeburn_config::CodeBurnConfig;
+use codeburn_lib::optimize::{self, OptimizeConfig};
 use codeburn_pricing::PricingEngine;
 use codeburn_provider::ProviderRegistry;
 use ratatui::prelude::{CrosstermBackend, Terminal};
@@ -243,23 +244,102 @@ fn handle_export(cli: &Cli) -> Result<TuiOutput, Box<dyn std::error::Error>> {
     })))
 }
 
-async fn handle_optimize(_cli: &Cli) -> Result<TuiOutput, Box<dyn std::error::Error>> {
+async fn handle_optimize(cli: &Cli) -> Result<TuiOutput, Box<dyn std::error::Error>> {
     let _project_root = std::env::current_dir()?;
-    let registry = ProviderRegistry::new();
+
+    // Parse command options
+    let CliCommand::Optimize {
+        period: _,
+        threshold,
+        ratio_threshold,
+        top_n,
+        model,
+        project,
+        format,
+    } = &cli.command.as_ref().ok_or("expected Optimize command")?
+    else {
+        return Err("expected Optimize command".into());
+    };
+
+    let config = OptimizeConfig {
+        high_output_threshold: *threshold,
+        output_ratio_threshold: *ratio_threshold,
+        max_complexity: 2,
+        top_n: *top_n,
+        model_filter: model.clone(),
+        project_filter: project.clone(),
+        output_format: format.clone(),
+    };
+
+    // Discover providers
+    let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+    let path = std::path::Path::new(&home_dir).join(".codeburn");
+    let registry = ProviderRegistry::discover(&path)?;
     let classifier = TaskClassifier::new();
 
     let sessions = registry.read_sessions()?;
     let classified = classifier.classify(&sessions)?;
 
-    let findings = optimize_engine(&classified)?;
+    let findings = optimize::optimize_engine(&classified, &config);
 
-    Ok(TuiOutput::Json(json!({
+    // Format output based on format option
+    let output = if format == "markdown" {
+        format_findings_markdown(&findings)
+    } else {
+        json!({
+            "success": true,
+            "optimize": {
+                "findings": findings.iter().map(|f| {
+                    json!({
+                        "category": f.category,
+                        "provider": f.provider,
+                        "model": f.model,
+                        "input_tokens": f.input_tokens,
+                        "output_tokens": f.output_tokens,
+                        "output_ratio": f.output_ratio,
+                        "complexity": f.complexity,
+                        "project": f.project,
+                        "date": f.date,
+                        "explanation": f.explanation,
+                    })
+                }).collect::<Vec<_>>(),
+                "total_findings": findings.len(),
+                "fixes": findings.iter().map(|f| f.model.clone()).collect::<Vec<String>>(),
+            },
+        })
+    };
+
+    Ok(TuiOutput::Json(output))
+}
+
+fn format_findings_markdown(findings: &[optimize::Finding]) -> serde_json::Value {
+    let mut md = String::new();
+    md.push_str("# Token Optimization Findings\n\n");
+
+    for (i, f) in findings.iter().enumerate() {
+        md.push_str(&format!(
+            "## {}. [{:?}] {} ({})\n",
+            i + 1,
+            f.category,
+            f.model,
+            f.provider
+        ));
+        md.push_str(&format!("- **Input**: {:>12} tokens\n", f.input_tokens));
+        md.push_str(&format!("- **Output**: {:>12} tokens\n", f.output_tokens));
+        md.push_str(&format!("- **Ratio**: {:.2}x output/input\n", f.output_ratio));
+        md.push_str(&format!("- **Complexity**: {}\n", f.complexity));
+        md.push_str(&format!("- **Project**: {}\n", f.project));
+        md.push_str(&format!("- **Date**: {}\n", f.date));
+        md.push_str(&format!("\n> {}\n\n", f.explanation));
+    }
+
+    json!({
         "success": true,
         "optimize": {
-            "findings": findings,
-            "fixes": findings.iter().map(|f| f.model.clone()).collect::<Vec<String>>(),
+            "markdown": md,
+            "total_findings": findings.len(),
         },
-    })))
+    })
 }
 
 async fn handle_compare(_cli: &Cli) -> Result<TuiOutput, Box<dyn std::error::Error>> {
@@ -396,79 +476,6 @@ fn usage_response(show_usage: bool) -> serde_json::Value {
             "error": null,
         })
     }
-}
-
-fn optimize_engine(
-    classified: &[codeburn_provider::SessionData],
-) -> Result<Vec<codeburn_provider::SessionData>, Box<dyn std::error::Error>> {
-    let mut waste_findings = Vec::new();
-
-    // Detect token waste patterns: high-output sessions with low task complexity
-    for session in classified {
-        let complexity = match session.task_category.as_str() {
-            "edit" | "fix" | "debugging" => 1,
-            "test" | "docs" | "review" => 2,
-            "refactor" | "design" | "research" => 3,
-            "architecture" | "integration" | "deployment" => 4,
-            _ => 0,
-        };
-
-        let output_ratio = if session.input_tokens > 0 {
-            session.output_tokens as f64 / session.input_tokens as f64
-        } else {
-            0.0
-        };
-
-        // High output ratio on low complexity = potential waste
-        if complexity <= 2 && output_ratio > 10.0 {
-            waste_findings.push(codeburn_provider::SessionData {
-                provider_name: session.provider.clone(),
-                provider: session.provider.clone(),
-                date: session.date.clone(),
-                input_tokens: session.input_tokens,
-                output_tokens: session.output_tokens,
-                model: session.model.clone(),
-                task_category: "waste_detected".to_string(),
-                project: session.project.clone(),
-                message_id: session.message_id.clone(),
-                format: codeburn_provider::DataFormat::Jsonl,
-                provenance: codeburn_provider::ProvenanceEntry {
-                    source: "codeburn".to_string(),
-                    provenance_id: uuid::Uuid::new_v4().to_string(),
-                    provider_id: "codeburn-optimize".to_string(),
-                    data_path: session.provenance.data_path.clone(),
-                    format: "waste_analysis".to_string(),
-                    ingestion_timestamp: chrono::Utc::now().timestamp(),
-                },
-            });
-        }
-
-        // Sessions with very high output tokens = potential waste
-        if session.output_tokens > 500_000 {
-            waste_findings.push(codeburn_provider::SessionData {
-                provider_name: session.provider.clone(),
-                provider: session.provider.clone(),
-                date: session.date.clone(),
-                input_tokens: session.input_tokens,
-                output_tokens: session.output_tokens,
-                model: session.model.clone(),
-                task_category: "high_output".to_string(),
-                project: session.project.clone(),
-                message_id: session.message_id.clone(),
-                format: codeburn_provider::DataFormat::Jsonl,
-                provenance: codeburn_provider::ProvenanceEntry {
-                    source: "codeburn".to_string(),
-                    provenance_id: uuid::Uuid::new_v4().to_string(),
-                    provider_id: "codeburn-optimize".to_string(),
-                    data_path: session.provenance.data_path.clone(),
-                    format: "high_output_analysis".to_string(),
-                    ingestion_timestamp: chrono::Utc::now().timestamp(),
-                },
-            });
-        }
-    }
-
-    Ok(waste_findings)
 }
 
 fn usage_lines() -> &'static [&'static str] {
