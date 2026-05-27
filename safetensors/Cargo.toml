@@ -19,6 +19,7 @@ thiserror.workspace = true
 path-absolutize.workspace = true
 sha2.workspace = true
 hex.workspace = true
+safetensors = { workspace = true, features = ["std"] }
 
 [dev-dependencies]
 tempfile.workspace = true
