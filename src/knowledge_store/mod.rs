@@ -591,7 +591,7 @@ mod tests {
         fs::create_dir_all(&overlay).unwrap();
         fs::write(state_docs.join("alpha.md"), "# Alpha\n").unwrap();
         fs::write(
-            overlay.join("alpha.md.overlay.json"),
+            overlay.join("alpha.overlay.json"),
             r#"{
   "entries": [
     {
@@ -629,7 +629,7 @@ mod tests {
         fs::create_dir_all(&overlay).unwrap();
         fs::write(state_docs.join("beta.md"), "# Beta\n").unwrap();
         fs::write(
-            overlay.join("beta.md.overlay.json"),
+            overlay.join("beta.overlay.json"),
             r#"{
   "entries": [
     {

@@ -240,9 +240,9 @@ mod tests {
         mg.add_node(NodeKind::Fact, "stale node", TrustScore::new(0.5))
             .unwrap();
 
-        // All nodes should be "stale" with a large max_age_seconds
-        let stale = engine.retrieve_stale(999999, 100).unwrap();
-        assert!(stale.len() >= 0);
+        // Use negative max_age so all nodes satisfy (now - last_touched) > max_age
+        let stale = engine.retrieve_stale(-1, 100).unwrap();
+        assert!(stale.len() > 0);
     }
 
     #[test]

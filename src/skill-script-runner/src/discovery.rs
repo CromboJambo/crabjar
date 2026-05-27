@@ -39,7 +39,6 @@ pub fn filter_by_skill(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::discover_skills;
     use tempfile::tempdir;
 
     #[test]
