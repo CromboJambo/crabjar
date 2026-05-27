@@ -175,8 +175,7 @@ mod tests {
 
     #[test]
     fn knowledge_entry_tags() {
-        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern)
-            .tags(["rust", "pattern"]);
+        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern).tags(["rust", "pattern"]);
         assert_eq!(entry.tags, vec!["rust", "pattern"]);
     }
 
@@ -188,8 +187,7 @@ mod tests {
 
     #[test]
     fn knowledge_entry_meta() {
-        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern)
-            .meta("key", "value");
+        let entry = KnowledgeEntry::new("test", KnowledgeKind::Pattern).meta("key", "value");
         assert_eq!(entry.metadata["key"], "value");
     }
 

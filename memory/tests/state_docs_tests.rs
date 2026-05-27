@@ -137,7 +137,7 @@ fn schema_migrate_creates_indexes() {
         .unwrap();
     let indexes: Vec<String> = stmt
         .query_map([], |row| -> std::result::Result<String, rusqlite::Error> {
-            Ok(row.get(0)?)
+            row.get(0)
         })
         .unwrap()
         .filter_map(|r| r.ok())
@@ -381,6 +381,7 @@ fn seed_confidence(
     ).unwrap();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn seed_annotation(
     conn: &Connection,
     doc_id: i64,
@@ -493,7 +494,7 @@ fn index_minimal_doc_creates_no_sections() {
 
     // The minimal doc has "# Minimal Doc" which is an h1 heading, so it will be parsed as a section
     assert!(
-        sections.len() >= 1,
+        !sections.is_empty(),
         "minimal doc with h1 heading should have at least one section"
     );
 }

@@ -13,10 +13,11 @@ pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         [],
     )?;
 
-    let current_version: i64 = conn
-        .query_row("SELECT COALESCE(MAX(version), 0) FROM schema_versions", [], |row| {
-            row.get(0)
-        })?;
+    let current_version: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_versions",
+        [],
+        |row| row.get(0),
+    )?;
 
     if current_version >= SCHEMA_VERSION {
         return Ok(());

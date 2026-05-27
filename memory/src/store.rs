@@ -391,7 +391,9 @@ mod tests {
     fn test_query_with_all_filters() {
         let (store, _dir) = temp_store();
         insert_entry(&store, "filtered content", &["test"]);
-        let rows = store.query(&[], 10, "prov-1", "test-file", "test.md").unwrap();
+        let rows = store
+            .query(&[], 10, "prov-1", "test-file", "test.md")
+            .unwrap();
         assert_eq!(rows.len(), 1);
     }
 
@@ -399,17 +401,19 @@ mod tests {
     fn test_query_limit() {
         let (store, _dir) = temp_store();
         for i in 0..5 {
-            store.insert(KnowledgeEntry {
-                content: format!("entry-{}", i),
-                kind: KnowledgeKind::Pattern,
-                tags: vec!["test".to_string()],
-                metadata: serde_json::json!({}),
-                weight: 1.0,
-                source: Source::User,
-                source_type: "file".to_string(),
-                source_id: "test".to_string(),
-                provenance_id: "prov-1".to_string(),
-            }).unwrap();
+            store
+                .insert(KnowledgeEntry {
+                    content: format!("entry-{}", i),
+                    kind: KnowledgeKind::Pattern,
+                    tags: vec!["test".to_string()],
+                    metadata: serde_json::json!({}),
+                    weight: 1.0,
+                    source: Source::User,
+                    source_type: "file".to_string(),
+                    source_id: "test".to_string(),
+                    provenance_id: "prov-1".to_string(),
+                })
+                .unwrap();
         }
         let rows = store.query(&[], 3, "", "", "").unwrap();
         assert!(rows.len() <= 3);
@@ -418,17 +422,19 @@ mod tests {
     #[test]
     fn test_find_active_by_source() {
         let (store, _dir) = temp_store();
-        store.insert(KnowledgeEntry {
-            content: "found content".to_string(),
-            kind: KnowledgeKind::Pattern,
-            tags: vec!["test".to_string()],
-            metadata: serde_json::json!({}),
-            weight: 1.0,
-            source: Source::User,
-            source_type: "file".to_string(),
-            source_id: "unique-id".to_string(),
-            provenance_id: "prov-1".to_string(),
-        }).unwrap();
+        store
+            .insert(KnowledgeEntry {
+                content: "found content".to_string(),
+                kind: KnowledgeKind::Pattern,
+                tags: vec!["test".to_string()],
+                metadata: serde_json::json!({}),
+                weight: 1.0,
+                source: Source::User,
+                source_type: "file".to_string(),
+                source_id: "unique-id".to_string(),
+                provenance_id: "prov-1".to_string(),
+            })
+            .unwrap();
         let row = store.find_active_by_source("file", "unique-id").unwrap();
         assert!(row.is_some());
         assert_eq!(row.unwrap().content, "found content");
@@ -474,7 +480,9 @@ mod tests {
         let (store, _dir) = temp_store();
         insert_entry(&store, "keep this", &["other"]);
         insert_entry(&store, "remove this", &["test"]);
-        let affected = store.deactivate_by_source("file", "test-file", Source::User, Some("reason")).unwrap();
+        let affected = store
+            .deactivate_by_source("file", "test-file", Source::User, Some("reason"))
+            .unwrap();
         assert!(affected >= 1);
     }
 
@@ -482,7 +490,9 @@ mod tests {
     fn test_deactivate_by_provenance_id() {
         let (store, _dir) = temp_store();
         insert_entry(&store, "prov content", &["test"]);
-        let affected = store.deactivate_by_provenance_id("prov-1", Source::User, Some("reason")).unwrap();
+        let affected = store
+            .deactivate_by_provenance_id("prov-1", Source::User, Some("reason"))
+            .unwrap();
         assert!(affected >= 1);
     }
 
