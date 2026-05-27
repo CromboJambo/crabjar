@@ -70,6 +70,12 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: BitwardenCommand,
     },
+
+    /// Pre-flight system validation
+    Doctor {
+        #[command(subcommand)]
+        command: DoctorCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -222,6 +228,13 @@ pub enum GuardCommand {
         #[arg(long)]
         pid: i32,
     },
+}
+
+/// Doctor subcommands for pre-flight validation
+#[derive(Debug, Subcommand, Clone)]
+pub enum DoctorCommand {
+    /// Run all pre-flight checks
+    Check,
 }
 
 pub mod knowledge_store;
