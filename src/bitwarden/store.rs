@@ -18,7 +18,11 @@ pub struct CredentialEntry {
 }
 
 impl CredentialEntry {
-    pub fn new(name: impl Into<String>, username: impl Into<String>, password: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        username: impl Into<String>,
+        password: impl Into<String>,
+    ) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
             name: name.into(),
@@ -75,21 +79,18 @@ pub fn load_store_config(path: &std::path::Path) -> BitwardenResult<CredentialSt
         return Ok(CredentialStore::new(None, None));
     }
 
-    let content = std::fs::read_to_string(path).map_err(|e| {
-        BitwardenError::Internal(format!("Failed to read config: {}", e))
-    })?;
-    
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| BitwardenError::Internal(format!("Failed to read config: {}", e)))?;
+
     let config: CredentialStore = serde_json::from_str(&content)?;
     Ok(config)
 }
 
 /// Save credential store configuration to file
 pub fn save_store_config(path: &std::path::Path, store: &CredentialStore) -> BitwardenResult<()> {
-    let content = serde_json::to_string_pretty(store).map_err(|e| {
-        BitwardenError::Internal(format!("Failed to serialize config: {}", e))
-    })?;
-    
-    std::fs::write(path, content).map_err(|e| {
-        BitwardenError::Internal(format!("Failed to write config: {}", e))
-    })
+    let content = serde_json::to_string_pretty(store)
+        .map_err(|e| BitwardenError::Internal(format!("Failed to serialize config: {}", e)))?;
+
+    std::fs::write(path, content)
+        .map_err(|e| BitwardenError::Internal(format!("Failed to write config: {}", e)))
 }

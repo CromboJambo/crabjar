@@ -23,10 +23,10 @@ pub fn login(email: &str, master_password: &str, server: Option<&str>) -> Bitwar
         cmd.arg("--server").arg(server);
     }
 
-    let output = cmd.output().map_err(|e| {
-        BitwardenError::CliNotFound(format!("Failed to execute bw: {}", e))
-    })?;
-    
+    let output = cmd
+        .output()
+        .map_err(|e| BitwardenError::CliNotFound(format!("Failed to execute bw: {}", e)))?;
+
     if output.status.success() {
         Ok(())
     } else {
@@ -38,10 +38,11 @@ pub fn login(email: &str, master_password: &str, server: Option<&str>) -> Bitwar
 
 /// Logout from bitwarden CLI
 pub fn logout() -> BitwardenResult<()> {
-    let output = Command::new("bw").arg("logout").output().map_err(|e| {
-        BitwardenError::CliError(format!("Failed to execute bw logout: {}", e))
-    })?;
-    
+    let output = Command::new("bw")
+        .arg("logout")
+        .output()
+        .map_err(|e| BitwardenError::CliError(format!("Failed to execute bw logout: {}", e)))?;
+
     if output.status.success() {
         Ok(())
     } else {
@@ -53,10 +54,11 @@ pub fn logout() -> BitwardenResult<()> {
 
 /// Get status of bitwarden session
 pub fn status() -> BitwardenResult<String> {
-    let output = Command::new("bw").arg("status").output().map_err(|e| {
-        BitwardenError::CliError(format!("Failed to execute bw status: {}", e))
-    })?;
-    
+    let output = Command::new("bw")
+        .arg("status")
+        .output()
+        .map_err(|e| BitwardenError::CliError(format!("Failed to execute bw status: {}", e)))?;
+
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
@@ -67,12 +69,12 @@ pub fn status() -> BitwardenResult<String> {
 }
 
 /// List bitwarden items
-pub fn list_items(folder: Option<&str>, collection: Option<&str>) -> BitwardenResult<Vec<BitwardenItem>> {
+pub fn list_items(
+    folder: Option<&str>,
+    collection: Option<&str>,
+) -> BitwardenResult<Vec<BitwardenItem>> {
     let mut cmd = Command::new("bw");
-    cmd.arg("list")
-        .arg("items")
-        .arg("--output")
-        .arg("json");
+    cmd.arg("list").arg("items").arg("--output").arg("json");
 
     if let Some(folder) = folder {
         cmd.arg("--folderid").arg(folder);
@@ -82,12 +84,13 @@ pub fn list_items(folder: Option<&str>, collection: Option<&str>) -> BitwardenRe
         cmd.arg("--collectionid").arg(collection);
     }
 
-    let output = cmd.output().map_err(|e| {
-        BitwardenError::CliError(format!("Failed to execute bw list: {}", e))
-    })?;
-    
+    let output = cmd
+        .output()
+        .map_err(|e| BitwardenError::CliError(format!("Failed to execute bw list: {}", e)))?;
+
     if output.status.success() {
-        let items: Vec<BitwardenItem> = serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
+        let items: Vec<BitwardenItem> =
+            serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
         Ok(items)
     } else {
         Err(BitwardenError::CliError(
@@ -105,18 +108,13 @@ pub fn get_item(id: &str) -> BitwardenResult<BitwardenItem> {
         .arg("--output")
         .arg("json")
         .output()
-        .map_err(|e| {
-            BitwardenError::CliError(format!("Failed to execute bw get: {}", e))
-        })?;
+        .map_err(|e| BitwardenError::CliError(format!("Failed to execute bw get: {}", e)))?;
 
     if output.status.success() {
         let item: BitwardenItem = serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
         Ok(item)
     } else {
-        Err(BitwardenError::NotFound(format!(
-            "Item {} not found",
-            id
-        )))
+        Err(BitwardenError::NotFound(format!("Item {} not found", id)))
     }
 }
 
@@ -128,12 +126,11 @@ pub fn search_items(query: &str) -> BitwardenResult<Vec<BitwardenItem>> {
         .arg("--output")
         .arg("json")
         .output()
-        .map_err(|e| {
-            BitwardenError::CliError(format!("Failed to execute bw search: {}", e))
-        })?;
+        .map_err(|e| BitwardenError::CliError(format!("Failed to execute bw search: {}", e)))?;
 
     if output.status.success() {
-        let items: Vec<BitwardenItem> = serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
+        let items: Vec<BitwardenItem> =
+            serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
         Ok(items)
     } else {
         Err(BitwardenError::CliError(
@@ -151,9 +148,7 @@ pub fn generate_password(
     special: bool,
 ) -> BitwardenResult<String> {
     let mut cmd = Command::new("bw");
-    cmd.arg("generate")
-        .arg("--length")
-        .arg(length.to_string());
+    cmd.arg("generate").arg("--length").arg(length.to_string());
 
     if uppercase {
         cmd.arg("--uppercase");
@@ -168,10 +163,10 @@ pub fn generate_password(
         cmd.arg("--special");
     }
 
-    let output = cmd.output().map_err(|e| {
-        BitwardenError::CliError(format!("Failed to execute bw generate: {}", e))
-    })?;
-    
+    let output = cmd
+        .output()
+        .map_err(|e| BitwardenError::CliError(format!("Failed to execute bw generate: {}", e)))?;
+
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
