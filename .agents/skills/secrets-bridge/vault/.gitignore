@@ -1,0 +1,6 @@
+# Secrets vault — never commit to git
+secrets/
+keypairs/*.priv
+keypairs/*.json
+keyring/
+*.age
