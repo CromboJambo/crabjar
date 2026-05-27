@@ -219,7 +219,7 @@ async fn handle_exec(
                 "args": args,
                 "reason": reason,
                 "gate_result": "denied",
-                "reason": "tool_execution_enabled is false in config",
+                "gate_reason": "tool_execution_enabled is false in config",
             },
         }));
     }

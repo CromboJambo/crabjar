@@ -71,8 +71,12 @@ impl<'a> FlightRecorder<'a> {
             .spawn()
             .map_err(|e| FlightRecorderError::CommandCapture(e.to_string()))?;
 
-        let stdout = child.stdout.take().expect("Failed to take stdout");
-        let stderr = child.stderr.take().expect("Failed to take stderr");
+        let stdout = child.stdout.take().ok_or_else(|| {
+            FlightRecorderError::CommandCapture("Failed to take stdout".to_string())
+        })?;
+        let stderr = child.stderr.take().ok_or_else(|| {
+            FlightRecorderError::CommandCapture("Failed to take stderr".to_string())
+        })?;
 
         let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
         let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
