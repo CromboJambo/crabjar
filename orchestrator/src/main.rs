@@ -638,6 +638,78 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
             Ok(output)
         }
         "search_logs" => {
+            // Security layer: check command before execution with provenance.
+            let guard_root = std::env::var("MIRROR_GUARD_ROOT")
+                .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
+
+            let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
+                format!("{}/mirror.db", &guard_root),
+            ))
+            .unwrap_or_else(|_| {
+                warn!("Failed to open guard DB for search_logs, using in-memory fallback");
+                crabjar_guard::GuardDb::open(":memory:").unwrap()
+            });
+
+            let gate = ExecutionGate::new(&guard_db, false, &guard_root);
+
+            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
+
+            match gate.check(GateContext {
+                action_type: "tool_call",
+                command: "search_logs",
+                args: args.to_vec(),
+                trust_layer: 2,
+                confidence: crabjar_guard::TrustScore::new(0.5),
+                source_event_id: Some("orchestrator-sl"),
+                can_interrupt: true,
+                pid: None,
+            }) {
+                Ok(result) => {
+                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
+                        result,
+                        "tool_call",
+                        "search_logs",
+                        &args,
+                        2,
+                        0.5,
+                        Some("orchestrator-sl".to_string()),
+                    );
+
+                    match status {
+                        ActionStatus::TrustApproved => {}
+                        ActionStatus::Pending => {
+                            return Err(format!(
+                                "Pending: queued for review (pending_id: {})",
+                                pending_entry
+                                    .as_ref()
+                                    .map(|e| e.id.clone())
+                                    .unwrap_or_default()
+                            ));
+                        }
+                        ActionStatus::Denied => {
+                            return Err(format!(
+                                "Interrupted: {} (interrupted_id: {})",
+                                interrupted_entry
+                                    .as_ref()
+                                    .map(|e| e.reason.clone())
+                                    .unwrap_or_default(),
+                                interrupted_entry
+                                    .as_ref()
+                                    .map(|e| e.id.clone())
+                                    .unwrap_or_default()
+                            ));
+                        }
+                        ActionStatus::Executed | ActionStatus::Interrupted => {
+                            return Err("Status not handled by concierge".to_string());
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Security gate error for search_logs: {}", e);
+                    return Err(format!("Security gate error: {}", e));
+                }
+            }
+
             let search_req: SearchLogsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
                     Ok(req) => req,
@@ -683,6 +755,78 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
             Ok(output)
         }
         "recent_events" => {
+            // Security layer: check command before execution with provenance.
+            let guard_root = std::env::var("MIRROR_GUARD_ROOT")
+                .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
+
+            let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
+                format!("{}/mirror.db", &guard_root),
+            ))
+            .unwrap_or_else(|_| {
+                warn!("Failed to open guard DB for recent_events, using in-memory fallback");
+                crabjar_guard::GuardDb::open(":memory:").unwrap()
+            });
+
+            let gate = ExecutionGate::new(&guard_db, false, &guard_root);
+
+            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
+
+            match gate.check(GateContext {
+                action_type: "tool_call",
+                command: "recent_events",
+                args: args.to_vec(),
+                trust_layer: 2,
+                confidence: crabjar_guard::TrustScore::new(0.5),
+                source_event_id: Some("orchestrator-re"),
+                can_interrupt: true,
+                pid: None,
+            }) {
+                Ok(result) => {
+                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
+                        result,
+                        "tool_call",
+                        "recent_events",
+                        &args,
+                        2,
+                        0.5,
+                        Some("orchestrator-re".to_string()),
+                    );
+
+                    match status {
+                        ActionStatus::TrustApproved => {}
+                        ActionStatus::Pending => {
+                            return Err(format!(
+                                "Pending: queued for review (pending_id: {})",
+                                pending_entry
+                                    .as_ref()
+                                    .map(|e| e.id.clone())
+                                    .unwrap_or_default()
+                            ));
+                        }
+                        ActionStatus::Denied => {
+                            return Err(format!(
+                                "Interrupted: {} (interrupted_id: {})",
+                                interrupted_entry
+                                    .as_ref()
+                                    .map(|e| e.reason.clone())
+                                    .unwrap_or_default(),
+                                interrupted_entry
+                                    .as_ref()
+                                    .map(|e| e.id.clone())
+                                    .unwrap_or_default()
+                            ));
+                        }
+                        ActionStatus::Executed | ActionStatus::Interrupted => {
+                            return Err("Status not handled by concierge".to_string());
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Security gate error for recent_events: {}", e);
+                    return Err(format!("Security gate error: {}", e));
+                }
+            }
+
             let recent_req: RecentEventsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
                     Ok(req) => req,
@@ -724,6 +868,78 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
             Ok(output)
         }
         "by_source" => {
+            // Security layer: check command before execution with provenance.
+            let guard_root = std::env::var("MIRROR_GUARD_ROOT")
+                .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
+
+            let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
+                format!("{}/mirror.db", &guard_root),
+            ))
+            .unwrap_or_else(|_| {
+                warn!("Failed to open guard DB for by_source, using in-memory fallback");
+                crabjar_guard::GuardDb::open(":memory:").unwrap()
+            });
+
+            let gate = ExecutionGate::new(&guard_db, false, &guard_root);
+
+            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
+
+            match gate.check(GateContext {
+                action_type: "tool_call",
+                command: "by_source",
+                args: args.to_vec(),
+                trust_layer: 2,
+                confidence: crabjar_guard::TrustScore::new(0.5),
+                source_event_id: Some("orchestrator-bs"),
+                can_interrupt: true,
+                pid: None,
+            }) {
+                Ok(result) => {
+                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
+                        result,
+                        "tool_call",
+                        "by_source",
+                        &args,
+                        2,
+                        0.5,
+                        Some("orchestrator-bs".to_string()),
+                    );
+
+                    match status {
+                        ActionStatus::TrustApproved => {}
+                        ActionStatus::Pending => {
+                            return Err(format!(
+                                "Pending: queued for review (pending_id: {})",
+                                pending_entry
+                                    .as_ref()
+                                    .map(|e| e.id.clone())
+                                    .unwrap_or_default()
+                            ));
+                        }
+                        ActionStatus::Denied => {
+                            return Err(format!(
+                                "Interrupted: {} (interrupted_id: {})",
+                                interrupted_entry
+                                    .as_ref()
+                                    .map(|e| e.reason.clone())
+                                    .unwrap_or_default(),
+                                interrupted_entry
+                                    .as_ref()
+                                    .map(|e| e.id.clone())
+                                    .unwrap_or_default()
+                            ));
+                        }
+                        ActionStatus::Executed | ActionStatus::Interrupted => {
+                            return Err("Status not handled by concierge".to_string());
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("Security gate error for by_source: {}", e);
+                    return Err(format!("Security gate error: {}", e));
+                }
+            }
+
             let source_req: BySourceRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
                     Ok(req) => req,

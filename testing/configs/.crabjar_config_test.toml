@@ -1,0 +1,13 @@
+name = "crabjar-test-workspace"
+description = "CrabJar agent workspace with cuda-oxide integration"
+
+tool_execution_enabled = true
+auto_register = true
+
+[[tools]]
+path = "/home/crombo/.cargo/bin/cargo-oxide"
+commands = ["run", "build", "pipeline", "debug", "doctor"]
+
+[[tools]]
+path = "/usr/bin/cargo"
+commands = ["check", "build", "test", "clippy", "fmt", "run"]
