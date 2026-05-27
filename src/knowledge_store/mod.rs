@@ -133,10 +133,13 @@ impl KnowledgeBridge {
             .parent()
             .unwrap()
             .join(agent_context::state_docs::OVERLAY_DIR);
-        let overlay_file = overlay_dir.join(format!(
-            "{}.overlay.json",
-            path.file_name().unwrap().to_string_lossy()
-        ));
+        let stem = path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .trim_end_matches(".md")
+            .to_string();
+        let overlay_file = overlay_dir.join(format!("{}.overlay.json", stem));
         let content = std::fs::read_to_string(&overlay_file)
             .map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
         serde_json::from_str(&content).map_err(agent_context::Error::Json)
