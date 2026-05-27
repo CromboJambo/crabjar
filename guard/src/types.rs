@@ -758,7 +758,10 @@ mod tests {
     #[test]
     fn model_inference_kind_equality() {
         assert_eq!(ModelInferenceKind::Prompt, ModelInferenceKind::Prompt);
-        assert_ne!(ModelInferenceKind::Prompt, ModelInferenceKind::ContextAugmented);
+        assert_ne!(
+            ModelInferenceKind::Prompt,
+            ModelInferenceKind::ContextAugmented
+        );
     }
 
     #[test]

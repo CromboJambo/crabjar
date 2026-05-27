@@ -235,10 +235,7 @@ impl GuardDb {
     }
 
     /// Persist a revoked entry to the revoked_log.
-    pub fn persist_revoked_entry(
-        &self,
-        entry: &InterruptedLogEntry,
-    ) -> Result<(), GuardDbError> {
+    pub fn persist_revoked_entry(&self, entry: &InterruptedLogEntry) -> Result<(), GuardDbError> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO revoked_log (id, gate_result_id, action_type, command, args, trust_layer, source_event_id, reason, logged_at)
@@ -298,21 +295,26 @@ impl GuardDb {
     }
 
     /// Get PID trust record.
-    pub fn get_pid_trust(&self, pid: i32) -> Result<Option<crate::types::PidTrustRecord>, GuardDbError> {
+    pub fn get_pid_trust(
+        &self,
+        pid: i32,
+    ) -> Result<Option<crate::types::PidTrustRecord>, GuardDbError> {
         let conn = self.conn.lock().unwrap();
         let row = conn.query_row(
             "SELECT pid, trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate
              FROM pid_trust WHERE pid = ?1",
             params![pid],
-            |row| Ok((
-                row.get::<_, i32>(0)?,
-                row.get::<_, u32>(1)?,
-                row.get::<_, u64>(2)?,
-                row.get::<_, i64>(3)?,
-                row.get::<_, bool>(4)?,
-                row.get::<_, i64>(5)?,
-                row.get::<_, f64>(6)?,
-            )),
+            |row| {
+                Ok((
+                    row.get::<_, i32>(0)?,
+                    row.get::<_, u32>(1)?,
+                    row.get::<_, u64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, bool>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, f64>(6)?,
+                ))
+            },
         );
 
         match row {
@@ -466,6 +468,6 @@ mod tests {
 
         let config = db.load_anneal_config().unwrap();
         assert_eq!(config.decay_rate, 0.02);
-        assert_eq!(config.auto_anneal_enabled, true);
+        assert!(config.auto_anneal_enabled);
     }
 }

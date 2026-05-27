@@ -11,11 +11,15 @@ use crate::types::TrustScore;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GateResult {
     Proceed,
-    Interrupted { reason: String },
+    Interrupted {
+        reason: String,
+    },
     Pending,
     DryRun,
     /// Process was revoked — guide out gracefully, don't block hard.
-    Revoked { reason: String },
+    Revoked {
+        reason: String,
+    },
 }
 
 /// Execution gate that combines trust-layer gating with command security checks.
@@ -122,7 +126,8 @@ impl<'a> ExecutionGate<'a> {
 
         // 6. PID trust check (Option B: per-process trust layers)
         if let Some(pid) = ctx.pid
-            && let Some(gate_result) = self.check_pid_trust(pid, ctx.command)? {
+            && let Some(gate_result) = self.check_pid_trust(pid, ctx.command)?
+        {
             return Ok(gate_result);
         }
 
@@ -177,14 +182,16 @@ impl<'a> ExecutionGate<'a> {
             "SELECT trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate
              FROM pid_trust WHERE pid = ?1",
             rusqlite::params![pid],
-            |row| Ok((
-                row.get::<_, u32>(0)?,
-                row.get::<_, u64>(1)?,
-                row.get::<_, i64>(2)?,
-                row.get::<_, bool>(3)?,
-                row.get::<_, i64>(4)?,
-                row.get::<_, f64>(5)?,
-            )),
+            |row| {
+                Ok((
+                    row.get::<_, u32>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, bool>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, f64>(5)?,
+                ))
+            },
         );
 
         let (current_layer, _use_count, last_use, auto_grant, decay_interval, decay_rate) =

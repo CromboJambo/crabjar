@@ -214,8 +214,12 @@ mod tests {
         let engine = RetrievalEngine::new(&db);
         let mg = MemoryGraph::new(&db);
 
-        let node_id = mg.add_node(NodeKind::Fact, "evidence node", TrustScore::new(0.5)).unwrap();
-        let evidence = engine.retrieve_with_evidence(&[node_id.clone()]).unwrap();
+        let node_id = mg
+            .add_node(NodeKind::Fact, "evidence node", TrustScore::new(0.5))
+            .unwrap();
+        let evidence = engine
+            .retrieve_with_evidence(std::slice::from_ref(&node_id))
+            .unwrap();
         assert_eq!(evidence.len(), 1);
         assert_eq!(evidence[0].0.id, node_id);
     }
@@ -242,7 +246,7 @@ mod tests {
 
         // Use negative max_age so all nodes satisfy (now - last_touched) > max_age
         let stale = engine.retrieve_stale(-1, 100).unwrap();
-        assert!(stale.len() > 0);
+        assert!(!stale.is_empty());
     }
 
     #[test]
