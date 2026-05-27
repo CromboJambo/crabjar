@@ -374,16 +374,47 @@ impl SessionState {
 /// This complements LM Studio's native stateful chat by storing session
 /// metadata and message history in SQLite. When the orchestrator restarts,
 /// it can restore sessions from the database.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SessionStore {
     /// SQLite database path.
     pub db_path: String,
+    /// Connection to the database (opened lazily).
+    conn: std::sync::Mutex<Option<rusqlite::Connection>>,
 }
 
 impl SessionStore {
     /// Creates a new session store with the given database path.
     pub fn new(db_path: String) -> Self {
-        Self { db_path }
+        Self {
+            db_path,
+            conn: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// Opens the database connection lazily.
+    fn open_conn(&self) -> Result<std::sync::MutexGuard<'_, Option<rusqlite::Connection>>, SessionError> {
+        let mut guard = self.conn.lock().map_err(|e| {
+            SessionError::Database(format!("failed to lock connection: {e}"))
+        })?;
+        if guard.is_none() {
+            let conn = rusqlite::Connection::open(&self.db_path)
+                .map_err(|e| SessionError::Database(format!("failed to open DB: {e}")))?;
+            conn.execute_batch(
+                "PRAGMA journal_mode=WAL;
+                 CREATE TABLE IF NOT EXISTS sessions (
+                     id TEXT PRIMARY KEY,
+                     system_prompt TEXT,
+                     message_history TEXT,
+                     response_id TEXT,
+                     created_at INTEGER DEFAULT (unixepoch()),
+                     updated_at INTEGER DEFAULT (unixepoch())
+                 );
+                 CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC);",
+            )
+            .map_err(|e| SessionError::Database(format!("failed to init schema: {e}")))?;
+            *guard = Some(conn);
+        }
+        Ok(guard)
     }
 
     /// Creates a new session and returns its ID.
@@ -391,10 +422,20 @@ impl SessionStore {
     /// The session is initialized with a system prompt.
     pub fn create_session(&self, system_prompt: Option<String>) -> Result<String, SessionError> {
         let session_id = uuid::Uuid::new_v4().to_string();
+        let system_prompt_json = serde_json::to_string(&system_prompt).unwrap_or_else(|_| "null".to_string());
 
-        // In production, this would write to SQLite.
-        // For now, we return the session ID — the actual SQLite integration
-        // would be done in a separate module.
+        let conn = self.open_conn()?.as_ref().unwrap();
+        conn.execute(
+            "INSERT INTO sessions (id, system_prompt, message_history, response_id) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![
+                &session_id,
+                system_prompt_json,
+                "[]", // empty message history
+                "",   // no response_id yet
+            ],
+        )
+        .map_err(|e| SessionError::Database(format!("failed to create session: {e}")))?;
+
         debug!(
             "Created session {} with system prompt: {:?}",
             session_id, system_prompt
@@ -405,9 +446,35 @@ impl SessionStore {
 
     /// Retrieves session state by ID.
     pub fn get_session(&self, session_id: &str) -> Result<SessionState, SessionError> {
-        // In production, this would read from SQLite.
-        debug!("Retrieving session {}", session_id);
-        Ok(SessionState::new())
+        let conn = self.open_conn()?.as_ref().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT system_prompt, message_history, response_id FROM sessions WHERE id = ?1",
+        )
+        .map_err(|e| SessionError::Database(format!("failed to prepare query: {e}")))?;
+
+        let row = stmt.query_row(rusqlite::params![session_id], |row| {
+            let system_prompt: String = row.get(0)?;
+            let message_history: String = row.get(1)?;
+            let response_id: String = row.get(2)?;
+            Ok((system_prompt, message_history, response_id))
+        })
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => SessionError::NotFound(session_id.to_string()),
+            e => SessionError::Database(format!("failed to query session: {e}")),
+        })?;
+
+        let system_prompt: Option<String> = serde_json::from_str(&row.0).unwrap_or(None);
+        let message_history: Vec<ChatMessage> = serde_json::from_str(&row.1).unwrap_or_default();
+        let response_id = if row.2.is_empty() { None } else { Some(row.2) };
+
+        let mut state = SessionState::new();
+        state.response_id = response_id;
+        for msg in message_history {
+            state.message_history.push(msg);
+        }
+
+        debug!("Retrieved session {}", session_id);
+        Ok(state)
     }
 
     /// Updates session state in the store.
@@ -416,15 +483,38 @@ impl SessionStore {
         session_id: &str,
         state: &SessionState,
     ) -> Result<(), SessionError> {
-        debug!("Updating session {}", session_id);
+        let message_history_json = serde_json::to_string(&state.message_history)
+            .unwrap_or_else(|_| "[]".to_string());
+        let response_id = state.response_id.as_deref().unwrap_or("");
+
+        let conn = self.open_conn()?.as_ref().unwrap();
+        conn.execute(
+            "UPDATE sessions SET message_history = ?1, response_id = ?2, updated_at = unixepoch() WHERE id = ?3",
+            rusqlite::params![message_history_json, response_id, session_id],
+        )
+        .map_err(|e| SessionError::Database(format!("failed to update session: {e}")))?;
+
+        debug!("Updated session {}", session_id);
         Ok(())
     }
 
     /// Deletes a session.
     pub fn delete_session(&self, session_id: &str) -> Result<(), SessionError> {
-        debug!("Deleting session {}", session_id);
+        let conn = self.open_conn()?.as_ref().unwrap();
+        let rows = conn.execute(
+            "DELETE FROM sessions WHERE id = ?1",
+            rusqlite::params![session_id],
+        )
+        .map_err(|e| SessionError::Database(format!("failed to delete session: {e}")))?;
+
+        if rows == 0 {
+            return Err(SessionError::NotFound(session_id.to_string()));
+        }
+
+        debug!("Deleted session {}", session_id);
         Ok(())
     }
+}
 }
 
 /// Errors from session store operations.
