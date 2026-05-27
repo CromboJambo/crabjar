@@ -1,7 +1,7 @@
 use crate::error::{FlightRecorderError, TelemetryError};
 use crate::schema::{
-    checkpoint_session, init_db, query_flight_records, query_session_checkpoints, query_transcript,
-    record_command, record_transcript_line, CheckpointRow, FlightRecordRow,
+    CheckpointRow, FlightRecordRow, checkpoint_session, init_db, query_flight_records,
+    query_session_checkpoints, query_transcript, record_command, record_transcript_line,
 };
 use rusqlite::Connection;
 use sha2::Digest;
@@ -180,9 +180,7 @@ impl<'a> FlightRecorder<'a> {
     }
 
     /// Serialize a checkpoint row to bitcode bytes.
-    pub fn serialize_checkpoint_bincode(
-        checkpoint: &CheckpointRow,
-    ) -> Vec<u8> {
+    pub fn serialize_checkpoint_bincode(checkpoint: &CheckpointRow) -> Vec<u8> {
         bitcode::encode(checkpoint)
     }
 
@@ -190,14 +188,11 @@ impl<'a> FlightRecorder<'a> {
     pub fn deserialize_checkpoint_bincode(
         bytes: &[u8],
     ) -> Result<CheckpointRow, FlightRecorderError> {
-        bitcode::decode(bytes)
-            .map_err(|e| FlightRecorderError::BincodeDecode(e.to_string()))
+        bitcode::decode(bytes).map_err(|e| FlightRecorderError::BincodeDecode(e.to_string()))
     }
 
     /// Serialize a flight record row to bitcode bytes.
-    pub fn serialize_flight_record_bincode(
-        record: &FlightRecordRow,
-    ) -> Vec<u8> {
+    pub fn serialize_flight_record_bincode(record: &FlightRecordRow) -> Vec<u8> {
         bitcode::encode(record)
     }
 
@@ -205,8 +200,7 @@ impl<'a> FlightRecorder<'a> {
     pub fn deserialize_flight_record_bincode(
         bytes: &[u8],
     ) -> Result<FlightRecordRow, FlightRecorderError> {
-        bitcode::decode(bytes)
-            .map_err(|e| FlightRecorderError::BincodeDecode(e.to_string()))
+        bitcode::decode(bytes).map_err(|e| FlightRecorderError::BincodeDecode(e.to_string()))
     }
 
     /// Query transcript lines for a specific command.

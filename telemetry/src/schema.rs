@@ -425,7 +425,7 @@ mod tests {
             "session-1",
             "cargo test",
             "/repo",
-            &[].to_vec(),
+            &[],
             101,
             "hash1",
             "hash2",
