@@ -95,10 +95,7 @@ mod tests {
         std::fs::create_dir_all(&staging).unwrap();
 
         let manager = DotfileManager::new(dir.path().to_path_buf());
-        let result = manager.propose(
-            staging.to_str().unwrap(),
-            target.to_str().unwrap(),
-        );
+        let result = manager.propose(staging.to_str().unwrap(), target.to_str().unwrap());
         assert!(result.is_ok());
 
         let value = result.unwrap();
@@ -132,10 +129,7 @@ mod tests {
         std::fs::create_dir_all(&target).unwrap();
 
         let manager = DotfileManager::new(dir.path().to_path_buf());
-        let result = manager.verify(
-            staging.to_str().unwrap(),
-            target.to_str().unwrap(),
-        );
+        let result = manager.verify(staging.to_str().unwrap(), target.to_str().unwrap());
         assert!(result.is_ok());
 
         let value = result.unwrap();
@@ -156,10 +150,7 @@ mod tests {
         std::fs::create_dir_all(&target).unwrap();
 
         let manager = DotfileManager::new(dir.path().to_path_buf());
-        let result = manager.verify(
-            "/nonexistent/staging",
-            target.to_str().unwrap(),
-        );
+        let result = manager.verify("/nonexistent/staging", target.to_str().unwrap());
         assert!(result.is_ok());
 
         let value = result.unwrap();
@@ -175,10 +166,7 @@ mod tests {
         std::fs::create_dir_all(&staging).unwrap();
 
         let manager = DotfileManager::new(dir.path().to_path_buf());
-        let result = manager.verify(
-            staging.to_str().unwrap(),
-            "/nonexistent/target",
-        );
+        let result = manager.verify(staging.to_str().unwrap(), "/nonexistent/target");
         assert!(result.is_ok());
 
         let value = result.unwrap();
@@ -190,10 +178,7 @@ mod tests {
     #[test]
     fn test_verify_both_missing() {
         let manager = DotfileManager::new("/tmp".into());
-        let result = manager.verify(
-            "/nonexistent/staging1",
-            "/nonexistent/staging2",
-        );
+        let result = manager.verify("/nonexistent/staging1", "/nonexistent/staging2");
         assert!(result.is_ok());
 
         let value = result.unwrap();

@@ -469,7 +469,10 @@ impl KnowledgeBridge {
                 if entry.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id {
                     if let Some(obj) = entry.as_object_mut() {
                         obj.insert("status".to_string(), serde_json::json!("resolved"));
-                        obj.insert("resolved_at_unix_ms".to_string(), serde_json::json!(now_unix_ms()));
+                        obj.insert(
+                            "resolved_at_unix_ms".to_string(),
+                            serde_json::json!(now_unix_ms()),
+                        );
                         obj.insert("resolution_reason".to_string(), serde_json::json!(reason));
                     }
                     break;
@@ -479,8 +482,7 @@ impl KnowledgeBridge {
 
         // Write updated overlay back
         std::fs::create_dir_all(&overlay_dir).ok();
-        let json = serde_json::to_string_pretty(&overlay)
-            .map_err(agent_context::Error::Json)?;
+        let json = serde_json::to_string_pretty(&overlay).map_err(agent_context::Error::Json)?;
         std::fs::write(&overlay_file, json)
             .map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
 

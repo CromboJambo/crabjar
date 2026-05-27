@@ -2,13 +2,15 @@ use clap::Parser;
 use crabjar_lib::{Cli, CliCommand, StateCommand, WorkspaceCommand};
 use serde_json::json;
 
+mod bitwarden;
 mod dotfile_manager;
 mod knowledge_store;
 mod project_loader;
 mod state_docs;
-mod bitwarden;
 
-use crabjar_lib::{BitwardenCommand, DotfileCommand, GuardCommand, KnowledgeCommand, DoctorCommand};
+use crabjar_lib::{
+    BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand, KnowledgeCommand,
+};
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
@@ -449,7 +451,11 @@ fn handle_guard_command(
                 },
             }))
         }
-        GuardCommand::Grant { pid, trust_layer, auto_grant } => {
+        GuardCommand::Grant {
+            pid,
+            trust_layer,
+            auto_grant,
+        } => {
             guard_db.grant_pid_trust(pid, trust_layer, auto_grant)?;
             Ok(json!({
                 "success": true,
@@ -561,7 +567,13 @@ fn handle_bitwarden_command(
                 },
             }))
         }
-        BitwardenCommand::Generate { length, uppercase, lowercase, numbers, special } => {
+        BitwardenCommand::Generate {
+            length,
+            uppercase,
+            lowercase,
+            numbers,
+            special,
+        } => {
             if !bitwarden::cli::is_available() {
                 return Ok(json!({
                     "success": false,
@@ -572,13 +584,8 @@ fn handle_bitwarden_command(
                 }));
             }
 
-            let password = bitwarden::cli::generate_password(
-                length,
-                uppercase,
-                lowercase,
-                numbers,
-                special,
-            )?;
+            let password =
+                bitwarden::cli::generate_password(length, uppercase, lowercase, numbers, special)?;
             Ok(json!({
                 "success": true,
                 "bitwarden": {
@@ -638,11 +645,9 @@ async fn handle_doctor_command(
                         checks.push(doctor_status("guard_schema", schema_ok, &schema_detail));
 
                         let pending_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM pending_queue WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM pending_queue WHERE 1=1", [], |r| {
+                                r.get(0)
+                            })
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "guard_pending_queue",
@@ -651,11 +656,9 @@ async fn handle_doctor_command(
                         ));
 
                         let interrupted_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM interrupted_log WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM interrupted_log WHERE 1=1", [], |r| {
+                                r.get(0)
+                            })
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "guard_interrupted_log",
@@ -664,11 +667,9 @@ async fn handle_doctor_command(
                         ));
 
                         let outcomes_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM action_outcomes WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM action_outcomes WHERE 1=1", [], |r| {
+                                r.get(0)
+                            })
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "guard_action_outcomes",
@@ -677,11 +678,7 @@ async fn handle_doctor_command(
                         ));
 
                         let pid_trust_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM pid_trust WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM pid_trust WHERE 1=1", [], |r| r.get(0))
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "guard_pid_trust",
@@ -690,11 +687,9 @@ async fn handle_doctor_command(
                         ));
 
                         let node_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM memory_nodes WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM memory_nodes WHERE 1=1", [], |r| {
+                                r.get(0)
+                            })
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "guard_memory_graph",
@@ -703,11 +698,9 @@ async fn handle_doctor_command(
                         ));
 
                         let action_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM action_requests WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM action_requests WHERE 1=1", [], |r| {
+                                r.get(0)
+                            })
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "guard_action_requests",
@@ -734,7 +727,11 @@ async fn handle_doctor_command(
             } else {
                 "not found (created on first exec)".to_string()
             };
-            checks.push(doctor_status("flight_recorder_db", flight_ok, &flight_detail));
+            checks.push(doctor_status(
+                "flight_recorder_db",
+                flight_ok,
+                &flight_detail,
+            ));
 
             if flight_exists {
                 match rusqlite::Connection::open(&flight_path) {
@@ -755,11 +752,9 @@ async fn handle_doctor_command(
                         checks.push(doctor_status("flight_schema", schema_ok, &schema_detail));
 
                         let record_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM flight_records WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM flight_records WHERE 1=1", [], |r| {
+                                r.get(0)
+                            })
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "flight_records",
@@ -833,11 +828,9 @@ async fn handle_doctor_command(
                         ));
 
                         let event_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM event_rows WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
+                            .query_row("SELECT count(*) FROM event_rows WHERE 1=1", [], |r| {
+                                r.get(0)
+                            })
                             .unwrap_or(0);
                         checks.push(doctor_status(
                             "knowledge_events",
@@ -908,7 +901,11 @@ async fn handle_doctor_command(
             checks.push(doctor_status(
                 "tool_bitwarden",
                 bw_available,
-                if bw_available { "available" } else { "not found or not logged in" },
+                if bw_available {
+                    "available"
+                } else {
+                    "not found or not logged in"
+                },
             ));
 
             // 7. State-docs directory check

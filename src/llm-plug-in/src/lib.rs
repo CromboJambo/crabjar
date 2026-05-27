@@ -49,7 +49,7 @@ mod tests {
         assert_eq!(restored.weight_id, "w-1");
         assert_eq!(restored.model_name, "qwen3");
         assert_eq!(restored.tensor_count, 100);
-        assert_eq!(restored.lazy_loading, true);
+        assert!(restored.lazy_loading);
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
         let manifest = generate_weight_manifest(&conn, "test-model").unwrap();
         assert_eq!(manifest.model_name, "test-model");
         assert_eq!(manifest.tensor_count, 5);
-        assert_eq!(manifest.lazy_loading, true);
+        assert!(manifest.lazy_loading);
         assert_eq!(manifest.tensors.len(), 0);
     }
 

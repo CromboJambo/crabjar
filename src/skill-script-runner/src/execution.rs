@@ -64,18 +64,14 @@ pub async fn execute_parallel(scripts: &[(std::path::PathBuf, Vec<String>)]) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use std::os::unix::fs::PermissionsExt;
+    use tempfile::tempdir;
 
     #[test]
     fn execute_default_runs_echo() {
         let dir = tempdir().unwrap();
         let script_path = dir.path().join("echo.sh");
-        std::fs::write(
-            &script_path,
-            "#!/bin/bash\necho '{\"result\":\"ok\"}'",
-        )
-        .unwrap();
+        std::fs::write(&script_path, "#!/bin/bash\necho '{\"result\":\"ok\"}'").unwrap();
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let work_dir = dir.path();
@@ -95,7 +91,12 @@ mod tests {
         std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755)).unwrap();
 
         let work_dir = dir.path();
-        let result = execute_default(&script_path, &["hello".to_string(), "world".to_string()], work_dir).unwrap();
+        let result = execute_default(
+            &script_path,
+            &["hello".to_string(), "world".to_string()],
+            work_dir,
+        )
+        .unwrap();
         assert_eq!(result["arg1"], "hello");
         assert_eq!(result["arg2"], "world");
     }
@@ -134,10 +135,7 @@ mod tests {
         std::fs::write(&script2, "#!/bin/bash\necho '{\"id\":2}'").unwrap();
         std::fs::set_permissions(&script2, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        let scripts = vec![
-            (script1.clone(), Vec::new()),
-            (script2.clone(), Vec::new()),
-        ];
+        let scripts = vec![(script1.clone(), Vec::new()), (script2.clone(), Vec::new())];
         let results = execute_parallel(&scripts).await.unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0]["id"], 1);
@@ -163,10 +161,7 @@ mod tests {
         std::fs::write(&bad_script, "#!/bin/bash\nexit 1").unwrap();
         std::fs::set_permissions(&bad_script, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        let scripts = vec![
-            (good_script, Vec::new()),
-            (bad_script, Vec::new()),
-        ];
+        let scripts = vec![(good_script, Vec::new()), (bad_script, Vec::new())];
         let result = execute_parallel(&scripts).await;
         assert!(result.is_err());
     }

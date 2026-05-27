@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn task_category_clone_works() {
         let cat = TaskCategory::Debugging;
-        let cloned = cat.clone();
+        let cloned = cat;
         assert_eq!(cat, cloned);
     }
 

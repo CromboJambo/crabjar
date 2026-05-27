@@ -228,8 +228,14 @@ name = "test"
 "#;
         let config = ProjectConfig::parse_from_str(toml_str).unwrap();
         assert_eq!(config.keybindings.len(), 2);
-        assert_eq!(config.keybindings.get("Ctrl a"), Some(&"load-data".to_string()));
-        assert_eq!(config.keybindings.get("Ctrl b"), Some(&"transform".to_string()));
+        assert_eq!(
+            config.keybindings.get("Ctrl a"),
+            Some(&"load-data".to_string())
+        );
+        assert_eq!(
+            config.keybindings.get("Ctrl b"),
+            Some(&"transform".to_string())
+        );
     }
 
     #[test]
@@ -343,7 +349,10 @@ name = "test"
 "Ctrl a" = "load-data"
 "#;
         let config = ProjectConfig::parse_from_str(toml_str).unwrap();
-        assert_eq!(config.get_keybinding_action("Ctrl a"), Some("load-data".to_string()));
+        assert_eq!(
+            config.get_keybinding_action("Ctrl a"),
+            Some("load-data".to_string())
+        );
     }
 
     #[test]
@@ -378,12 +387,18 @@ name = "test"
     #[test]
     fn builder_with_tool() {
         let config = ProjectConfigBuilder::new("test")
-            .add_tool("deploy.nu", vec!["deploy".to_string(), "rollback".to_string()])
+            .add_tool(
+                "deploy.nu",
+                vec!["deploy".to_string(), "rollback".to_string()],
+            )
             .build()
             .unwrap();
         assert_eq!(config.tools.len(), 1);
         assert_eq!(config.tools[0].path, "deploy.nu");
-        assert_eq!(config.tools[0].commands, vec!["deploy".to_string(), "rollback".to_string()]);
+        assert_eq!(
+            config.tools[0].commands,
+            vec!["deploy".to_string(), "rollback".to_string()]
+        );
     }
 
     #[test]
@@ -392,7 +407,10 @@ name = "test"
             .knowledge_store_path("/custom/path.db")
             .build()
             .unwrap();
-        assert_eq!(config.knowledge_store_path, Some("/custom/path.db".to_string()));
+        assert_eq!(
+            config.knowledge_store_path,
+            Some("/custom/path.db".to_string())
+        );
     }
 
     #[test]
@@ -434,7 +452,10 @@ name = "test"
 
         assert_eq!(config.workspace_name, "full-workspace");
         assert_eq!(config.description, Some("Full test".to_string()));
-        assert_eq!(config.knowledge_store_path, Some("/tmp/knowledge.db".to_string()));
+        assert_eq!(
+            config.knowledge_store_path,
+            Some("/tmp/knowledge.db".to_string())
+        );
         assert_eq!(config.tools.len(), 2);
         assert_eq!(config.keybindings.len(), 2);
         assert!(!config.auto_register);
@@ -455,7 +476,10 @@ name = "test"
     fn config_error_not_found() {
         let path = std::path::PathBuf::from("/nonexistent/.crabjar_config.toml");
         let err = ConfigError::NotFound(path.clone());
-        assert!(err.to_string().contains("/nonexistent/.crabjar_config.toml"));
+        assert!(
+            err.to_string()
+                .contains("/nonexistent/.crabjar_config.toml")
+        );
     }
 
     #[test]

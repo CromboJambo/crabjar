@@ -178,8 +178,10 @@ mod tests {
     #[test]
     fn runner_bridge_update_config_updates_endpoint() {
         let mut bridge = RunnerBridge::new(RunnerConfig::default());
-        let mut new_config = RunnerConfig::default();
-        new_config.endpoint = "http://localhost:8080".into();
+        let new_config = RunnerConfig {
+            endpoint: "http://localhost:8080".into(),
+            ..Default::default()
+        };
         bridge.update_config(new_config).unwrap();
         assert_eq!(bridge.endpoint, "http://localhost:8080");
     }

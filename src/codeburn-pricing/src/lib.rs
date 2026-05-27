@@ -194,7 +194,13 @@ mod tests {
         }
     }
 
-    fn make_session(model: &str, input: u64, output: u64, project: &str, date: &str) -> codeburn_provider::SessionData {
+    fn make_session(
+        model: &str,
+        input: u64,
+        output: u64,
+        project: &str,
+        date: &str,
+    ) -> codeburn_provider::SessionData {
         codeburn_provider::SessionData {
             provider_name: "test".into(),
             provider: "test".into(),
@@ -240,9 +246,9 @@ mod tests {
     #[test]
     fn calculate_empty_sessions_returns_zero_cost() {
         let engine = make_engine();
-        let result = futures::executor::block_on(async {
-            engine.calculate(&[], Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&[], Some("USD")).await })
+                .unwrap();
         assert_eq!(result.total_cost, 0.0);
         assert_eq!(result.input_tokens, 0);
         assert_eq!(result.output_tokens, 0);
@@ -253,9 +259,9 @@ mod tests {
     fn calculate_single_session_gpt4() {
         let engine = make_engine();
         let session = make_session("gpt-4", 1000, 500, "proj-a", "2026-05-24");
-        let result = futures::executor::block_on(async {
-            engine.calculate(&[session], Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&[session], Some("USD")).await })
+                .unwrap();
         assert_eq!(result.input_tokens, 1000);
         assert_eq!(result.output_tokens, 500);
         // 1000 * 0.03 + 500 * 0.06 = 30 + 30 = 60
@@ -267,9 +273,9 @@ mod tests {
     fn calculate_single_session_gpt35() {
         let engine = make_engine();
         let session = make_session("gpt-3.5-turbo", 5000, 1000, "proj-b", "2026-05-24");
-        let result = futures::executor::block_on(async {
-            engine.calculate(&[session], Some("EUR")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&[session], Some("EUR")).await })
+                .unwrap();
         assert_eq!(result.input_tokens, 5000);
         assert_eq!(result.output_tokens, 1000);
         // 5000 * 0.0015 + 1000 * 0.002 = 7.5 + 2 = 9.5
@@ -281,9 +287,9 @@ mod tests {
     fn calculate_unknown_model_uses_zero_price() {
         let engine = make_engine();
         let session = make_session("unknown-model", 1000, 500, "proj-a", "2026-05-24");
-        let result = futures::executor::block_on(async {
-            engine.calculate(&[session], Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&[session], Some("USD")).await })
+                .unwrap();
         assert_eq!(result.total_cost, 0.0);
         assert_eq!(result.input_tokens, 1000);
         assert_eq!(result.output_tokens, 500);
@@ -296,9 +302,9 @@ mod tests {
             make_session("gpt-4", 1000, 500, "proj-a", "2026-05-24"),
             make_session("claude-3", 2000, 1000, "proj-b", "2026-05-24"),
         ];
-        let result = futures::executor::block_on(async {
-            engine.calculate(&sessions, Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&sessions, Some("USD")).await })
+                .unwrap();
         assert_eq!(result.input_tokens, 3000);
         assert_eq!(result.output_tokens, 1500);
         // gpt-4: 1000*0.03 + 500*0.06 = 60
@@ -313,9 +319,9 @@ mod tests {
             make_session("gpt-4", 1000, 500, "proj-a", "2026-05-24"),
             make_session("gpt-4", 2000, 1000, "proj-a", "2026-05-25"),
         ];
-        let result = futures::executor::block_on(async {
-            engine.calculate(&sessions, Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&sessions, Some("USD")).await })
+                .unwrap();
         assert_eq!(result.daily.len(), 2);
         assert!(result.daily.contains_key("2026-05-24"));
         assert!(result.daily.contains_key("2026-05-25"));
@@ -328,9 +334,9 @@ mod tests {
             make_session("gpt-4", 1000, 500, "proj-a", "2026-05-24"),
             make_session("claude-3", 2000, 1000, "proj-b", "2026-05-24"),
         ];
-        let result = futures::executor::block_on(async {
-            engine.calculate(&sessions, Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&sessions, Some("USD")).await })
+                .unwrap();
         assert_eq!(result.by_project.len(), 2);
         assert!(result.by_project.contains_key("proj-a"));
         assert!(result.by_project.contains_key("proj-b"));
@@ -343,9 +349,9 @@ mod tests {
             make_session("gpt-4", 1000, 500, "proj-a", "2026-05-24"),
             make_session("claude-3", 2000, 1000, "proj-a", "2026-05-24"),
         ];
-        let result = futures::executor::block_on(async {
-            engine.calculate(&sessions, Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&sessions, Some("USD")).await })
+                .unwrap();
         assert_eq!(result.by_model.len(), 2);
         assert!(result.by_model.contains_key("gpt-4"));
         assert!(result.by_model.contains_key("claude-3"));
@@ -355,9 +361,9 @@ mod tests {
     fn calculate_efficiency_with_zero_input() {
         let engine = make_engine();
         let session = make_session("gpt-4", 0, 500, "proj-a", "2026-05-24");
-        let result = futures::executor::block_on(async {
-            engine.calculate(&[session], Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&[session], Some("USD")).await })
+                .unwrap();
         assert_eq!(result.efficiency, 0.0);
     }
 
@@ -365,9 +371,9 @@ mod tests {
     fn calculate_efficiency_with_nonzero_input() {
         let engine = make_engine();
         let session = make_session("gpt-4", 1000, 500, "proj-a", "2026-05-24");
-        let result = futures::executor::block_on(async {
-            engine.calculate(&[session], Some("USD")).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&[session], Some("USD")).await })
+                .unwrap();
         // efficiency = total_cost / input_tokens = 60.0 / 1000 = 0.06
         assert!((result.efficiency - 0.06).abs() < f64::EPSILON);
     }
@@ -435,9 +441,9 @@ mod tests {
     fn calculate_default_currency_when_none() {
         let engine = make_engine();
         let session = make_session("gpt-4", 1000, 500, "proj-a", "2026-05-24");
-        let result = futures::executor::block_on(async {
-            engine.calculate(&[session], None).await
-        }).unwrap();
+        let result =
+            futures::executor::block_on(async { engine.calculate(&[session], None).await })
+                .unwrap();
         assert_eq!(result.style, "USD");
     }
 }
