@@ -33,3 +33,4 @@ tarpaulin-report.html
 # Generated manifests
 *.manifest.json
 guard.db
+knowledge.db
