@@ -51,11 +51,14 @@ fn parse_v1<R: Read>(reader: &mut R) -> Result<GgufHeader, GgufError> {
         tensors.push(read_tensor_info(reader)?);
     }
 
+    let data_section_start = compute_data_section_start(1, &kv_pairs, &tensors, None);
+
     Ok(GgufHeader {
         version: 1,
         kv_pairs,
         tensors,
         data_alignment: None,
+        data_section_start,
     })
 }
 
@@ -73,11 +76,14 @@ fn parse_v2<R: Read>(reader: &mut R) -> Result<GgufHeader, GgufError> {
         tensors.push(read_tensor_info(reader)?);
     }
 
+    let data_section_start = compute_data_section_start(2, &kv_pairs, &tensors, None);
+
     Ok(GgufHeader {
         version: 2,
         kv_pairs,
         tensors,
         data_alignment: None,
+        data_section_start,
     })
 }
 
@@ -97,12 +103,41 @@ fn parse_v3<R: Read>(reader: &mut R) -> Result<GgufHeader, GgufError> {
         tensors.push(read_tensor_info(reader)?);
     }
 
+    let data_section_start = compute_data_section_start(3, &kv_pairs, &tensors, Some(data_alignment));
+
     Ok(GgufHeader {
         version: 3,
         kv_pairs,
         tensors,
         data_alignment: Some(data_alignment),
+        data_section_start,
     })
+}
+
+/// Compute the byte offset where the tensor data section begins.
+///
+/// GGUF tensor offsets are relative to the data section start, not the file start.
+/// The data section starts after the header (magic + version + counts + KV pairs + tensor metadata),
+/// aligned up to `data_alignment` for v3.
+fn compute_data_section_start(version: u32, kv_pairs: &[GgufKvPair], tensors: &[GgufTensorInfo], data_alignment: Option<u64>) -> u64 {
+    let header_base: u64 = 4 + 4 + 8 + 8; // magic + version + tensor_count + kv_count
+    let kv_size: usize = kv_pairs.iter().map(|p| p.raw_byte_size()).sum();
+    let tensor_size: usize = tensors.iter().map(|t| t.raw_byte_size()).sum();
+    let mut data_section: u64 = header_base + kv_size as u64 + tensor_size as u64;
+
+    if version == 3 {
+        data_section += 8; // data_alignment field itself
+        if let Some(alignment) = data_alignment {
+            if alignment > 0 {
+                let remainder = data_section % alignment;
+                if remainder != 0 {
+                    data_section += alignment - remainder;
+                }
+            }
+        }
+    }
+
+    data_section
 }
 
 fn read_bytes<R: Read>(reader: &mut R, len: usize) -> Result<Vec<u8>, GgufError> {
@@ -169,11 +204,6 @@ fn read_kv_value<R: Read>(reader: &mut R, value_type: GgufValueType) -> Result<G
             let v = reader.read_i64::<LittleEndian>()?;
             Ok(GgufKvValue::Int64(v))
         }
-        GgufValueType::Float16 => {
-            let raw = reader.read_u16::<LittleEndian>()?;
-            let f = half::f16::from_bits(raw);
-            Ok(GgufKvValue::Float16(f))
-        }
         GgufValueType::Float32 => {
             let v = reader.read_f32::<LittleEndian>()?;
             Ok(GgufKvValue::Float32(v))
@@ -186,9 +216,9 @@ fn read_kv_value<R: Read>(reader: &mut R, value_type: GgufValueType) -> Result<G
             let v = reader.read_u8()? != 0;
             Ok(GgufKvValue::Bool(v))
         }
-        GgufValueType::Text => {
+        GgufValueType::String => {
             let s = read_string(reader)?;
-            Ok(GgufKvValue::Text(s))
+            Ok(GgufKvValue::String(s))
         }
         GgufValueType::Array => {
             let element_type = read_value_type(reader)?;
@@ -236,6 +266,12 @@ pub fn extract_tensor_bytes(path: &Path, offset: u64, size: usize) -> Result<Vec
     Ok(buffer)
 }
 
+/// Extract raw tensor bytes from a GGUF file using the header's data section offset.
+pub fn extract_tensor_bytes_with_header(path: &Path, header: &GgufHeader, tensor: &GgufTensorInfo) -> Result<Vec<u8>, GgufError> {
+    let file_offset = header.data_section_start + tensor.offset;
+    extract_tensor_bytes(path, file_offset, tensor.stored_size() as usize)
+}
+
 /// Extract tensor bytes from an already-opened file handle.
 pub fn extract_tensor_bytes_from<R: std::io::Read + std::io::Seek>(
     reader: &mut R,
@@ -265,71 +301,76 @@ mod tests {
     use crate::types::GgufKvPair;
 
     fn make_v3_header() -> GgufHeader {
+        let kv_pairs = vec![
+            GgufKvPair {
+                key: "general.architecture".to_string(),
+                value_type: GgufValueType::String,
+                value: GgufKvValue::String("llama".to_string()),
+            },
+            GgufKvPair {
+                key: "general.file_type".to_string(),
+                value_type: GgufValueType::Uint32,
+                value: GgufKvValue::Uint32(6),
+            },
+            GgufKvPair {
+                key: "llama.context_length".to_string(),
+                value_type: GgufValueType::Uint32,
+                value: GgufKvValue::Uint32(4096),
+            },
+            GgufKvPair {
+                key: "llama.embedding_length".to_string(),
+                value_type: GgufValueType::Uint32,
+                value: GgufKvValue::Uint32(4096),
+            },
+            GgufKvPair {
+                key: "llama.block_count".to_string(),
+                value_type: GgufValueType::Uint32,
+                value: GgufKvValue::Uint32(32),
+            },
+            GgufKvPair {
+                key: "llama.attention.head_count".to_string(),
+                value_type: GgufValueType::Uint32,
+                value: GgufKvValue::Uint32(32),
+            },
+            GgufKvPair {
+                key: "llama.attention.head_count_kv".to_string(),
+                value_type: GgufValueType::Uint32,
+                value: GgufKvValue::Uint32(8),
+            },
+            GgufKvPair {
+                key: "llama.rope.dimension_count".to_string(),
+                value_type: GgufValueType::Int32,
+                value: GgufKvValue::Int32(128),
+            },
+        ];
+        let tensors = vec![
+            GgufTensorInfo {
+                name: "token_embd.weight".to_string(),
+                shape: vec![4096],
+                offset: 0,
+                dtype: 1,
+            },
+            GgufTensorInfo {
+                name: "blk.0.attn_k.weight".to_string(),
+                shape: vec![4096, 4096],
+                offset: 67108864,
+                dtype: 1,
+            },
+            GgufTensorInfo {
+                name: "blk.0.attn_output.weight".to_string(),
+                shape: vec![4096, 4096],
+                offset: 134217728,
+                dtype: 1,
+            },
+        ];
+        let data_section_start = compute_data_section_start(3, &kv_pairs, &tensors, Some(32));
+
         GgufHeader {
             version: 3,
-            kv_pairs: vec![
-                GgufKvPair {
-                    key: "general.architecture".to_string(),
-                    value_type: GgufValueType::Text,
-                    value: GgufKvValue::Text("llama".to_string()),
-                },
-                GgufKvPair {
-                    key: "general.file_type".to_string(),
-                    value_type: GgufValueType::Uint32,
-                    value: GgufKvValue::Uint32(6),
-                },
-                GgufKvPair {
-                    key: "llama.context_length".to_string(),
-                    value_type: GgufValueType::Uint32,
-                    value: GgufKvValue::Uint32(4096),
-                },
-                GgufKvPair {
-                    key: "llama.embedding_length".to_string(),
-                    value_type: GgufValueType::Uint32,
-                    value: GgufKvValue::Uint32(4096),
-                },
-                GgufKvPair {
-                    key: "llama.block_count".to_string(),
-                    value_type: GgufValueType::Uint32,
-                    value: GgufKvValue::Uint32(32),
-                },
-                GgufKvPair {
-                    key: "llama.attention.head_count".to_string(),
-                    value_type: GgufValueType::Uint32,
-                    value: GgufKvValue::Uint32(32),
-                },
-                GgufKvPair {
-                    key: "llama.attention.head_count_kv".to_string(),
-                    value_type: GgufValueType::Uint32,
-                    value: GgufKvValue::Uint32(8),
-                },
-                GgufKvPair {
-                    key: "llama.rope.dimension_count".to_string(),
-                    value_type: GgufValueType::Int32,
-                    value: GgufKvValue::Int32(128),
-                },
-            ],
-            tensors: vec![
-                GgufTensorInfo {
-                    name: "token_embd.weight".to_string(),
-                    shape: vec![4096],
-                    offset: 0,
-                    dtype: 1,
-                },
-                GgufTensorInfo {
-                    name: "blk.0.attn_k.weight".to_string(),
-                    shape: vec![4096, 4096],
-                    offset: 67108864,
-                    dtype: 1,
-                },
-                GgufTensorInfo {
-                    name: "blk.0.attn_output.weight".to_string(),
-                    shape: vec![4096, 4096],
-                    offset: 134217728,
-                    dtype: 1,
-                },
-            ],
+            kv_pairs,
+            tensors,
             data_alignment: Some(32),
+            data_section_start,
         }
     }
 
@@ -456,11 +497,11 @@ mod tests {
         // KV count
         buf.extend_from_slice(&2u64.to_le_bytes());
 
-        // KV pair 1: general.architecture = "llama" (text)
+        // KV pair 1: general.architecture = "llama" (string)
         let key = "general.architecture";
         buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
         buf.extend_from_slice(key.as_bytes());
-        buf.extend_from_slice(&(12u32).to_le_bytes()); // TEXT type
+        buf.extend_from_slice(&(8u32).to_le_bytes()); // STRING type
         buf.extend_from_slice(&(5u64).to_le_bytes()); // "llama" length
         buf.extend_from_slice(b"llama");
 

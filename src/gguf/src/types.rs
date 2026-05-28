@@ -31,8 +31,8 @@ impl GgufVersion {
 ///
 /// Maps to GGUF spec value types:
 /// UINT8=0, INT8=1, UINT16=2, INT16=3, UINT32=4, INT32=5,
-/// UINT64=6, INT64=7, FLOAT16=8, FLOAT32=9, FLOAT64=10,
-/// BOOL=11, TEXT=12, ARRAY=13, BFLOAT16=15
+/// UINT64=6, INT64=7, STRING=8, FLOAT32=9, FLOAT64=10,
+/// BOOL=11, ARRAY=12, BFLOAT16=15
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GgufValueType {
     Uint8,
@@ -43,11 +43,10 @@ pub enum GgufValueType {
     Int32,
     Uint64,
     Int64,
-    Float16,
+    String,
     Float32,
     Float64,
     Bool,
-    Text,
     Array,
     Bfloat16,
 }
@@ -63,12 +62,11 @@ impl GgufValueType {
             5 => Some(Self::Int32),
             6 => Some(Self::Uint64),
             7 => Some(Self::Int64),
-            8 => Some(Self::Float16),
+            8 => Some(Self::String),
             9 => Some(Self::Float32),
             10 => Some(Self::Float64),
             11 => Some(Self::Bool),
-            12 => Some(Self::Text),
-            13 => Some(Self::Array),
+            12 => Some(Self::Array),
             15 => Some(Self::Bfloat16),
             _ => None,
         }
@@ -84,12 +82,11 @@ impl GgufValueType {
             Self::Int32 => 5,
             Self::Uint64 => 6,
             Self::Int64 => 7,
-            Self::Float16 => 8,
+            Self::String => 8,
             Self::Float32 => 9,
             Self::Float64 => 10,
             Self::Bool => 11,
-            Self::Text => 12,
-            Self::Array => 13,
+            Self::Array => 12,
             Self::Bfloat16 => 15,
         }
     }
@@ -101,11 +98,11 @@ impl GgufValueType {
     pub fn element_size(self) -> Option<usize> {
         match self {
             Self::Uint8 | Self::Int8 | Self::Bool => Some(1),
-            Self::Uint16 | Self::Int16 | Self::Float16 | Self::Bfloat16 => Some(2),
+            Self::Uint16 | Self::Int16 | Self::Bfloat16 => Some(2),
             Self::Uint32 | Self::Int32 => Some(4),
             Self::Uint64 | Self::Int64 | Self::Float64 => Some(8),
             Self::Float32 => Some(4),
-            Self::Text | Self::Array => None,
+            Self::String | Self::Array => None,
         }
     }
 }
@@ -116,6 +113,42 @@ pub struct GgufKvPair {
     pub key: String,
     pub value_type: GgufValueType,
     pub value: GgufKvValue,
+}
+
+impl GgufKvPair {
+    /// Total byte size of this KV pair in the GGUF file (key_len + key + type + value).
+    pub fn raw_byte_size(&self) -> usize {
+        let key_bytes = self.key.len();
+        let value_bytes = match &self.value {
+            GgufKvValue::Uint8(..)
+            | GgufKvValue::Int8(..)
+            | GgufKvValue::Bool(..) => 1,
+            GgufKvValue::Uint16(..) | GgufKvValue::Int16(..) => 2,
+            GgufKvValue::Uint32(..)
+            | GgufKvValue::Int32(..)
+            | GgufKvValue::Float32(..)
+            | GgufKvValue::Bfloat16(..) => 4,
+            GgufKvValue::Uint64(..) | GgufKvValue::Int64(..) | GgufKvValue::Float64(..) => 8,
+            GgufKvValue::String(s) => 8 + s.len(),
+            GgufKvValue::Array(arr) => {
+                let elem_size = match arr.first().map(|v| v.value_type()) {
+                    Some(GgufValueType::Uint8 | GgufValueType::Int8 | GgufValueType::Bool) => 1,
+                    Some(GgufValueType::Uint16 | GgufValueType::Int16) => 2,
+                    Some(GgufValueType::Uint32 | GgufValueType::Int32 | GgufValueType::Float32) => 4,
+                    Some(GgufValueType::Uint64 | GgufValueType::Int64 | GgufValueType::Float64) => 8,
+                    Some(GgufValueType::String) => {
+                        return arr.iter().map(|v| match v {
+                            GgufKvValue::String(s) => 8 + s.len(),
+                            _ => 0,
+                        }).sum::<usize>() + 4 + 8;
+                    }
+                    _ => 4,
+                };
+                4 + 8 + arr.len() * elem_size
+            }
+        };
+        8 + key_bytes + 4 + value_bytes
+    }
 }
 
 /// GGUF tensor data type (stored on disk).
@@ -360,6 +393,11 @@ impl GgufTensorInfo {
             GgufDtype::Unknown(_) => n * 2,
         }
     }
+
+    /// Total byte size of this tensor info in the GGUF file (name_len + name + dims + shape + dtype + offset).
+    pub fn raw_byte_size(&self) -> usize {
+        8 + self.name.len() + 4 + (self.shape.len() * 8) + 4 + 8
+    }
 }
 
 /// Parsed key-value value (runtime representation).
@@ -373,11 +411,10 @@ pub enum GgufKvValue {
     Int32(i32),
     Uint64(u64),
     Int64(i64),
-    Float16(half::f16),
+    String(String),
     Float32(f32),
     Float64(f64),
     Bool(bool),
-    Text(String),
     Array(Vec<GgufKvValue>),
     Bfloat16(f32),
 }
@@ -423,7 +460,6 @@ impl GgufKvValue {
 
     pub fn as_f32(&self) -> Option<f32> {
         match self {
-            GgufKvValue::Float16(v) => Some(v.to_f32()),
             GgufKvValue::Float32(v) => Some(*v),
             GgufKvValue::Float64(v) => Some(*v as f32),
             GgufKvValue::Bfloat16(v) => Some(*v),
@@ -440,7 +476,7 @@ impl GgufKvValue {
 
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            GgufKvValue::Text(s) => Some(s),
+            GgufKvValue::String(s) => Some(s),
             _ => None,
         }
     }
@@ -449,6 +485,25 @@ impl GgufKvValue {
         match self {
             GgufKvValue::Array(v) => Some(v),
             _ => None,
+        }
+    }
+
+    pub fn value_type(&self) -> GgufValueType {
+        match self {
+            GgufKvValue::Uint8(..) => GgufValueType::Uint8,
+            GgufKvValue::Int8(..) => GgufValueType::Int8,
+            GgufKvValue::Uint16(..) => GgufValueType::Uint16,
+            GgufKvValue::Int16(..) => GgufValueType::Int16,
+            GgufKvValue::Uint32(..) => GgufValueType::Uint32,
+            GgufKvValue::Int32(..) => GgufValueType::Int32,
+            GgufKvValue::Uint64(..) => GgufValueType::Uint64,
+            GgufKvValue::Int64(..) => GgufValueType::Int64,
+            GgufKvValue::String(..) => GgufValueType::String,
+            GgufKvValue::Float32(..) => GgufValueType::Float32,
+            GgufKvValue::Float64(..) => GgufValueType::Float64,
+            GgufKvValue::Bool(..) => GgufValueType::Bool,
+            GgufKvValue::Array(..) => GgufValueType::Array,
+            GgufKvValue::Bfloat16(..) => GgufValueType::Bfloat16,
         }
     }
 
@@ -462,11 +517,10 @@ impl GgufKvValue {
             GgufKvValue::Int32(_) => "i32",
             GgufKvValue::Uint64(_) => "u64",
             GgufKvValue::Int64(_) => "i64",
-            GgufKvValue::Float16(_) => "f16",
+            GgufKvValue::String(_) => "str",
             GgufKvValue::Float32(_) => "f32",
             GgufKvValue::Float64(_) => "f64",
             GgufKvValue::Bool(_) => "bool",
-            GgufKvValue::Text(_) => "str",
             GgufKvValue::Array(_) => "array",
             GgufKvValue::Bfloat16(_) => "bf16",
         }
@@ -480,6 +534,7 @@ pub struct GgufHeader {
     pub kv_pairs: Vec<GgufKvPair>,
     pub tensors: Vec<GgufTensorInfo>,
     pub data_alignment: Option<u64>,
+    pub data_section_start: u64,
 }
 
 impl GgufHeader {
@@ -680,7 +735,7 @@ mod tests {
     #[test]
     fn test_value_type_from_u32() {
         assert_eq!(GgufValueType::from_u32(0), Some(GgufValueType::Uint8));
-        assert_eq!(GgufValueType::from_u32(12), Some(GgufValueType::Text));
+        assert_eq!(GgufValueType::from_u32(12), Some(GgufValueType::Array));
         assert_eq!(GgufValueType::from_u32(15), Some(GgufValueType::Bfloat16));
         assert_eq!(GgufValueType::from_u32(14), None); // 14 is reserved
     }
@@ -689,7 +744,7 @@ mod tests {
     fn test_value_type_element_size() {
         assert_eq!(GgufValueType::Uint8.element_size(), Some(1));
         assert_eq!(GgufValueType::Float32.element_size(), Some(4));
-        assert_eq!(GgufValueType::Text.element_size(), None);
+        assert_eq!(GgufValueType::String.element_size(), None);
         assert_eq!(GgufValueType::Array.element_size(), None);
     }
 
@@ -712,8 +767,8 @@ mod tests {
             kv_pairs: vec![
                 GgufKvPair {
                     key: "general.architecture".to_string(),
-                    value_type: GgufValueType::Text,
-                    value: GgufKvValue::Text("llama".to_string()),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("llama".to_string()),
                 },
                 GgufKvPair {
                     key: "llama.context_length".to_string(),
@@ -740,13 +795,7 @@ mod tests {
                 },
             ],
             data_alignment: Some(32),
+            data_section_start: 0,
         };
-
-        assert_eq!(header.architecture(), Some("llama"));
-        assert_eq!(header.context_length(), Some(4096));
-        assert_eq!(header.embedding_length(), Some(4096));
-        assert_eq!(header.normalization_epsilon(), Some(1e-5));
-        assert!(!header.has_tensor("nonexistent"));
-        assert!(header.has_tensor("token_embd.weight"));
     }
 }

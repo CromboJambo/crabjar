@@ -86,7 +86,7 @@ fn main() {
     for key in &common_keys {
         if let Some(val) = config.get(*key) {
             let display = match val {
-                crabjar_gguf::GgufKvValue::Text(s) => s.clone(),
+                crabjar_gguf::GgufKvValue::String(s) => s.clone(),
                 crabjar_gguf::GgufKvValue::Uint32(v) => v.to_string(),
                 crabjar_gguf::GgufKvValue::Uint64(v) => v.to_string(),
                 crabjar_gguf::GgufKvValue::Int32(v) => v.to_string(),
@@ -96,7 +96,7 @@ fn main() {
                 crabjar_gguf::GgufKvValue::Array(arr) => {
                     format!("[{}]", arr.iter().map(|v| {
                         match v {
-                            crabjar_gguf::GgufKvValue::Text(s) => s.clone(),
+                            crabjar_gguf::GgufKvValue::String(s) => s.clone(),
                             crabjar_gguf::GgufKvValue::Uint32(v) => v.to_string(),
                             crabjar_gguf::GgufKvValue::Int32(v) => v.to_string(),
                             crabjar_gguf::GgufKvValue::Float32(v) => v.to_string(),
