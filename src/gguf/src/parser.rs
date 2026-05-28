@@ -3,7 +3,7 @@ use std::io::{BufReader, Read, Seek};
 use std::path::Path;
 
 use crate::error::GgufError;
-use crate::types::{GgufHeader, GgufKvPair, GgufKvValue, GgufTensorInfo, GgufValueType};
+use crate::types::{GgufDtype, GgufHeader, GgufKvPair, GgufKvValue, GgufTensorInfo, GgufValueType};
 
 const GGUF_MAGIC: &[u8; 4] = b"GGUF";
 const GGUF_VERSION_1: u32 = 1;
@@ -215,8 +215,9 @@ fn read_tensor_info<R: Read>(reader: &mut R) -> Result<GgufTensorInfo, GgufError
     for _ in 0..n_dims {
         shape.push(reader.read_u64::<LittleEndian>()?);
     }
+    let dtype = reader.read_u32::<LittleEndian>()?;
     let offset = reader.read_u64::<LittleEndian>()?;
-    Ok(GgufTensorInfo { name, shape, offset })
+    Ok(GgufTensorInfo { name, shape, offset, dtype })
 }
 
 /// Extract raw tensor bytes from a GGUF file at a given offset.
@@ -256,198 +257,6 @@ pub fn extract_tensor_bytes_from<R: std::io::Read + std::io::Seek>(
 /// Compute the raw byte size of a tensor before quantization.
 pub fn tensor_bytes_for_dtype(element_count: u64, dtype: GgufDtype) -> usize {
     (element_count as usize) * dtype.bytes_per_element()
-}
-
-/// GGUF tensor data type (stored on disk).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
-pub enum GgufDtype {
-    F32,
-    F16,
-    Q4_0,
-    Q4_1,
-    Q5_0,
-    Q5_1,
-    Q8_0,
-    Q8_1,
-    Q2_K,
-    Q3_K,
-    Q4_K,
-    Q5_K,
-    Q6_K,
-    Q8_K,
-    I8,
-    I16,
-    I32,
-    I64,
-    F64,
-    BF16,
-    Q1_K,
-    Q4_K_M,
-    Q5_K_M,
-    Q6_K_S,
-    Q8_K_M,
-    Q2_K_S,
-    Q3_K_S,
-    Q4_K_S,
-    Q5_K_S,
-    Q2_K_M,
-    Unknown(u32),
-}
-
-impl GgufDtype {
-    pub const fn from_u32(v: u32) -> Self {
-        match v {
-            0 => Self::F32,
-            1 => Self::F16,
-            2 => Self::Q4_0,
-            3 => Self::Q4_1,
-            4 => Self::Q5_0,
-            5 => Self::Q5_1,
-            6 => Self::Q8_0,
-            7 => Self::Q8_1,
-            8 => Self::Q2_K,
-            9 => Self::Q3_K,
-            10 => Self::Q4_K,
-            11 => Self::Q5_K,
-            12 => Self::Q6_K,
-            13 => Self::Q8_K,
-            14 => Self::I8,
-            15 => Self::I16,
-            16 => Self::I32,
-            17 => Self::I64,
-            18 => Self::F64,
-            19 => Self::BF16,
-            20 => Self::Q1_K,
-            21 => Self::Q4_K_M,
-            22 => Self::Q5_K_M,
-            23 => Self::Q6_K_S,
-            24 => Self::Q8_K_M,
-            25 => Self::Q2_K_S,
-            26 => Self::Q3_K_S,
-            27 => Self::Q4_K_S,
-            28 => Self::Q5_K_S,
-            29 => Self::Q2_K_M,
-            _ => Self::Unknown(v),
-        }
-    }
-
-    pub const fn to_u32(self) -> u32 {
-        match self {
-            Self::F32 => 0,
-            Self::F16 => 1,
-            Self::Q4_0 => 2,
-            Self::Q4_1 => 3,
-            Self::Q5_0 => 4,
-            Self::Q5_1 => 5,
-            Self::Q8_0 => 6,
-            Self::Q8_1 => 7,
-            Self::Q2_K => 8,
-            Self::Q3_K => 9,
-            Self::Q4_K => 10,
-            Self::Q5_K => 11,
-            Self::Q6_K => 12,
-            Self::Q8_K => 13,
-            Self::I8 => 14,
-            Self::I16 => 15,
-            Self::I32 => 16,
-            Self::I64 => 17,
-            Self::F64 => 18,
-            Self::BF16 => 19,
-            Self::Q1_K => 20,
-            Self::Q4_K_M => 21,
-            Self::Q5_K_M => 22,
-            Self::Q6_K_S => 23,
-            Self::Q8_K_M => 24,
-            Self::Q2_K_S => 25,
-            Self::Q3_K_S => 26,
-            Self::Q4_K_S => 27,
-            Self::Q5_K_S => 28,
-            Self::Q2_K_M => 29,
-            Self::Unknown(v) => v,
-        }
-    }
-
-    pub const fn is_quantized(self) -> bool {
-        matches!(
-            self,
-            Self::Q4_0
-                | Self::Q4_1
-                | Self::Q5_0
-                | Self::Q5_1
-                | Self::Q8_0
-                | Self::Q8_1
-                | Self::Q2_K
-                | Self::Q3_K
-                | Self::Q4_K
-                | Self::Q5_K
-                | Self::Q6_K
-                | Self::Q8_K
-                | Self::Q1_K
-                | Self::Q4_K_M
-                | Self::Q5_K_M
-                | Self::Q6_K_S
-                | Self::Q8_K_M
-                | Self::Q2_K_S
-                | Self::Q3_K_S
-                | Self::Q4_K_S
-                | Self::Q5_K_S
-                | Self::Q2_K_M
-        )
-    }
-
-    pub const fn bytes_per_element(self) -> usize {
-        match self {
-            Self::F32 => 4,
-            Self::F16 => 2,
-            Self::Q8_0 | Self::Q8_1 => 2,
-            Self::I8 => 1,
-            Self::I16 => 2,
-            Self::I32 => 4,
-            Self::I64 => 8,
-            Self::F64 => 8,
-            Self::BF16 => 2,
-            Self::Q4_0 | Self::Q4_1 | Self::Q1_K | Self::Q5_0 | Self::Q5_1 | Self::Q4_K_M => 0,
-            Self::Q2_K | Self::Q3_K | Self::Q4_K | Self::Q5_K | Self::Q5_K_S | Self::Q5_K_M | Self::Q6_K | Self::Q6_K_S | Self::Q8_K | Self::Q8_K_M | Self::Q2_K_M | Self::Q2_K_S | Self::Q3_K_S | Self::Q4_K_S => 0,
-            Self::Unknown(_) => 0,
-        }
-    }
-
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::F32 => "F32",
-            Self::F16 => "F16",
-            Self::Q4_0 => "Q4_0",
-            Self::Q4_1 => "Q4_1",
-            Self::Q5_0 => "Q5_0",
-            Self::Q5_1 => "Q5_1",
-            Self::Q8_0 => "Q8_0",
-            Self::Q8_1 => "Q8_1",
-            Self::Q2_K => "Q2_K",
-            Self::Q3_K => "Q3_K",
-            Self::Q4_K => "Q4_K",
-            Self::Q5_K => "Q5_K",
-            Self::Q6_K => "Q6_K",
-            Self::Q8_K => "Q8_K",
-            Self::I8 => "I8",
-            Self::I16 => "I16",
-            Self::I32 => "I32",
-            Self::I64 => "I64",
-            Self::F64 => "F64",
-            Self::BF16 => "BF16",
-            Self::Q1_K => "Q1_K",
-            Self::Q4_K_M => "Q4_K_M",
-            Self::Q5_K_M => "Q5_K_M",
-            Self::Q6_K_S => "Q6_K_S",
-            Self::Q8_K_M => "Q8_K_M",
-            Self::Q2_K_S => "Q2_K_S",
-            Self::Q3_K_S => "Q3_K_S",
-            Self::Q4_K_S => "Q4_K_S",
-            Self::Q5_K_S => "Q5_K_S",
-            Self::Q2_K_M => "Q2_K_M",
-            Self::Unknown(_) => "unknown",
-        }
-    }
 }
 
 #[cfg(test)]
@@ -505,16 +314,19 @@ mod tests {
                     name: "token_embd.weight".to_string(),
                     shape: vec![4096],
                     offset: 0,
+                    dtype: 1,
                 },
                 GgufTensorInfo {
                     name: "blk.0.attn_k.weight".to_string(),
                     shape: vec![4096, 4096],
                     offset: 67108864,
+                    dtype: 1,
                 },
                 GgufTensorInfo {
                     name: "blk.0.attn_output.weight".to_string(),
                     shape: vec![4096, 4096],
                     offset: 134217728,
+                    dtype: 1,
                 },
             ],
             data_alignment: Some(32),
@@ -662,21 +474,23 @@ mod tests {
         // Data alignment
         buf.extend_from_slice(&32u64.to_le_bytes());
 
-        // Tensor 1: token_embd.weight (shape [4096], offset 0)
+        // Tensor 1: token_embd.weight (shape [4096], dtype F16, offset 0)
         let name = "token_embd.weight";
         buf.extend_from_slice(&(name.len() as u64).to_le_bytes());
         buf.extend_from_slice(name.as_bytes());
         buf.extend_from_slice(&1u32.to_le_bytes()); // 1 dim
         buf.extend_from_slice(&4096u64.to_le_bytes()); // shape[0]
+        buf.extend_from_slice(&1u32.to_le_bytes()); // dtype F16
         buf.extend_from_slice(&0u64.to_le_bytes()); // offset
 
-        // Tensor 2: output.weight (shape [4096, 32000], offset after tensor 1)
+        // Tensor 2: output.weight (shape [4096, 32000], dtype F16, offset after tensor 1)
         let name = "output.weight";
         buf.extend_from_slice(&(name.len() as u64).to_le_bytes());
         buf.extend_from_slice(name.as_bytes());
         buf.extend_from_slice(&2u32.to_le_bytes()); // 2 dims
         buf.extend_from_slice(&4096u64.to_le_bytes()); // shape[0]
         buf.extend_from_slice(&32000u64.to_le_bytes()); // shape[1]
+        buf.extend_from_slice(&1u32.to_le_bytes()); // dtype F16
         buf.extend_from_slice(&(4096 * 2u64).to_le_bytes()); // offset (F16 = 2 bytes per element)
 
         buf

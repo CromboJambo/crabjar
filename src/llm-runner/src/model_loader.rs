@@ -1,4 +1,4 @@
-use crabjar_gguf::parser::GgufDtype;
+use crabjar_gguf::GgufDtype;
 use crabjar_gguf::GgufHeader;
 use crabjar_llm_plug_in::manifest::WeightManifest;
 
