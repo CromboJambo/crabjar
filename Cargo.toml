@@ -17,6 +17,7 @@ members = [
     "tool_registry",
     "src/llm-plug-in",
     "src/llm-runner",
+    "src/gguf",
     "zed-acp-bridge",
     "zed-acp-server",
 ]

@@ -23,6 +23,9 @@ pub enum RunnerError {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
+    #[error("GGUF parse error: {0}")]
+    Gguf(#[from] crabjar_gguf::GgufError),
+
     #[error("asset loading error: {0}")]
     Asset(String),
 

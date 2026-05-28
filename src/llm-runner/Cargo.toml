@@ -38,6 +38,7 @@ anyhow.workspace = true
 # CrabJar plug-in
 crabjar-llm-plug-in = { path = "../llm-plug-in" }
 crabjar-safetensors = { path = "../../safetensors" }
+crabjar-gguf = { path = "../gguf" }
 
 # Device backend
 cudarc.workspace = true

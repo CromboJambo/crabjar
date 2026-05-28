@@ -1,7 +1,10 @@
+use crabjar_gguf::parser::GgufDtype;
+use crabjar_gguf::GgufHeader;
 use crabjar_llm_plug_in::manifest::WeightManifest;
 
 use crate::error::RunnerError;
 use crabjar_safetensors::error::SafetensorsSchemaError;
+use std::path::Path;
 use tracing::debug;
 
 /// Model loader that consumes WeightManifest from safetensors DB.
@@ -112,5 +115,91 @@ impl ModelLoader {
                 })
             },
         )
+    }
+
+    /// Parse a GGUF file and return its header (metadata only, no tensor data).
+    pub fn load_gguf_header(path: &Path) -> Result<GgufHeader, RunnerError> {
+        crabjar_gguf::parser::parse_gguf(path).map_err(RunnerError::Gguf)
+    }
+
+    /// Detect the quantization type from a GGUF header.
+    pub fn detect_quantization(header: &GgufHeader) -> Option<GgufDtype> {
+        header
+            .get_kv_str("general.file_type")
+            .and_then(|s| s.parse::<u32>().ok())
+            .map(GgufDtype::from_u32)
+            .or_else(|| {
+                header
+                    .get_kv_str("general.file_type")
+                    .map(|s| match s {
+                        "F16" => GgufDtype::F16,
+                        "F32" => GgufDtype::F32,
+                        "Q4_0" => GgufDtype::Q4_0,
+                        "Q4_1" => GgufDtype::Q4_1,
+                        "Q5_0" => GgufDtype::Q5_0,
+                        "Q5_1" => GgufDtype::Q5_1,
+                        "Q8_0" => GgufDtype::Q8_0,
+                        "Q8_1" => GgufDtype::Q8_1,
+                        "Q2_K" => GgufDtype::Q2_K,
+                        "Q3_K" => GgufDtype::Q3_K,
+                        "Q4_K" => GgufDtype::Q4_K,
+                        "Q5_K" => GgufDtype::Q5_K,
+                        "Q6_K" => GgufDtype::Q6_K,
+                        "Q8_K" => GgufDtype::Q8_K,
+                        "BF16" => GgufDtype::BF16,
+                        _ => GgufDtype::Unknown(0),
+                    })
+            })
+    }
+
+    /// Extract raw tensor bytes from a GGUF file by tensor name.
+    pub fn extract_gguf_tensor(path: &Path, tensor_name: &str) -> Result<Vec<u8>, RunnerError> {
+        let header = Self::load_gguf_header(path)?;
+        let tensor = header
+            .get_tensor(tensor_name)
+            .ok_or_else(|| RunnerError::Gguf(crabjar_gguf::GgufError::InvalidTensor(format!("tensor '{tensor_name}' not found"))))?;
+
+        let size = tensor.element_count() as usize;
+        crabjar_gguf::parser::extract_tensor_bytes(path, tensor.offset, size).map_err(RunnerError::Gguf)
+    }
+
+    /// Get architecture from a GGUF header.
+    pub fn gguf_architecture(header: &GgufHeader) -> Option<&str> {
+        header.architecture()
+    }
+
+    /// Get context length from a GGUF header.
+    pub fn gguf_context_length(header: &GgufHeader) -> Option<u32> {
+        header.context_length()
+    }
+
+    /// Get embedding dimension from a GGUF header.
+    pub fn gguf_embedding_length(header: &GgufHeader) -> Option<u32> {
+        header.embedding_length()
+    }
+
+    /// Get block count (number of layers) from a GGUF header.
+    pub fn gguf_block_count(header: &GgufHeader) -> Option<u32> {
+        header.block_count()
+    }
+
+    /// Get attention head count from a GGUF header.
+    pub fn gguf_attention_head_count(header: &GgufHeader) -> Option<u32> {
+        header.attention_head_count()
+    }
+
+    /// Get attention head count KV from a GGUF header.
+    pub fn gguf_attention_head_count_kv(header: &GgufHeader) -> Option<u32> {
+        header.attention_head_count_kv()
+    }
+
+    /// Get rope dimension count from a GGUF header.
+    pub fn gguf_rope_dimension_count(header: &GgufHeader) -> Option<i32> {
+        header.rope_dimension_count()
+    }
+
+    /// Get normalization epsilon from a GGUF header.
+    pub fn gguf_normalization_epsilon(header: &GgufHeader) -> Option<f32> {
+        header.normalization_epsilon()
     }
 }
