@@ -86,12 +86,22 @@ pub fn knowledge_response(
     response
 }
 
+/// Result of a gated knowledge insert.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub enum GatedInsertResult {
+    Inserted { id: i64 },
+    Quarantined { id: i64 },
+    DryRun,
+}
+
 /// Bridge between state-docs and knowledge store
 #[allow(dead_code)]
 pub struct KnowledgeBridge {
     knowledge_store: Store,
     project_root: PathBuf,
     mirror_log_conn: Option<Connection>,
+    guard_db: Option<crabjar_guard::GuardDb>,
 }
 
 #[allow(dead_code)]
@@ -113,7 +123,14 @@ impl KnowledgeBridge {
             knowledge_store,
             project_root,
             mirror_log_conn,
+            guard_db: None,
         })
+    }
+
+    /// Attach a guard database for write authorization.
+    pub fn with_guard_db(mut self, guard_db: crabjar_guard::GuardDb) -> Self {
+        self.guard_db = Some(guard_db);
+        self
     }
 
     /// Resolve a state-doc path from project root
@@ -374,6 +391,77 @@ impl KnowledgeBridge {
         Ok(self.knowledge_store.insert(entry)?)
     }
 
+    /// Insert a knowledge entry gated by source type.
+    /// External sources are routed to quarantine (pending) regardless of confidence.
+    pub fn insert_gated(
+        &self,
+        content: &str,
+        kind: KnowledgeKind,
+        tags: Vec<String>,
+        source: Source,
+    ) -> Result<GatedInsertResult, agent_context::Error> {
+        let source_str = match source {
+            Source::User => "user",
+            Source::Agent => "agent",
+            Source::System => "system",
+            Source::External => "external",
+        };
+
+        let gate_result = if let Some(guard_db) = &self.guard_db {
+            let gate = crabjar_guard::ExecutionGate::new(guard_db, false, &self.project_root);
+            gate.check_knowledge_write(source_str)
+                .map_err(|e| agent_context::Error::Internal(e.to_string()))?
+        } else {
+            crabjar_guard::GateResult::Proceed
+        };
+
+        let entry = {
+            let mut entry = KnowledgeEntry::new(content, kind);
+            entry.source = source;
+            entry.source_type = source_str.to_string();
+            entry.tags = tags;
+            entry
+        };
+
+        match gate_result {
+            crabjar_guard::GateResult::Proceed => {
+                let id = self.knowledge_store.insert(entry)?;
+                Ok(GatedInsertResult::Inserted { id })
+            }
+            crabjar_guard::GateResult::Pending => {
+                let mut pending_entry = entry;
+                let mut new_meta = pending_entry
+                    .metadata
+                    .as_object()
+                    .cloned()
+                    .unwrap_or_else(serde_json::Map::new);
+                new_meta.insert("quarantined".to_string(), serde_json::json!(true));
+                new_meta.insert(
+                    "quarantined_at".to_string(),
+                    serde_json::json!(chrono::Utc::now().to_rfc3339()),
+                );
+                pending_entry.metadata = serde_json::Value::Object(new_meta);
+                let id = self.knowledge_store.insert(pending_entry)?;
+                Ok(GatedInsertResult::Quarantined { id })
+            }
+            crabjar_guard::GateResult::Interrupted { reason } => {
+                Err(agent_context::Error::Internal(format!(
+                    "Knowledge write blocked: {}",
+                    reason
+                )))
+            }
+            crabjar_guard::GateResult::DryRun => {
+                Ok(GatedInsertResult::DryRun)
+            }
+            crabjar_guard::GateResult::Revoked { reason } => {
+                Err(agent_context::Error::Internal(format!(
+                    "Knowledge write revoked: {}",
+                    reason
+                )))
+            }
+        }
+    }
+
     /// Verify knowledge store integrity.
     pub fn verify(&self) -> Result<Vec<i64>, agent_context::Error> {
         Ok(self.knowledge_store.verify()?)
@@ -387,6 +475,83 @@ impl KnowledgeBridge {
         reason: Option<&str>,
     ) -> Result<(), agent_context::Error> {
         Ok(self.knowledge_store.deactivate(id, source, reason)?)
+    }
+
+    /// Promote a quarantined knowledge entry to active.
+    /// Removes the quarantine flag and sets the entry as active.
+    pub fn promote_quarantined(&self, id: i64, reason: &str) -> Result<bool, agent_context::Error> {
+        let conn = &self.knowledge_store.conn;
+        
+        let is_quarantined: bool = conn.query_row(
+            "SELECT COALESCE(metadata->>'$.quarantined', 'false') = 'true' FROM knowledge_entries WHERE id = ?",
+            [id],
+            |row| row.get(0),
+        ).unwrap_or(false);
+
+        if !is_quarantined {
+            return Err(agent_context::Error::Internal(format!(
+                "Entry {} is not quarantined", id
+            )));
+        }
+
+        conn.execute(
+            "UPDATE knowledge_entries SET active = 1, metadata = json_set(
+                metadata, '$.quarantined', 0,
+                '$.promoted_at', ?,
+                '$.promotion_reason', ?
+            ) WHERE id = ?",
+            rusqlite::params![
+                chrono::Utc::now().to_rfc3339(),
+                reason,
+                id,
+            ],
+        )?;
+
+        let ts = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO event_rows (event_type, timestamp) VALUES (?, ?)",
+            rusqlite::params!["promote", ts],
+        )?;
+
+        Ok(true)
+    }
+
+    /// List quarantined entries (for human review).
+    pub fn list_quarantined(&self) -> Result<Vec<serde_json::Value>, agent_context::Error> {
+        let mut stmt = self.knowledge_store.conn.prepare(
+            "SELECT id, content, tags, metadata, source, source_type, created_at 
+             FROM knowledge_entries 
+             WHERE metadata->>'$.quarantined' = 'true' 
+             ORDER BY created_at DESC"
+        )?;
+        
+        let mut rows = Vec::new();
+        let cursor = stmt.query_map([], |row| {
+            Ok((
+                row.get::<usize, i64>(0)?,
+                row.get::<usize, String>(1)?,
+                row.get::<usize, String>(2)?,
+                row.get::<usize, String>(3)?,
+                row.get::<usize, String>(4)?,
+                row.get::<usize, String>(5)?,
+                row.get::<usize, String>(6)?,
+            ))
+        })?;
+        
+        for row in cursor {
+            let (id, content, tags, metadata, source, source_type, created_at) = row?;
+            rows.push(json!({
+                "id": id,
+                "content": content,
+                "tags": serde_json::from_str::<Vec<String>>(&tags).unwrap_or_default(),
+                "metadata": serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&metadata).unwrap_or_default(),
+                "source": source,
+                "source_type": source_type,
+                "created_at": created_at,
+            }));
+        }
+        
+        Ok(rows)
     }
 
     /// Resolve an annotation and deactivate derived knowledge entries.

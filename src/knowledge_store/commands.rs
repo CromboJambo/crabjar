@@ -108,6 +108,13 @@ impl KnowledgeCommandExt for KnowledgeCommand {
                     }),
                 ))
             }
+            Self::Promote { id, reason } => {
+                let promoted = bridge.promote_quarantined(*id, reason)?;
+                Ok(knowledge_response(
+                    "knowledge entry promoted",
+                    json!({ "id": id, "promoted": promoted }),
+                ))
+            }
         }
     }
 }
