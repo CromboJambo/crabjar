@@ -55,8 +55,9 @@ CREATE TABLE IF NOT EXISTS trust_layers (
 INSERT OR IGNORE INTO trust_layers (id, name, min_confidence, max_confidence, auto_execute, requires_review, description) VALUES
     (0, 'raw',          0.0, 0.2, 0, 1, 'Unverified raw observations'),
     (1, 'observed',     0.2, 0.5, 0, 1, 'Observed but not yet confirmed'),
-    (2, 'working',      0.5, 0.8, 0, 1, 'Working knowledge - requires review'),
-    (3, 'annealed',     0.8, 1.0, 1, 0, 'Highly annealed, trusted knowledge');
+    (2, 'quarantined',  0.5, 0.8, 0, 1, 'External-sourced knowledge - requires manual promotion'),
+    (3, 'working',      0.8, 0.9, 0, 1, 'Working knowledge - requires review'),
+    (4, 'annealed',     0.9, 1.0, 1, 0, 'Highly annealed, trusted knowledge');
 
 -- ============================================================================
 -- Review Records: human review history

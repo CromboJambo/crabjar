@@ -158,6 +158,33 @@ impl<'a> ExecutionGate<'a> {
         Ok(GateResult::Proceed)
     }
 
+    /// Gate knowledge write based on source.
+    ///
+    /// External-sourced writes always land in quarantine (pending) regardless
+    /// of confidence. User/Agent writes follow normal trust layer gating.
+    pub fn check_knowledge_write(&self, source: &str) -> Result<GateResult, GuardDbError> {
+        match source {
+            "external" => {
+                // External writes always go to quarantine — requires human promotion
+                debug!(source = source, "Knowledge write from external source → quarantine");
+                Ok(GateResult::Pending)
+            }
+            "agent" | "system" => {
+                // Agent/system writes follow normal trust gating
+                debug!(source = source, "Knowledge write from trusted source");
+                Ok(GateResult::Proceed)
+            }
+            "user" => {
+                // User writes are trusted
+                Ok(GateResult::Proceed)
+            }
+            _ => {
+                warn!(source = source, "Unknown knowledge write source → quarantine");
+                Ok(GateResult::Pending)
+            }
+        }
+    }
+
     /// Verify provenance: source_event_id exists in GuardDb action_requests.
     fn verify_provenance(&self, id: &str) -> Result<bool, GuardDbError> {
         let conn = self.trust.conn();
@@ -382,8 +409,8 @@ mod tests {
                 "evt-1",
                 "echo",
                 "hello",
-                3,
-                0.9,
+                4,
+                0.95,
                 "trust-approved",
             ],
         )
@@ -396,8 +423,8 @@ mod tests {
             action_type: "echo",
             command: "echo",
             args: vec!["hello".to_string()],
-            trust_layer: 3,
-            confidence: TrustScore::new(0.9),
+            trust_layer: 4,
+            confidence: TrustScore::new(0.95),
             source_event_id: Some("evt-1"),
             can_interrupt: true,
             pid: None,
@@ -534,8 +561,8 @@ mod tests {
             action_type: "delete",
             command: "rm",
             args: vec!["-rf".to_string(), "/tmp/test".to_string()],
-            trust_layer: 3,
-            confidence: TrustScore::new(0.9),
+            trust_layer: 4,
+            confidence: TrustScore::new(0.95),
             source_event_id: Some("evt-5"),
             can_interrupt: true,
             pid: None,
@@ -640,8 +667,8 @@ mod tests {
                 "evt-1",
                 "echo",
                 "hello",
-                3,
-                0.9,
+                4,
+                0.95,
                 "trust-approved",
             ],
         )
@@ -654,8 +681,8 @@ mod tests {
             action_type: "echo",
             command: "echo",
             args: vec!["hello".to_string()],
-            trust_layer: 3,
-            confidence: TrustScore::new(0.9),
+            trust_layer: 4,
+            confidence: TrustScore::new(0.95),
             source_event_id: Some("evt-1"),
             can_interrupt: true,
             pid: None,

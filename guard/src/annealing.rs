@@ -421,8 +421,8 @@ mod tests {
                 Some(node_id),
                 "echo",
                 "hello",
-                3,
-                TrustScore::new(0.9),
+                4,
+                TrustScore::new(0.95),
             )
             .unwrap();
 

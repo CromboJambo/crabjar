@@ -270,13 +270,13 @@ mod tests {
         let tm = TrustManager::new(&db);
 
         let layers = tm.list_layers().unwrap();
-        assert!(layers.len() >= 4);
+        assert!(layers.len() >= 5);
         assert_eq!(layers[0].name(), "raw");
         assert!(!layers[0].auto_execute);
         assert!(!layers[2].auto_execute);
         assert!(layers[2].requires_review);
-        assert!(layers[3].auto_execute);
-        assert!(!layers[3].requires_review);
+        assert!(layers[4].auto_execute);
+        assert!(!layers[4].requires_review);
     }
 
     #[test]
@@ -288,10 +288,13 @@ mod tests {
         let raw = tm.layer_for_score(TrustScore::new(0.1)).unwrap().unwrap();
         assert_eq!(raw.name(), "raw");
 
-        let working = tm.layer_for_score(TrustScore::new(0.6)).unwrap().unwrap();
+        let quarantined = tm.layer_for_score(TrustScore::new(0.6)).unwrap().unwrap();
+        assert_eq!(quarantined.name(), "quarantined");
+
+        let working = tm.layer_for_score(TrustScore::new(0.85)).unwrap().unwrap();
         assert_eq!(working.name(), "working");
 
-        let annealed = tm.layer_for_score(TrustScore::new(0.9)).unwrap().unwrap();
+        let annealed = tm.layer_for_score(TrustScore::new(0.95)).unwrap().unwrap();
         assert_eq!(annealed.name(), "annealed");
     }
 
