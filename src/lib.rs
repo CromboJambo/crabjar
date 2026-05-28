@@ -133,6 +133,14 @@ pub enum KnowledgeCommand {
         #[arg(long)]
         reason: String,
     },
+    /// Promote a quarantined knowledge entry to active
+    Promote {
+        /// ID of the quarantined entry to promote
+        id: i64,
+        /// Reason for promotion
+        #[arg(long)]
+        reason: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]

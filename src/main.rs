@@ -165,7 +165,17 @@ async fn handle_knowledge_command(
 ) -> Result<serde_json::Value, agent_context::Error> {
     let project_root = std::env::current_dir()
         .map_err(|err| agent_context::Error::Io(std::io::Error::other(err.to_string())))?;
-    let bridge = KnowledgeBridge::new("knowledge.db", project_root, None)?;
+    
+    // Build guard DB path for gate
+    let guard_db_path = project_root.join("guard.db");
+    let guard_db = crabjar_guard::GuardDb::open(&guard_db_path)
+        .unwrap_or_else(|_| {
+            let temp_dir = tempfile::tempdir().unwrap();
+            crabjar_guard::GuardDb::open(temp_dir.path().join("guard.db")).unwrap()
+        });
+    
+    let bridge = KnowledgeBridge::new("knowledge.db", project_root, None)?
+        .with_guard_db(guard_db);
     command.execute(&bridge).await
 }
 
