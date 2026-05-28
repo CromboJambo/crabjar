@@ -35,3 +35,4 @@ tarpaulin-report.html
 guard.db
 knowledge.db
 memory/knowledge.db
+llmrunner.md
