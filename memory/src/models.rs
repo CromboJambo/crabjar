@@ -16,6 +16,7 @@ pub enum Source {
     User,
     Agent,
     System,
+    External,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,6 +162,13 @@ mod tests {
         let source = Source::System;
         let json = serde_json::to_string(&source).unwrap();
         assert_eq!(json, "\"system\"");
+    }
+
+    #[test]
+    fn source_serde_external() {
+        let source = Source::External;
+        let json = serde_json::to_string(&source).unwrap();
+        assert_eq!(json, "\"external\"");
     }
 
     #[test]

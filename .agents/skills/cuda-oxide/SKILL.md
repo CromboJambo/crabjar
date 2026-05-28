@@ -79,6 +79,13 @@ When evaluating cuda-oxide patterns for crabjar adoption, consider:
 5. Output structured analysis with doubt block (assumptions, blind_spots, stale_after)
 6. If user wants to build: propose concrete implementation steps
 
+## Pipeline Output Clarification
+
+`cargo oxide pipeline` outputs MIR/LLVM IR, **not PTX**. For PTX, look for
+`.ptx` files in the build artifacts or use `--emit=ptx` if supported.
+This distinction matters — the pipeline visualization shows the translation
+chain, not the final GPU code.
+
 ## crabjar Tool Registration
 
 If cuda-oxide is installed locally:
