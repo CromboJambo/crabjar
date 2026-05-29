@@ -11,10 +11,13 @@
 //! - `device`: CUDA/CPU/MKL backend selection
 //! - `runner`: external runner bridge (endpoint/protocol)
 //! - `plug-in`: implements InferenceRequest/Response protocol
+//! - `model`: Model struct with per-layer KV cache, prefill/decode loop
 
 pub mod device;
 pub mod error;
 pub mod inference_engine;
+pub mod kernel;
+pub mod model;
 pub mod model_loader;
 pub mod plug_in;
 pub mod runner;
@@ -23,6 +26,7 @@ pub mod tokenizer;
 pub use device::DeviceBackend;
 pub use error::{Result, RunnerError};
 pub use inference_engine::InferenceEngine;
+pub use model::{Model, ModelConfig};
 pub use model_loader::ModelLoader;
 pub use plug_in::PlugInProtocol;
 pub use runner::RunnerBridge;

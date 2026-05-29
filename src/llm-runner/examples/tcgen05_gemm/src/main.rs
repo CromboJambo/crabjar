@@ -15,6 +15,7 @@
 
 use cuda_core::{CudaContext, DeviceBuffer, LaunchConfig};
 use cuda_device::shared::SharedArray;
+use cuda_device::tcgen05::{tcgen05_alloc, tcgen05_dealloc};
 use cuda_device::{DisjointSlice, kernel, thread, warp};
 use cuda_host::cuda_launch;
 use half::f16;
