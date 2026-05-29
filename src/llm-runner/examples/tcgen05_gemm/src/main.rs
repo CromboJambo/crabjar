@@ -18,7 +18,6 @@ use cuda_device::shared::SharedArray;
 use cuda_device::tcgen05::{tcgen05_alloc, tcgen05_dealloc};
 use cuda_device::{DisjointSlice, kernel, thread, warp};
 use cuda_host::cuda_launch;
-use half::f16;
 use std::time::Instant;
 
 #[kernel]
@@ -27,8 +26,8 @@ pub unsafe fn tcgen05_gemm(
     n: u32,
     k: u32,
     alpha: f32,
-    a: &[f16],
-    b: &[f16],
+    a: &[f32],
+    b: &[f32],
     beta: f32,
     mut c: DisjointSlice<f32>,
 ) {
@@ -41,8 +40,8 @@ pub unsafe fn tcgen05_gemm(
         const BN: usize = 128;
         const BK: usize = 64;
 
-        static mut SA: SharedArray<f16, 8192, 128> = SharedArray::UNINIT;
-        static mut SB: SharedArray<f16, 8192, 128> = SharedArray::UNINIT;
+        static mut SA: SharedArray<f32, 8192, 128> = SharedArray::UNINIT;
+        static mut SB: SharedArray<f32, 8192, 128> = SharedArray::UNINIT;
         static mut TMEM_ADDR: SharedArray<u32, 1, 4> = SharedArray::UNINIT;
 
         let tid = thread::threadIdx_x() as usize;
@@ -88,13 +87,13 @@ pub unsafe fn tcgen05_gemm(
                 thread::sync_threads();
 
                 // Compute dot product for this K-tile using tcgen05 MMA
-                let a_base = &raw const SA as *const f16;
-                let b_base = &raw const SB as *const f16;
+                let a_base = &raw const SA as *const f32;
+                let b_base = &raw const SB as *const f32;
                 let mut inner = 0usize;
                 while inner < BK {
                     let a_val = *a_base.add((c_row - tile_m) * BK + inner);
                     let b_val = *b_base.add(inner * BN + (c_col - tile_n));
-                    sum += a_val.to_f32() * b_val.to_f32();
+                    sum += a_val * b_val;
                     inner += 1;
                 }
 
@@ -134,18 +133,18 @@ fn main() {
     println!("Initialized CUDA context");
 
     println!("\nInitializing matrices...");
-    let mut a = vec![f16::ZERO; M * K];
-    let mut b = vec![f16::ZERO; K * N];
+    let mut a = vec![0.0f32; M * K];
+    let mut b = vec![0.0f32; K * N];
     let c_init = vec![0.0f32; M * N];
 
     for i in 0..M {
         for j in 0..K {
-            a[i * K + j] = f16::from_f32(((i + j) % 10) as f32 * 0.1);
+            a[i * K + j] = ((i + j) % 10) as f32 * 0.1;
         }
     }
     for i in 0..K {
         for j in 0..N {
-            b[i * N + j] = f16::from_f32(((i * j) % 10) as f32 * 0.1);
+            b[i * N + j] = ((i * j) % 10) as f32 * 0.1;
         }
     }
 
@@ -218,7 +217,7 @@ fn main() {
 
         let mut expected = 0.0f32;
         for kk in 0..K {
-            expected += a[row * K + kk].to_f32() * b[kk * N + col].to_f32();
+            expected += a[row * K + kk] * b[kk * N + col];
         }
         expected = ALPHA * expected + BETA * c_init[idx];
 
@@ -237,7 +236,7 @@ fn main() {
     for (row, col) in &[(0, 0), (M/2, N/2), (M-1, N-1)] {
         let mut expected = 0.0f32;
         for kk in 0..K {
-            expected += a[*row * K + kk].to_f32() * b[kk * N + *col].to_f32();
+            expected += a[*row * K + kk] * b[kk * N + *col];
         }
         let idx = row * N + col;
         println!("  C[{}][{}] = {:.6e} (expected {:.6e}, err {:.2e})",

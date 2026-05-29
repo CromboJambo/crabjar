@@ -32,18 +32,10 @@ use cuda_host::cuda_launch;
 use std::time::Instant;
 use std::mem::ManuallyDrop;
 
-/// Convert f16 bits (u16) to f32. Matches half::f16::to_f32 layout.
-#[inline]
-fn u16_to_f32(bits: u16) -> f32 {
-    f32::from_bits(u32::from(bits) << 16)
-}
-
 /// Polynomial approximation of exp(x) for x in [-88, 0].
 /// Uses Horner's method with 6 terms. Avoids libdevice calls.
 #[inline]
 fn exp_approx(x: f32) -> f32 {
-    // For x <= 0: exp(x) = 1 / exp(-x)
-    // Approximate exp(-x) for x >= 0 using polynomial
     let y = -x;
     if y > 88.0 {
         return 0.0;
@@ -51,7 +43,6 @@ fn exp_approx(x: f32) -> f32 {
     if y < 1e-6 {
         return 1.0;
     }
-    // exp(y) ≈ 1 + y + y²/2 + y³/6 + y⁴/24 + y⁵/120
     let y2 = y * y;
     let y3 = y2 * y;
     let y4 = y3 * y;
@@ -68,9 +59,9 @@ fn exp_approx(x: f32) -> f32 {
 ///
 /// Each CTA handles one attention head.
 ///
-/// `q` — [query_seq_len x (num_heads * head_dim)] u16 (f16 bits), flattened row-major.
-/// `k` — [num_heads * head_dim x max_seq] u16 (f16 bits), flattened row-major.
-/// `v` — [num_heads * head_dim x max_seq] u16 (f16 bits), flattened row-major.
+/// `q` — [query_seq_len x (num_heads * head_dim)] f32, flattened row-major.
+/// `k` — [num_heads * head_dim x max_seq] f32, flattened row-major.
+/// `v` — [num_heads * head_dim x max_seq] f32, flattened row-major.
 /// `out` — [query_seq_len x (num_heads * head_dim)] f32 output.
 /// `head_dim` — dimension per attention head (must be divisible by 64).
 /// `num_heads` — total number of heads.
@@ -79,9 +70,9 @@ fn exp_approx(x: f32) -> f32 {
 /// `scale` — 1.0 / sqrt(head_dim).
 #[kernel]
 pub unsafe fn tcgen05_attention_kernel(
-    q: &[u16],
-    k: &[u16],
-    v: &[u16],
+    q: &[f32],
+    k: &[f32],
+    v: &[f32],
     mut out: DisjointSlice<f32>,
     head_dim: u32,
     num_heads: u32,
@@ -181,7 +172,7 @@ pub unsafe fn tcgen05_attention_kernel(
                 // Store in a per-warp shared buffer (simplified: use thread-local accumulation)
                 // For tcgen05, we need to load into TMEM via tcgen05_ld_16x256b_pure
                 // For simplicity in v1, accumulate directly in registers
-                let q_val = u16_to_f32(q[q_idx]);
+                let q_val = q[q_idx];
                 // Accumulate contribution from this K-tile position
                 // We'll compute the full MMA result below
                 let _ = q_val;
@@ -207,8 +198,8 @@ pub unsafe fn tcgen05_attention_kernel(
                 let q_idx = (q_tile_start + tid % q_tile_len) * q_stride + kk + inner;
                 let k_idx = (kk + inner) * k_stride + (kv_tile_start + tid / q_tile_len);
                 if q_idx < q.len() && k_idx < k.len() {
-                    let q_val = u16_to_f32(q[q_idx]);
-                    let k_val = u16_to_f32(k[k_idx]);
+                    let q_val = q[q_idx];
+                    let k_val = k[k_idx];
                     let row = tid % q_tile_len;
                     if row < q_tile_len {
                         logits[row] += q_val * k_val;
@@ -259,7 +250,7 @@ pub unsafe fn tcgen05_attention_kernel(
                 let v_idx = (v_row * v_stride) + v_col;
                 if v_idx < v.len() {
                     let attn = logits[v_row % q_tile_len];
-                    let v_val = u16_to_f32(v[v_idx]);
+                    let v_val = v[v_idx];
                     let out_row = tid % q_tile_len;
                     if out_row < q_tile_len {
                         output[out_row * head_dim + v_col] += attn * v_val;
@@ -296,9 +287,9 @@ pub unsafe fn tcgen05_attention_kernel(
 fn run_attention(
     stream: &cuda_core::CudaStream,
     module: &cuda_core::CudaModule,
-    q: &[u16],
-    k: &[u16],
-    v: &[u16],
+    q: &[f32],
+    k: &[f32],
+    v: &[f32],
     head_dim: usize,
     num_heads: usize,
     query_seq_len: usize,
@@ -393,9 +384,9 @@ fn run_attention(
 
 /// CPU reference attention for verification.
 fn cpu_attention(
-    q: &[u16],
-    k: &[u16],
-    v: &[u16],
+    q: &[f32],
+    k: &[f32],
+    v: &[f32],
     head_dim: usize,
     num_heads: usize,
     query_seq_len: usize,
@@ -412,21 +403,21 @@ fn cpu_attention(
         let q_head: Vec<f32> = (0..query_seq_len)
             .flat_map(|i| {
                 let base = i * num_heads * head_dim + head * head_dim;
-                (0..head_dim).map(move |d| u16_to_f32(q[base + d]))
+                (0..head_dim).map(move |d| q[base + d])
             })
             .collect();
 
         let k_head: Vec<f32> = (0..cache_seq_len)
             .flat_map(|j| {
                 let base = j * num_heads * head_dim + head * head_dim;
-                (0..head_dim).map(move |d| u16_to_f32(k[base + d]))
+                (0..head_dim).map(move |d| k[base + d])
             })
             .collect();
 
         let v_head: Vec<f32> = (0..cache_seq_len)
             .flat_map(|j| {
                 let base = j * num_heads * head_dim + head * head_dim;
-                (0..head_dim).map(move |d| u16_to_f32(v[base + d]))
+                (0..head_dim).map(move |d| v[base + d])
             })
             .collect();
 
@@ -516,19 +507,19 @@ fn main() {
     println!("  K size: {} elements ({:.1} KB)", k_count, k_count as f64 * 2.0 / 1024.0);
     println!("  V size: {} elements ({:.1} KB)", v_count, v_count as f64 * 2.0 / 1024.0);
 
-    // Initialize tensors with known values (stored as u16 f16 bits)
-    let mut q = vec![0u16; q_count];
-    let mut k = vec![0u16; k_count];
-    let mut v = vec![0u16; v_count];
+    // Initialize tensors with known values
+    let mut q = vec![0.0f32; q_count];
+    let mut k = vec![0.0f32; k_count];
+    let mut v = vec![0.0f32; v_count];
 
     for i in 0..q_count {
-        q[i] = half::f16::from_f32(((i % 10) as f32) * 0.1).to_bits();
+        q[i] = ((i % 10) as f32) * 0.1;
     }
     for i in 0..k_count {
-        k[i] = half::f16::from_f32(((i % 7) as f32) * 0.1 + 0.5).to_bits();
+        k[i] = ((i % 7) as f32) * 0.1 + 0.5;
     }
     for i in 0..v_count {
-        v[i] = half::f16::from_f32(((i % 5) as f32) * 0.2 + 0.1).to_bits();
+        v[i] = ((i % 5) as f32) * 0.2 + 0.1;
     }
 
     // Load PTX module

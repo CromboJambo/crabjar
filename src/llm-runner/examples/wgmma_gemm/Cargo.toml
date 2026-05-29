@@ -8,7 +8,7 @@ license = "Apache-2.0"
 [workspace]
 
 [dependencies]
-cuda-device = { path = "../../../reference_materials/cuda-oxide/crates/cuda-device" }
-cuda-host = { path = "../../../reference_materials/cuda-oxide/crates/cuda-host" }
-cuda-core = { path = "../../../reference_materials/cuda-oxide/crates/cuda-core" }
+cuda-device = { path = "/home/crombo/reference_materials/cuda-oxide/crates/cuda-device" }
+cuda-host = { path = "/home/crombo/reference_materials/cuda-oxide/crates/cuda-host" }
+cuda-core = { path = "/home/crombo/reference_materials/cuda-oxide/crates/cuda-core" }
 half = "2"
