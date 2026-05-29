@@ -127,12 +127,12 @@ fn compute_data_section_start(version: u32, kv_pairs: &[GgufKvPair], tensors: &[
 
     if version == 3 {
         data_section += 8; // data_alignment field itself
-        if let Some(alignment) = data_alignment {
-            if alignment > 0 {
-                let remainder = data_section % alignment;
-                if remainder != 0 {
-                    data_section += alignment - remainder;
-                }
+        if let Some(alignment) = data_alignment
+            && alignment > 0
+        {
+            let remainder = data_section % alignment;
+            if remainder != 0 {
+                data_section += alignment - remainder;
             }
         }
     }

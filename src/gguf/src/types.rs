@@ -370,10 +370,22 @@ impl GgufTensorInfo {
         match dtype {
             GgufDtype::F32 => n * 4,
             GgufDtype::F16 | GgufDtype::BF16 => n * 2,
-            GgufDtype::Q8_0 => n / 2 + 256,
+            GgufDtype::Q8_0 => {
+                let full_blocks = n / 256;
+                let remaining = n % 256;
+                full_blocks * 258 + if remaining > 0 { 2 + remaining } else { 0 }
+            }
             GgufDtype::Q8_1 => n / 2 + 128 + 128,
-            GgufDtype::Q4_0 => n / 2 + 32,
-            GgufDtype::Q4_1 => n / 2 + 64,
+            GgufDtype::Q4_0 => {
+                let full_blocks = n / 32;
+                let remaining = n % 32;
+                full_blocks * 20 + if remaining > 0 { 4 + remaining.div_ceil(2) } else { 0 }
+            }
+            GgufDtype::Q4_1 => {
+                let full_blocks = n / 32;
+                let remaining = n % 32;
+                full_blocks * 20 + if remaining > 0 { 4 + remaining.div_ceil(2) } else { 0 }
+            }
             GgufDtype::Q5_0 => n / 2 + 32 + 16,
             GgufDtype::Q5_1 => n / 2 + 64 + 16,
             GgufDtype::Q2_K => n / 4 + n * 6 / 32 + 8,
