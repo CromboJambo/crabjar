@@ -16,7 +16,7 @@ pub const TOOL_REGISTRY_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS tools (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    type TEXT NOT NULL CHECK (type IN ('command', 'mcp', 'llm', 'vector_store', 'embedding', 'rag')),
+    type TEXT NOT NULL CHECK (type IN ('command', 'mcp', 'llm', 'vector_store', 'embedding', 'rag', 'skill')),
     description TEXT NOT NULL DEFAULT '',
     schema TEXT NOT NULL DEFAULT '',
     execution_policy TEXT NOT NULL DEFAULT '',
