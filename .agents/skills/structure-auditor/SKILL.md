@@ -36,6 +36,9 @@ The Structure Auditor is a diagnostic tool designed to detect "structural drift"
 *   `scripts/fs_audit.sh`: filesystem vs project_map discrepancy analysis
 
 ## Skill Capabilities
-*   **Path Resolution**: Resolves relative paths to absolute filesystem locations.
-*   **Tree Diffing**: Performs a high-speed comparison between two directory trees.
-implements structural integrity checks for the agent's navigation logic.
+* **Path Resolution**: Resolves relative paths to absolute filesystem locations.
+* **Tree Diffing**: Performs a high-speed comparison between two directory trees.
+* **Drift Reporting**: Outputs actionable discrepancy lists for `project_map.md` updates.
+
+## Boundary with `drift-governance`
+`structure-auditor` is the diagnostic tool — it finds what's drifted. `drift-governance` is the governance layer — it decides what to do about it (re-index, manual review, or pipeline consolidation). Use `structure-auditor` when a command fails with "path not found" or after a refactor. Use `drift-governance` when you need to assess structural integrity, compute perturbations, or prevent pipeline collapse.
