@@ -1,4 +1,12 @@
-# Grex Skill: Pattern Verification Engine
+---
+name: grex
+description: |
+  Verification Pillar for structural analysis and pattern matching across the workspace.
+  Use whenever the user asks to verify file contents against patterns, check if a
+  pattern exists or is absent, or needs structural verification feedback. Also trigger
+  when the user mentions "verify", "pattern check", "regex search", or "structural
+  verification".
+---
 
 ## 🎯 Purpose
 The `grex` skill is the **Verification Pillar** of the Islet architecture. Its sole responsibility is to perform structural verification of files within the workspace against a set of predefined patterns (regex or literal). It provides machine-readable feedback to enable automated, self-correcting loops.
@@ -29,7 +37,7 @@ The skill MUST return a structured response in the following format to ensure do
 |---|---|---|
 | `status` | `enum` | `SUCCESS` (Verification passed) or `FAILURE` (Verification failed). |
 | `match_count` | `int` | The number of times the pattern was found in the target path. |
-            | `line_numbers` | An array of integers representing the line numbers where matches were found. |
+| `line_numbers` | `int[]` | An array of integers representing the line numbers where matches were found. |
 | `error_message` | `string` | If `status` is `FAILURE`, a brief description of why it failed (e.g., "Pattern not found"). |
 
 **Example Success Output:**
