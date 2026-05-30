@@ -137,8 +137,12 @@ fn main() {
     let ptx_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("wgmma_gemm.ptx");
     eprintln!("PTX path: {:?}", ptx_path);
     let module = ctx
-        .load_module_from_file(ptx_path.to_str().unwrap())
-        .expect("Failed to load PTX module");
+        .load_module_from_file(ptx_path.to_str().unwrap());
+    match &module {
+        Ok(m) => eprintln!("Module loaded: {:p}", &**m as *const _),
+        Err(e) => eprintln!("Module load error: {:?} ({})", e, e.0),
+    }
+    let module = module.expect("Failed to load PTX module");
 
     let tile_dim = 64u32;
     let grid_x = (N as u32 + tile_dim - 1) / tile_dim;
