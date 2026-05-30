@@ -186,3 +186,11 @@ human gates.
 - What the threat model is (scraper infrastructure, not human error)
 - How cryptographic proofs replace human gates
 - Why the audit log is a record, not a gate
+
+**Note on user boundaries:**
+This skill governs cryptographic authorization for secret access.
+It does not override general user boundaries (e.g., sudo commands,
+destructive file operations). Those are governed by other skills
+(`post-update-audit`, `dotfiles-breach`, etc.). Zero-knowledge
+means the agent cannot see secrets — not that the agent can act
+without permission.
