@@ -1,3 +1,12 @@
+---
+name: session-backtrace
+description: |
+  Reconstruct session context from available persistence layers when resuming work
+  on a project or task. Use when the user mentions "pick up from," "resume," "what
+  were we doing," "backtrace," "session context," or needs to recover state from
+  a previous conversation.
+---
+
 # Session Backtrace
 
 Reconstruct session context from available persistence layers when resuming work on a project or task. Use when the user mentions "pick up from," "resume," "what were we doing," "backtrace," "session context," or needs to recover state from a previous conversation.
@@ -37,8 +46,7 @@ cat state-docs/<doc>.md
 - `agent_config.md` — agent operational principles
 - `AGENTS.md` — repository guidelines
 - `project_map.md` — structural alignment reference
-- `~/.dotfiles/manifest/graph.toml` — symlink graph
-- `~/.dotfiles/environment_manifest.json` — system constraints
+- `~/.dotfiles/environment_manifest.json` — system constraints (if present)
 
 ### 5. Environment Manifest
 ```bash
@@ -104,3 +112,7 @@ Present findings as a structured summary:
 ## Key Insight
 
 The knowledge DB is often empty — don't assume it has data. Git history and state-docs are the reliable backtrace layers. Environment constraints (especially VRAM) are critical for inference-related tasks.
+
+## Boundary with `env-aware`
+
+`session-backtrace` reads environment data from existing sources (state-docs, git history, manifests) to reconstruct context. It does NOT do live system probing — that is the job of `env-aware`. If the environment data in state-docs is stale or sparse, delegate to `env-aware` for live probes.
