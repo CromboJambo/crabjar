@@ -1,55 +1,103 @@
 ---
 name: how-foo
 description: |
-  Use whenever the user asks to document how to reproduce a workflow from a reference
-  directory, or mentions "how-foo", "reproduce this", "repro guide", or provides a
-  directory path with reproduction intent. Also trigger when the user says "turn this
-  into a skill" for a workflow that involves reproducing external project setup.
+  Explain a process to the user so they can execute it themselves. Trigger whenever
+  the agent is blocked from doing something that requires user privileges (sudo, system
+  config, browser auth, etc.) and needs to teach the user how to do it. Also trigger
+  when the user asks "how do I..." for a task the agent can't complete alone, or when
+  the agent wants to dog-food a workflow back to the user. Covers: system commands,
+  external project setup, reproduction guides from reference directories, and any
+  process the agent detects but cannot act on.
 ---
 
-# How-Foo: Reproduction Guide Generator
+# How-Foo: Teach-the-User Guide Generator
 
-## Trigger
+The agent's mechanism for explaining processes it's blocked from executing. When the
+agent detects a task requiring user action (sudo, system config, auth, etc.), this
+skill generates a clear, executable guide the user can follow.
 
-User phrases: "how-foo", "reproduce this", "repro guide", "document how to reproduce",
-"turn this workflow into a skill", or a directory path with reproduction intent.
+## When to Activate
+
+- Agent detects a required action it **cannot** perform (sudo, user auth, browser login)
+- User asks "how do I..." for a task the agent can't complete alone
+- Agent needs to dog-food a workflow back to the user
+- User provides a directory path with reproduction intent
+- User says "turn this into a skill" for a workflow involving external setup
+
+## Output Modes
+
+### Mode 1: Direct Instructions (default)
+
+For straightforward tasks, present clear steps:
+
+```
+## Actions to run
+
+1. `sudo <command>` — what it does
+2. `rsync ...` — what it does
+
+## Notes
+- Why each step is needed
+- Any caveats or gotchas
+```
+
+### Mode 2: Structured Guide (for complex workflows)
+
+For multi-step or reference-heavy tasks:
+
+```
+# Reproducing <name>
+
+## Source
+<path> — <description>
+
+## Steps
+1. <command> — <why>
+2. <command> — <why>
+
+## Key Dependencies
+| Crate | Version | Purpose |
+
+## Notes
+<edge cases, platform restrictions>
+```
+
+### Mode 3: Dog-food Back
+
+When the agent has partial knowledge but needs user input (auth, confirmation):
+
+```
+## What I detected
+<what the agent found>
+
+## What I can't do
+<what requires user action>
+
+## What you need to do
+1. <specific action>
+2. <specific action>
+```
 
 ## Workflow
 
-1. **Read the target directory** — discover its structure, Cargo.toml, README, and key files.
-2. **Extract reproduction data** — source repo URL, build commands, install commands, dependencies, MSRV, release profile, notable features.
-3. **Write REPRO.md** — output a reproduction guide to the target directory.
-
-## Output Format
-
-```
-# Reproducing the <name> <path> workflow
-
-## Source
-The directory <path> contains <project-description>.
-
-## Reproduction Steps
-1. Clone/install/build commands
-2. Usage commands
-
-## Key Dependencies (Cargo.toml)
-| Crate | Version | Purpose |
-
-## MSRV
-<version>
-
-## Release Profile
-<toml block>
-
-## Notes
-<edge cases, platform restrictions, branch info>
-```
+1. **Detect the gap** — what can the agent see vs what can it act on?
+2. **Classify the task** — direct instruction, structured guide, or dog-food back?
+3. **Generate the guide** — use the appropriate output mode
+4. **Include provenance** — where the agent got its info (pacman log, git history, file scan)
+5. **Flag what needs user judgment** — decisions only the user can make
 
 ## When to Skip
 
-- Directory is a local project with no upstream repo (no clone step needed).
-- Directory contains no Cargo.toml or README (insufficient data for a repro guide).
-- User explicitly says "don't write a file" or "just tell me".
+- The agent can do it itself without user intervention — don't generate a guide
+- The user explicitly says "just do it" or "I trust you" (within agent's authority)
+- The task is already covered by another skill (e.g., `post-update-audit` handles
+  post-update sudo actions; use that skill instead of generating a raw guide)
+
+## Key Principle
+
+The guide must be **executable without ambiguity**. Every step should be a copy-paste
+command with a brief explanation of what it does. Never say "run the appropriate
+command" — give the actual command.
 
 ## Reference Material
 
