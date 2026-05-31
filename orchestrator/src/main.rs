@@ -14,6 +14,9 @@ use std::convert::Infallible;
 use std::sync::Arc;
 use std::net::SocketAddr;
 
+mod backend;
+mod lm_studio_client;
+
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
@@ -234,100 +237,55 @@ async fn handle_prompt(Json(payload): Json<PromptRequest>) -> Json<AcpResponse> 
     })
 }
 
-/// Handler for chat requests that queries the LLM via LM Studio.
+/// Handler for chat requests — uses the configured inference backend.
 #[axum::debug_handler]
 async fn handle_chat(
     State(state): State<AppState>,
     Json(payload): Json<ChatRequest>,
 ) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
-    let model = payload.model.unwrap_or_else(|| "local-model".to_string());
-    let lm_studio_url = std::env::var("LM_STUDIO_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:1234/v1/chat/completions".to_string());
+    let user_input = payload.prompt;
 
-    info!(
-        "Chat request received. Model: {}, URL: {}",
-        model, lm_studio_url
-    );
+    info!("Chat request received (backend: {})", state.backend.kind());
 
-    let client = reqwest::Client::new();
-    let chat_request = ChatCompletionRequest {
-        model,
-        messages: vec![ChatMessage {
-            role: MessageRole::User,
-            content: payload.prompt,
-        }],
-    };
+    let mut backend = state.backend;
+    let response = backend.chat(user_input).await.map_err(|e| {
+        error!("Inference backend error: {}", e);
+        axum::http::StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    let response = client
-        .post(&lm_studio_url)
-        .json(&chat_request)
-        .send()
-        .await
-        .map_err(|e| {
-            error!("Failed to connect to LM Studio: {}", e);
-            axum::http::StatusCode::BAD_GATEWAY
-        })?;
+    // Check for tool calls first.
+    let tool_calls = backend.extract_tool_calls(&response);
+    if !tool_calls.is_empty() {
+        let mut results = Vec::new();
+        for tc in tool_calls {
+            info!("LLM requested tool call: {} with args: {}", tc.tool, tc.arguments);
 
-    let chat_response = response
-        .json::<ChatCompletionResponse>()
-        .await
-        .map_err(|e| {
-            error!("Failed to parse LM Studio response: {}", e);
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    if let Some(choice) = chat_response.choices.first() {
-        // Check if the LLM wants to call a tool
-        if let Some(tool_calls) = &choice.tool_calls {
-            if !tool_calls.is_empty() {
-                // Collect all tool call results
-                let mut results = Vec::new();
-                for tool_call in tool_calls {
-                    info!(
-                        "LLM requested tool call: {} with args: {}",
-                        tool_call.function.name, tool_call.function.arguments
-                    );
-
-                    // Try to parse the arguments as JSON
-                    let args: Vec<String> =
-                        match serde_json::from_str(&tool_call.function.arguments) {
-                            Ok(parsed) => parsed,
-                            Err(e) => {
-                                error!("Failed to parse tool arguments: {}", e);
-                                results.push(format!(
-                                    "Error parsing arguments for {}: {}",
-                                    tool_call.function.name, e
-                                ));
-                                continue;
-                            }
-                        };
-
-                    // Execute the tool call
-                    let tool_result = execute_tool_call(&tool_call.function.name, &args, Arc::clone(&state.store)).await;
-                    results.push(format!(
-                        "Tool '{}' executed: {}",
-                        tool_call.function.name,
-                        tool_result.unwrap_or_else(|e| e)
-                    ));
+            let args: Vec<String> = match serde_json::from_str(&tc.arguments.to_string()) {
+                Ok(parsed) => parsed,
+                Err(e) => {
+                    error!("Failed to parse tool arguments: {}", e);
+                    results.push(format!("Error parsing arguments for {}: {}", tc.tool, e));
+                    continue;
                 }
+            };
 
-                // Return the combined results
-                let output = results.join("\n");
-                Ok(Json(AcpResponse::Output { data: output }))
-            } else {
-                // No tool calls, return the content
-                let content = choice.message.content.clone();
-                info!("LLM Response: {}", content);
-                Ok(Json(AcpResponse::Output { data: content }))
-            }
+            let tool_result = execute_tool_call(&tc.tool, &args, Arc::clone(&state.store)).await;
+            results.push(format!(
+                "Tool '{}' executed: {}",
+                tc.tool,
+                tool_result.unwrap_or_else(|e| e)
+            ));
+        }
+
+        Ok(Json(AcpResponse::Output { data: results.join("\n") }))
+    } else {
+        let content = backend.extract_text(&response);
+        if content.is_empty() {
+            Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
         } else {
-            // No tool_calls field, return the content
-            let content = choice.message.content.clone();
             info!("LLM Response: {}", content);
             Ok(Json(AcpResponse::Output { data: content }))
         }
-    } else {
-        Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
@@ -835,6 +793,7 @@ struct AppState {
     store: Arc<std::sync::Mutex<Store>>,
     events_db_path: String,
     guard_root: String,
+    backend: backend::Backend,
 }
 
 /// Handler for recent_events — queries the knowledge store.
@@ -973,6 +932,7 @@ async fn main() -> anyhow::Result<()> {
         store: Arc::new(std::sync::Mutex::new(store)),
         events_db_path,
         guard_root,
+        backend: backend::Backend::new(),
     };
 
     // Define the Axum router with SSE and JSON endpoints.

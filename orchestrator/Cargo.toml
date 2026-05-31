@@ -11,6 +11,7 @@ documentation.workspace = true
 
 [dependencies]
 # Async runtime
+async-trait.workspace = true
 tokio.workspace = true
 tokio-stream = { version = "0.1", features = ["time"] }
 futures-util = "0.3"
@@ -43,6 +44,10 @@ crabjar-telemetry = { path = "../telemetry" }
 
 # Knowledge store
 agent-context = { path = "../memory" }
+
+# Local LLM inference
+futures.workspace = true
+mistralrs.workspace = true
 
 # Testing
 tempfile = "3.10"

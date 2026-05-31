@@ -515,7 +515,6 @@ impl SessionStore {
         Ok(())
     }
 }
-}
 
 /// Errors from session store operations.
 #[derive(Debug, Error)]
@@ -1315,7 +1314,35 @@ pub enum LmStudioError {
 /// Returns a list of available endpoints. If none are available, returns
 /// an error.
 pub async fn detect_available_endpoints(
-    basee
+    base_url: &str,
+) -> Result<Vec<LmStudioEndpoint>, LmStudioError> {
+    let client = reqwest::Client::new();
+    let mut available = Vec::new();
+
+    // Check OpenAI-compatible endpoint.
+    let openai_url = format!("{}/v1/chat/completions", base_url);
+    if client.get(&openai_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+        available.push(LmStudioEndpoint::Openai);
+    }
+
+    // Check Anthropic-compatible endpoint.
+    let anthropic_url = format!("{}/v1/messages", base_url);
+    if client.get(&anthropic_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+        available.push(LmStudioEndpoint::Anthropic);
+    }
+
+    // Check native endpoint.
+    let native_url = format!("{}/api/v1/chat", base_url);
+    if client.get(&native_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+        available.push(LmStudioEndpoint::Native);
+    }
+
+    if available.is_empty() {
+        Err(LmStudioError::RequestError("No LM Studio endpoints available".to_string()))
+    } else {
+        Ok(available)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Tests

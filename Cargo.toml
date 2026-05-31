@@ -44,6 +44,8 @@ invalid_html_tags = "deny"
 
 [workspace.dependencies]
 # Async runtime
+async-trait = "0.1"
+futures = "0.3"
 tokio = { version = "1.51.1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["time"] }
 
@@ -104,6 +106,9 @@ candle-core = { version = "0.10.2", package = "candle-core" }
 candle-nn = { version = "0.10.2" }
 candle-transformers = { version = "0.10.2" }
 candle-datasets = { version = "0.10.2" }
+
+# Local LLM inference
+mistralrs = { version = "0.8", features = ["cuda"] }
 
 # Burn framework
 burn = { version = "0.21.0", default-features = false }
