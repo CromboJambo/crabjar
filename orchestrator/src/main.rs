@@ -3,11 +3,15 @@ use axum::{
     extract::Json,
     response::sse::{Event as SseEvent, Sse},
     routing::post,
+    extract::State,
 };
+use agent_context::{store::StoreError, Store};
+use agent_context::state_docs::schema as state_schema;
 use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
 use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
+use std::sync::Arc;
 use std::net::SocketAddr;
 
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -125,153 +129,9 @@ enum AcpResponse {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Local SQLite event store (replaces mirror-log dependency)
+// Events are now stored and queried via the agent-context Store.
+// Mirror-lab paths are optional overrides via environment variables.
 // ---------------------------------------------------------------------------
-
-/// A lightweight SQLite-backed event store for the orchestrator.
-/// Provides search, recent events, and by-source queries without
-/// requiring the full mirror-log crate.
-mod local_log {
-    use rusqlite::{Connection, params};
-
-    /// Initialize or open the event database.
-    pub fn init_db(db_path: &str) -> Result<Connection, String> {
-        let conn = Connection::open(db_path).map_err(|e| format!("Failed to open DB: {e}"))?;
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                source TEXT NOT NULL,
-                content TEXT NOT NULL,
-                preview TEXT NOT NULL DEFAULT ''
-            );
-            CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_events_source ON events(source);
-            CREATE INDEX IF NOT EXISTS idx_events_content ON events(content);",
-        )
-        .map_err(|e| format!("Failed to initialize DB: {e}"))?;
-        Ok(conn)
-    }
-
-    /// Search events by term.
-    pub fn search(conn: &Connection, term: &str) -> Result<Vec<EventRow>, String> {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, timestamp, source, content, preview FROM events
-                 WHERE content LIKE ?1 OR preview LIKE ?1
-                 ORDER BY timestamp DESC",
-            )
-            .map_err(|e| format!("Failed to prepare search query: {e}"))?;
-
-        let events = stmt
-            .query_map(params![format!("%{term}%")], |row| {
-                Ok(EventRow {
-                    id: row.get(0)?,
-                    timestamp: row.get(1)?,
-                    source: row.get(2)?,
-                    content: row.get(3)?,
-                    preview: row.get(4)?,
-                })
-            })
-            .map_err(|e| format!("Failed to execute search query: {e}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Failed to collect results: {e}"))?;
-
-        Ok(events)
-    }
-
-    /// Get recent events.
-    pub fn recent(conn: &Connection, limit: Option<i64>) -> Result<Vec<EventRow>, String> {
-        let limit = limit.unwrap_or(50);
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, timestamp, source, content, preview FROM events
-                 ORDER BY timestamp DESC LIMIT ?1",
-            )
-            .map_err(|e| format!("Failed to prepare recent query: {e}"))?;
-
-        let events = stmt
-            .query_map(params![limit], |row| {
-                Ok(EventRow {
-                    id: row.get(0)?,
-                    timestamp: row.get(1)?,
-                    source: row.get(2)?,
-                    content: row.get(3)?,
-                    preview: row.get(4)?,
-                })
-            })
-            .map_err(|e| format!("Failed to execute recent query: {e}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Failed to collect results: {e}"))?;
-
-        Ok(events)
-    }
-
-    /// Get events by source.
-    pub fn by_source(
-        conn: &Connection,
-        source: &str,
-        limit: Option<i64>,
-    ) -> Result<Vec<EventRow>, String> {
-        let limit = limit.unwrap_or(50);
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, timestamp, source, content, preview FROM events
-                 WHERE source LIKE ?1
-                 ORDER BY timestamp DESC LIMIT ?2",
-            )
-            .map_err(|e| format!("Failed to prepare by_source query: {e}"))?;
-
-        let events = stmt
-            .query_map(params![format!("%{source}%"), limit], |row| {
-                Ok(EventRow {
-                    id: row.get(0)?,
-                    timestamp: row.get(1)?,
-                    source: row.get(2)?,
-                    content: row.get(3)?,
-                    preview: row.get(4)?,
-                })
-            })
-            .map_err(|e| format!("Failed to execute by_source query: {e}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| format!("Failed to collect results: {e}"))?;
-
-        Ok(events)
-    }
-
-    /// A single event row from the database.
-    #[derive(Debug, Clone)]
-    pub struct EventRow {
-        pub id: i64,
-        pub timestamp: String,
-        pub source: String,
-        pub content: String,
-        pub preview: String,
-    }
-
-    impl EventRow {
-        /// Format the timestamp for display.
-        pub fn format_time(&self) -> String {
-            // Try RFC3339 parsing, fallback to raw string
-            chrono::DateTime::parse_from_rfc3339(&self.timestamp)
-                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                .unwrap_or_else(|_| self.timestamp.clone())
-        }
-
-        /// Get a preview of the content.
-        pub fn preview_content(&self, max_len: usize) -> String {
-            if self.preview.is_empty() {
-                if self.content.len() <= max_len {
-                    self.content.clone()
-                } else {
-                    format!("{}...", &self.content[..max_len])
-                }
-            } else {
-                self.preview.clone()
-            }
-        }
-    }
-}
 
 /// Handler for running a command and streaming its output via SSE.
 async fn handle_run(
@@ -377,6 +237,7 @@ async fn handle_prompt(Json(payload): Json<PromptRequest>) -> Json<AcpResponse> 
 /// Handler for chat requests that queries the LLM via LM Studio.
 #[axum::debug_handler]
 async fn handle_chat(
+    State(state): State<AppState>,
     Json(payload): Json<ChatRequest>,
 ) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
     let model = payload.model.unwrap_or_else(|| "local-model".to_string());
@@ -442,7 +303,7 @@ async fn handle_chat(
                         };
 
                     // Execute the tool call
-                    let tool_result = execute_tool_call(&tool_call.function.name, &args).await;
+                    let tool_result = execute_tool_call(&tool_call.function.name, &args, Arc::clone(&state.store)).await;
                     results.push(format!(
                         "Tool '{}' executed: {}",
                         tool_call.function.name,
@@ -471,7 +332,7 @@ async fn handle_chat(
 }
 
 /// Execute a tool call based on the function name and arguments.
-async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<String, String> {
+async fn execute_tool_call(function_name: &str, args: &[String], store: Arc<std::sync::Mutex<Store>>) -> Result<String, String> {
     match function_name {
         "run_command" => {
             if args.len() < 2 {
@@ -718,37 +579,31 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                     }
                 };
 
-            let db_path = std::env::var("MIRROR_LOG_DB_PATH")
-                .unwrap_or_else(|_| "/home/crombo/mirror-lab/mirror-log/mirror.db".to_string());
-
-            let conn = match local_log::init_db(&db_path) {
-                Ok(conn) => conn,
-                Err(e) => {
-                    return Err(format!("Error initializing event database: {}", e));
-                }
-            };
-
-            let events = match local_log::search(&conn, &search_req.term) {
+            let events = match store.lock().unwrap().search_content(&search_req.term, search_req.limit.map(|l| l as usize)) {
                 Ok(events) => events,
-                Err(e) => {
-                    return Err(format!("Error searching events: {}", e));
+                Err(StoreError::DatabaseError(e)) => {
+                    return Err(format!("Error searching events: {e}"));
+                }
+                Err(StoreError::JsonError(e)) => {
+                    return Err(format!("Error serializing search results: {e}"));
+                }
+                Err(StoreError::Internal(e)) => {
+                    return Err(format!("Error searching events: {e}"));
                 }
             };
 
             let mut output = String::new();
             output.push_str(&format!(
-                "Found {} events matching '{}':\n",
+                "Found {} entries matching '{}':\n",
                 events.len(),
                 search_req.term
             ));
 
             for event in events.iter().take(search_req.limit.unwrap_or(10) as usize) {
                 output.push_str(&format!(
-                    "[{}] {} - {}\n  Content: {}\n",
-                    event.format_time(),
-                    event.source,
+                    "[id:{}] {}\n",
                     event.id,
-                    event.preview_content(200)
+                    &event.content[..event.content.len().min(200)]
                 ));
             }
 
@@ -757,10 +612,10 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
         "recent_events" => {
             // Security layer: check command before execution with provenance.
             let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
+                .unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", guard_root),
+                format!("{}/guard.db", guard_root),
             ))
             .unwrap_or_else(|_| {
                 warn!("Failed to open guard DB for recent_events, using in-memory fallback");
@@ -835,20 +690,16 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                     }
                 };
 
-            let db_path = std::env::var("MIRROR_LOG_DB_PATH")
-                .unwrap_or_else(|_| "/home/crombo/mirror-lab/mirror-log/mirror.db".to_string());
-
-            let conn = match local_log::init_db(&db_path) {
-                Ok(conn) => conn,
-                Err(e) => {
-                    return Err(format!("Error initializing event database: {}", e));
-                }
-            };
-
-            let events = match local_log::recent(&conn, Some(recent_req.limit)) {
+            let events = match store.lock().unwrap().events(recent_req.limit as usize) {
                 Ok(events) => events,
-                Err(e) => {
-                    return Err(format!("Error fetching recent events: {}", e));
+                Err(StoreError::DatabaseError(e)) => {
+                    return Err(format!("Error fetching recent events: {e}"));
+                }
+                Err(StoreError::JsonError(e)) => {
+                    return Err(format!("Error serializing events: {e}"));
+                }
+                Err(StoreError::Internal(e)) => {
+                    return Err(format!("Error fetching recent events: {e}"));
                 }
             };
 
@@ -857,11 +708,10 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
 
             for event in events.iter() {
                 output.push_str(&format!(
-                    "[{}] {} - {}\n  Content: {}\n",
-                    event.format_time(),
-                    event.source,
+                    "[{}] {} - {}\n",
+                    event.timestamp.format("%Y-%m-%d %H:%M:%S"),
+                    event.event_type,
                     event.id,
-                    event.preview_content(200)
                 ));
             }
 
@@ -870,10 +720,10 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
         "by_source" => {
             // Security layer: check command before execution with provenance.
             let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
+                .unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", guard_root),
+                format!("{}/guard.db", guard_root),
             ))
             .unwrap_or_else(|_| {
                 warn!("Failed to open guard DB for by_source, using in-memory fallback");
@@ -948,20 +798,16 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
                     }
                 };
 
-            let db_path = std::env::var("MIRROR_LOG_DB_PATH")
-                .unwrap_or_else(|_| "/home/crombo/mirror-lab/mirror-log/mirror.db".to_string());
-
-            let conn = match local_log::init_db(&db_path) {
-                Ok(conn) => conn,
-                Err(e) => {
-                    return Err(format!("Error initializing event database: {}", e));
-                }
-            };
-
-            let events = match local_log::by_source(&conn, &source_req.source, source_req.limit) {
+            let events = match store.lock().unwrap().query(&[&source_req.source], source_req.limit.unwrap_or(50) as usize, "", "", "") {
                 Ok(events) => events,
-                Err(e) => {
-                    return Err(format!("Error fetching events by source: {}", e));
+                Err(StoreError::DatabaseError(e)) => {
+                    return Err(format!("Error fetching events by source: {e}"));
+                }
+                Err(StoreError::JsonError(e)) => {
+                    return Err(format!("Error serializing events: {e}"));
+                }
+                Err(StoreError::Internal(e)) => {
+                    return Err(format!("Error fetching events by source: {e}"));
                 }
             };
 
@@ -970,11 +816,9 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
 
             for event in events.iter() {
                 output.push_str(&format!(
-                    "[{}] {} - {}\n  Content: {}\n",
-                    event.format_time(),
-                    event.source,
+                    "[id:{}] {}\n",
                     event.id,
-                    event.preview_content(200)
+                    &event.content[..event.content.len().min(200)]
                 ));
             }
 
@@ -982,6 +826,122 @@ async fn execute_tool_call(function_name: &str, args: &[String]) -> Result<Strin
         }
         _ => Ok(format!("Unknown tool: {}", function_name)),
     }
+}
+
+/// Shared state for Axum handlers.
+#[allow(dead_code)]
+#[derive(Clone)]
+struct AppState {
+    store: Arc<std::sync::Mutex<Store>>,
+    events_db_path: String,
+    guard_root: String,
+}
+
+/// Handler for recent_events — queries the knowledge store.
+async fn recent_events(
+    State(state): State<AppState>,
+    Json(payload): Json<RecentEventsRequest>,
+) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
+    let events = match state.store.lock().unwrap().events(payload.limit as usize) {
+        Ok(events) => events,
+        Err(StoreError::DatabaseError(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(StoreError::JsonError(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(StoreError::Internal(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let mut output = String::new();
+    output.push_str(&format!("Recent {} events:\n", events.len()));
+
+    for event in events.iter() {
+        output.push_str(&format!(
+            "[{}] {} - {}\n",
+            event.timestamp.format("%Y-%m-%d %H:%M:%S"),
+            event.event_type,
+            event.id,
+        ));
+    }
+
+    Ok(Json(AcpResponse::Output { data: output }))
+}
+
+/// Handler for by_source — queries the knowledge store.
+async fn by_source(
+    State(state): State<AppState>,
+    Json(payload): Json<BySourceRequest>,
+) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
+    let events = match state.store.lock().unwrap().query(
+        &[&payload.source],
+        payload.limit.unwrap_or(50) as usize,
+        "",
+        "",
+        "",
+    ) {
+        Ok(events) => events,
+        Err(StoreError::DatabaseError(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(StoreError::JsonError(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(StoreError::Internal(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let mut output = String::new();
+    output.push_str(&format!("Events from source '{}':\n", payload.source));
+
+    for event in events.iter() {
+        output.push_str(&format!(
+            "[id:{}] {}\n",
+            event.id,
+            &event.content[..event.content.len().min(200)]
+        ));
+    }
+
+    Ok(Json(AcpResponse::Output { data: output }))
+}
+
+/// Handler for search_logs — queries the knowledge store.
+async fn search_logs(
+    State(state): State<AppState>,
+    Json(payload): Json<SearchLogsRequest>,
+) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
+    let events = match state.store.lock().unwrap().search_content(&payload.term, payload.limit.map(|l| l as usize)) {
+        Ok(events) => events,
+        Err(StoreError::DatabaseError(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(StoreError::JsonError(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+        Err(StoreError::Internal(_e)) => {
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let mut output = String::new();
+    output.push_str(&format!(
+        "Found {} entries matching '{}':\n",
+        events.len(),
+        payload.term
+    ));
+
+    for event in events.iter().take(payload.limit.unwrap_or(10) as usize) {
+        output.push_str(&format!(
+            "[id:{}] {}\n",
+            event.id,
+            &event.content[..event.content.len().min(200)]
+        ));
+    }
+
+    Ok(Json(AcpResponse::Output { data: output }))
 }
 
 #[tokio::main]
@@ -992,11 +952,38 @@ async fn main() -> anyhow::Result<()> {
         .with(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .init();
 
+    // Database configuration — mirror-lab paths are optional overrides
+    let knowledge_db_path = std::env::var("KNOWLEDGE_DB_PATH")
+        .unwrap_or_else(|_| "/home/crombo/crabjar/memory/knowledge.db".to_string());
+    let events_db_path = std::env::var("MIRROR_LOG_DB_PATH")
+        .unwrap_or_else(|_| "/home/crombo/crabjar/memory/events.db".to_string());
+    let guard_root = std::env::var("MIRROR_GUARD_ROOT")
+        .unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
+
+    // Initialize knowledge store schema
+    let kconn = rusqlite::Connection::open(&knowledge_db_path)
+        .map_err(|e| anyhow::anyhow!("Failed to open knowledge DB: {e}"))?;
+    state_schema::migrate(&kconn)
+        .map_err(|e| anyhow::anyhow!("Schema migration failed: {e}"))?;
+    let store = Store::open(&knowledge_db_path)
+        .map_err(|e| anyhow::anyhow!("Failed to open knowledge store: {e}"))?;
+
+    // Share state across handlers
+    let state = AppState {
+        store: Arc::new(std::sync::Mutex::new(store)),
+        events_db_path,
+        guard_root,
+    };
+
     // Define the Axum router with SSE and JSON endpoints.
     let app = Router::new()
         .route("/acp/run", post(handle_run))
         .route("/acp/prompt", post(handle_prompt))
         .route("/acp/chat", post(handle_chat))
+        .route("/acp/search_logs", post(search_logs))
+        .route("/acp/recent_events", post(recent_events))
+        .route("/acp/by_source", post(by_source))
+        .with_state(state)
         .layer(CorsLayer::permissive());
 
     // Bind to localhost:3000.
@@ -1009,405 +996,3 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::local_log;
-
-    fn temp_db() -> (rusqlite::Connection, tempfile::TempDir) {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("events.db");
-        let conn = local_log::init_db(path.to_str().unwrap()).unwrap();
-        (conn, dir)
-    }
-
-    fn insert_event(conn: &rusqlite::Connection, timestamp: &str, source: &str, content: &str) {
-        conn.execute(
-            "INSERT INTO events (timestamp, source, content, preview) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![
-                timestamp,
-                source,
-                content,
-                "preview of: ".to_string() + content
-            ],
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn init_db_creates_table() {
-        let (conn, _dir) = temp_db();
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='events'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(count, 1);
-    }
-
-    #[test]
-    fn init_db_creates_indexes() {
-        let (conn, _dir) = temp_db();
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_events_%'",
-            [],
-            |row| row.get(0),
-        ).unwrap();
-        assert!(count >= 2);
-    }
-
-    #[test]
-    fn search_finds_exact_match() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "hello world");
-        let events = local_log::search(&conn, "hello").unwrap();
-        assert_eq!(events.len(), 1);
-    }
-
-    #[test]
-    fn search_finds_partial_match() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "hello world");
-        let events = local_log::search(&conn, "world").unwrap();
-        assert_eq!(events.len(), 1);
-    }
-
-    #[test]
-    fn search_no_match_returns_empty() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "hello world");
-        let events = local_log::search(&conn, "nonexistent").unwrap();
-        assert!(events.is_empty());
-    }
-
-    #[test]
-    fn search_matches_preview() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "short");
-        let events = local_log::search(&conn, "preview").unwrap();
-        assert_eq!(events.len(), 1);
-    }
-
-    #[test]
-    fn search_order_is_descending() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-22T10:00:00Z", "test-source", "old");
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "new");
-        let events = local_log::search(&conn, "").unwrap();
-        assert_eq!(events.len(), 2);
-        assert!(events[0].content == "new" || events[0].timestamp > events[1].timestamp);
-    }
-
-    #[test]
-    fn recent_returns_ordered_by_descending() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-22T10:00:00Z", "test-source", "old");
-        insert_event(&conn, "2026-05-23T10:00:00Z", "test-source", "middle");
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test-source", "new");
-        let events = local_log::recent(&conn, Some(2)).unwrap();
-        assert_eq!(events.len(), 2);
-        // Newest first (ORDER BY timestamp DESC)
-        assert!(events[0].timestamp >= events[1].timestamp);
-    }
-
-    #[test]
-    fn recent_defaults_to_50() {
-        let (conn, _dir) = temp_db();
-        for i in 0..60u64 {
-            insert_event(
-                &conn,
-                &format!("2026-05-24T{:02}:00:00Z", i % 24),
-                "test",
-                &format!("event-{}", i),
-            );
-        }
-        let events = local_log::recent(&conn, None).unwrap();
-        assert_eq!(events.len(), 50);
-    }
-
-    #[test]
-    fn recent_empty_db_returns_empty() {
-        let (conn, _dir) = temp_db();
-        let events = local_log::recent(&conn, Some(10)).unwrap();
-        assert!(events.is_empty());
-    }
-
-    #[test]
-    fn by_source_filters_by_source() {
-        let (conn, _dir) = temp_db();
-        insert_event(
-            &conn,
-            "2026-05-24T10:00:00Z",
-            "auth-service",
-            "login attempt",
-        );
-        insert_event(
-            &conn,
-            "2026-05-24T11:00:00Z",
-            "api-gateway",
-            "request received",
-        );
-        insert_event(&conn, "2026-05-24T12:00:00Z", "auth-service", "logout");
-        let events = local_log::by_source(&conn, "auth", Some(10)).unwrap();
-        assert_eq!(events.len(), 2);
-    }
-
-    #[test]
-    fn by_source_with_limit() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test-src", "event-1");
-        insert_event(&conn, "2026-05-24T11:00:00Z", "test-src", "event-2");
-        insert_event(&conn, "2026-05-24T12:00:00Z", "test-src", "event-3");
-        let events = local_log::by_source(&conn, "test", Some(2)).unwrap();
-        assert_eq!(events.len(), 2);
-    }
-
-    #[test]
-    fn by_source_empty_db_returns_empty() {
-        let (conn, _dir) = temp_db();
-        let events = local_log::by_source(&conn, "nonexistent", Some(10)).unwrap();
-        assert!(events.is_empty());
-    }
-
-    #[test]
-    fn event_row_format_time_rfc3339() {
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-05-24T10:30:00Z".to_string(),
-            source: "test".to_string(),
-            content: "hello".to_string(),
-            preview: "".to_string(),
-        };
-        let formatted = row.format_time();
-        assert!(formatted.contains("2026-05-24"));
-        assert!(formatted.contains("10:30:00"));
-    }
-
-    #[test]
-    fn event_row_format_time_fallback() {
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "not-a-date".to_string(),
-            source: "test".to_string(),
-            content: "hello".to_string(),
-            preview: "".to_string(),
-        };
-        let formatted = row.format_time();
-        assert_eq!(formatted, "not-a-date");
-    }
-
-    #[test]
-    fn event_row_preview_content_short_content() {
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-05-24T10:00:00Z".to_string(),
-            source: "test".to_string(),
-            content: "short".to_string(),
-            preview: "".to_string(),
-        };
-        assert_eq!(row.preview_content(200), "short");
-    }
-
-    #[test]
-    fn event_row_preview_content_long_content_truncated() {
-        let long = "a".repeat(300);
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-05-24T10:00:00Z".to_string(),
-            source: "test".to_string(),
-            content: long,
-            preview: "".to_string(),
-        };
-        let preview = row.preview_content(100);
-        assert!(preview.len() <= 103); // 100 chars + "..."
-        assert!(preview.ends_with("..."));
-    }
-
-    #[test]
-    fn event_row_preview_content_uses_stored_preview() {
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-05-24T10:00:00Z".to_string(),
-            source: "test".to_string(),
-            content: "this is the full content".to_string(),
-            preview: "my custom preview".to_string(),
-        };
-        assert_eq!(row.preview_content(200), "my custom preview");
-    }
-
-    #[test]
-    fn search_case_insensitive() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "Hello World");
-        let events_lower = local_log::search(&conn, "hello").unwrap();
-        let events_upper = local_log::search(&conn, "Hello").unwrap();
-        // SQLite LIKE is case-insensitive for ASCII
-        assert_eq!(events_lower.len(), 1);
-        assert_eq!(events_upper.len(), 1);
-    }
-
-    #[test]
-    fn by_source_wildcard_match() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "auth-service", "login");
-        insert_event(&conn, "2026-05-24T11:00:00Z", "auth-gateway", "verify");
-        let events = local_log::by_source(&conn, "auth", None).unwrap();
-        assert_eq!(events.len(), 2);
-    }
-
-    #[test]
-    fn event_row_clone_works() {
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-05-24T10:00:00Z".to_string(),
-            source: "test".to_string(),
-            content: "hello".to_string(),
-            preview: "preview".to_string(),
-        };
-        let cloned = row.clone();
-        assert_eq!(row.id, cloned.id);
-        assert_eq!(row.timestamp, cloned.timestamp);
-        assert_eq!(row.source, cloned.source);
-        assert_eq!(row.content, cloned.content);
-        assert_eq!(row.preview, cloned.preview);
-    }
-
-    #[test]
-    fn init_db_nonexistent_parent_fails() {
-        let result = local_log::init_db("/nonexistent/path/db.sqlite");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn local_log_search_matches_content() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "unique-content-xyz");
-        let events = local_log::search(&conn, "unique-content-xyz").unwrap();
-        assert_eq!(events.len(), 1);
-    }
-
-    #[test]
-    fn local_log_recent_with_limit_zero() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "event");
-        let events = local_log::recent(&conn, Some(0)).unwrap();
-        assert!(events.is_empty());
-    }
-
-    #[test]
-    fn local_log_by_source_with_none_limit() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "auth-service", "login");
-        let events = local_log::by_source(&conn, "auth", None).unwrap();
-        assert_eq!(events.len(), 1);
-    }
-
-    #[test]
-    fn local_log_event_row_format_time_utc() {
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-01-15T08:30:45Z".to_string(),
-            source: "test".to_string(),
-            content: "hello".to_string(),
-            preview: "".to_string(),
-        };
-        let formatted = row.format_time();
-        assert!(formatted.contains("2026-01-15"));
-        assert!(formatted.contains("08:30:45"));
-    }
-
-    #[test]
-    fn local_log_preview_content_empty_preview_short_content() {
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-05-24T10:00:00Z".to_string(),
-            source: "test".to_string(),
-            content: "short".to_string(),
-            preview: "".to_string(),
-        };
-        assert_eq!(row.preview_content(10), "short");
-    }
-
-    #[test]
-    fn local_log_preview_content_empty_preview_exact_length() {
-        let content = "1234567890".to_string();
-        let row = local_log::EventRow {
-            id: 1,
-            timestamp: "2026-05-24T10:00:00Z".to_string(),
-            source: "test".to_string(),
-            content,
-            preview: "".to_string(),
-        };
-        assert_eq!(row.preview_content(10), "1234567890");
-    }
-
-    #[test]
-    fn local_log_search_both_content_and_preview() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "main-content");
-        let by_content = local_log::search(&conn, "main-content").unwrap();
-        let by_preview = local_log::search(&conn, "preview").unwrap();
-        assert_eq!(by_content.len(), 1);
-        assert_eq!(by_preview.len(), 1);
-    }
-
-    #[test]
-    fn local_log_recent_order_correct() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-20T10:00:00Z", "test", "older");
-        insert_event(&conn, "2026-05-23T10:00:00Z", "test", "newer");
-        let events = local_log::recent(&conn, Some(10)).unwrap();
-        assert_eq!(events.len(), 2);
-        assert!(events[0].timestamp > events[1].timestamp);
-    }
-
-    #[test]
-    fn local_log_by_source_case_insensitive() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "AuthService", "login");
-        let events_lower = local_log::by_source(&conn, "authservice", Some(10)).unwrap();
-        let events_upper = local_log::by_source(&conn, "AUTHSERVICE", Some(10)).unwrap();
-        assert_eq!(events_lower.len(), 1);
-        assert_eq!(events_upper.len(), 1);
-    }
-
-    #[test]
-    fn local_log_event_row_clone_fields() {
-        let row = local_log::EventRow {
-            id: 42,
-            timestamp: "2026-05-24T10:00:00Z".to_string(),
-            source: "test-source".to_string(),
-            content: "test-content".to_string(),
-            preview: "test-preview".to_string(),
-        };
-        let cloned = row.clone();
-        assert_eq!(cloned.id, 42);
-        assert_eq!(cloned.source, "test-source");
-        assert_eq!(cloned.content, "test-content");
-        assert_eq!(cloned.preview, "test-preview");
-    }
-
-    #[test]
-    fn local_log_search_wildcard_in_term() {
-        let (conn, _dir) = temp_db();
-        insert_event(&conn, "2026-05-24T10:00:00Z", "test", "hello world");
-        let events = local_log::search(&conn, "hello%").unwrap();
-        assert_eq!(events.len(), 1);
-    }
-
-    #[test]
-    fn local_log_recent_large_limit() {
-        let (conn, _dir) = temp_db();
-        for i in 0..100u64 {
-            insert_event(
-                &conn,
-                &format!("2026-05-24T{:02}:00:00Z", i % 24),
-                "test",
-                &format!("event-{}", i),
-            );
-        }
-        let events = local_log::recent(&conn, Some(1000)).unwrap();
-        assert_eq!(events.len(), 100);
-    }
-}

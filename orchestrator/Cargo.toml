@@ -41,5 +41,8 @@ crabjar-guard = { path = "../guard" }
 # Telemetry
 crabjar-telemetry = { path = "../telemetry" }
 
+# Knowledge store
+agent-context = { path = "../memory" }
+
 # Testing
 tempfile = "3.10"
