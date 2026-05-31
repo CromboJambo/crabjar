@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: May 26 2026
+> Generated: May 30 2026
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), safetensors (model weight storage), tool registry, LLM inference crates, and Zed ACP bridge.
+CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server with unified LM client), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), safetensors (model weight storage), GGUF parsing, tool registry, LLM inference crates, Zed ACP bridge, and agent skills.
 
 ---
 
@@ -18,7 +18,7 @@ CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes stat
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 20 members, shared deps
+├── Cargo.toml               # Workspace root — 21 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── build.rs                 # Root build script
 ├── AGENTS.md               # Repository guidelines
@@ -26,22 +26,34 @@ crabjar/
 ├── agent_config.md         # Agent configuration
 ├── Justfile               # Task runner shortcuts
 ├── Containerfile, Dockerfile
+├── rust-toolchain.toml     # Rust nightly toolchain
+├── .crabjar_config.toml    # Workspace config (tool_execution_enabled)
 ├── index.md               # Root index
 ├── REPRO.md               # Reproduction guide
+├── human_reference.md     # Human reference documentation
+├── environment_manifest.json  # Environment manifest (CPU/GPU/storage)
+├── llmrunner.md           # LLM runner architecture notes
+├── project_map.md         # This file
 │
 │  Core crabjar crates
 ├── src/main.rs              # CLI entry point
 ├── src/lib.rs               # shared library surface
 ├── src/project_loader.rs    # config loading
 ├── src/dotfile_manager.rs   # dotfile management
-├── src/state_docs.rs        # state-docs source (top-level)
-├── src/state_docs/          # state-docs source (module)
+├── src/state_docs.rs        # state-docs manager (top-level)
+├── src/state_docs/          # state-docs commands
 │   └── commands.rs
 ├── src/knowledge_store/     # knowledge-store commands
 │   ├── mod.rs
 │   └── commands.rs
 ├── src/crabjar-config/      # workspace config crate
-├── src/models/              # empty directory
+│   └── src/lib.rs
+├── src/bitwarden/           # bitwarden CLI integration
+│   ├── cli.rs
+│   ├── mod.rs
+│   └── store.rs
+├── src/index.md             # src directory index
+├── src/manifest.json        # src directory manifest
 │
 │  Codeburn crates (nested src/)
 ├── src/codeburn-provider/   # ProviderRegistry (Claude/Cursor/OpenCode etc.)
@@ -58,63 +70,201 @@ crabjar/
 │   ├── src/lib.rs
 │   ├── src/main.rs
 │   ├── src/tui.rs
+│   ├── src/optimize.rs
 │   └── tests/cli.rs
 │
+│  GGUF crates (nested src/)
+├── src/gguf/                # GGUF parser crate
+│   └── src/
+│       ├── lib.rs
+│       ├── parser.rs
+│       ├── types.rs
+│       └── error.rs
+├── src/gguf-cli/            # GGUF CLI binary
+│   └── src/main.rs
+│
 │  LLM inference crates
-├── src/llm-plug-in/         # LLM plugin protocol
-│   └── src/lib.rs
-├── src/llm-runner/          # LLM runner (Candle/Burn backends)
-│   └── src/lib.rs
+├── src/llm-plug-in/         # LLM plugin protocol (InferenceRequest/Response)
+│   └── src/
+│       ├── lib.rs
+│       ├── protocol.rs
+│       ├── manifest.rs
+│       └── error.rs
+├── src/llm-runner/          # LLM runner (Blackwell tcgen05/WGMMA kernels)
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── lib.rs
+│   │   ├── inference_engine.rs
+│   │   ├── model.rs
+│   │   ├── model_loader.rs
+│   │   ├── error.rs
+│   │   ├── tokenizer.rs
+│   │   ├── runner.rs
+│   │   ├── plug_in.rs
+│   │   ├── device.rs
+│   │   └── kernel/
+│   │       ├── mod.rs
+│   │       ├── gemm.rs          # GEMM trait (WGMMA/tcgen05)
+│   │       ├── attention.rs     # Attention trait (Blackwell)
+│   │       ├── kvcache.rs       # KV cache with TMA support
+│   │       ├── device_buf.rs    # DeviceBuffer<T> abstraction
+│   │       ├── tma_descriptor.rs # Blackwell TMA descriptor (64-bit)
+│   │       ├── tma_bridge.rs    # cuda-oxide TmaDescriptor bridge
+│   │       ├── builder.rs       # PTX builder, kernel registration
+│   │       └── tests/
+│   │   ├── device/            # (empty — legacy dir)
+│   │   ├── inference-engine/  # (empty — legacy dir)
+│   │   ├── model-loader/      # (empty — legacy dir)
+│   │   ├── plug-in/           # (empty — legacy dir)
+│   │   ├── runner/            # (empty — legacy dir)
+│   │   └── tokenizer/         # (empty — legacy dir)
+│   └── examples/
+│       ├── tcgen05_attention/
+│       ├── tcgen05_gemm/
+│       ├── tiled_gemm/
+│       └── wgmma_gemm/
 │
 │  Skill crates (nested src/)
 ├── src/skill-script-runner/ # skill script discovery and execution
-│   └── src/lib.rs
+│   └── src/
+│       ├── discovery.rs
+│       ├── execution.rs
+│       └── lib.rs
 ├── src/skill-reference-store/ # skill reference indexing and staleness
 │   └── src/lib.rs
 │
 │  Supporting crates
 ├── memory/                  # agent-context crate, SQLite-backed storage
-│   └── src/lib.rs
-├── orchestrator/            # Axum SSE server (ACP-compliant orchestrator)
-│   └── src/main.rs
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── lib.rs
+│   │   ├── error.rs
+│   │   ├── models.rs
+│   │   ├── schema.rs
+│   │   ├── state_docs/      # state-docs querier (drift_status)
+│   │   │   ├── mod.rs
+│   │   │   ├── indexer.rs
+│   │   │   ├── querier.rs
+│   │   │   ├── renderer.rs
+│   │   │   ├── models.rs
+│   │   │   └── schema.rs
+│   │   └── files/
+│   │       ├── index.md
+│   │       └── manifest.json
+│   └── tests/
+│       └── state_docs_tests.rs
+├── orchestrator/            # Axum SSE server (ACP orchestrator + unified LM client)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs          # Axum router: /acp/run, /acp/prompt, /acp/chat
+│       └── lm_studio_client/
+│           └── mod.rs       # Unified client (native/OpenAI/Anthropic) + SessionStore
 ├── guard/                   # Trust layers, annealing, execution gate
-│   └── src/lib.rs
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── gate.rs          # ExecutionGate (single authorization boundary)
+│       ├── concierge.rs     # GateConcierge (enforce: deny/pending/proceed)
+│       ├── trust.rs         # TrustManager (confidence bands)
+│       ├── annealing.rs     # AnnealingPipeline (confidence decay/reinforcement)
+│       ├── retrieval.rs     # RetrievalEngine (layer-based querying)
+│       ├── memory.rs        # MemoryGraph (nodes + edges)
+│       ├── reversibility.rs # ReversibilityScore → PerturbationSet
+│       ├── guard_db.rs      # GuardDb (SQLite schema + queries)
+│       ├── schema.sql       # GuardDb schema definition
+│       └── types.rs
 ├── telemetry/               # Flight recorder, command executor
-│   └── src/lib.rs
-├── sandbox/                 # Agent isolation (Unix user, systemd-nspawn / dinit-container, cgroup)
-│   └── src/lib.rs
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── flight_recorder.rs  # FlightRecorder (execute_command, git capture)
+│       ├── command_executor.rs # process spawning + output capture
+│       ├── schema.rs
+│       └── error.rs
+├── sandbox/                 # Agent isolation (Unix user, dinit-container, cgroup)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── agent_isolation.rs
+│       ├── schema.rs
+│       └── error.rs
 ├── safetensors/             # Model weight storage (SQLite, checksum verification)
-│   └── src/lib.rs
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── safetensors_store.rs
+│       ├── schema.rs
+│       ├── gguf_converter.rs
+│       └── error.rs
 ├── tool_registry/           # MCP tool registry (rig/aur patterns)
-│   └── src/lib.rs
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── tool_registry.rs
+│       ├── schema.rs
+│       └── error.rs
 │
 │  Zed ACP bridge
 ├── zed-acp-bridge/          # Wasm extension (tool call mapping + gate enforcement)
+│   ├── Cargo.toml
+│   ├── src/lib.rs
 │   └── pkg/
 ├── zed-acp-server/          # stdio JSON-RPC server (ACP protocol execution)
-│   └── src/lib.rs
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       └── main.rs
 │
 │  Documentation
 ├── state-docs/              # Durable Markdown state documentation
-│   ├── zeroclaw/
-│   ├── GitNexus/
-│   ├── oxc/
-│   ├── vllm.rs/
-│   ├── pi-subagents/
-│   ├── rakers/
-│   ├── rusty-buns/
-│   └── Crane/
+│   ├── bustd-state.md
+│   ├── checkpoint-2026-05-15.md
+│   ├── checkpoint-2026-05-16.md
+│   ├── codex5.14.md
+│   ├── crabjar-state.md
+│   ├── cuda-oxide-state.md
+│   ├── DeepSeek-TUI-state.md
+│   ├── failing-tests.md
+│   ├── gitnexus-state.md
+│   ├── graphifyrs-state.md
+│   ├── graphify-state.md
+│   ├── hermes-agent-state.md
+│   ├── iced-state.md
+│   ├── microsandbox-state.md
+│   ├── mistralrs.md
+│   ├── Observability in Agentic Workflows.md
+│   ├── superpowers-state.md
+│   ├── tokenizers-state.md
+│   ├── uk-pitfalls-state.md
+│   └── overlay/
+│       └── cuda-oxide-state.overlay.json
 │
 │  Non-crate artifacts
-├── tests/cli.rs             # CLI integration tests
-├── tests/cli/               # CLI test fixtures
-├── testing/configs/         # test configs
-├── ui-state-copy/           # UI state copy
-├── git/                     # git helper scripts
-├── gitignore/               # gitignore management
-├── workspace/               # workspace config
+├── tests/                   # CLI integration tests
+│   ├── cli.rs
+│   ├── cli/
+│   └── index.md
+│   └── manifest.json
+├── testing/
+│   └── configs/
 ├── bin/                     # compiled binaries
+│   ├── index.md
+│   └── manifest.json
 ├── assets/                  # assets
+│   └── crabjar-banner.png
+├── workspace/               # workspace config
+│   ├── index.md
+│   └── manifest.json
+├── git/                     # git helper scripts
+│   ├── index.md
+│   └── manifest.json
+├── gitignore/               # gitignore management
+│   ├── index.md
+│   └── manifest.json
+├── ui-state-copy/           # UI state copy
+│   └── daemon/
+│       ├── index.md
+│       └── manifest.json
 ├── reference_materials/     # excluded from Git
 └── browser-tools-mcp/       # external tool (has .git/)
 ```
@@ -126,12 +276,14 @@ crabjar/
 | `crabjar` | CLI for state-docs management | Observer (Active) | Core |
 | `crabjar-config` | TOML config crate | Config | Active |
 | `memory` | Agent-context SQLite storage | Storage | Active |
-| `orchestrator` | Axum SSE server (ACP orchestrator) | Orchestrator | Active |
+| `orchestrator` | Axum SSE server + unified LM client | Orchestrator | Active |
 | `guard` | Trust layers, annealing, execution gate | Authorization | Active |
 | `telemetry` | Flight recorder, command executor | Telemetry | Active |
-| `sandbox` | Agent isolation tooling (Unix user, systemd-nspawn / dinit-container, cgroup) | Isolation | Active |
-| `safetensors` | Model weight storage | Storage | Active |
+| `sandbox` | Agent isolation (Unix user, dinit-container, cgroup) | Isolation | Active |
+| `safetensors` | Model weight storage (SQLite, checksum verification) | Storage | Active |
 | `tool_registry` | MCP tool registry | Registry | Active |
+| `gguf` | GGUF parser crate | Inference | Active |
+| `gguf-cli` | GGUF CLI binary | Inference | Active |
 | `codeburn-provider` | ProviderRegistry (Claude/Cursor/OpenCode etc.) | Provider | Active |
 | `codeburn-classifier` | TaskClassifier | Classification | Active |
 | `codeburn-pricing` | PricingEngine with LiteLLM fetch | Pricing | Active |
@@ -139,8 +291,8 @@ crabjar/
 | `codeburn` | codeburn CLI binary | CLI | Active |
 | `skill-script-runner` | Skill script discovery and execution | Skill | Active |
 | `skill-reference-store` | Skill reference indexing and staleness | Reference | Active |
-| `llm-plug-in` | LLM plugin protocol | Plugin | Active |
-| `llm-runner` | LLM runner (Candle/Burn backends) | Inference | Active |
+| `llm-plug-in` | LLM plugin protocol (InferenceRequest/Response) | Plugin | Active |
+| `llm-runner` | LLM runner (Blackwell tcgen05/WGMMA kernels) | Inference | Active |
 | `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) | Bridge | Active |
 | `zed-acp-server` | stdio JSON-RPC server (ACP protocol execution) | Bridge | Active |
 
@@ -164,6 +316,8 @@ Declared in Cargo.toml `[workspace.members]`:
 - `tool_registry`
 - `src/llm-plug-in`
 - `src/llm-runner`
+- `src/gguf`
+- `src/gguf-cli`
 - `zed-acp-bridge`
 - `zed-acp-server`
 
@@ -231,6 +385,7 @@ Declared in Cargo.toml `[workspace.dependencies]`:
 - tracing-appender (0.2.3)
 - nvml-wrapper (0.12.0)
 - sysinfo (0.38.0)
+- systemstat (0.2.6)
 - async-channel (2.5)
 
 ### 2.5 Release Profile
@@ -281,23 +436,85 @@ debug = true
 
 ---
 
-## 6. Integration Roadmap
+## 6. CLI Binary Surface
 
-### Phase 1 — Standardization ✅ DONE
+### 6.1 `crabjar` CLI (src/main.rs)
 
-clippy passes across all members (0 warnings); unified error-handling patterns (libraries: thiserror, binaries: anyhow); CI passes across all members (fmt + clippy + build + test); 516 tests passing (0 failed, 0 ignored)
+| Command | Status | Notes |
+|---|---|---|
+| `crabjar state list` | wired | JSON output, lists state-docs |
+| `crabjar state show <doc>` | wired | JSON output, doc + annotations |
+| `crabjar state annotate <doc> <msg>` | wired | JSON output, note annotation |
+| `crabjar state question <doc> <msg>` | wired | JSON output, question annotation |
+| `crabjar state resolve <doc> <id>` | wired | JSON output, resolved annotation |
+| `crabjar knowledge index <doc>` | wired | Structured JSON |
+| `crabjar knowledge sync <doc>` | wired | Structured JSON |
+| `crabjar knowledge query --tags <tags>` | wired | Structured JSON |
+| `crabjar knowledge insert --content --kind --tags` | wired | Structured JSON |
+| `crabjar knowledge verify` | wired | Structured JSON |
+| `crabjar knowledge events --limit <n>` | wired | Structured JSON |
+| `crabjar knowledge deactivate <id> --reason` | wired | Structured JSON |
+| `crabjar knowledge promote <id> --reason` | wired | Structured JSON |
+| `crabjar knowledge resolve-annotation` | wired | Structured JSON |
+| `crabjar dotfile promote <path>` | wired | JSON output |
+| `crabjar workspace status` | wired | `workspace: null` when config missing |
+| `crabjar guard queue --status --limit` | wired | Reads guard.db pending_queue |
+| `crabjar guard approve --action_id` | wired | Updates guard.db |
+| `crabjar guard reject --action_id --reason` | wired | Updates guard.db |
+| `crabjar guard interrupted --limit` | wired | Reads guard.db interrupted_log |
+| `crabjar guard provenance --source_event_id` | wired | Provenance lookup in guard.db |
+| `crabjar guard grant --pid --trust_layer` | wired | PID trust grant |
+| `crabjar guard revoke --pid` | wired | PID trust revoke |
+| `crabjar exec --command <cmd> --reason <id>` | **end-to-end** | request → guard → concierge → telemetry → outcome → trust update |
+| `crabjar bitwarden status/list/get/search/generate` | wired | CLI-available gate |
+| `crabjar doctor check` | wired | Checks guard.db/flight.db/knowledge.db schema |
 
-### Phase 2 — Feature Integration ✅ DONE
+### 6.2 `crabjar exec` Pipeline
 
-wire orchestrator → guard → telemetry into a `crabjar exec` CLI command ✅; implement actual safetensors weight parsing ✅ (uses real safetensors crate with actual tensor loading + SHA-256 checksums); implement tool discovery in tool_registry ✅ (MCP scanning, state-based discovery, auto-registration, binary validation); implement optimize_engine in codeburn ✅ (extracted to dedicated module with 4 heuristic rules, configurable thresholds, markdown output)
+```
+config check (tool_execution_enabled)
+  → dry_run shortcut (skip gate + telemetry)
+  → ExecutionGate::check() with GateContext{trust_layer, confidence, source_event_id}
+  → GateConcierge::enforce() → ActionStatus {Denied|Pending|TrustApproved|Executed|Interrupted}
+  → Pending → persist to guard.db pending_queue
+  → TrustApproved → FlightRecorder::execute_command() → capture_git_dirty + capture_git_diff
+  → GuardDb::action_outcomes INSERT (confidence_delta = 0.02)
+  → JSON output with cmd_id, exit_code, gate_result, outcome_id, flight_recorder
+```
 
-### Phase 3 — Consolidation
+### 6.3 `orchestrator` Binary (Axum SSE server)
 
-move completed experiments to archive/ directory; produce clean pre-optimized workspace
+| Endpoint | Purpose |
+|---|---|
+| `POST /acp/run` | Run command + stream output via SSE |
+| `POST /acp/prompt` | Acknowledge prompt (JSON response) |
+| `POST /acp/chat` | LLM chat via LM Studio (OpenAI-compatible) |
+
+The `handle_chat` handler currently does a one-shot HTTP call to `LM_STUDIO_URL/v1/chat/completions`. The `lm_studio_client` module provides a unified client (native/OpenAI/Anthropic) with `SessionStore` (SQLite-backed session persistence), but it is not yet wired into the Axum handler.
 
 ---
 
-## 7. Architectural Constraints
+## 7. Integration Roadmap
+
+### Phase 1 — Standardization ✅ DONE
+
+clippy passes across all members (0 warnings); unified error-handling patterns (libraries: thiserror, binaries: anyhow); CI passes across all members (fmt + clippy + build + test); 741 tests passing (0 failed, 1 ignored).
+
+### Phase 2 — Feature Integration ✅ DONE
+
+wire orchestrator → guard → telemetry into a `crabjar exec` CLI command ✅; implement actual safetensors weight parsing ✅ (uses real safetensors crate with actual tensor loading + SHA-256 checksums); implement tool discovery in tool_registry ✅ (MCP scanning, state-based discovery, auto-registration, binary validation); implement optimize_engine in codeburn ✅ (extracted to dedicated module with 4 heuristic rules, configurable thresholds, markdown output).
+
+### Phase 3 — Consolidation
+
+move completed experiments to archive/ directory; produce clean pre-optimized workspace.
+
+### Phase 4 — Inference Integration (in progress)
+
+wire orchestrator's `LmStudioClient` into the `handle_chat` handler; add mistral.rs as inference substrate; unify LM client to support mistral.rs serve on OpenAI-compatible port; replace hardcoded LM Studio URL with env-configurable endpoint.
+
+---
+
+## 8. Architectural Constraints
 
 ### Detection ≠ Authorization
 
@@ -317,9 +534,9 @@ Every derived output must include a `doubt` block with:
 
 ---
 
-## 8. Crabjar Context
+## 9. Crabjar Context
 
-### 8.1 Structure
+### 9.1 Structure
 
 crabjar contains:
 - agent_config.md
@@ -327,14 +544,14 @@ crabjar contains:
 - Cargo.toml (workspace root + crabjar binary manifest)
 - Justfile
 - Containerfile, Dockerfile
-- orchestrator (Axum SSE server)
-- guard (SecurityGuard)
+- orchestrator (Axum SSE server + unified LM client)
+- guard (SecurityGuard: gate, concierge, trust, annealing, memory, retrieval, reversibility)
 - codeburn-config (config struct, TOML parsing)
 - codeburn-provider (ProviderRegistry)
 - codeburn-classifier (TaskClassifier)
 - codeburn-pricing (PricingEngine)
-- codeburn (CLI binary)
-- memory/files (agent-context crate)
+- codeburn (CLI binary with TUI + optimize_engine)
+- memory/files (agent-context crate with state_docs querier)
 - tests/cli.rs
 - ui-state-copy
 - reference_materials (excluded from Git)
@@ -342,56 +559,63 @@ crabjar contains:
 - git/ (git helper scripts)
 - gitignore/ (gitignore management)
 - workspace/ (workspace config)
-- state-docs/ (local state-docs)
-- src/models/ (empty directory)
-- src/state_docs/ (state-docs source)
+- state-docs/ (local state-docs + overlay)
+- .agents/skills/ (29 agent skills)
+- .agents/references/
+- src/gguf/ (GGUF parser crate)
+- src/gguf-cli/ (GGUF CLI binary)
+- src/bitwarden/ (bitwarden CLI integration)
+- src/state_docs/ (state-docs commands)
 - src/dotfile_manager.rs (dotfile management)
 - src/knowledge_store/ (knowledge store commands)
 - src/llm-plug-in/ (LLM plugin protocol)
-- src/llm-runner/ (LLM runner)
+- src/llm-runner/ (LLM runner with Blackwell kernels)
+- src/skill-script-runner/ (skill script discovery)
+- src/skill-reference-store/ (skill reference indexing)
+- src/crabjar-config/ (workspace config crate)
+- src/codeburn*/ (codeburn sub-crates)
 - *.manifest.json (file manifests)
 - human_reference.md (human reference documentation)
 - environment_manifest.json (environment manifest)
 - index.md (root index)
 - REPRO.md (reproduction guide)
 - build.rs (root build script)
+- llmrunner.md (LLM runner architecture notes)
 
-### 8.2 Active Rust Surface
+### 9.2 Active Rust Surface
 
-crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + safetensors + tool_registry + codeburn-provider + codeburn-classifier + codeburn-pricing + codeburn-config + codeburn + skill-script-runner + skill-reference-store + llm-plug-in + llm-runner + zed-acp-bridge + zed-acp-server
+crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + safetensors + tool_registry + codeburn-provider + codeburn-classifier + codeburn-pricing + codeburn-config + codeburn + skill-script-runner + skill-reference-store + llm-plug-in + llm-runner + gguf + gguf-cli + zed-acp-bridge + zed-acp-server
 
-### 8.3 Build Commands
+### 9.3 Test Count
 
-- just check: cargo check --workspace
-- just build: cargo build -p crabjar
-- just test: cargo test --workspace
-- just clean: remove build artifacts
+741 tests passing across all workspace members (0 failed, 1 ignored). Clippy: clean.
 
 ---
 
-## 9. Drift Report
+## 10. Drift Report
 
 ### Last Audit
 
-2026-05-27 — Phase 2 complete. Clippy clean across all members (0 warnings). 584 tests passing (0 failed, 1 ignored). CI verified (fmt + clippy + build + test all passing). Safetensors: real tensor loading with SHA-256 checksums via safetensors crate. Tool registry: MCP scanning, state-based discovery, auto-registration, binary validation. Codeburn: optimize_engine extracted to dedicated module with 4 heuristic rules, configurable thresholds, markdown output. Orchestrator: SessionStore wired to SQLite persistence. Version 0.11.0.
+2026-05-30 — Phase 3 in progress. Clippy clean across all members (0 warnings). 741 tests passing (0 failed, 1 ignored). CI verified (fmt + clippy + build + test all passing). New crates: `gguf` (GGUF parser crate), `gguf-cli` (GGUF CLI binary). `orchestrator/src/lm_studio_client/` unified client (native/OpenAI/Anthropic) with SQLite SessionStore — not yet wired into Axum handler. `guard/src/schema.sql` added. `memory/src/state_docs/` has indexer.rs, querier.rs (drift_status), renderer.rs. `llm-runner/src/kernel/tests/` added. `state-docs/` has 19 state docs + overlay. `src/models/` removed. `src/llm-runner/src/` has 6 legacy empty subdirs (device/, inference-engine/, model-loader/, plug-in/, runner/, tokenizer/). Version 0.11.0.
 
 ### Known Items
 
-- `state-docs/` overlays in `state-docs/*/` subdirectories (zeroclaw, GitNexus, oxc, vllm.rs, pi-subagents, rakers, rusty-buns, Crane)
+- `state-docs/` overlays in `state-docs/*/` subdirectories (cuda-oxide-state.overlay.json)
+- `state-docs/` has 19 Markdown state docs (bustd-state.md, checkpoint-2026-05-15.md, checkpoint-2026-05-16.md, codex5.14.md, crabjar-state.md, cuda-oxide-state.md, DeepSeek-TUI-state.md, failing-tests.md, gitnexus-state.md, graphifyrs-state.md, graphify-state.md, hermes-agent-state.md, iced-state.md, microsandbox-state.md, mistralrs.md, Observability in Agentic Workflows.md, superpowers-state.md, tokenizers-state.md, uk-pitfalls-state.md)
 - Single Git repo — `browser-tools-mcp/` is an external submodule with its own `.git/`
 - Single `Cargo.lock` at workspace root
 - `reference_materials/` — excluded from Git (cloned reference repos, not authored code)
-- `src/models/` — empty directory, no files
-- `src/knowledge_store/` — contains `mod.rs` and `commands.rs` (not a workspace crate)
-- `src/state_docs/` — contains `commands.rs` (not a workspace crate)
+- `src/llm-runner/src/device/`, `inference-engine/`, `model-loader/`, `plug-in/`, `runner/`, `tokenizer/` — empty legacy directories
+- `guard/src/schema.sql` — GuardDb schema definition
 - `guard/src/concierge.rs` — present (guard's GateConcierge is sole gate enforcement layer)
 - `guard/src/reversibility.rs` — ReversibilityScore → PerturbationSet
 - `memory/src/state_docs/querier.rs` — drift_status() added
-- `orchestrator/src/concierge.rs` — removed (not present)
-- `guard/src/reversibility.rs` — ReversibilityScore → PerturbationSet
-- `memory/src/state_docs/querier.rs` — drift_status() added
-- Phase 2 complete — 584 tests passing, clippy clean, all 4 Phase 2 items delivered
-- Phase 1 complete — clippy clean, 571 tests passing, CI verified, 6 ignored tests enabled
+- `orchestrator/src/lm_studio_client/` — unified LM client with SessionStore (not wired into handler)
+- `orchestrator/src/main.rs` handle_chat does one-shot reqwest call, not using LmStudioClient
+- Phase 2 complete — 741 tests passing, clippy clean
+- Phase 1 complete — clippy clean, CI verified
+- `.agents/skills/` — 29 agent skills
+- `.agents/references/` — agent reference files
 
 ### Provenance Entries
 
@@ -406,6 +630,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 | `prov-crates-io-0110` | version 0.10.2 → 0.11.0, publish config added to all crates, stale artifacts removed | 2026-05-26 | crates.io publication prep | crabjar |
 | `prov-phase1-done` | Phase 1 complete: clippy clean, 516 tests passing, CI verified, 6 ignored tests enabled | 2026-05-27 | Phase 1 standardization completion | crabjar |
 | `prov-phase2-done` | Phase 2 complete: 584 tests passing, safetensors real tensor loading, tool_registry MCP discovery, codeburn optimize_engine extraction | 2026-05-27 | Phase 2 feature integration completion | crabjar |
+| `prov-map-drift-2026-05-30` | project_map.md regenerated — 21 members, gguf/gguf-cli added, orchestrator lm_studio_client documented, test count 741, legacy dirs noted | 2026-05-30 | Structural alignment refresh | crabjar/project_map.md |
 
 ---
 
