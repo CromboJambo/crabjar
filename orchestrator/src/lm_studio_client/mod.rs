@@ -23,7 +23,7 @@ use tracing::{debug, error, info, warn};
 
 /// Which LM Studio endpoint to use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum LmStudioEndpoint {
     /// Native `/api/v1/chat` endpoint — supports stateful chat.
     Native,
@@ -31,6 +31,8 @@ pub enum LmStudioEndpoint {
     Openai,
     /// Anthropic-compatible `/v1/messages` endpoint.
     Anthropic,
+    /// Mistral.rs serve OpenAI-compatible endpoint.
+    MistralRsServe,
 }
 
 impl LmStudioEndpoint {
@@ -41,6 +43,7 @@ impl LmStudioEndpoint {
             Some("native") => Self::Native,
             Some("openai") => Self::Openai,
             Some("anthropic") => Self::Anthropic,
+            Some("mistralrs") => Self::MistralRsServe,
             _ => Self::Openai,
         }
     }
@@ -51,6 +54,7 @@ impl LmStudioEndpoint {
             Self::Native => "/api/v1/chat",
             Self::Openai => "/v1/chat/completions",
             Self::Anthropic => "/v1/messages",
+            Self::MistralRsServe => "/v1/chat/completions",
         }
     }
 
@@ -60,6 +64,7 @@ impl LmStudioEndpoint {
             Self::Native => "native",
             Self::Openai => "openai-compat",
             Self::Anthropic => "anthropic-compat",
+            Self::MistralRsServe => "mistralrs-serve",
         }
     }
 }
@@ -73,6 +78,8 @@ impl LmStudioEndpoint {
 pub struct LmStudioConfig {
     /// Base URL of the LM Studio server (e.g. `http://127.0.0.1:1234`).
     pub base_url: String,
+    /// Base URL for mistral.rs serve (overrides `base_url` when endpoint is `MistralRsServe`).
+    pub serve_base_url: Option<String>,
     /// Which endpoint to use.
     pub endpoint: LmStudioEndpoint,
     /// API token for authentication (optional).
@@ -92,6 +99,8 @@ impl LmStudioConfig {
     pub fn from_env() -> Self {
         let base_url = env::var("LM_STUDIO_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:1234".to_string());
+
+        let serve_base_url = env::var("MISTRALRS_SERVE_URL").ok();
 
         let endpoint = LmStudioEndpoint::from_env();
 
@@ -114,6 +123,7 @@ impl LmStudioConfig {
 
         Self {
             base_url,
+            serve_base_url,
             endpoint,
             api_token,
             default_model,
@@ -124,8 +134,17 @@ impl LmStudioConfig {
     }
 
     /// Returns the full URL for the configured endpoint.
+    ///
+    /// Uses `serve_base_url` when the endpoint is `MistralRsServe`,
+    /// otherwise falls back to `base_url`.
     pub fn endpoint_url(&self) -> String {
-        format!("{}{}", self.base_url, self.endpoint.path())
+        let base = match self.endpoint {
+            LmStudioEndpoint::MistralRsServe => {
+                self.serve_base_url.as_deref().unwrap_or(&self.base_url)
+            }
+            _ => &self.base_url,
+        };
+        format!("{}{}", base, self.endpoint.path())
     }
 }
 
@@ -1071,6 +1090,7 @@ impl LmStudioClient {
             LmStudioEndpoint::Native => self.send_native(&req).await,
             LmStudioEndpoint::Openai => self.send_openai(&req).await,
             LmStudioEndpoint::Anthropic => self.send_anthropic(&req).await,
+            LmStudioEndpoint::MistralRsServe => self.send_openai(&req).await,
         }?;
 
         // Update session state with the response.
@@ -1102,6 +1122,7 @@ impl LmStudioClient {
             LmStudioEndpoint::Native => self.send_native(&req).await,
             LmStudioEndpoint::Openai => self.send_openai(&req).await,
             LmStudioEndpoint::Anthropic => self.send_anthropic(&req).await,
+            LmStudioEndpoint::MistralRsServe => self.send_openai(&req).await,
         }?;
 
         self.session.update_with_response(&response);
@@ -1317,8 +1338,11 @@ pub enum LmStudioError {
 ///
 /// Returns a list of available endpoints. If none are available, returns
 /// an error.
+///
+/// `serve_url` is the mistral.rs serve base URL (default `http://127.0.0.1:8081`).
 pub async fn detect_available_endpoints(
     base_url: &str,
+    serve_url: Option<&str>,
 ) -> Result<Vec<LmStudioEndpoint>, LmStudioError> {
     let client = reqwest::Client::new();
     let mut available = Vec::new();
@@ -1339,6 +1363,17 @@ pub async fn detect_available_endpoints(
     let native_url = format!("{}/api/v1/chat", base_url);
     if client.get(&native_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
         available.push(LmStudioEndpoint::Native);
+    }
+
+    // Check mistral.rs serve endpoint.
+    let mistralrs_url = match serve_url {
+        Some(s) => s.to_string(),
+        None => std::env::var("MISTRALRS_SERVE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8081".to_string()),
+    };
+    let mistralrs_endpoint = format!("{}/v1/chat/completions", mistralrs_url);
+    if client.get(&mistralrs_endpoint).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+        available.push(LmStudioEndpoint::MistralRsServe);
     }
 
     if available.is_empty() {
@@ -1452,6 +1487,7 @@ mod tests {
     fn config_endpoint_url_constructed() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: None,
             default_model: "test-model".to_string(),
@@ -1469,6 +1505,7 @@ mod tests {
     fn config_endpoint_url_native() {
         let config = LmStudioConfig {
             base_url: "http://example.com:8080".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Native,
             api_token: None,
             default_model: "test".to_string(),
@@ -1483,6 +1520,7 @@ mod tests {
     fn config_endpoint_url_anthropic() {
         let config = LmStudioConfig {
             base_url: "http://example.com:8080".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Anthropic,
             api_token: None,
             default_model: "test".to_string(),
@@ -1537,6 +1575,7 @@ mod tests {
     fn unified_chat_request_from_config() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: Some("token".to_string()),
             default_model: "test-model".to_string(),
@@ -1774,6 +1813,7 @@ mod tests {
     fn native_to_native_request_includes_model() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Native,
             api_token: None,
             default_model: "my-model".to_string(),
@@ -1790,6 +1830,7 @@ mod tests {
     fn native_to_native_request_includes_input() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Native,
             api_token: None,
             default_model: "test".to_string(),
@@ -1806,6 +1847,7 @@ mod tests {
     fn openai_to_request_includes_messages() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: None,
             default_model: "test".to_string(),
@@ -1823,6 +1865,7 @@ mod tests {
     fn openai_to_request_includes_system_prompt() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: None,
             default_model: "test".to_string(),
@@ -1842,6 +1885,7 @@ mod tests {
     fn anthropic_to_request_includes_messages() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Anthropic,
             api_token: None,
             default_model: "test".to_string(),
@@ -1859,6 +1903,7 @@ mod tests {
     fn anthropic_to_request_with_system_prompt_prepends() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Anthropic,
             api_token: None,
             default_model: "test".to_string(),
@@ -2031,6 +2076,7 @@ mod tests {
     fn client_new_with_config() {
         let config = LmStudioConfig {
             base_url: "http://custom:9999".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: Some("secret".to_string()),
             default_model: "custom-model".to_string(),
@@ -2047,6 +2093,7 @@ mod tests {
     fn client_with_session_store() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: None,
             default_model: "test".to_string(),
@@ -2063,6 +2110,7 @@ mod tests {
     fn client_create_session_returns_id() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: None,
             default_model: "test".to_string(),
@@ -2079,6 +2127,7 @@ mod tests {
     fn client_create_session_with_system_prompt() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: None,
             default_model: "test".to_string(),
@@ -2427,6 +2476,7 @@ mod tests {
     fn unified_chat_request_clone_works() {
         let config = LmStudioConfig {
             base_url: "http://localhost:1234".to_string(),
+            serve_base_url: None,
             endpoint: LmStudioEndpoint::Openai,
             api_token: None,
             default_model: "test".to_string(),

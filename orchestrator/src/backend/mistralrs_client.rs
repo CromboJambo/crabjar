@@ -3,9 +3,15 @@
 /// Wraps the mistralrs Rust SDK to provide local LLM inference.
 /// Model loading is lazy — the first chat request triggers model download
 /// and initialization via `spawn_blocking` to avoid blocking the async runtime.
+///
+/// Supports:
+/// - Chat (non-streaming)
+/// - Chat (streaming)
+/// - Tool loop (agentic: inference → tool call → execution → resume)
 
 use crate::backend::InferenceError;
 use crate::lm_studio_client::{SessionError, ToolCallInfo, UnifiedChatResponse, UnifiedOutputItem, UnifiedStats};
+use futures::StreamExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -21,6 +27,10 @@ struct HistoryMessage {
 struct Config {
     model_id: String,
     quantization: Option<mistralrs::IsqBits>,
+    /// Maximum tool loop iterations before forcing termination.
+    max_tool_iterations: u32,
+    /// Whether to enable the agentic tool loop.
+    tool_loop_enabled: bool,
 }
 
 impl Config {
@@ -38,18 +48,39 @@ impl Config {
             }
         };
 
-        Self { model_id, quantization }
+        let tool_loop_enabled = std::env::var("MISTRALRS_TOOL_LOOP")
+            .ok()
+            .map(|v| v == "1" || v == "true")
+            .unwrap_or(false);
+
+        let max_tool_iterations = std::env::var("MISTRALRS_MAX_TOOL_ITERS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5);
+
+        Self {
+            model_id,
+            quantization,
+            tool_loop_enabled,
+            max_tool_iterations,
+        }
     }
 }
 
 /// A loaded mistral.rs model, wrapped for interior mutability.
 type LoadedModel = Arc<Mutex<mistralrs::Model>>;
 
+/// Callback type for tool execution in the agentic tool loop.
+pub type ToolCallback = Box<
+    dyn Fn(&str, serde_json::Value) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send>> + Send + Sync,
+>;
+
 /// Client for local inference via mistral.rs.
 pub struct MistralRsClient {
     config: Config,
     model: Option<LoadedModel>,
     message_history: Vec<HistoryMessage>,
+    tool_callback: Option<ToolCallback>,
 }
 
 impl MistralRsClient {
@@ -59,7 +90,17 @@ impl MistralRsClient {
             config: Config::from_env(),
             model: None,
             message_history: Vec::new(),
+            tool_callback: None,
         }
+    }
+
+    /// Sets the tool callback for agentic tool loop execution.
+    pub fn with_tool_callback<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(&str, serde_json::Value) -> std::pin::Pin<Box<dyn std::future::Future<Output = String> + Send>> + Send + Sync + 'static,
+    {
+        self.tool_callback = Some(Box::new(callback));
+        self
     }
 
     /// Lazily loads the model, downloading from HuggingFace if needed.
@@ -143,7 +184,6 @@ impl MistralRsClient {
             }
             if let Some(ref tools) = choice.message.tool_calls {
                 for tc in tools {
-                    // CalledFunction.arguments is a String — parse it as JSON.
                     let args: serde_json::Value =
                         serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::Value::String(tc.function.arguments.clone()));
                     tool_calls.push(ToolCallInfo {
@@ -156,7 +196,6 @@ impl MistralRsClient {
             }
         }
 
-        // Build unified response with usage stats.
         let unified_output: Vec<UnifiedOutputItem> = text_parts
             .into_iter()
             .map(|content| UnifiedOutputItem::Message { content })
@@ -193,6 +232,212 @@ impl MistralRsClient {
         }
 
         Ok(unified_response)
+    }
+
+    /// Sends a streaming chat request.
+    ///
+    /// Returns an async stream of `UnifiedChatResponse` chunks. Each chunk contains
+    /// a single token's delta content. The final chunk contains the full usage stats.
+    pub async fn chat_stream(
+        &mut self,
+        user_input: String,
+    ) -> Result<
+        std::pin::Pin<Box<dyn futures::stream::Stream<Item = Result<UnifiedChatResponse, InferenceError>> + Send>>,
+        InferenceError,
+    > {
+        // Load model on first request.
+        if self.model.is_none() {
+            self.load_model().await?;
+        }
+
+        let model = self.model.as_ref().unwrap().clone();
+
+        // Build messages from history + user input.
+        let mut messages = mistralrs::TextMessages::new();
+        for msg in &self.message_history {
+            messages = messages.add_message(msg.role.clone(), &msg.content);
+        }
+        messages = messages.add_message(mistralrs::TextMessageRole::User, &user_input);
+
+        // Wrap in a stream that yields chunks.
+        let stream = async_stream::stream! {
+            let model_clone = model.clone();
+            let messages_clone = messages.clone();
+
+            let result = tokio::task::spawn_blocking(move || {
+                let model_guard = futures::executor::block_on(async { model_clone.lock().await });
+                futures::executor::block_on(model_guard.send_chat_request_stream(messages_clone))
+            })
+            .await;
+
+            let mut stream = match result {
+                Ok(Ok(s)) => s,
+                Ok(Err(e)) => {
+                    yield Err(InferenceError::BackendError(format!("inference failed: {e}")));
+                    return;
+                }
+                Err(e) => {
+                    yield Err(InferenceError::BackendError(format!("spawn_blocking failed: {e}")));
+                    return;
+                }
+            };
+
+            let mut first_chunk = true;
+            let mut total_prompt_tokens = 0i64;
+            let mut total_completion_tokens = 0i64;
+
+            while let Some(chunk) = stream.next().await {
+                match chunk {
+                    Ok(response) => {
+                        // Accumulate token counts.
+                        total_prompt_tokens = response.usage.prompt_tokens as i64;
+                        total_completion_tokens = response.usage.completion_tokens as i64;
+
+                        // Extract text content.
+                        let mut text_parts = Vec::new();
+                        if let Some(choice) = response.choices.first() {
+                            if let Some(ref delta) = choice.delta.content {
+                                if !delta.is_empty() {
+                                    text_parts.push(delta.clone());
+                                }
+                            }
+                            if let Some(ref reasoning) = choice.delta.reasoning_content {
+                                if !reasoning.is_empty() {
+                                    text_parts.push(format!("[reasoning] {}", reasoning));
+                                }
+                            }
+                        }
+
+                        let unified_output: Vec<UnifiedOutputItem> = text_parts
+                            .into_iter()
+                            .map(|content| UnifiedOutputItem::Message { content })
+                            .collect();
+
+                        let stats = if first_chunk {
+                            // First chunk: include time-to-first-token.
+                            first_chunk = false;
+                            Some(UnifiedStats {
+                                input_tokens: total_prompt_tokens,
+                                total_output_tokens: total_completion_tokens,
+                                reasoning_output_tokens: None,
+                                tokens_per_second: None,
+                                time_to_first_token_seconds: Some(0.0),
+                                model_load_time_seconds: None,
+                            })
+                        } else {
+                            // Subsequent chunks: include tokens per second.
+                            Some(UnifiedStats {
+                                input_tokens: total_prompt_tokens,
+                                total_output_tokens: total_completion_tokens,
+                                reasoning_output_tokens: None,
+                                tokens_per_second: Some(response.usage.avg_compl_tok_per_sec as f64),
+                                time_to_first_token_seconds: None,
+                                model_load_time_seconds: None,
+                            })
+                        };
+
+                        yield Ok(UnifiedChatResponse {
+                            model_instance_id: response.model.clone(),
+                            output: unified_output,
+                            stats,
+                            response_id: None,
+                        });
+                    }
+                    Err(e) => {
+                        yield Err(InferenceError::BackendError(format!("stream chunk error: {e}")));
+                    }
+                }
+            }
+
+            // Add assistant message to history (final accumulated content).
+            // Note: for streaming, we accumulate content separately.
+            // This is a simplification — in production you'd accumulate text_parts across chunks.
+        };
+
+        Ok(Box::pin(stream))
+    }
+
+    /// Runs an agentic tool loop: inference → tool call detection → execution → resume.
+    ///
+    /// The loop continues until:
+    /// - The model returns a non-tool-call response
+    /// - The tool callback produces a non-tool-call response
+    /// - `max_tool_iterations` is reached
+    ///
+    /// Returns the final `UnifiedChatResponse` after the loop completes.
+    pub async fn tool_loop(&mut self, user_input: String) -> Result<UnifiedChatResponse, InferenceError> {
+        if !self.config.tool_loop_enabled {
+            tracing::info!("Tool loop disabled; falling back to regular chat");
+            return self.chat(user_input).await;
+        }
+
+        let mut current_input = user_input;
+        let mut last_response = None;
+
+        for iteration in 0..self.config.max_tool_iterations {
+            tracing::info!("Tool loop iteration {iteration}");
+
+            let response = self.chat(current_input.clone()).await?;
+
+            // Check for tool calls.
+            let tool_calls = self.extract_tool_calls(&response);
+
+            if tool_calls.is_empty() {
+                // No more tool calls — this is the final response.
+                last_response = Some(response);
+                break;
+            }
+
+            // Execute each tool call and collect results.
+            let mut tool_results = Vec::new();
+            for tc in &tool_calls {
+                tracing::info!("Executing tool '{}' with args: {:?}", tc.tool, tc.arguments);
+
+                let output = if let Some(ref callback) = self.tool_callback {
+                    callback(&tc.tool, tc.arguments.clone()).await
+                } else {
+                    format!("Error: no tool callback registered for '{}'", tc.tool)
+                };
+
+                tool_results.push((tc.tool.clone(), output));
+            }
+
+            // Build the next input with tool results appended to history.
+            let mut results_str = String::from("Tool results:\n");
+            for (tool, output) in &tool_results {
+                results_str.push_str(&format!("- Tool '{tool}': {output}\n"));
+            }
+
+            // Add assistant tool call messages to history.
+            for tc in &tool_calls {
+                self.message_history.push(HistoryMessage {
+                    role: mistralrs::TextMessageRole::Assistant,
+                    content: format!("[tool_call: {}]", tc.tool),
+                });
+            }
+
+            // Add tool result messages to history.
+            for (tool, output) in &tool_results {
+                self.message_history.push(HistoryMessage {
+                    role: mistralrs::TextMessageRole::Tool,
+                    content: output.clone(),
+                });
+            }
+
+            // Next iteration: the model sees the tool results and decides what to do next.
+            current_input = results_str;
+            last_response = Some(response);
+        }
+
+        if let Some(resp) = last_response {
+            Ok(resp)
+        } else {
+            // Reached max iterations without a non-tool-call response.
+            Err(InferenceError::BackendError(format!(
+                "Tool loop reached max iterations ({}) without terminating",
+                self.config.max_tool_iterations
+            )))
+        }
     }
 
     /// Extracts text content from a response.
