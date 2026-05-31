@@ -413,7 +413,7 @@ impl GgufTensorInfo {
 }
 
 /// Parsed key-value value (runtime representation).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum GgufKvValue {
     Uint8(u8),
     Int8(i8),
@@ -747,8 +747,15 @@ mod tests {
     #[test]
     fn test_value_type_from_u32() {
         assert_eq!(GgufValueType::from_u32(0), Some(GgufValueType::Uint8));
+        assert_eq!(GgufValueType::from_u32(6), Some(GgufValueType::Uint64));
+        assert_eq!(GgufValueType::from_u32(7), Some(GgufValueType::Int64));
+        assert_eq!(GgufValueType::from_u32(8), Some(GgufValueType::String));
+        assert_eq!(GgufValueType::from_u32(9), Some(GgufValueType::Float32));
+        assert_eq!(GgufValueType::from_u32(10), Some(GgufValueType::Float64));
+        assert_eq!(GgufValueType::from_u32(11), Some(GgufValueType::Bool));
         assert_eq!(GgufValueType::from_u32(12), Some(GgufValueType::Array));
         assert_eq!(GgufValueType::from_u32(15), Some(GgufValueType::Bfloat16));
+        assert_eq!(GgufValueType::from_u32(13), None); // 13 is reserved
         assert_eq!(GgufValueType::from_u32(14), None); // 14 is reserved
     }
 
@@ -809,5 +816,661 @@ mod tests {
             data_alignment: Some(32),
             data_section_start: 0,
         };
+        assert_eq!(header.architecture(), Some("llama"));
+        assert_eq!(header.context_length(), Some(4096));
+        assert_eq!(header.embedding_length(), Some(4096));
+        assert_eq!(header.has_tensor("token_embd.weight"), true);
+        assert_eq!(header.has_tensor("missing"), false);
+    }
+
+    #[test]
+    fn test_empty_header() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![],
+            tensors: vec![],
+            data_alignment: Some(32),
+            data_section_start: 0,
+        };
+        assert_eq!(header.architecture(), None);
+        assert_eq!(header.context_length(), None);
+        assert_eq!(header.get_kv_str("anything"), None);
+        assert_eq!(header.get_kv_u32("anything"), None);
+        assert_eq!(header.get_kv_i32("anything"), None);
+        assert_eq!(header.get_kv_f32("anything"), None);
+        assert_eq!(header.get_kv_bool("anything"), None);
+        assert!(header.get_kv_array("anything").is_none());
+        assert!(header.get_tensor("anything").is_none());
+        assert!(!header.has_tensor("anything"));
+        assert_eq!(header.file_type(), None);
+        assert_eq!(header.rope_scaling_type(), None);
+        assert_eq!(header.quantization_description(), None);
+        assert_eq!(header.vocab_size(), None);
+        assert_eq!(header.normalization_epsilon(), None);
+        assert_eq!(header.feed_forward_length(), None);
+        assert_eq!(header.rope_dimension_count(), None);
+        assert_eq!(header.block_count(), None);
+        assert_eq!(header.attention_head_count(), None);
+        assert_eq!(header.attention_head_count_kv(), None);
+    }
+
+    #[test]
+    fn test_kv_pair_serialization() {
+        let kv = GgufKvPair {
+            key: "test.key".to_string(),
+            value_type: GgufValueType::Uint32,
+            value: GgufKvValue::Uint32(42),
+        };
+        let json = serde_json::to_string(&kv).unwrap();
+        let deserialized: GgufKvPair = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.key, "test.key");
+        assert_eq!(deserialized.value_type, GgufValueType::Uint32);
+        assert_eq!(deserialized.value, GgufKvValue::Uint32(42));
+    }
+
+    #[test]
+    fn test_string_kv_pair_raw_byte_size() {
+        let kv = GgufKvPair {
+            key: "arch".to_string(),
+            value_type: GgufValueType::String,
+            value: GgufKvValue::String("llama".to_string()),
+        };
+        assert_eq!(kv.raw_byte_size(), 29);
+    }
+
+    #[test]
+    fn test_string_kv_pair_raw_byte_size_empty() {
+        let kv = GgufKvPair {
+            key: "k".to_string(),
+            value_type: GgufValueType::String,
+            value: GgufKvValue::String("".to_string()),
+        };
+        assert_eq!(kv.raw_byte_size(), 21);
+    }
+
+    #[test]
+    fn test_array_kv_pair_raw_byte_size() {
+        let kv = GgufKvPair {
+            key: "arr".to_string(),
+            value_type: GgufValueType::Array,
+            value: GgufKvValue::Array(vec![
+                GgufKvValue::Uint32(1),
+                GgufKvValue::Uint32(2),
+                GgufKvValue::Uint32(3),
+            ]),
+        };
+        assert_eq!(kv.raw_byte_size(), 39);
+    }
+
+    #[test]
+    fn test_kv_value_conversions() {
+        let u8_val = GgufKvValue::Uint8(255);
+        assert_eq!(u8_val.as_u64(), Some(255));
+        assert_eq!(u8_val.as_u32(), Some(255));
+        assert!(u8_val.as_i64().is_none());
+        assert!(u8_val.as_f32().is_none());
+        assert!(u8_val.as_bool().is_none());
+        assert!(u8_val.as_str().is_none());
+        assert!(u8_val.as_array().is_none());
+
+        let i8_val = GgufKvValue::Int8(-128);
+        assert_eq!(i8_val.as_i64(), Some(-128));
+        assert!(i8_val.as_u64().is_none());
+
+        let f32_val = GgufKvValue::Float32(3.14);
+        assert_eq!(f32_val.as_f32(), Some(3.14));
+
+        let f64_val = GgufKvValue::Float64(3.14159);
+        assert_eq!(f64_val.as_f32(), Some(3.14159f64 as f32));
+
+        let bool_val = GgufKvValue::Bool(true);
+        assert_eq!(bool_val.as_bool(), Some(true));
+
+        let str_val = GgufKvValue::String("hello".to_string());
+        assert_eq!(str_val.as_str(), Some("hello"));
+    }
+
+    #[test]
+    fn test_dtype_roundtrip_all() {
+        for v in 0u32..=29 {
+            let dt = GgufDtype::from_u32(v);
+            assert_eq!(dt.to_u32(), v, "roundtrip failed for {v}");
+        }
+        for v in 30u32..=100 {
+            let dt = GgufDtype::from_u32(v);
+            if let GgufDtype::Unknown(val) = dt {
+                assert_eq!(val, v);
+            } else {
+                panic!("expected Unknown({v}) for input {v}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_is_quantized_all() {
+        let quantized = [
+            GgufDtype::Q4_0, GgufDtype::Q4_1, GgufDtype::Q5_0, GgufDtype::Q5_1,
+            GgufDtype::Q8_0, GgufDtype::Q8_1, GgufDtype::Q2_K, GgufDtype::Q3_K,
+            GgufDtype::Q4_K, GgufDtype::Q5_K, GgufDtype::Q6_K, GgufDtype::Q8_K,
+            GgufDtype::Q1_K, GgufDtype::Q4_K_M, GgufDtype::Q5_K_M, GgufDtype::Q6_K_S,
+            GgufDtype::Q8_K_M, GgufDtype::Q2_K_S, GgufDtype::Q3_K_S, GgufDtype::Q4_K_S,
+            GgufDtype::Q5_K_S, GgufDtype::Q2_K_M,
+        ];
+        for dt in &quantized {
+            assert!(dt.is_quantized(), "{dt:?} should be quantized");
+        }
+
+        let unquantized = [
+            GgufDtype::F32, GgufDtype::F16, GgufDtype::I8, GgufDtype::I16,
+            GgufDtype::I32, GgufDtype::I64, GgufDtype::F64, GgufDtype::BF16,
+        ];
+        for dt in &unquantized {
+            assert!(!dt.is_quantized(), "{dt:?} should not be quantized");
+        }
+    }
+
+    #[test]
+    fn test_stored_size_quantized_variants() {
+        let q8 = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 6,
+        };
+        assert_eq!(q8.stored_size(), 258);
+
+        let q8_2 = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![512], offset: 0, dtype: 6,
+        };
+        assert_eq!(q8_2.stored_size(), 516);
+
+        let q8_3 = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![257], offset: 0, dtype: 6,
+        };
+        assert_eq!(q8_3.stored_size(), 261);
+
+        let q4 = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![32], offset: 0, dtype: 2,
+        };
+        assert_eq!(q4.stored_size(), 20);
+
+        let q4_2 = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![64], offset: 0, dtype: 2,
+        };
+        assert_eq!(q4_2.stored_size(), 40);
+
+        let q2 = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![1], offset: 0, dtype: 8,
+        };
+        assert!(q2.stored_size() > 0);
+
+        let q6 = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 12,
+        };
+        assert!(q6.stored_size() > 0);
+
+        let q8k = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 13,
+        };
+        assert!(q8k.stored_size() > 0);
+    }
+
+    #[test]
+    fn test_stored_size_integer_types() {
+        let i8_t = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 14,
+        };
+        assert_eq!(i8_t.stored_size(), 100);
+
+        let i16_t = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 15,
+        };
+        assert_eq!(i16_t.stored_size(), 200);
+
+        let i32_t = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 16,
+        };
+        assert_eq!(i32_t.stored_size(), 400);
+
+        let i64_t = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 17,
+        };
+        assert_eq!(i64_t.stored_size(), 800);
+
+        let f64_t = GgufTensorInfo {
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 18,
+        };
+        assert_eq!(f64_t.stored_size(), 800);
+    }
+
+    #[test]
+    fn test_tensor_info_serialization() {
+        let tensor = GgufTensorInfo {
+            name: "test.weight".to_string(),
+            shape: vec![128, 256],
+            offset: 4096,
+            dtype: 1,
+        };
+        let json = serde_json::to_string(&tensor).unwrap();
+        let deserialized: GgufTensorInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.name, "test.weight");
+        assert_eq!(deserialized.shape, vec![128u64, 256u64]);
+        assert_eq!(deserialized.offset, 4096);
+        assert_eq!(deserialized.dtype, 1);
+    }
+
+    #[test]
+    fn test_header_serialization() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "general.architecture".to_string(),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("llama".to_string()),
+                },
+            ],
+            tensors: vec![
+                GgufTensorInfo {
+                    name: "token_embd.weight".to_string(),
+                    shape: vec![4096],
+                    offset: 0,
+                    dtype: 1,
+                },
+            ],
+            data_alignment: Some(32),
+            data_section_start: 1024,
+        };
+        let json = serde_json::to_string(&header).unwrap();
+        let deserialized: GgufHeader = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.version, 3);
+        assert_eq!(deserialized.kv_pairs.len(), 1);
+        assert_eq!(deserialized.tensors.len(), 1);
+        assert_eq!(deserialized.data_alignment, Some(32));
+        assert_eq!(deserialized.data_section_start, 1024);
+    }
+
+    #[test]
+    fn test_to_config_map_identity() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "a".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(1),
+                },
+                GgufKvPair {
+                    key: "b".to_string(),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("two".to_string()),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        let map = header.to_config_map();
+        assert_eq!(map.len(), 2);
+        assert_eq!(map["a"], GgufKvValue::Uint32(1));
+        assert_eq!(map["b"], GgufKvValue::String("two".to_string()));
+    }
+
+    #[test]
+    fn test_get_kv_with_type_conversion() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "general.architecture".to_string(),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("llama".to_string()),
+                },
+                GgufKvPair {
+                    key: "general.file_type".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(6),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+
+        let arch = header.get_kv_str("general.architecture");
+        assert_eq!(arch, Some("llama"));
+
+        let ft = header.get_kv_u32("general.file_type");
+        assert_eq!(ft, Some(6));
+
+        let missing = header.get_kv_str("nonexistent");
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn test_file_type_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "ft".to_string(),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("Q4_0".to_string()),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.file_type(), Some("Q4_0".to_string()));
+    }
+
+    #[test]
+    fn test_context_length_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "n_ctx".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(8192),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.context_length(), Some(8192));
+    }
+
+    #[test]
+    fn test_embedding_length_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "n_embd".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(4096),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.embedding_length(), Some(4096));
+    }
+
+    #[test]
+    fn test_block_count_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "n_layer".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(32),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.block_count(), Some(32));
+    }
+
+    #[test]
+    fn test_attention_head_count_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "n_head".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(32),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.attention_head_count(), Some(32));
+    }
+
+    #[test]
+    fn test_rope_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "rope_type".to_string(),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("yarn".to_string()),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.rope_scaling_type(), Some("yarn"));
+    }
+
+    #[test]
+    fn test_normalization_epsilon_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "rms_norm_eps".to_string(),
+                    value_type: GgufValueType::Float32,
+                    value: GgufKvValue::Float32(1e-6),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.normalization_epsilon(), Some(1e-6));
+    }
+
+    #[test]
+    fn test_vocab_size_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "n_vocab".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(32000),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.vocab_size(), Some(32000));
+    }
+
+    #[test]
+    fn test_quantization_description_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "quantization".to_string(),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("Q4_0".to_string()),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.quantization_description(), Some("Q4_0"));
+    }
+
+    #[test]
+    fn test_architecture_fallback_arch_key() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "arch".to_string(),
+                    value_type: GgufValueType::String,
+                    value: GgufKvValue::String("mistral".to_string()),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.architecture(), Some("mistral"));
+    }
+
+    #[test]
+    fn test_file_type_from_u32_key() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "general.file_type".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(7),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.file_type(), Some("7".to_string()));
+    }
+
+    #[test]
+    fn test_file_type_from_ft_u32_key() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "ft".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(8),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.file_type(), Some("8".to_string()));
+    }
+
+    #[test]
+    fn test_feed_forward_length_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "n_ff".to_string(),
+                    value_type: GgufValueType::Uint32,
+                    value: GgufKvValue::Uint32(11008),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.feed_forward_length(), Some(11008));
+    }
+
+    #[test]
+    fn test_rope_dimension_count_fallback_keys() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![
+                GgufKvPair {
+                    key: "rope_dim".to_string(),
+                    value_type: GgufValueType::Int32,
+                    value: GgufKvValue::Int32(128),
+                },
+            ],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.rope_dimension_count(), Some(128));
+    }
+
+    #[test]
+    fn test_value_type_is_array() {
+        assert!(GgufValueType::Array.is_array());
+        assert!(!GgufValueType::Uint32.is_array());
+        assert!(!GgufValueType::String.is_array());
+    }
+
+    #[test]
+    fn test_value_type_to_u32_roundtrip() {
+        let types = vec![
+            GgufValueType::Uint8, GgufValueType::Int8, GgufValueType::Uint16,
+            GgufValueType::Int16, GgufValueType::Uint32, GgufValueType::Int32,
+            GgufValueType::Uint64, GgufValueType::Int64, GgufValueType::String,
+            GgufValueType::Float32, GgufValueType::Float64, GgufValueType::Bool,
+            GgufValueType::Array, GgufValueType::Bfloat16,
+        ];
+        for t in types {
+            let raw = t.to_u32();
+            assert_eq!(GgufValueType::from_u32(raw), Some(t), "failed for {:?}", t);
+        }
+    }
+
+    #[test]
+    fn test_value_type_from_u32_unmapped_reserved() {
+        assert!(GgufValueType::from_u32(13).is_none());
+        assert!(GgufValueType::from_u32(14).is_none());
+        assert!(GgufValueType::from_u32(16).is_none());
+    }
+
+    #[test]
+    fn test_gguf_version_from_u32_unmapped() {
+        assert!(GgufVersion::from_u32(0).is_none());
+        assert!(GgufVersion::from_u32(4).is_none());
+        assert!(GgufVersion::from_u32(99).is_none());
+    }
+
+    #[test]
+    fn test_tensor_info_raw_byte_size() {
+        let info = GgufTensorInfo {
+            name: "test.weight".to_string(),
+            shape: vec![100, 200],
+            offset: 0,
+            dtype: 0,
+        };
+        assert_eq!(info.raw_byte_size(), 8 + 11 + 4 + 16 + 4 + 8);
+    }
+
+    #[test]
+    fn test_total_tensor_bytes_f32_empty() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![],
+            tensors: vec![],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.total_tensor_bytes_f32(), 0);
+    }
+
+    #[test]
+    fn test_total_tensor_bytes_f32_single() {
+        let header = GgufHeader {
+            version: 3,
+            kv_pairs: vec![],
+            tensors: vec![
+                GgufTensorInfo {
+                    name: "t".to_string(),
+                    shape: vec![100, 200],
+                    offset: 0,
+                    dtype: 0,
+                },
+            ],
+            data_alignment: None,
+            data_section_start: 0,
+        };
+        assert_eq!(header.total_tensor_bytes_f32(), 100 * 200);
     }
 }

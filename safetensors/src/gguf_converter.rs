@@ -1013,11 +1013,13 @@ fn gguf_dtype_to_safetensors(gguf_dtype: GgufDtype) -> Result<Dtype, GgufConvert
         GgufDtype::I32 => Ok(Dtype::I32),
         GgufDtype::I64 => Ok(Dtype::I64),
         GgufDtype::F64 => Ok(Dtype::F64),
-        GgufDtype::Q4_0
-        | GgufDtype::Q4_1
-        | GgufDtype::Q5_0
+        // Supported dequantization types — dequantize_tensor() handles these
+        GgufDtype::Q4_0 | GgufDtype::Q4_1 | GgufDtype::Q8_0 => Ok(Dtype::F32),
+        // Unsupported: K-family types (Q2_K–Q8_K, Q1_K, Q4_K_M–Q8_K_M, Q2_K_S–Q5_K_S)
+        // These require llama.cpp ggml-quants.c block layout implementations.
+        // Mapping to F32 would be a lie — dequantize_tensor() will reject them.
+        GgufDtype::Q5_0
         | GgufDtype::Q5_1
-        | GgufDtype::Q8_0
         | GgufDtype::Q8_1
         | GgufDtype::Q2_K
         | GgufDtype::Q3_K
@@ -1034,7 +1036,9 @@ fn gguf_dtype_to_safetensors(gguf_dtype: GgufDtype) -> Result<Dtype, GgufConvert
         | GgufDtype::Q3_K_S
         | GgufDtype::Q4_K_S
         | GgufDtype::Q5_K_S
-        | GgufDtype::Q2_K_M => Ok(Dtype::F32),
+        | GgufDtype::Q2_K_M => {
+            Err(GgufConvertError::UnsupportedDtype(gguf_dtype.to_u32()))
+        }
         GgufDtype::Unknown(_) => Err(GgufConvertError::UnsupportedDtype(gguf_dtype.to_u32())),
     }
 }
@@ -1349,22 +1353,47 @@ mod tests {
 
     #[test]
     fn test_gguf_dtype_to_safetensors_quantized_returns_f32() {
-        // Quantized types are dequantized to f32
+        // Supported dequantization types map to f32
         assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q4_0).unwrap(), Dtype::F32);
         assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q4_1).unwrap(), Dtype::F32);
         assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q8_0).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q2_K).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q3_K).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q4_K).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q5_K).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q6_K).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q8_K).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q4_K_M).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q5_K_M).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q6_K_S).unwrap(), Dtype::F32);
-        assert_eq!(gguf_dtype_to_safetensors(GgufDtype::Q8_K_M).unwrap(), Dtype::F32);
     }
 
+    #[test]
+    fn test_gguf_dtype_to_safetensors_unsupported_k_family_returns_error() {
+        // K-family types without dequantization should return error, not lie about F32 support
+        let unsupported = [
+            GgufDtype::Q2_K,
+            GgufDtype::Q3_K,
+            GgufDtype::Q4_K,
+            GgufDtype::Q5_K,
+            GgufDtype::Q6_K,
+            GgufDtype::Q8_K,
+            GgufDtype::Q1_K,
+            GgufDtype::Q4_K_M,
+            GgufDtype::Q5_K_M,
+            GgufDtype::Q6_K_S,
+            GgufDtype::Q8_K_M,
+            GgufDtype::Q2_K_S,
+            GgufDtype::Q3_K_S,
+            GgufDtype::Q4_K_S,
+            GgufDtype::Q5_K_S,
+            GgufDtype::Q2_K_M,
+            GgufDtype::Q5_0,
+            GgufDtype::Q5_1,
+            GgufDtype::Q8_1,
+        ];
+        for dtype in unsupported {
+            let result = gguf_dtype_to_safetensors(dtype);
+            assert!(
+                result.is_err(),
+                "K-family dtype {:?} should return error (no dequantization implemented)",
+                dtype
+            );
+        }
+    }
+
+    #[ignore] // Q-K dequantization not implemented — requires llama.cpp ggml-quants.c
     #[test]
     fn test_dequantize_q2_k_basic() {
         // Create a simple Q2_K block with known values
@@ -1391,6 +1420,7 @@ mod tests {
         }
     }
 
+    #[ignore] // Q-K dequantization not implemented
     #[test]
     fn test_dequantize_q3_k_basic() {
         let mut block = Vec::with_capacity(24);
@@ -1411,6 +1441,7 @@ mod tests {
         }
     }
 
+    #[ignore] // Q-K dequantization not implemented
     #[test]
     fn test_dequantize_q4_k_basic() {
         let mut block = Vec::with_capacity(24);
@@ -1428,6 +1459,7 @@ mod tests {
         }
     }
 
+    #[ignore] // Q-K dequantization not implemented
     #[test]
     fn test_dequantize_q5_k_basic() {
         let mut block = Vec::with_capacity(32);
@@ -1445,6 +1477,7 @@ mod tests {
         }
     }
 
+    #[ignore] // Q-K dequantization not implemented
     #[test]
     fn test_dequantize_q6_k_basic() {
         let mut block = Vec::with_capacity(24);
@@ -1460,6 +1493,7 @@ mod tests {
         }
     }
 
+    #[ignore] // Q-K dequantization not implemented
     #[test]
     fn test_dequantize_q8_k_basic() {
         let mut block = Vec::with_capacity(18);

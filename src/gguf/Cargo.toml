@@ -1,26 +1,26 @@
 [package]
 name = "crabjar-gguf"
-publish = false
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
+publish = true
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
 description = "GGUF model weight file parser: header, tensor metadata, KV config, quantization type detection"
+repository = "https://github.com/crombojambo/gguf"
+readme = "README.md"
+keywords = ["gguf", "llm", "model", "parser"]
+categories = ["encoding", "science"]
 
 [dependencies]
 # Serialization
-serde.workspace = true
-serde_json.workspace = true
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Error handling
-thiserror.workspace = true
+thiserror = "2.0"
 
 # Binary I/O
-byteorder = { workspace = true, features = ["std"] }
-half = { workspace = true, features = ["serde"] }
-
-# CrabJar shared
-crabjar-config = { path = "../crabjar-config" }
+byteorder = { version = "1.4.3", default-features = false, features = ["std"] }
+half = { version = "2.7.1", features = ["serde"] }
 
 [dev-dependencies]
-tempfile.workspace = true
+tempfile = "3.24.0"

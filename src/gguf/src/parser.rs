@@ -150,6 +150,9 @@ fn read_bytes<R: Read>(reader: &mut R, len: usize) -> Result<Vec<u8>, GgufError>
 
 fn read_string<R: Read>(reader: &mut R) -> Result<String, GgufError> {
     let len = reader.read_u64::<LittleEndian>()?;
+    if len > 1024 * 1024 {
+        return Err(GgufError::Io(format!("string length {len} exceeds max 1MB")));
+    }
     let bytes = read_bytes(reader, len as usize)?;
     String::from_utf8(bytes).map_err(GgufError::Utf8)
 }
@@ -158,6 +161,8 @@ fn read_kv_pair<R: Read>(reader: &mut R) -> Result<GgufKvPair, GgufError> {
     let key = read_string(reader)?;
     let value_type = read_value_type(reader)?;
     let value = read_kv_value(reader, value_type)?;
+    #[cfg(debug_assertions)]
+    eprintln!("KV key='{}' type={}", key, value_type.to_u32());
     Ok(GgufKvPair {
         key,
         value_type,
@@ -298,7 +303,8 @@ pub fn tensor_bytes_for_dtype(element_count: u64, dtype: GgufDtype) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::GgufKvPair;
+    use crate::types::{GgufKvPair, GgufKvValue, GgufValueType};
+    use crate::GgufVersion;
 
     fn make_v3_header() -> GgufHeader {
         let kv_pairs = vec![
@@ -627,5 +633,284 @@ mod tests {
         assert_eq!(tensor_bytes_for_dtype(4096, GgufDtype::F32), 4096 * 4);
         assert_eq!(tensor_bytes_for_dtype(4096, GgufDtype::F16), 4096 * 2);
         assert_eq!(tensor_bytes_for_dtype(100, GgufDtype::I8), 100);
+    }
+
+    fn make_minimal_gguf_v1_bytes() -> Vec<u8> {
+        let mut buf = Vec::new();
+
+        // Magic
+        buf.extend_from_slice(b"GGUF");
+
+        // Version
+        buf.extend_from_slice(&1u32.to_le_bytes());
+
+        // Tensor count
+        buf.extend_from_slice(&1u64.to_le_bytes());
+
+        // KV count
+        buf.extend_from_slice(&1u64.to_le_bytes());
+
+        // KV pair: general.architecture = "llama" (string)
+        let key = "general.architecture";
+        buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        buf.extend_from_slice(key.as_bytes());
+        buf.extend_from_slice(&(8u32).to_le_bytes()); // STRING type
+        buf.extend_from_slice(&(5u64).to_le_bytes()); // "llama" length
+        buf.extend_from_slice(b"llama");
+
+        // Tensor: token_embd.weight (shape [4096], dtype F16, offset 0)
+        let name = "token_embd.weight";
+        buf.extend_from_slice(&(name.len() as u64).to_le_bytes());
+        buf.extend_from_slice(name.as_bytes());
+        buf.extend_from_slice(&1u32.to_le_bytes()); // 1 dim
+        buf.extend_from_slice(&4096u64.to_le_bytes()); // shape[0]
+        buf.extend_from_slice(&1u32.to_le_bytes()); // dtype F16
+        buf.extend_from_slice(&0u64.to_le_bytes()); // offset
+
+        buf
+    }
+
+    fn make_minimal_gguf_v2_bytes() -> Vec<u8> {
+        let mut buf = Vec::new();
+
+        // Magic
+        buf.extend_from_slice(b"GGUF");
+
+        // Version
+        buf.extend_from_slice(&2u32.to_le_bytes());
+
+        // Tensor count
+        buf.extend_from_slice(&1u64.to_le_bytes());
+
+        // KV count
+        buf.extend_from_slice(&1u64.to_le_bytes());
+
+        // KV pair: general.architecture = "qwen2" (string)
+        let key = "general.architecture";
+        buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        buf.extend_from_slice(key.as_bytes());
+        buf.extend_from_slice(&(8u32).to_le_bytes()); // STRING type
+        buf.extend_from_slice(&(5u64).to_le_bytes()); // "qwen2" length
+        buf.extend_from_slice(b"qwen2");
+
+        // Tensor: token_embd.weight (shape [4096], dtype F16, offset 0)
+        let name = "token_embd.weight";
+        buf.extend_from_slice(&(name.len() as u64).to_le_bytes());
+        buf.extend_from_slice(name.as_bytes());
+        buf.extend_from_slice(&1u32.to_le_bytes()); // 1 dim
+        buf.extend_from_slice(&4096u64.to_le_bytes()); // shape[0]
+        buf.extend_from_slice(&1u32.to_le_bytes()); // dtype F16
+        buf.extend_from_slice(&0u64.to_le_bytes()); // offset
+
+        buf
+    }
+
+    #[test]
+    fn test_parse_minimal_gguf_v1() {
+        let bytes = make_minimal_gguf_v1_bytes();
+        let header = parse_gguf_reader(std::io::Cursor::new(&bytes)).unwrap();
+
+        assert_eq!(header.version, 1);
+        assert_eq!(header.data_alignment, None);
+        assert_eq!(header.kv_pairs.len(), 1);
+        assert_eq!(header.tensors.len(), 1);
+        assert_eq!(header.architecture(), Some("llama"));
+        assert_eq!(header.data_section_start, 118);
+    }
+
+    #[test]
+    fn test_parse_minimal_gguf_v2() {
+        let bytes = make_minimal_gguf_v2_bytes();
+        let header = parse_gguf_reader(std::io::Cursor::new(&bytes)).unwrap();
+
+        assert_eq!(header.version, 2);
+        assert_eq!(header.data_alignment, None);
+        assert_eq!(header.kv_pairs.len(), 1);
+        assert_eq!(header.tensors.len(), 1);
+        assert_eq!(header.architecture(), Some("qwen2"));
+    }
+
+    #[test]
+    fn test_parse_gguf_v1_v2_v3_data_section_alignment() {
+        // v1: no alignment field, data_section_start = header_base + kv_size + tensor_size
+        let v1 = make_minimal_gguf_v1_bytes();
+        let h1 = parse_gguf_reader(std::io::Cursor::new(&v1)).unwrap();
+
+        // v2: same as v1, no alignment
+        let v2 = make_minimal_gguf_v2_bytes();
+        let h2 = parse_gguf_reader(std::io::Cursor::new(&v2)).unwrap();
+
+        // v3: has alignment field, data_section_start is aligned
+        let v3 = make_minimal_gguf_v3_bytes();
+        let h3 = parse_gguf_reader(std::io::Cursor::new(&v3)).unwrap();
+
+        // v1 and v2 should have the same data_section_start (no alignment)
+        assert_eq!(h1.data_section_start, h2.data_section_start);
+
+        // v3 should have data_section_start >= v1's value due to alignment padding
+        assert!(h3.data_section_start >= h1.data_section_start);
+        assert_eq!(h3.data_alignment, Some(32));
+    }
+
+    #[test]
+    fn test_kv_pair_raw_byte_size() {
+        use crate::types::GgufKvPair;
+
+        let kv = GgufKvPair {
+            key: "test".to_string(),
+            value_type: GgufValueType::Uint32,
+            value: GgufKvValue::Uint32(42),
+        };
+        // 8 (key_len) + 4 (key) + 4 (type) + 4 (value) = 20
+        assert_eq!(kv.raw_byte_size(), 8 + 4 + 4 + 4);
+
+        let str_kv = GgufKvPair {
+            key: "arch".to_string(),
+            value_type: GgufValueType::String,
+            value: GgufKvValue::String("llama".to_string()),
+        };
+        // 8 (key_len) + 4 (key) + 4 (type) + 8 (str_len) + 5 (str) = 29
+        assert_eq!(str_kv.raw_byte_size(), 8 + 4 + 4 + 8 + 5);
+    }
+
+    #[test]
+    fn test_tensor_stored_size_f32() {
+        let info = GgufTensorInfo {
+            name: "test".to_string(),
+            shape: vec![100, 200],
+            offset: 0,
+            dtype: 0, // F32
+        };
+        // 100 * 200 * 4 bytes
+        assert_eq!(info.stored_size(), 100 * 200 * 4);
+    }
+
+    #[test]
+    fn test_tensor_stored_size_f16() {
+        let info = GgufTensorInfo {
+            name: "test".to_string(),
+            shape: vec![100, 200],
+            offset: 0,
+            dtype: 1, // F16
+        };
+        // 100 * 200 * 2 bytes
+        assert_eq!(info.stored_size(), 100 * 200 * 2);
+    }
+
+    #[test]
+    fn test_tensor_stored_size_q4_0() {
+        let info = GgufTensorInfo {
+            name: "test".to_string(),
+            shape: vec![256],
+            offset: 0,
+            dtype: 2, // Q4_0
+        };
+        // Q4_0: 8 full blocks of 32 = 8 * 20 = 160
+        assert_eq!(info.stored_size(), 160);
+    }
+
+    #[test]
+    fn test_tensor_stored_size_q4_0_partial() {
+        let info = GgufTensorInfo {
+            name: "test".to_string(),
+            shape: vec![32],
+            offset: 0,
+            dtype: 2, // Q4_0
+        };
+        // Q4_0: 32 elements = one partial block
+        // full_blocks=0, remaining=32 => 4 + 32/2 = 20
+        assert_eq!(info.stored_size(), 20);
+    }
+
+    #[test]
+    fn test_gguf_header_get_tensor() {
+        let header = make_v3_header();
+        let tensor = header.get_tensor("token_embd.weight").unwrap();
+        assert_eq!(tensor.name, "token_embd.weight");
+        assert_eq!(tensor.shape, vec![4096u64]);
+        assert_eq!(tensor.element_count(), 4096);
+        assert!(header.has_tensor("blk.0.attn_k.weight"));
+        assert!(!header.has_tensor("nonexistent"));
+    }
+
+    #[test]
+    fn test_gguf_header_helpers_comprehensive() {
+        let header = make_v3_header();
+
+        // Architecture
+        assert_eq!(header.architecture(), Some("llama"));
+
+        // Context length
+        assert_eq!(header.context_length(), Some(4096));
+
+        // Embedding length
+        assert_eq!(header.embedding_length(), Some(4096));
+
+        // Block count
+        assert_eq!(header.block_count(), Some(32));
+
+        // Attention heads
+        assert_eq!(header.attention_head_count(), Some(32));
+        assert_eq!(header.attention_head_count_kv(), Some(8));
+
+        // Rope
+        assert_eq!(header.rope_dimension_count(), Some(128));
+
+        // File type
+        assert_eq!(header.file_type(), Some("6".to_string()));
+    }
+
+    #[test]
+    fn test_value_type_name() {
+        assert_eq!(GgufKvValue::Uint8(1).type_name(), "u8");
+        assert_eq!(GgufKvValue::String("test".to_string()).type_name(), "str");
+        assert_eq!(GgufKvValue::Bool(true).type_name(), "bool");
+        assert_eq!(GgufKvValue::Float32(1.0).type_name(), "f32");
+        assert_eq!(GgufKvValue::Array(vec![]).type_name(), "array");
+        assert_eq!(GgufKvValue::Bfloat16(1.0).type_name(), "bf16");
+    }
+
+    #[test]
+    fn test_gguf_version_from_u32_and_to_u32() {
+        assert_eq!(GgufVersion::from_u32(1), Some(GgufVersion::V1));
+        assert_eq!(GgufVersion::from_u32(2), Some(GgufVersion::V2));
+        assert_eq!(GgufVersion::from_u32(3), Some(GgufVersion::V3));
+        assert_eq!(GgufVersion::from_u32(4), None);
+
+        assert_eq!(GgufVersion::V1.to_u32(), 1);
+        assert_eq!(GgufVersion::V2.to_u32(), 2);
+        assert_eq!(GgufVersion::V3.to_u32(), 3);
+    }
+
+    #[test]
+    fn test_extract_tensor_bytes_with_header() {
+        let header = make_v3_header();
+        let tensor = header.get_tensor("token_embd.weight").unwrap();
+        // This would fail without a real file, so we just verify the offset calculation
+        let file_offset = header.data_section_start + tensor.offset;
+        assert!(file_offset > 0 || header.data_section_start > 0);
+    }
+
+    #[test]
+    fn test_compute_data_section_start_v3_aligned() {
+        let kv_pairs: Vec<GgufKvPair> = vec![];
+        let tensors: Vec<GgufTensorInfo> = vec![];
+        let start = compute_data_section_start(3, &kv_pairs, &tensors, Some(32));
+        assert_eq!(start % 32, 0);
+    }
+
+    #[test]
+    fn test_compute_data_section_start_v3_not_aligned() {
+        // Create a header where the base size is not aligned to 32
+        let kv_pairs = vec![
+            GgufKvPair {
+                key: "x".to_string(),
+                value_type: GgufValueType::Uint32,
+                value: GgufKvValue::Uint32(1),
+            },
+        ];
+        let tensors: Vec<GgufTensorInfo> = vec![];
+        let start = compute_data_section_start(3, &kv_pairs, &tensors, Some(32));
+        assert_eq!(start % 32, 0);
     }
 }
