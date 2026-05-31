@@ -48,7 +48,6 @@ agent-context = { path = "../memory" }
 # Local LLM inference
 futures.workspace = true
 mistralrs.workspace = true
-async-stream = "0.3"
 
 # Testing
 tempfile = "3.10"

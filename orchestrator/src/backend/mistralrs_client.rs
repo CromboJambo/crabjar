@@ -236,8 +236,13 @@ impl MistralRsClient {
 
     /// Sends a streaming chat request.
     ///
-    /// Returns an async stream of `UnifiedChatResponse` chunks. Each chunk contains
-    /// a single token's delta content. The final chunk contains the full usage stats.
+    /// Returns a `ReceiverStream` that yields `UnifiedChatResponse` chunks.
+    /// Each chunk contains a single token's delta content. The final chunk
+    /// contains the full usage stats.
+    ///
+    /// Uses an mpsc channel internally: the model is locked via tokio::sync::Mutex
+    /// and the mistral.rs stream is iterated on a spawned task. Chunks are forwarded
+    /// through the channel to the receiver returned to the caller.
     pub async fn chat_stream(
         &mut self,
         user_input: String,
@@ -250,7 +255,9 @@ impl MistralRsClient {
             self.load_model().await?;
         }
 
-        let model = self.model.as_ref().unwrap().clone();
+        let model = self.model.clone().ok_or_else(|| {
+            InferenceError::BackendError("model not loaded".to_string())
+        })?;
 
         // Build messages from history + user input.
         let mut messages = mistralrs::TextMessages::new();
@@ -259,43 +266,34 @@ impl MistralRsClient {
         }
         messages = messages.add_message(mistralrs::TextMessageRole::User, &user_input);
 
-        // Wrap in a stream that yields chunks.
-        let stream = async_stream::stream! {
-            let model_clone = model.clone();
-            let messages_clone = messages.clone();
+        // mpsc channel: 32 buffers is enough — chunks arrive fast but rarely queue.
+        let (tx, rx) = tokio::sync::mpsc::channel(32);
 
-            let result = tokio::task::spawn_blocking(move || {
-                let model_guard = futures::executor::block_on(async { model_clone.lock().await });
-                futures::executor::block_on(model_guard.send_chat_request_stream(messages_clone))
-            })
-            .await;
-
-            let mut stream = match result {
-                Ok(Ok(s)) => s,
-                Ok(Err(e)) => {
-                    yield Err(InferenceError::BackendError(format!("inference failed: {e}")));
-                    return;
-                }
+        // Spawn task: lock model, start stream, forward chunks through channel.
+        tokio::spawn(async move {
+            let guard = model.lock().await;
+            let mut stream = match guard.stream_chat_request(messages).await {
+                Ok(s) => s,
                 Err(e) => {
-                    yield Err(InferenceError::BackendError(format!("spawn_blocking failed: {e}")));
+                    let _ = tx
+                        .send(Err(InferenceError::BackendError(format!(
+                            "stream_chat_request failed: {e}"
+                        ))))
+                        .await;
                     return;
                 }
             };
 
-            let mut first_chunk = true;
-            let mut total_prompt_tokens = 0i64;
-            let mut total_completion_tokens = 0i64;
-
-            while let Some(chunk) = stream.next().await {
-                match chunk {
-                    Ok(response) => {
-                        // Accumulate token counts.
-                        total_prompt_tokens = response.usage.prompt_tokens as i64;
-                        total_completion_tokens = response.usage.completion_tokens as i64;
-
-                        // Extract text content.
+            while let Some(chunk_result) = stream.next().await {
+                match chunk_result {
+                    mistralrs::Response::Chunk(mistralrs::ChatCompletionChunkResponse {
+                        choices,
+                        usage,
+                        model: model_id,
+                        ..
+                    }) => {
                         let mut text_parts = Vec::new();
-                        if let Some(choice) = response.choices.first() {
+                        if let Some(choice) = choices.first() {
                             if let Some(ref delta) = choice.delta.content {
                                 if !delta.is_empty() {
                                     text_parts.push(delta.clone());
@@ -313,48 +311,92 @@ impl MistralRsClient {
                             .map(|content| UnifiedOutputItem::Message { content })
                             .collect();
 
-                        let stats = if first_chunk {
-                            // First chunk: include time-to-first-token.
-                            first_chunk = false;
-                            Some(UnifiedStats {
-                                input_tokens: total_prompt_tokens,
-                                total_output_tokens: total_completion_tokens,
-                                reasoning_output_tokens: None,
-                                tokens_per_second: None,
-                                time_to_first_token_seconds: Some(0.0),
-                                model_load_time_seconds: None,
-                            })
-                        } else {
-                            // Subsequent chunks: include tokens per second.
-                            Some(UnifiedStats {
-                                input_tokens: total_prompt_tokens,
-                                total_output_tokens: total_completion_tokens,
-                                reasoning_output_tokens: None,
-                                tokens_per_second: Some(response.usage.avg_compl_tok_per_sec as f64),
-                                time_to_first_token_seconds: None,
-                                model_load_time_seconds: None,
-                            })
-                        };
-
-                        yield Ok(UnifiedChatResponse {
-                            model_instance_id: response.model.clone(),
-                            output: unified_output,
-                            stats,
-                            response_id: None,
+                        let stats = usage.as_ref().map(|u| UnifiedStats {
+                            input_tokens: u.prompt_tokens as i64,
+                            total_output_tokens: u.completion_tokens as i64,
+                            reasoning_output_tokens: None,
+                            tokens_per_second: Some(u.avg_compl_tok_per_sec as f64),
+                            time_to_first_token_seconds: None,
+                            model_load_time_seconds: None,
                         });
+
+                        let _ = tx
+                            .send(Ok(UnifiedChatResponse {
+                                model_instance_id: model_id,
+                                output: unified_output,
+                                stats,
+                                response_id: None,
+                            }))
+                            .await;
                     }
-                    Err(e) => {
-                        yield Err(InferenceError::BackendError(format!("stream chunk error: {e}")));
+                    mistralrs::Response::Done(mistralrs::ChatCompletionResponse {
+                        choices,
+                        usage,
+                        model: model_id,
+                        ..
+                    }) => {
+                        let mut text_parts = Vec::new();
+                        if let Some(choice) = choices.first() {
+                            if let Some(ref content) = choice.message.content {
+                                if !content.is_empty() {
+                                    text_parts.push(content.clone());
+                                }
+                            }
+                            if let Some(ref reasoning) = choice.message.reasoning_content {
+                                if !reasoning.is_empty() {
+                                    text_parts.push(format!("[reasoning] {}", reasoning));
+                                }
+                            }
+                        }
+
+                        let unified_output: Vec<UnifiedOutputItem> = text_parts
+                            .into_iter()
+                            .map(|content| UnifiedOutputItem::Message { content })
+                            .collect();
+
+                        let _ = tx
+                            .send(Ok(UnifiedChatResponse {
+                                model_instance_id: model_id,
+                                output: unified_output,
+                                stats: Some(UnifiedStats {
+                                    input_tokens: usage.prompt_tokens as i64,
+                                    total_output_tokens: usage.completion_tokens as i64,
+                                    reasoning_output_tokens: None,
+                                    tokens_per_second: Some(usage.avg_compl_tok_per_sec as f64),
+                                    time_to_first_token_seconds: None,
+                                    model_load_time_seconds: None,
+                                }),
+                                response_id: None,
+                            }))
+                            .await;
                     }
+                    mistralrs::Response::InternalError(e) => {
+                        let _ = tx
+                            .send(Err(InferenceError::BackendError(format!(
+                                "internal error: {e:?}"
+                            ))))
+                            .await;
+                    }
+                    mistralrs::Response::ModelError(e, _) => {
+                        let _ = tx
+                            .send(Err(InferenceError::BackendError(format!(
+                                "model error: {e}"
+                            ))))
+                            .await;
+                    }
+                    mistralrs::Response::ValidationError(e) => {
+                        let _ = tx
+                            .send(Err(InferenceError::BackendError(format!(
+                                "validation error: {e:?}"
+                            ))))
+                            .await;
+                    }
+                    _ => {} // Ignore AgenticToolCallProgress, File, etc.
                 }
             }
+        });
 
-            // Add assistant message to history (final accumulated content).
-            // Note: for streaming, we accumulate content separately.
-            // This is a simplification — in production you'd accumulate text_parts across chunks.
-        };
-
-        Ok(Box::pin(stream))
+        Ok(Box::pin(tokio_stream::wrappers::ReceiverStream::new(rx)))
     }
 
     /// Runs an agentic tool loop: inference → tool call detection → execution → resume.
