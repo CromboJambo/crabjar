@@ -13,11 +13,11 @@
 /// - `MISTRALRS_MODEL` — HuggingFace model ID or local GGUF path (default: `Qwen/Qwen2.5-Coder-1.5B-Instruct`)
 /// - `MISTRALRS_QUANT` — quantization type: `Q4K`, `Q8_0`, `F16` (default: `Q4K`)
 
-pub use backend::Backend;
 pub use lm_studio_client::UnifiedChatResponse;
 
-mod lm_studio;
 mod mistralrs_client;
+
+use crate::lm_studio_client;
 
 // ---------------------------------------------------------------------------
 // Trait + enum

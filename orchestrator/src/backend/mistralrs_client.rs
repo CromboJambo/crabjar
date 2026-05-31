@@ -5,15 +5,22 @@
 /// and initialization via `spawn_blocking` to avoid blocking the async runtime.
 
 use crate::backend::InferenceError;
-use crate::lm_studio_client::{SessionError, ToolCallInfo, UnifiedChatResponse, UnifiedOutputItem};
+use crate::lm_studio_client::{SessionError, ToolCallInfo, UnifiedChatResponse, UnifiedOutputItem, UnifiedStats};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+/// A chat message stored in history.
+#[derive(Debug, Clone)]
+struct HistoryMessage {
+    role: mistralrs::TextMessageRole,
+    content: String,
+}
 
 /// Configuration for the mistral.rs client.
 #[derive(Debug, Clone)]
 struct Config {
     model_id: String,
-    quantization: Option<mistralrs::IsqType>,
+    quantization: Option<mistralrs::IsqBits>,
 }
 
 impl Config {
@@ -22,12 +29,12 @@ impl Config {
             .unwrap_or_else(|_| "Qwen/Qwen2.5-Coder-1.5B-Instruct".to_string());
 
         let quantization = match std::env::var("MISTRALRS_QUANT").ok().as_deref() {
-            Some("Q4K") | None => Some(mistralrs::IsqType::Q4K),
-            Some("Q8_0") => Some(mistralrs::IsqType::Q8_0),
+            Some("Q4K") | None => Some(mistralrs::IsqBits::Four),
+            Some("Q8_0") => Some(mistralrs::IsqBits::Eight),
             Some("F16") => None, // no quantization
             Some(other) => {
                 tracing::warn!("Unknown MISTRALRS_QUANT='{other}', defaulting to Q4K");
-                Some(mistralrs::IsqType::Q4K)
+                Some(mistralrs::IsqBits::Four)
             }
         };
 
@@ -36,13 +43,13 @@ impl Config {
 }
 
 /// A loaded mistral.rs model, wrapped for interior mutability.
-type LoadedModel = Arc<Mutex<Box<dyn mistralrs::TextModel>>>;
+type LoadedModel = Arc<Mutex<mistralrs::Model>>;
 
 /// Client for local inference via mistral.rs.
 pub struct MistralRsClient {
     config: Config,
     model: Option<LoadedModel>,
-    message_history: Vec<mistralrs::TextMessage>,
+    message_history: Vec<HistoryMessage>,
 }
 
 impl MistralRsClient {
@@ -70,12 +77,15 @@ impl MistralRsClient {
             quantization.map(|q| format!("{q:?}"))
         );
 
-        let builder = mistralrs::MultimodalModelBuilder::new(mistralrs::Which::Plain(model_id.clone()))
-            .with_device_mapping(mistralrs::DeviceMapSetting::Auto)
-            .with_loading_config(mistralrs::LlamaHostingConfig::default());
+        let builder = mistralrs::ModelBuilder::new(model_id.clone())
+            .with_device(
+                mistralrs::best_device(true)
+                    .unwrap_or_else(|_| mistralrs::Device::cuda_if_available(0).unwrap())
+            )
+            .with_logging();
 
         let builder = if let Some(isq) = quantization {
-            builder.with_isq(isq)
+            builder.with_auto_isq(isq)
         } else {
             builder
         };
@@ -104,30 +114,13 @@ impl MistralRsClient {
         // Build messages from history + user input.
         let mut messages = mistralrs::TextMessages::new();
         for msg in &self.message_history {
-            messages.add_message(msg.role, &msg.content);
+            messages = messages.add_message(msg.role.clone(), &msg.content);
         }
-        messages.add_message(mistralrs::TextMessageRole::User, &user_input);
-
-        // Clone history for the blocking call.
-        let history = self.message_history.clone();
+        messages = messages.add_message(mistralrs::TextMessageRole::User, &user_input);
 
         let response = tokio::task::spawn_blocking(move || {
             let model_guard = futures::executor::block_on(async { model.lock().await });
-            let result = futures::executor::block_on(model_guard.send_chat_request(messages));
-            // Save assistant message after inference completes.
-            if let Ok(ref resp) = result {
-                if let Some(ref choice) = resp.choices.first() {
-                    if let Some(ref msg) = choice.message {
-                        if let Some(ref content) = msg.content {
-                            if !content.is_empty() {
-                                // This is a simplification — in practice we'd need
-                                // to parse the response to know the role.
-                            }
-                        }
-                    }
-                }
-            }
-            result
+            futures::executor::block_on(model_guard.send_chat_request(messages))
         })
         .await
         .map_err(|e| InferenceError::BackendError(format!("spawn_blocking failed: {e}")))?
@@ -138,52 +131,63 @@ impl MistralRsClient {
         let mut tool_calls = Vec::new();
 
         if let Some(choice) = response.choices.first() {
-            if let Some(ref msg) = choice.message {
-                // Collect text content.
-                if let Some(ref content) = msg.content {
-                    if !content.is_empty() {
-                        text_parts.push(content.clone());
-                    }
+            if let Some(ref content) = choice.message.content {
+                if !content.is_empty() {
+                    text_parts.push(content.clone());
                 }
-
-                // Collect tool calls.
-                if let Some(ref tools) = msg.tool_calls {
-                    for tool_call in tools {
-                        let args_str = tool_call.function.arguments.to_string();
-                        let args: serde_json::Value =
-                            serde_json::from_str(&args_str).unwrap_or(serde_json::Value::String(args_str));
-
-                        tool_calls.push(ToolCallInfo {
-                            tool: tool_call.function.name.clone(),
-                            arguments: args,
-                            output: None,
-                            provider_info: None,
-                        });
-                    }
+            }
+            if let Some(ref reasoning) = choice.message.reasoning_content {
+                if !reasoning.is_empty() {
+                    text_parts.push(format!("[reasoning] {}", reasoning));
+                }
+            }
+            if let Some(ref tools) = choice.message.tool_calls {
+                for tc in tools {
+                    // CalledFunction.arguments is a String — parse it as JSON.
+                    let args: serde_json::Value =
+                        serde_json::from_str(&tc.function.arguments).unwrap_or(serde_json::Value::String(tc.function.arguments.clone()));
+                    tool_calls.push(ToolCallInfo {
+                        tool: tc.function.name.clone(),
+                        arguments: args,
+                        output: None,
+                        provider_info: None,
+                    });
                 }
             }
         }
 
-        // Build unified response.
+        // Build unified response with usage stats.
         let unified_output: Vec<UnifiedOutputItem> = text_parts
             .into_iter()
             .map(|content| UnifiedOutputItem::Message { content })
             .collect();
 
+        let unified_stats = if response.usage.total_tokens > 0 {
+            Some(UnifiedStats {
+                input_tokens: response.usage.prompt_tokens as i64,
+                total_output_tokens: response.usage.completion_tokens as i64,
+                reasoning_output_tokens: None,
+                tokens_per_second: Some(response.usage.avg_compl_tok_per_sec as f64),
+                time_to_first_token_seconds: None,
+                model_load_time_seconds: None,
+            })
+        } else {
+            None
+        };
+
         let unified_response = UnifiedChatResponse {
-            model_instance_id: "mistralrs".to_string(),
+            model_instance_id: response.model.clone(),
             output: unified_output,
-            stats: None,
+            stats: unified_stats,
             response_id: None,
         };
 
         // Add assistant message to history.
         if let Some(ref choice) = response.choices.first() {
-            if let Some(ref msg) = choice.message {
-                let content = msg.content.clone().unwrap_or_default();
-                self.message_history.push(mistralrs::TextMessage {
+            if let Some(ref content) = choice.message.content {
+                self.message_history.push(HistoryMessage {
                     role: mistralrs::TextMessageRole::Assistant,
-                    content,
+                    content: content.clone(),
                 });
             }
         }
@@ -233,7 +237,7 @@ impl MistralRsClient {
         self.message_history.clear();
 
         if let Some(ref prompt) = system_prompt {
-            self.message_history.push(mistralrs::TextMessage {
+            self.message_history.push(HistoryMessage {
                 role: mistralrs::TextMessageRole::System,
                 content: prompt.clone(),
             });
@@ -245,14 +249,12 @@ impl MistralRsClient {
 
     /// Loads an existing session (resets message history — mistral.rs manages state internally).
     pub fn load_session(&mut self, _session_id: &str) -> Result<(), SessionError> {
-        // mistral.rs manages message history internally; session_id is tracked for persistence.
         tracing::info!("Loaded mistral.rs session (history managed internally)");
         Ok(())
     }
 
     /// Saves the current session state.
     pub fn save_session(&self) -> Result<(), SessionError> {
-        // Session state is in-memory; persistence handled by the session store if needed.
         Ok(())
     }
 }

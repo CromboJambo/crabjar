@@ -17,9 +17,12 @@ use std::net::SocketAddr;
 mod backend;
 mod lm_studio_client;
 
+use backend::InferenceBackend;
+
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
@@ -245,9 +248,9 @@ async fn handle_chat(
 ) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
     let user_input = payload.prompt;
 
-    info!("Chat request received (backend: {})", state.backend.kind());
+    let mut backend = state.backend.lock().await;
+    info!("Chat request received (backend: {})", backend.kind());
 
-    let mut backend = state.backend;
     let response = backend.chat(user_input).await.map_err(|e| {
         error!("Inference backend error: {}", e);
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
@@ -793,7 +796,7 @@ struct AppState {
     store: Arc<std::sync::Mutex<Store>>,
     events_db_path: String,
     guard_root: String,
-    backend: backend::Backend,
+    backend: Arc<Mutex<backend::Backend>>,
 }
 
 /// Handler for recent_events — queries the knowledge store.
@@ -932,7 +935,7 @@ async fn main() -> anyhow::Result<()> {
         store: Arc::new(std::sync::Mutex::new(store)),
         events_db_path,
         guard_root,
-        backend: backend::Backend::new(),
+        backend: Arc::new(Mutex::new(backend::Backend::new())),
     };
 
     // Define the Axum router with SSE and JSON endpoints.

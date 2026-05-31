@@ -333,7 +333,7 @@ impl SessionState {
                     });
                 }
                 UnifiedOutputItem::ToolCall { tool, output, .. } => {
-                    if let Some(ref result) = output {
+                    if let Some(result) = output {
                         self.message_history.push(UnifiedMessage {
                             role: MessageRole::Assistant,
                             content: format!("Tool '{}' executed: {}", tool, result),
@@ -424,7 +424,8 @@ impl SessionStore {
         let session_id = uuid::Uuid::new_v4().to_string();
         let system_prompt_json = serde_json::to_string(&system_prompt).unwrap_or_else(|_| "null".to_string());
 
-        let conn = self.open_conn()?.as_ref().unwrap();
+        let guard = self.open_conn()?;
+        let conn = guard.as_ref().unwrap();
         conn.execute(
             "INSERT INTO sessions (id, system_prompt, message_history, response_id) VALUES (?1, ?2, ?3, ?4)",
             rusqlite::params![
@@ -446,7 +447,8 @@ impl SessionStore {
 
     /// Retrieves session state by ID.
     pub fn get_session(&self, session_id: &str) -> Result<SessionState, SessionError> {
-        let conn = self.open_conn()?.as_ref().unwrap();
+        let guard = self.open_conn()?;
+        let conn = guard.as_ref().unwrap();
         let mut stmt = conn.prepare(
             "SELECT system_prompt, message_history, response_id FROM sessions WHERE id = ?1",
         )
@@ -464,7 +466,7 @@ impl SessionStore {
         })?;
 
         let system_prompt: Option<String> = serde_json::from_str(&row.0).unwrap_or(None);
-        let message_history: Vec<ChatMessage> = serde_json::from_str(&row.1).unwrap_or_default();
+        let message_history: Vec<UnifiedMessage> = serde_json::from_str(&row.1).unwrap_or_default();
         let response_id = if row.2.is_empty() { None } else { Some(row.2) };
 
         let mut state = SessionState::new();
@@ -487,7 +489,8 @@ impl SessionStore {
             .unwrap_or_else(|_| "[]".to_string());
         let response_id = state.response_id.as_deref().unwrap_or("");
 
-        let conn = self.open_conn()?.as_ref().unwrap();
+        let guard = self.open_conn()?;
+        let conn = guard.as_ref().unwrap();
         conn.execute(
             "UPDATE sessions SET message_history = ?1, response_id = ?2, updated_at = unixepoch() WHERE id = ?3",
             rusqlite::params![message_history_json, response_id, session_id],
@@ -500,7 +503,8 @@ impl SessionStore {
 
     /// Deletes a session.
     pub fn delete_session(&self, session_id: &str) -> Result<(), SessionError> {
-        let conn = self.open_conn()?.as_ref().unwrap();
+        let guard = self.open_conn()?;
+        let conn = guard.as_ref().unwrap();
         let rows = conn.execute(
             "DELETE FROM sessions WHERE id = ?1",
             rusqlite::params![session_id],
@@ -555,11 +559,11 @@ mod native {
         }
 
         if let Some(temp) = req.temperature {
-            builder.insert("temperature".to_string(), serde_json::Value::Number(temp.into()));
+            builder.insert("temperature".to_string(), serde_json::to_value(temp).unwrap_or(serde_json::Value::Null));
         }
 
         if let Some(top_p) = req.top_p {
-            builder.insert("top_p".to_string(), serde_json::Value::Number(top_p.into()));
+            builder.insert("top_p".to_string(), serde_json::to_value(top_p).unwrap_or(serde_json::Value::Null));
         }
 
         if let Some(max_tokens) = req.max_output_tokens {
@@ -677,7 +681,7 @@ mod native {
                     .and_then(|v| serde_json::from_value::<ToolProviderInfo>(v.clone()).ok());
                 Some(UnifiedOutputItem::InvalidToolCall {
                     reason,
-                    metadata,
+                    metadata: Some(metadata),
                     tool_name,
                     provider_info,
                 })
@@ -733,7 +737,7 @@ mod openai {
         builder.insert("messages".to_string(), serde_json::Value::Array(messages));
 
         if let Some(temp) = req.temperature {
-            builder.insert("temperature".to_string(), serde_json::Value::Number(temp.into()));
+            builder.insert("temperature".to_string(), serde_json::to_value(temp).unwrap_or(serde_json::Value::Null));
         }
 
         if let Some(max_tokens) = req.max_output_tokens {
@@ -776,7 +780,7 @@ mod openai {
             .unwrap_or("")
             .to_string();
 
-        let tool_calls = message
+        let tool_calls: Vec<UnifiedOutputItem> = message
             .get("tool_calls")
             .and_then(|v| v.as_array())
             .map(|arr| {
@@ -872,7 +876,7 @@ mod anthropic {
         builder.insert("messages".to_string(), serde_json::Value::Array(messages));
 
         if let Some(temp) = req.temperature {
-            builder.insert("temperature".to_string(), serde_json::Value::Number(temp.into()));
+            builder.insert("temperature".to_string(), serde_json::to_value(temp).unwrap_or(serde_json::Value::Null));
         }
 
         if let Some(max_tokens) = req.max_output_tokens {
@@ -898,16 +902,16 @@ mod anthropic {
 
         let mut output_items = Vec::new();
         for block in content_blocks {
-            let block_type = block.get("type")?.as_str()?;
+            let block_type = block.get("type").ok_or(anthropic_error::AnthropicError::ParseError("missing type".to_string()))?.as_str().ok_or(anthropic_error::AnthropicError::ParseError("type not a string".to_string()))?;
 
             match block_type {
                 "text" => {
-                    let content = block.get("text")?.as_str()?.to_string();
+                    let content = block.get("text").ok_or(anthropic_error::AnthropicError::ParseError("missing text".to_string()))?.as_str().ok_or(anthropic_error::AnthropicError::ParseError("text not a string".to_string()))?.to_string();
                     output_items.push(UnifiedOutputItem::Message { content });
                 }
                 "tool_use" => {
-                    let name = block.get("name")?.as_str()?.to_string();
-                    let input = block.get("input")?.clone();
+                    let name = block.get("name").ok_or(anthropic_error::AnthropicError::ParseError("missing name".to_string()))?.as_str().ok_or(anthropic_error::AnthropicError::ParseError("name not a string".to_string()))?.to_string();
+                    let input = block.get("input").ok_or(anthropic_error::AnthropicError::ParseError("missing input".to_string()))?.clone();
                     output_items.push(UnifiedOutputItem::ToolCall {
                         tool: name,
                         arguments: input,
@@ -958,7 +962,7 @@ mod anthropic {
 /// It routes requests to the configured endpoint and converts responses
 /// to the unified format so the orchestrator doesn't need to know which
 /// endpoint it's talking to.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct LmStudioClient {
     /// Configuration.
     config: LmStudioConfig,
@@ -1011,7 +1015,7 @@ impl LmStudioClient {
     /// Creates a new session and returns its ID.
     pub fn create_session(&mut self, system_prompt: Option<String>) -> Result<String, SessionError> {
         let session_id = match &self.session_store {
-            Some(store) => store.create_session(system_prompt)?,
+            Some(store) => store.create_session(system_prompt.clone())?,
             None => uuid::Uuid::new_v4().to_string(),
         };
 
@@ -1045,7 +1049,7 @@ impl LmStudioClient {
 
     /// Saves the current session state.
     pub fn save_session(&self) -> Result<(), SessionError> {
-        if let (Some(ref store), Some(ref sid)) = (&self.session_store, &self.current_session_id) {
+        if let (Some(store), Some(sid)) = (&self.session_store, &self.current_session_id) {
             store.update_session(sid, &self.session)?;
         }
         Ok(())
@@ -1174,7 +1178,7 @@ impl LmStudioClient {
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(LmStudioError::HttpError {
-                status,
+                status: status.as_u16(),
                 body,
                 endpoint: self.config.endpoint.name().to_string(),
             });
@@ -1217,7 +1221,7 @@ impl LmStudioClient {
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(LmStudioError::HttpError {
-                status,
+                status: status.as_u16(),
                 body,
                 endpoint: self.config.endpoint.name().to_string(),
             });
@@ -1260,7 +1264,7 @@ impl LmStudioClient {
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
             return Err(LmStudioError::HttpError {
-                status,
+                status: status.as_u16(),
                 body,
                 endpoint: self.config.endpoint.name().to_string(),
             });
@@ -1295,7 +1299,7 @@ pub enum LmStudioError {
     RequestError(String),
     #[error("response parse error: {0}")]
     ParseError(String),
-    #[error("HTTP error (status {}): {1} (endpoint: {})")]
+    #[error("HTTP error (status {status}): {body} (endpoint: {endpoint})")]
     HttpError {
         status: u16,
         body: String,
