@@ -24,8 +24,20 @@ rg "transaction completed" /var/log/pacman.log | grep recent timestamps
 
 ### 2. Check boot logs
 
-Run `journalctl --boot=0` for current boot and `journalctl --boot=-1` for pre-reboot boot (systemd). On Artix/Dinit, use `dinitctl status` or `/var/log/dinit` equivalents. Filter:
+Run `journalctl --boot=0` for current boot and `journalctl --boot=-1` for pre-reboot boot (systemd). On Artix/Dinit where journalctl may be unavailable, use `dmesg` instead:
+
+```bash
+dmesg | grep -i "failed\|error\|critical"
+dmesg | grep -i dinit | tail -20
+```
+
+On Artix/Dinit, check `/var/log/dinit` for dinit-specific logs. Filter:
 - kernel messages (e820/BIOS/ACPI — skip these, they're verbose noise)
+- dmesg error categorization (all are pre-existing unless update-related):
+  - ACPI BIOS errors (AE_ALREADY_EXISTS) — firmware bug, harmless
+  - VF BAR assignment failures — GPU SR-IOV, harmless unless doing passthrough
+  - PCI bridge window failures — firmware/resource quirks, harmless
+  - regulatory.db load failure — WiFi regulatory domain, may need linux-firmware
 - powerdevil udev events (drm device changes during kernel update)
 - systemd-fstab-generator / dinit-fstab errors (duplicate entries)
 - kwin_wayland DRM device failures (nvidia modules not loaded yet)
@@ -34,7 +46,16 @@ Run `journalctl --boot=0` for current boot and `journalctl --boot=-1` for pre-re
 
 ### 3. Check failed services
 
-Run `diagnose_system(action='failed_services')` to confirm no failed systemd units. On Artix/Dinit, use `dinitctl status` to check service state.
+Run `diagnose_system(action='failed_services')` to confirm no failed systemd units. On Artix/Dinit:
+
+```bash
+# List all services with state (look for failed/stopped entries)
+dinitctl -s list
+# Check dinit boot log
+dmesg | grep -i dinit | tail -20
+```
+
+Note: `dinitctl status` is NOT a valid command. Use `dinitctl list` instead.
 
 ### 4. Check fstab duplicates
 
@@ -89,6 +110,9 @@ Report:
 - systemd-fstab-generator / dinit-fstab fails on duplicate entries — fix fstab before next update
 - D-Bus reload mid-session — hooks triggered, normal behavior
 - tailscaled connection timeouts post-reboot — network state settling, normal
+- dmesg errors post-kernel update: VF BAR, PCI bridge, ACPI BIOS — all pre-existing firmware noise, not update-related
+- regulatory.db load failure: cfg80211 can't find regulatory DB even when linux-firmware is installed, harmless
+- nvidia module verification failure: expected for out-of-tree DKMS module, taints kernel but works fine
 
 ## Command categorization
 
@@ -115,10 +139,13 @@ Fstab and EFI boot order files are persistent — no stale threshold. System hea
 
 ### 2.5. Live probe fallback
 
-If `diagnose_system` or `arch_ops_server` tools are unavailable, use:
+If `diagnose_system`, `arch_ops_server`, or `journalctl` tools are unavailable, use:
 ```
-journalctl --boot=0 --no-pager | grep -i "failed\|error\|critical"
+dmesg | grep -i "failed\|error\|critical"
+dmesg | grep -i dinit | tail -20
 lsblk -f
+dmesg | grep -i "regulatory\|cfg80211" | tail -5
+dinitctl -s list
 arch_ops_server_check_database_freshness
 ```
 
