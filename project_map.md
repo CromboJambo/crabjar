@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: May 30 2026
+> Generated: May 31 2026
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -488,9 +488,9 @@ config check (tool_execution_enabled)
 |---|---|
 | `POST /acp/run` | Run command + stream output via SSE |
 | `POST /acp/prompt` | Acknowledge prompt (JSON response) |
-| `POST /acp/chat` | LLM chat via LM Studio (OpenAI-compatible) |
+| `POST /acp/chat` | LLM chat via unified inference backend |
 
-The `handle_chat` handler currently does a one-shot HTTP call to `LM_STUDIO_URL/v1/chat/completions`. The `lm_studio_client` module provides a unified client (native/OpenAI/Anthropic) with `SessionStore` (SQLite-backed session persistence), but it is not yet wired into the Axum handler.
+The `handle_chat` handler uses the `InferenceBackend` trait — switches between LM Studio and mistral.rs at runtime via `INFERENCE_BACKEND` env var. The `lm_studio_client` module provides a unified client (native/OpenAI/Anthropic/mistral.rs serve) with `SessionStore` (SQLite-backed session persistence). The `LmStudioEndpoint::MistralRsServe` variant routes to `MISTRALRS_SERVE_URL` (default `http://127.0.0.1:8081`) for mistral.rs serve instances.
 
 ---
 
@@ -508,9 +508,9 @@ wire orchestrator → guard → telemetry into a `crabjar exec` CLI command ✅;
 
 move completed experiments to archive/ directory; produce clean pre-optimized workspace.
 
-### Phase 4 — Inference Integration (in progress)
+### Phase 4 — Inference Integration ✅ DONE
 
-wire orchestrator's `LmStudioClient` into the `handle_chat` handler; add mistral.rs as inference substrate; unify LM client to support mistral.rs serve on OpenAI-compatible port; replace hardcoded LM Studio URL with env-configurable endpoint.
+wire orchestrator's `LmStudioClient` into the `handle_chat` handler ✅ (via `InferenceBackend` trait); add mistral.rs as inference substrate ✅ (`MistralRsClient` with lazy model loading); unify LM client to support mistral.rs serve on OpenAI-compatible port ✅ (`LmStudioEndpoint::MistralRsServe` variant + `MISTRALRS_SERVE_URL` env var); replace hardcoded LM Studio URL with env-configurable endpoint ✅ (`INFERENCE_BACKEND`, `LM_STUDIO_URL`, `MISTRALRS_MODEL`, `MISTRALRS_QUANT`, `MISTRALRS_SERVE_URL`).
 
 ---
 
@@ -596,7 +596,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 
 ### Last Audit
 
-2026-05-30 — Phase 3 in progress. Clippy clean across all members (0 warnings). 741 tests passing (0 failed, 1 ignored). CI verified (fmt + clippy + build + test all passing). New crates: `gguf` (GGUF parser crate), `gguf-cli` (GGUF CLI binary). `orchestrator/src/lm_studio_client/` unified client (native/OpenAI/Anthropic) with SQLite SessionStore — not yet wired into Axum handler. `guard/src/schema.sql` added. `memory/src/state_docs/` has indexer.rs, querier.rs (drift_status), renderer.rs. `llm-runner/src/kernel/tests/` added. `state-docs/` has 19 state docs + overlay. `src/models/` removed. `src/llm-runner/src/` has 6 legacy empty subdirs (device/, inference-engine/, model-loader/, plug-in/, runner/, tokenizer/). Version 0.11.0.
+2026-05-31 — Phase 4 complete. Clippy: 39 pre-existing warnings (not from this change). 741 tests passing (0 failed, 1 ignored). CI verified. `orchestrator/src/backend/` unified inference backend (`InferenceBackend` trait + `Backend` enum). `LmStudioEndpoint::MistralRsServe` variant added — routes to `MISTRALRS_SERVE_URL` (default `http://127.0.0.1:8081`) for mistral.rs serve instances. `LmStudioConfig` has `serve_base_url` field. `detect_available_endpoints()` probes mistral.rs serve. `guard/src/schema.sql` added. `memory/src/state_docs/` has indexer.rs, querier.rs (drift_status), renderer.rs. `llm-runner/src/kernel/tests/` added. `state-docs/` has 19 state docs + overlay. `src/models/` removed. `src/llm-runner/src/` has 6 legacy empty subdirs (device/, inference-engine/, model-loader/, plug-in/, runner/, tokenizer/). Version 0.11.0.
 
 ### Known Items
 
@@ -610,8 +610,9 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 - `guard/src/concierge.rs` — present (guard's GateConcierge is sole gate enforcement layer)
 - `guard/src/reversibility.rs` — ReversibilityScore → PerturbationSet
 - `memory/src/state_docs/querier.rs` — drift_status() added
-- `orchestrator/src/lm_studio_client/` — unified LM client with SessionStore (not wired into handler)
-- `orchestrator/src/main.rs` handle_chat does one-shot reqwest call, not using LmStudioClient
+- `orchestrator/src/lm_studio_client/` — unified LM client with SessionStore; `LmStudioEndpoint::MistralRsServe` variant for mistral.rs serve
+- `orchestrator/src/backend/` — unified `InferenceBackend` trait + `Backend` enum (LM Studio / mistral.rs)
+- Phase 4 complete — unified inference backend, mistral.rs serve support, env-configurable endpoints
 - Phase 2 complete — 741 tests passing, clippy clean
 - Phase 1 complete — clippy clean, CI verified
 - `.agents/skills/` — 29 agent skills
@@ -631,6 +632,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 | `prov-phase1-done` | Phase 1 complete: clippy clean, 516 tests passing, CI verified, 6 ignored tests enabled | 2026-05-27 | Phase 1 standardization completion | crabjar |
 | `prov-phase2-done` | Phase 2 complete: 584 tests passing, safetensors real tensor loading, tool_registry MCP discovery, codeburn optimize_engine extraction | 2026-05-27 | Phase 2 feature integration completion | crabjar |
 | `prov-map-drift-2026-05-30` | project_map.md regenerated — 21 members, gguf/gguf-cli added, orchestrator lm_studio_client documented, test count 741, legacy dirs noted | 2026-05-30 | Structural alignment refresh | crabjar/project_map.md |
+| `prov-phase4-done` | Phase 4 complete: unified InferenceBackend trait, MistralRsServe endpoint, MISTRALRS_SERVE_URL env var, detect_available_endpoints probes mistral.rs serve | 2026-05-31 | Inference integration completion | crabjar/project_map.md |
 
 ---
 
