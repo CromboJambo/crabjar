@@ -3,6 +3,7 @@ use crabjar_lib::{Cli, CliCommand, StateCommand, WorkspaceCommand};
 use serde_json::json;
 
 mod bitwarden;
+mod dinit;
 mod dotfile_manager;
 mod knowledge_store;
 mod project_loader;
@@ -196,6 +197,7 @@ async fn handle_workspace_status() -> serde_json::Value {
                     "description": config.description,
                     "declared_tools": config.tools.len(),
                     "tool_execution_enabled": config.tool_execution_enabled,
+                    "user_dinit_socket": config.user_dinit_socket,
                 }
             });
         }
@@ -219,20 +221,23 @@ async fn handle_exec(
 
     // Config check: tool_execution_enabled must be true
     let loader = ProjectLoader::new();
-    if let Some(config) = loader.get_current_config()
-        && !config.tool_execution_enabled
-    {
-        return Ok(json!({
-            "success": false,
-            "exec": {
-                "command": command,
-                "args": args,
-                "reason": reason,
-                "gate_result": "denied",
-                "gate_reason": "tool_execution_enabled is false in config",
-            },
-        }));
-    }
+    let user_dinit_socket = if let Some(config) = loader.get_current_config() {
+        if !config.tool_execution_enabled {
+            return Ok(json!({
+                "success": false,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "reason": reason,
+                    "gate_result": "denied",
+                    "gate_reason": "tool_execution_enabled is false in config",
+                },
+            }));
+        }
+        config.user_dinit_socket.clone()
+    } else {
+        None
+    };
 
     // Dry-run shortcut: skip gate and telemetry when dry_run is true
     if dry_run {
@@ -359,6 +364,30 @@ async fn handle_exec(
                 })
                 .map(|_| uuid::Uuid::new_v4().to_string());
 
+            // Dinit integration: if command is dinitctl, route through crabjar-dinit
+            let dinit_result = if command == "dinitctl" {
+                execute_via_dinitctl(&user_dinit_socket, args, &effective_cwd)
+            } else {
+                Ok(exit_code)
+            };
+
+            let final_exit_code = match dinit_result {
+                Ok(code) => code,
+                Err(e) => {
+                    return Ok(json!({
+                        "success": false,
+                        "exec": {
+                            "command": command,
+                            "args": args,
+                            "cwd": effective_cwd,
+                            "reason": reason,
+                            "gate_result": "proceed",
+                            "dinit_error": e.to_string(),
+                        },
+                    }));
+                }
+            };
+
             Ok(json!({
                 "success": true,
                 "exec": {
@@ -367,7 +396,7 @@ async fn handle_exec(
                     "cwd": effective_cwd,
                     "reason": reason,
                     "cmd_id": cmd_id,
-                    "exit_code": exit_code,
+                    "exit_code": final_exit_code,
                     "gate_result": "proceed",
                     "git_dirty": git_dirty,
                     "git_diff_hash": git_diff,
@@ -389,6 +418,49 @@ async fn handle_exec(
             }))
         }
     }
+}
+
+/// Execute dinitctl command, routing through crabjar-dinit instance when configured.
+fn execute_via_dinitctl(
+    socket_path: &Option<String>,
+    args: &[String],
+    cwd: &str,
+) -> Result<i32, dinit::DinitError> {
+    let effective_socket = match socket_path {
+        Some(s) => s.clone(),
+        None => dinit::default_socket_path(),
+    };
+
+    // Build dinitctl args with crabjar-dinit socket
+    let mut dinit_args: Vec<String> = vec![
+        "-p".to_string(),
+        effective_socket.clone(),
+    ];
+    dinit_args.extend(args.iter().cloned());
+    let dinit_args: Vec<&str> = dinit_args.iter().map(|s| s.as_str()).collect();
+
+    let output = std::process::Command::new("dinitctl")
+        .args(&dinit_args)
+        .current_dir(cwd)
+        .output()
+        .map_err(|e| dinit::DinitError::DinitctlError(e.to_string()))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    if !output.status.success() {
+        return Err(dinit::DinitError::DinitctlError(
+            stderr.trim().to_string(),
+        ));
+    }
+
+    // Parse exit code from output if present
+    let exit_code = stdout
+        .lines()
+        .find_map(|line| line.trim().parse::<i32>().ok())
+        .unwrap_or(0);
+
+    Ok(exit_code)
 }
 
 /// Handle guard commands
@@ -887,7 +959,28 @@ async fn handle_doctor_command(
                 }));
             }
 
-            // 5. Tool availability
+            // 5. Dinit integration check
+            let dinit_path = which::which("dinitctl").ok();
+            let dinit_ok = dinit_path.is_some();
+            let dinit_detail = if dinit_ok {
+                format!("found at {}", dinit_path.unwrap().display())
+            } else {
+                "not found".to_string()
+            };
+            checks.push(doctor_status("tool_dinitctl", dinit_ok, &dinit_detail));
+
+            if let Some(ref cfg) = loader.get_current_config() {
+                if let Some(ref socket) = cfg.user_dinit_socket {
+                    let socket_exists = std::path::Path::new(socket).exists();
+                    checks.push(doctor_status(
+                        "dinit_socket",
+                        socket_exists,
+                        format!("{}: {}", socket, if socket_exists { "exists" } else { "not found" }),
+                    ));
+                }
+            }
+
+            // 6. Tool availability
             let git_path = which::which("git").ok();
             checks.push(doctor_status(
                 "tool_git",
@@ -906,7 +999,7 @@ async fn handle_doctor_command(
                     .unwrap_or_else(|| "not found".to_string()),
             ));
 
-            // 6. Bitwarden availability
+            // 7. Bitwarden availability
             let bw_available = bitwarden::cli::is_available();
             checks.push(doctor_status(
                 "tool_bitwarden",
@@ -918,7 +1011,7 @@ async fn handle_doctor_command(
                 },
             ));
 
-            // 7. State-docs directory check
+            // 8. State-docs directory check
             let state_docs_path = project_root.join("state-docs");
             let state_docs_exists = state_docs_path.exists();
             checks.push(doctor_status(

@@ -38,6 +38,8 @@ pub struct ProjectConfig {
     pub tool_execution_enabled: bool,
     #[serde(default = "default_true", skip_serializing_if = "bool::clone")]
     pub auto_register: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_dinit_socket: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -89,6 +91,7 @@ pub struct ProjectConfigBuilder {
     keybindings: HashMap<String, String>,
     tool_execution_enabled: bool,
     auto_register: bool,
+    user_dinit_socket: Option<String>,
 }
 
 impl ProjectConfigBuilder {
@@ -122,6 +125,10 @@ impl ProjectConfigBuilder {
         self.auto_register = false;
         self
     }
+    pub fn user_dinit_socket(mut self, path: impl Into<String>) -> Self {
+        self.user_dinit_socket = Some(path.into());
+        self
+    }
     pub fn build(self) -> Result<ProjectConfig, ConfigError> {
         if self.name.is_empty() {
             return Err(ConfigError::MissingName);
@@ -134,13 +141,14 @@ impl ProjectConfigBuilder {
             keybindings: self.keybindings,
             tool_execution_enabled: self.tool_execution_enabled,
             auto_register: self.auto_register,
+            user_dinit_socket: self.user_dinit_socket,
         })
     }
 }
 
 pub fn generate_template(name: &str) -> String {
     format!(
-        "name = \"{}\"\ndescription = \"Custom CrabJar workspace for {}\"\n\nauto_register = true\n\n[[tools]]\npath = \"data-transformations.nu\"\ncommands = [\"load-data\", \"transform-pipeline\"]\n\n[keybindings]\n\"Ctrl a\" = \"load-data\"\n",
+        "name = \"{}\"\ndescription = \"Custom CrabJar workspace for {}\"\n\nauto_register = true\nuser_dinit_socket = \"/run/user/1000/crabjar-dinit\"\n\n[[tools]]\npath = \"data-transformations.nu\"\ncommands = [\"load-data\", \"transform-pipeline\"]\n\n[keybindings]\n\"Ctrl a\" = \"load-data\"\n",
         name, name
     )
 }
