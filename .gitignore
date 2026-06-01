@@ -36,3 +36,4 @@ guard.db
 knowledge.db
 memory/knowledge.db
 llmrunner.md
+src/dinit.rs

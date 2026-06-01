@@ -1,7 +1,7 @@
 name = "crabjar-workspace"
 description = "CrabJar agent workspace with cuda-oxide integration"
 
-tool_execution_enabled = false
+tool_execution_enabled = true
 auto_register = true
 
 [[tools]]
