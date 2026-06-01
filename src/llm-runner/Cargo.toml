@@ -63,6 +63,9 @@ zip.workspace = true
 memmap2.workspace = true
 safetensors.workspace = true
 
+# Regex
+regex = { version = "1.12.3", default-features = false, features = ["perf", "unicode"] }
+
 # Async
 tokio.workspace = true
 

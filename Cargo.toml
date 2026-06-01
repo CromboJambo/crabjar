@@ -18,7 +18,7 @@ members = [
     "src/llm-plug-in",
     "src/llm-runner",
     "zed-acp-bridge",
-    "zed-acp-server",
+    "zed-acp-server", "src/gguf",
 ]
 
 resolver = "2"

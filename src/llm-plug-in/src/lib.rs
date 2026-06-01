@@ -13,10 +13,12 @@
 pub mod error;
 pub mod manifest;
 pub mod protocol;
+pub mod templates;
 
 pub use error::{PlugInError, Result};
 pub use manifest::WeightManifest;
 pub use protocol::{InferenceRequest, InferenceResponse, RunnerConfig};
+pub use templates::{infer_template, TemplateFamily};
 
 #[cfg(test)]
 mod tests {

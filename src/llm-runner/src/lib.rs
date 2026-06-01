@@ -19,16 +19,22 @@ pub mod inference_engine;
 pub mod kernel;
 pub mod model;
 pub mod model_loader;
+pub mod model_manager;
 pub mod plug_in;
+pub mod registry;
 pub mod runner;
 pub mod tokenizer;
 
 pub use device::DeviceBackend;
 pub use error::{Result, RunnerError};
 pub use inference_engine::InferenceEngine;
+pub use kernel::{AttentionKernel, CpuAttentionKernel, GemmKernel, GemmBuilder};
+pub use kernel::{DeviceBuffer, HostTmaDescriptor, Kvcache};
 pub use model::{Model, ModelConfig};
 pub use model_loader::ModelLoader;
+pub use model_manager::{ModelManager, ModelSpec, PreloadConfig, PreloadStats};
 pub use plug_in::PlugInProtocol;
+pub use registry::{DiscoveredModel, ModelDiscovery, ModelEntry, ModelFormat, Registry};
 pub use runner::RunnerBridge;
 pub use tokenizer::Tokenizer;
 
