@@ -1428,51 +1428,53 @@ mod tests {
 
     #[test]
     fn endpoint_from_env_default() {
-        std::env::remove_var("LM_STUDIO_ENDPOINT");
+        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Openai);
     }
 
     #[test]
     fn endpoint_from_env_native() {
-        std::env::set_var("LM_STUDIO_ENDPOINT", "native");
+        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "native"); }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Native);
-        std::env::remove_var("LM_STUDIO_ENDPOINT");
+        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
     }
 
     #[test]
     fn endpoint_from_env_openai() {
-        std::env::set_var("LM_STUDIO_ENDPOINT", "openai");
+        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "openai"); }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Openai);
-        std::env::remove_var("LM_STUDIO_ENDPOINT");
+        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
     }
 
     #[test]
     fn endpoint_from_env_anthropic() {
-        std::env::set_var("LM_STUDIO_ENDPOINT", "anthropic");
+        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "anthropic"); }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Anthropic);
-        std::env::remove_var("LM_STUDIO_ENDPOINT");
+        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
     }
 
     #[test]
     fn endpoint_from_env_invalid_defaults_to_openai() {
-        std::env::set_var("LM_STUDIO_ENDPOINT", "invalid");
+        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "invalid"); }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Openai);
-        std::env::remove_var("LM_STUDIO_ENDPOINT");
+        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
     }
 
     #[test]
     fn config_from_env_defaults() {
-        std::env::remove_var("LM_STUDIO_URL");
-        std::env::remove_var("LM_STUDIO_MODEL");
-        std::env::remove_var("LM_STUDIO_CONTEXT_LENGTH");
-        std::env::remove_var("LM_STUDIO_TEMPERATURE");
-        std::env::remove_var("LM_STUDIO_MAX_OUTPUT_TOKENS");
-        std::env::remove_var("LM_API_TOKEN");
+        unsafe {
+            std::env::remove_var("LM_STUDIO_URL");
+            std::env::remove_var("LM_STUDIO_MODEL");
+            std::env::remove_var("LM_STUDIO_CONTEXT_LENGTH");
+            std::env::remove_var("LM_STUDIO_TEMPERATURE");
+            std::env::remove_var("LM_STUDIO_MAX_OUTPUT_TOKENS");
+            std::env::remove_var("LM_API_TOKEN");
+        }
 
         let config = LmStudioConfig::from_env();
         assert_eq!(config.base_url, "http://127.0.0.1:1234");
@@ -2062,10 +2064,12 @@ mod tests {
 
     #[test]
     fn client_from_env_uses_defaults() {
-        std::env::remove_var("LM_STUDIO_URL");
-        std::env::remove_var("LM_STUDIO_ENDPOINT");
-        std::env::remove_var("LM_STUDIO_MODEL");
-        std::env::remove_var("LM_API_TOKEN");
+        unsafe {
+            std::env::remove_var("LM_STUDIO_URL");
+            std::env::remove_var("LM_STUDIO_ENDPOINT");
+            std::env::remove_var("LM_STUDIO_MODEL");
+            std::env::remove_var("LM_API_TOKEN");
+        }
 
         let client = LmStudioClient::from_env();
         assert_eq!(client.config.base_url, "http://127.0.0.1:1234");
@@ -2298,7 +2302,7 @@ mod tests {
         match &response.output[0] {
             UnifiedOutputItem::ToolCall { tool, output, .. } => {
                 assert_eq!(tool, "echo");
-                assert_eq!(output, Some("echoed".to_string()));
+                assert_eq!(output, &Some("echoed".to_string()));
             }
             _ => panic!("expected ToolCall"),
         }

@@ -107,6 +107,54 @@ impl Backend {
         }
     }
 
+    /// Creates a new backend with fallback: tries mistral.rs serve first,
+    /// falls back to LM Studio if the serve endpoint is unavailable.
+    ///
+    /// Probes the mistral.rs serve URL (`MISTRALRS_SERVE_URL`, default `http://127.0.0.1:8081`)
+    /// by hitting `/v1/models`. If the probe fails, falls back to LM Studio.
+    pub async fn try_new() -> Self {
+        // Explicit env var takes priority
+        match std::env::var("INFERENCE_BACKEND").ok().as_deref() {
+            Some("mistralrs") => {
+                tracing::info!("Using mistral.rs inference backend (explicit)");
+                return Self::MistralRs(mistralrs_client::MistralRsClient::new());
+            }
+            Some("lm-studio") | Some("lm_studio") => {
+                tracing::info!("Using LM Studio inference backend (explicit)");
+                return Self::LmStudio(lm_studio_client::LmStudioClient::from_env());
+            }
+            _ => {}
+        }
+
+        // Probe mistral.rs serve (default port 1234 matches LM Studio default)
+        let serve_url = std::env::var("MISTRALRS_SERVE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:1234".to_string());
+        let models_url = format!("{}/v1/models", serve_url);
+
+        match reqwest::get(&models_url).await {
+            Ok(resp) if resp.status().is_success() => {
+                tracing::info!("Using mistral.rs inference backend (probe success: {})", models_url);
+                Self::MistralRs(mistralrs_client::MistralRsClient::new())
+            }
+            Ok(resp) => {
+                tracing::warn!(
+                    "mistral.rs serve returned status {} at {}, falling back to LM Studio",
+                    resp.status(),
+                    models_url
+                );
+                Self::LmStudio(lm_studio_client::LmStudioClient::from_env())
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "mistral.rs serve probe failed at {}: {}, falling back to LM Studio",
+                    models_url,
+                    e
+                );
+                Self::LmStudio(lm_studio_client::LmStudioClient::from_env())
+            }
+        }
+    }
+
     /// Creates a new LM Studio backend explicitly.
     pub fn lm_studio() -> Self {
         tracing::info!("Using LM Studio inference backend (explicit)");

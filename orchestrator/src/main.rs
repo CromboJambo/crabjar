@@ -935,7 +935,7 @@ async fn main() -> anyhow::Result<()> {
         store: Arc::new(std::sync::Mutex::new(store)),
         events_db_path,
         guard_root,
-        backend: Arc::new(Mutex::new(backend::Backend::new())),
+        backend: Arc::new(Mutex::new(backend::Backend::try_new().await)),
     };
 
     // Define the Axum router with SSE and JSON endpoints.
