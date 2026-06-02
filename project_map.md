@@ -90,7 +90,7 @@ crabjar/
 │       ├── protocol.rs
 │       ├── manifest.rs
 │       └── error.rs
-├── src/llm-runner/          # LLM runner (Blackwell tcgen05/WGMMA kernels)
+├── src/llm-runner/          # LLM runner (CPU fallback kernels; GPU path stubbed)
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── lib.rs
@@ -102,15 +102,18 @@ crabjar/
 │   │   ├── runner.rs
 │   │   ├── plug_in.rs
 │   │   ├── device.rs
+│   │   ├── gguf_weight_loader.rs
+│   │   ├── model_manager.rs
+│   │   ├── registry.rs
 │   │   └── kernel/
 │   │       ├── mod.rs
-│   │       ├── gemm.rs          # GEMM trait (WGMMA/tcgen05)
-│   │       ├── attention.rs     # Attention trait (Blackwell)
-│   │       ├── kvcache.rs       # KV cache with TMA support
+│   │       ├── gemm.rs          # GEMM trait (WGMMA/tcgen05) + CPU fallback
+│   │       ├── attention.rs     # Attention trait (Blackwell) + CPU fallback
+│   │       ├── kvcache.rs       # KV cache with TMA descriptor support
 │   │       ├── device_buf.rs    # DeviceBuffer<T> abstraction
-│   │       ├── tma_descriptor.rs # Blackwell TMA descriptor (64-bit)
-│   │       ├── tma_bridge.rs    # cuda-oxide TmaDescriptor bridge
-│   │       ├── builder.rs       # PTX builder, kernel registration
+│   │       ├── tma_descriptor.rs # Blackwell TMA descriptor (128-bit)
+│   │       ├── tma_bridge.rs    # cuda-oxide CUtensorMap bridge
+│   │       ├── builder.rs       # PTX builder, kernel registration (stub)
 │   │       └── tests/
 │   │   ├── device/            # (empty — legacy dir)
 │   │   ├── inference-engine/  # (empty — legacy dir)
@@ -195,6 +198,7 @@ crabjar/
 │       ├── safetensors_store.rs
 │       ├── schema.rs
 │       ├── gguf_converter.rs
+│       ├── gguf_model_loader.rs
 │       └── error.rs
 ├── tool_registry/           # MCP tool registry (rig/aur patterns)
 │   ├── Cargo.toml
@@ -280,7 +284,7 @@ crabjar/
 | `guard` | Trust layers, annealing, execution gate | Authorization | Active |
 | `telemetry` | Flight recorder, command executor | Telemetry | Active |
 | `sandbox` | Agent isolation (Unix user, dinit-container, cgroup) | Isolation | Active |
-| `safetensors` | Model weight storage (SQLite, checksum verification) | Storage | Active |
+| `safetensors` | Model weight storage (SQLite, checksum verification, GGUF converter) | Storage | Active |
 | `tool_registry` | MCP tool registry | Registry | Active |
 | `gguf` | GGUF parser crate | Inference | Active |
 | `gguf-cli` | GGUF CLI binary | Inference | Active |
@@ -292,7 +296,7 @@ crabjar/
 | `skill-script-runner` | Skill script discovery and execution | Skill | Active |
 | `skill-reference-store` | Skill reference indexing and staleness | Reference | Active |
 | `llm-plug-in` | LLM plugin protocol (InferenceRequest/Response) | Plugin | Active |
-| `llm-runner` | LLM runner (Blackwell tcgen05/WGMMA kernels) | Inference | Active |
+| `llm-runner` | LLM runner (CPU fallback kernels; GPU path stubbed) | Inference | Experimental |
 | `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) | Bridge | Active |
 | `zed-acp-server` | stdio JSON-RPC server (ACP protocol execution) | Bridge | Active |
 
@@ -569,7 +573,7 @@ crabjar contains:
 - src/dotfile_manager.rs (dotfile management)
 - src/knowledge_store/ (knowledge store commands)
 - src/llm-plug-in/ (LLM plugin protocol)
-- src/llm-runner/ (LLM runner with Blackwell kernels)
+- src/llm-runner/ (LLM runner, CPU fallback kernels)
 - src/skill-script-runner/ (skill script discovery)
 - src/skill-reference-store/ (skill reference indexing)
 - src/crabjar-config/ (workspace config crate)
@@ -617,6 +621,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 - Phase 1 complete — clippy clean, CI verified
 - `.agents/skills/` — 29 agent skills
 - `.agents/references/` — agent reference files
+- `llm-runner` — CPU fallback kernels (CpuGemmKernel, CpuAttentionKernel) operational; GPU path stubbed (GemmBuilder::build returns KernelFromPtx with no-op matmul); weight loading → inference pipeline bridge missing; K-family dequantization unimplemented; RoPE/RMSNorm/activations/LM head/sampling not yet coded
 
 ### Provenance Entries
 
