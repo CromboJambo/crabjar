@@ -88,8 +88,12 @@ fn dequantize_tensor(tensor: &GgufTensorInfo, raw_data: &[u8]) -> Result<Vec<u8>
 
     match dtype {
         GgufDtype::F32 => Ok(raw_data.to_vec()),
-        GgufDtype::F16 | GgufDtype::BF16 => {
+        GgufDtype::F16 => {
             let f32_data = half_f32(raw_data);
+            Ok(f32_data.into_iter().flat_map(|v| v.to_le_bytes()).collect())
+        }
+        GgufDtype::BF16 => {
+            let f32_data = bf16_f32(raw_data);
             Ok(f32_data.into_iter().flat_map(|v| v.to_le_bytes()).collect())
         }
         GgufDtype::Q4_0 => {
@@ -125,46 +129,46 @@ fn dequantize_tensor(tensor: &GgufTensorInfo, raw_data: &[u8]) -> Result<Vec<u8>
 
 /// Dequantize Q4_0 data to f32.
 ///
-/// Q4_0 block: 32 elements, 20 bytes (2×f16 scale/min + 16 bytes quantized).
-/// dequantized = scale * (q - 8) + min
+/// Q4_0 block: 32 elements, 18 bytes (2-byte f16 scale + 16 bytes quantized, nibble-packed).
+/// dequantized = scale * (q - 8)
 fn dequantize_q4_0(data: &[u8], element_count: usize) -> Result<Vec<f32>> {
     let num_full_blocks = element_count / 32;
     let remaining = element_count % 32;
-    let expected_size = num_full_blocks * 20 + if remaining > 0 { 4 + remaining.div_ceil(2) } else { 0 };
+    let expected_size = num_full_blocks * 18 + if remaining > 0 { 2 + remaining.div_ceil(2) } else { 0 };
 
     if data.len() < expected_size {
         return Err(RunnerError::Internal(format!(
-            "Q4_0 data too small: got {expected_size} bytes, need {expected_size}"
+            "Q4_0 data too small: got {} bytes, need {}",
+            data.len(),
+            expected_size
         )));
     }
 
     let mut result = Vec::with_capacity(element_count);
 
     for block in 0..num_full_blocks {
-        let base = block * 20;
+        let base = block * 18;
         let scale = f16_to_f32(&data[base..base + 2]);
-        let min = f16_to_f32(&data[base + 2..base + 4]);
 
         for i in 0..32usize {
             if result.len() >= element_count {
                 break;
             }
-            let nibble = (data[base + 4 + i / 2] >> (4 * (i & 1))) & 0x0F;
+            let nibble = (data[base + 2 + i / 2] >> (4 * (i & 1))) & 0x0F;
             let q = nibble as i32 - 8;
-            result.push(scale * q as f32 + min);
+            result.push(scale * q as f32);
         }
     }
 
     if remaining > 0 {
-        let base = num_full_blocks * 20;
+        let base = num_full_blocks * 18;
         let scale = f16_to_f32(&data[base..base + 2]);
-        let min = f16_to_f32(&data[base + 2..base + 4]);
 
         let elems_in_block = remaining.min(32);
         for i in 0..elems_in_block {
-            let nibble = (data[base + 4 + i / 2] >> (4 * (i & 1))) & 0x0F;
+            let nibble = (data[base + 2 + i / 2] >> (4 * (i & 1))) & 0x0F;
             let q = nibble as i32 - 8;
-            result.push(scale * q as f32 + min);
+            result.push(scale * q as f32);
         }
     }
 
@@ -221,11 +225,11 @@ fn dequantize_q4_1(data: &[u8], element_count: usize) -> Result<Vec<f32>> {
 
 /// Dequantize Q8_0 data to f32.
 ///
-/// Q8_0 block: 256 elements, 258 bytes (2 bytes scale + 256 bytes int8 quantized).
-/// dequantized = scale * (quantized_value / 128.0)
+/// Q8_0 block: 32 elements, 34 bytes (2 bytes scale + 32 bytes int8 quantized).
+/// dequantized = scale * quantized_value
 fn dequantize_q8_0(data: &[u8], element_count: usize) -> Result<Vec<f32>> {
-    let num_blocks = element_count.div_ceil(256);
-    let expected_size = num_blocks * 258;
+    let num_blocks = element_count.div_ceil(32);
+    let expected_size = num_blocks * 34;
 
     if data.len() < expected_size {
         return Err(RunnerError::Internal(format!(
@@ -236,14 +240,14 @@ fn dequantize_q8_0(data: &[u8], element_count: usize) -> Result<Vec<f32>> {
     let mut result = Vec::with_capacity(element_count);
 
     for block in 0..num_blocks {
-        let base = block * 258;
+        let base = block * 34;
         let scale = f16_to_f32(&data[base..base + 2]);
 
-        for i in 0..256usize {
+        for i in 0..32usize {
             if result.len() >= element_count {
                 break;
             }
-            let q = data[base + 2 + i] as i8 as f32 / 128.0;
+            let q = data[base + 2 + i] as i8 as f32;
             result.push(scale * q);
         }
     }
@@ -323,7 +327,6 @@ fn bf16_f32(bytes: &[u8]) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crabjar_gguf::types::{GgufKvPair, GgufKvValue, GgufValueType};
     use tempfile::tempdir;
 
     fn make_test_gguf_v3(path: &Path) {
@@ -336,7 +339,7 @@ mod tests {
         // Tensor count
         buf.extend_from_slice(&2u64.to_le_bytes());
         // KV count
-        buf.extend_from_slice(&2u64.to_le_bytes());
+        buf.extend_from_slice(&3u64.to_le_bytes());
 
         // KV: general.architecture = "llama"
         let key = "general.architecture";
@@ -354,8 +357,12 @@ mod tests {
         buf.extend_from_slice(&(4u64).to_le_bytes());
         buf.extend_from_slice(b"Q4_0");
 
-        // Data alignment
-        buf.extend_from_slice(&32u64.to_le_bytes());
+        // KV: general.alignment = 32
+        let key = "general.alignment";
+        buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        buf.extend_from_slice(key.as_bytes());
+        buf.extend_from_slice(&(4u32).to_le_bytes());
+        buf.extend_from_slice(&32u32.to_le_bytes());
 
         // Tensor 1: tok_embeddings.weight (shape [8], dtype F16, offset 0)
         let name = "tok_embeddings.weight";
@@ -379,7 +386,7 @@ mod tests {
 
         // Pad to data_section_start (256) and write tensor data
         let data_section_start = 256u64;
-        let current = buf.len() as u64;
+        let _current = buf.len() as u64;
         buf.resize(data_section_start as usize, 0);
 
         // F16 tensor data: 8 elements of 1.0
@@ -393,11 +400,10 @@ mod tests {
             buf.push(0);
         }
 
-        // Q4_0 tensor data: 32 elements, 1 block (scale=1.0, min=0.0)
-        let mut q4_block = Vec::with_capacity(20);
-        q4_block.extend_from_slice(&pack_f16(1.0f32)); // scale
-        q4_block.extend_from_slice(&pack_f16(0.0f32)); // min
-        for i in (0..16u32) {
+        // Q4_0 tensor data: 32 elements, 1 block (scale=1.0)
+        let mut q4_block = Vec::with_capacity(18);
+        q4_block.extend_from_slice(&pack_f16(1.0)); // scale
+        for i in 0..16u32 {
             let lo = (i as u8 % 16) as u8;
             let hi = ((i + 1) as u8 % 16) as u8;
             q4_block.push((hi << 4) | lo);
@@ -413,7 +419,7 @@ mod tests {
         buf.extend_from_slice(b"GGUF");
         buf.extend_from_slice(&3u32.to_le_bytes());
         buf.extend_from_slice(&1u64.to_le_bytes()); // tensor count
-        buf.extend_from_slice(&1u64.to_le_bytes()); // kv count
+        buf.extend_from_slice(&2u64.to_le_bytes()); // kv count
 
         // KV: general.architecture = "llama"
         let key = "general.architecture";
@@ -423,8 +429,12 @@ mod tests {
         buf.extend_from_slice(&(5u64).to_le_bytes());
         buf.extend_from_slice(b"llama");
 
-        // Data alignment
-        buf.extend_from_slice(&32u64.to_le_bytes());
+        // KV: general.alignment = 32
+        let key = "general.alignment";
+        buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        buf.extend_from_slice(key.as_bytes());
+        buf.extend_from_slice(&(4u32).to_le_bytes());
+        buf.extend_from_slice(&32u32.to_le_bytes());
 
         // Tensor: test.weight (shape [4], dtype F32, offset 0)
         let name = "test.weight";
@@ -435,8 +445,9 @@ mod tests {
         buf.extend_from_slice(&0u32.to_le_bytes()); // F32
         buf.extend_from_slice(&0u64.to_le_bytes()); // offset
 
-        // Pad to data_section_start (128) and write tensor data
-        let data_section_start = 128u64;
+        // Pad to data_section_start (computed by parser: header_base + kv_size + tensor_size, aligned to 32)
+        // header_base=24, kv_size=46+37=83, tensor_size=43 → 150 → align to 32 = 160
+        let data_section_start: u64 = 160;
         buf.resize(data_section_start as usize, 0);
 
         // F32 tensor data: [1.0, 2.0, 3.0, 4.0]
@@ -456,7 +467,7 @@ mod tests {
         buf.extend_from_slice(b"GGUF");
         buf.extend_from_slice(&3u32.to_le_bytes());
         buf.extend_from_slice(&1u64.to_le_bytes());
-        buf.extend_from_slice(&1u64.to_le_bytes());
+        buf.extend_from_slice(&2u64.to_le_bytes());
 
         let key = "general.architecture";
         buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
@@ -465,8 +476,11 @@ mod tests {
         buf.extend_from_slice(&(5u64).to_le_bytes());
         buf.extend_from_slice(b"llama");
 
-        // Data alignment
-        buf.extend_from_slice(&32u64.to_le_bytes());
+        let key = "general.alignment";
+        buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        buf.extend_from_slice(key.as_bytes());
+        buf.extend_from_slice(&(4u32).to_le_bytes());
+        buf.extend_from_slice(&32u32.to_le_bytes());
 
         // Tensor: q4_tensor (shape [32], dtype Q4_0, offset 0)
         let name = "q4_tensor";
@@ -477,14 +491,14 @@ mod tests {
         buf.extend_from_slice(&2u32.to_le_bytes()); // Q4_0
         buf.extend_from_slice(&0u64.to_le_bytes());
 
-        // Pad to data_section_start (128) and write tensor data
-        let data_section_start = 128u64;
+        // Pad to data_section_start (computed by parser: header_base + kv_size + tensor_size, aligned to 32)
+        // Same KV/tensor layout as f32 test → 160
+        let data_section_start: u64 = 160;
         buf.resize(data_section_start as usize, 0);
 
-        // Q4_0 tensor data: 32 elements, 1 block (scale=1.0, min=0.0)
-        let mut q4_block = Vec::with_capacity(20);
+        // Q4_0 tensor data: 32 elements, 1 block (scale=1.0)
+        let mut q4_block = Vec::with_capacity(18);
         q4_block.extend_from_slice(&pack_f16(1.0)); // scale
-        q4_block.extend_from_slice(&pack_f16(0.0)); // min
         for i in (0..32).step_by(2) {
             let lo = (i % 16) as u8;
             let hi = ((i + 1) % 16) as u8;

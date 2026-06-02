@@ -96,20 +96,20 @@ fn parse_v3<R: Read>(reader: &mut R) -> Result<GgufHeader, GgufError> {
         kv_pairs.push(read_kv_pair(reader)?);
     }
 
-    let data_alignment = reader.read_u64::<LittleEndian>()?;
-
     let mut tensors = Vec::with_capacity(tensor_count as usize);
     for _ in 0..tensor_count {
         tensors.push(read_tensor_info(reader)?);
     }
 
-    let data_section_start = compute_data_section_start(3, &kv_pairs, &tensors, Some(data_alignment));
+    let alignment = read_alignment_from_kv(&kv_pairs);
+
+    let data_section_start = compute_data_section_start(3, &kv_pairs, &tensors, alignment);
 
     Ok(GgufHeader {
         version: 3,
         kv_pairs,
         tensors,
-        data_alignment: Some(data_alignment),
+        data_alignment: alignment,
         data_section_start,
     })
 }
@@ -126,7 +126,6 @@ fn compute_data_section_start(version: u32, kv_pairs: &[GgufKvPair], tensors: &[
     let mut data_section: u64 = header_base + kv_size as u64 + tensor_size as u64;
 
     if version == 3 {
-        data_section += 8; // data_alignment field itself
         if let Some(alignment) = data_alignment
             && alignment > 0
         {
@@ -138,6 +137,14 @@ fn compute_data_section_start(version: u32, kv_pairs: &[GgufKvPair], tensors: &[
     }
 
     data_section
+}
+
+/// Read the `general.alignment` value from KV pairs (GGUF v3).
+fn read_alignment_from_kv(kv_pairs: &[GgufKvPair]) -> Option<u64> {
+    kv_pairs
+        .iter()
+        .find(|p| p.key == "general.alignment")
+        .and_then(|p| p.value.as_u64())
 }
 
 fn read_bytes<R: Read>(reader: &mut R, len: usize) -> Result<Vec<u8>, GgufError> {
@@ -535,7 +542,7 @@ mod tests {
         buf.extend_from_slice(&2u64.to_le_bytes());
 
         // KV count
-        buf.extend_from_slice(&2u64.to_le_bytes());
+        buf.extend_from_slice(&3u64.to_le_bytes());
 
         // KV pair 1: general.architecture = "llama" (string)
         let key = "general.architecture";
@@ -552,8 +559,12 @@ mod tests {
         buf.extend_from_slice(&(4u32).to_le_bytes()); // UINT32 type
         buf.extend_from_slice(&1u32.to_le_bytes());
 
-        // Data alignment
-        buf.extend_from_slice(&32u64.to_le_bytes());
+        // KV pair 3: general.alignment = 32
+        let key = "general.alignment";
+        buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
+        buf.extend_from_slice(key.as_bytes());
+        buf.extend_from_slice(&(4u32).to_le_bytes()); // UINT32 type
+        buf.extend_from_slice(&32u32.to_le_bytes());
 
         // Tensor 1: token_embd.weight (shape [4096], dtype F16, offset 0)
         let name = "token_embd.weight";
@@ -584,7 +595,7 @@ mod tests {
 
         assert_eq!(header.version, 3);
         assert_eq!(header.data_alignment, Some(32));
-        assert_eq!(header.kv_pairs.len(), 2);
+        assert_eq!(header.kv_pairs.len(), 3);
         assert_eq!(header.tensors.len(), 2);
 
         assert_eq!(header.architecture(), Some("llama"));
@@ -839,8 +850,8 @@ mod tests {
             offset: 0,
             dtype: 2, // Q4_0
         };
-        // Q4_0: 8 full blocks of 32 = 8 * 20 = 160
-        assert_eq!(info.stored_size(), 160);
+        // Q4_0: 8 full blocks of 32 = 8 * 18 = 144
+        assert_eq!(info.stored_size(), 144);
     }
 
     #[test]
@@ -852,8 +863,8 @@ mod tests {
             dtype: 2, // Q4_0
         };
         // Q4_0: 32 elements = one partial block
-        // full_blocks=0, remaining=32 => 4 + 32/2 = 20
-        assert_eq!(info.stored_size(), 20);
+        // full_blocks=0, remaining=32 => 2 + 32/2 = 18
+        assert_eq!(info.stored_size(), 18);
     }
 
     #[test]

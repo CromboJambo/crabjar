@@ -202,32 +202,22 @@ impl GgufDtype {
             1 => Self::F16,
             2 => Self::Q4_0,
             3 => Self::Q4_1,
-            4 => Self::Q5_0,
-            5 => Self::Q5_1,
-            6 => Self::Q8_0,
-            7 => Self::Q8_1,
-            8 => Self::Q2_K,
-            9 => Self::Q3_K,
-            10 => Self::Q4_K,
-            11 => Self::Q5_K,
-            12 => Self::Q6_K,
-            13 => Self::Q8_K,
-            14 => Self::I8,
-            15 => Self::I16,
-            16 => Self::I32,
-            17 => Self::I64,
-            18 => Self::F64,
-            19 => Self::BF16,
-            20 => Self::Q1_K,
-            21 => Self::Q4_K_M,
-            22 => Self::Q5_K_M,
-            23 => Self::Q6_K_S,
-            24 => Self::Q8_K_M,
-            25 => Self::Q2_K_S,
-            26 => Self::Q3_K_S,
-            27 => Self::Q4_K_S,
-            28 => Self::Q5_K_S,
-            29 => Self::Q2_K_M,
+            6 => Self::Q5_0,
+            7 => Self::Q5_1,
+            8 => Self::Q8_0,
+            9 => Self::Q8_1,
+            10 => Self::Q2_K,
+            11 => Self::Q3_K,
+            12 => Self::Q4_K,
+            13 => Self::Q5_K,
+            14 => Self::Q6_K,
+            15 => Self::Q8_K,
+            24 => Self::I8,
+            25 => Self::I16,
+            26 => Self::I32,
+            27 => Self::I64,
+            28 => Self::F64,
+            30 => Self::BF16,
             _ => Self::Unknown(v),
         }
     }
@@ -238,22 +228,22 @@ impl GgufDtype {
             Self::F16 => 1,
             Self::Q4_0 => 2,
             Self::Q4_1 => 3,
-            Self::Q5_0 => 4,
-            Self::Q5_1 => 5,
-            Self::Q8_0 => 6,
-            Self::Q8_1 => 7,
-            Self::Q2_K => 8,
-            Self::Q3_K => 9,
-            Self::Q4_K => 10,
-            Self::Q5_K => 11,
-            Self::Q6_K => 12,
-            Self::Q8_K => 13,
-            Self::I8 => 14,
-            Self::I16 => 15,
-            Self::I32 => 16,
-            Self::I64 => 17,
-            Self::F64 => 18,
-            Self::BF16 => 19,
+            Self::Q5_0 => 6,
+            Self::Q5_1 => 7,
+            Self::Q8_0 => 8,
+            Self::Q8_1 => 9,
+            Self::Q2_K => 10,
+            Self::Q3_K => 11,
+            Self::Q4_K => 12,
+            Self::Q5_K => 13,
+            Self::Q6_K => 14,
+            Self::Q8_K => 15,
+            Self::I8 => 24,
+            Self::I16 => 25,
+            Self::I32 => 26,
+            Self::I64 => 27,
+            Self::F64 => 28,
+            Self::BF16 => 30,
             Self::Q1_K => 20,
             Self::Q4_K_M => 21,
             Self::Q5_K_M => 22,
@@ -378,15 +368,19 @@ impl GgufTensorInfo {
             GgufDtype::F32 => n * 4,
             GgufDtype::F16 | GgufDtype::BF16 => n * 2,
             GgufDtype::Q8_0 => {
-                let full_blocks = n / 256;
-                let remaining = n % 256;
-                full_blocks * 258 + if remaining > 0 { 2 + remaining } else { 0 }
+                let full_blocks = n / 32;
+                let remaining = n % 32;
+                full_blocks * 34 + if remaining > 0 { 2 + remaining } else { 0 }
             }
-            GgufDtype::Q8_1 => n / 2 + 128 + 128,
+            GgufDtype::Q8_1 => {
+                let full_blocks = n / 32;
+                let remaining = n % 32;
+                full_blocks * 36 + if remaining > 0 { 4 + remaining } else { 0 }
+            }
             GgufDtype::Q4_0 => {
                 let full_blocks = n / 32;
                 let remaining = n % 32;
-                full_blocks * 20 + if remaining > 0 { 4 + remaining.div_ceil(2) } else { 0 }
+                full_blocks * 18 + if remaining > 0 { 2 + remaining.div_ceil(2) } else { 0 }
             }
             GgufDtype::Q4_1 => {
                 let full_blocks = n / 32;
@@ -945,11 +939,11 @@ mod tests {
 
     #[test]
     fn test_dtype_roundtrip_all() {
-        for v in 0u32..=29 {
+        for v in [0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 24, 25, 26, 27, 28, 30] {
             let dt = GgufDtype::from_u32(v);
             assert_eq!(dt.to_u32(), v, "roundtrip failed for {v}");
         }
-        for v in 30u32..=100 {
+        for v in [4, 5, 16, 17, 18, 19, 20, 21, 22, 23, 29, 31, 32, 33, 34, 35, 100] {
             let dt = GgufDtype::from_u32(v);
             if let GgufDtype::Unknown(val) = dt {
                 assert_eq!(val, v);
@@ -985,42 +979,42 @@ mod tests {
     #[test]
     fn test_stored_size_quantized_variants() {
         let q8 = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 6,
+            name: "t".to_string(), shape: vec![32], offset: 0, dtype: 8,
         };
-        assert_eq!(q8.stored_size(), 258);
+        assert_eq!(q8.stored_size(), 34);
 
         let q8_2 = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![512], offset: 0, dtype: 6,
+            name: "t".to_string(), shape: vec![64], offset: 0, dtype: 8,
         };
-        assert_eq!(q8_2.stored_size(), 516);
+        assert_eq!(q8_2.stored_size(), 68);
 
         let q8_3 = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![257], offset: 0, dtype: 6,
+            name: "t".to_string(), shape: vec![33], offset: 0, dtype: 8,
         };
-        assert_eq!(q8_3.stored_size(), 261);
+        assert_eq!(q8_3.stored_size(), 37);
 
         let q4 = GgufTensorInfo {
             name: "t".to_string(), shape: vec![32], offset: 0, dtype: 2,
         };
-        assert_eq!(q4.stored_size(), 20);
+        assert_eq!(q4.stored_size(), 18);
 
         let q4_2 = GgufTensorInfo {
             name: "t".to_string(), shape: vec![64], offset: 0, dtype: 2,
         };
-        assert_eq!(q4_2.stored_size(), 40);
+        assert_eq!(q4_2.stored_size(), 36);
 
         let q2 = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![1], offset: 0, dtype: 8,
+            name: "t".to_string(), shape: vec![1], offset: 0, dtype: 10,
         };
         assert!(q2.stored_size() > 0);
 
         let q6 = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 12,
+            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 14,
         };
         assert!(q6.stored_size() > 0);
 
         let q8k = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 13,
+            name: "t".to_string(), shape: vec![256], offset: 0, dtype: 15,
         };
         assert!(q8k.stored_size() > 0);
     }
@@ -1028,27 +1022,27 @@ mod tests {
     #[test]
     fn test_stored_size_integer_types() {
         let i8_t = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 14,
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 24,
         };
         assert_eq!(i8_t.stored_size(), 100);
 
         let i16_t = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 15,
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 25,
         };
         assert_eq!(i16_t.stored_size(), 200);
 
         let i32_t = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 16,
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 26,
         };
         assert_eq!(i32_t.stored_size(), 400);
 
         let i64_t = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 17,
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 27,
         };
         assert_eq!(i64_t.stored_size(), 800);
 
         let f64_t = GgufTensorInfo {
-            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 18,
+            name: "t".to_string(), shape: vec![100], offset: 0, dtype: 28,
         };
         assert_eq!(f64_t.stored_size(), 800);
     }
@@ -1446,14 +1440,16 @@ mod tests {
     }
 
     #[test]
-    fn test_tensor_info_raw_byte_size() {
+    fn test_tensor_stored_size_q4_0_partial() {
         let info = GgufTensorInfo {
-            name: "test.weight".to_string(),
-            shape: vec![100, 200],
+            name: "test".to_string(),
+            shape: vec![32],
             offset: 0,
-            dtype: 0,
+            dtype: 2, // Q4_0
         };
-        assert_eq!(info.raw_byte_size(), 8 + 11 + 4 + 16 + 4 + 8);
+        // Q4_0: 32 elements = one partial block
+        // full_blocks=0, remaining=32 => 2 + 32/2 = 18
+        assert_eq!(info.stored_size(), 18);
     }
 
     #[test]
