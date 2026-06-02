@@ -55,7 +55,7 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 | `skill-script-runner` | Skill script discovery and execution |
 | `skill-reference-store` | Skill reference indexing and staleness |
 | `llm-plug-in` | LLM plugin protocol |
-| `llm-runner` | LLM runner (Candle/Burn backends) |
+| `llm-runner` | LLM runner (CPU fallback kernels; GPU path experimental) |
 | `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) |
 | `zed-acp-server` | stdio JSON-RPC server (ACP protocol) |
 
@@ -63,7 +63,7 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 20 members, shared deps
+├── Cargo.toml               # Workspace root — 21 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── AGENTS.md               # Repository guidelines
 ├── README.md               # Project overview
@@ -95,7 +95,7 @@ crabjar/
 │
 │  LLM inference crates
 ├── src/llm-plug-in/         # LLM plugin protocol
-├── src/llm-runner/          # LLM runner (Candle/Burn backends)
+├── src/llm-runner/          # LLM runner (CPU fallback kernels; GPU path experimental)
 │
 │  Documentation
 ├── state-docs/              # Durable Markdown state documentation
