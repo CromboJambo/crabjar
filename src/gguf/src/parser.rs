@@ -213,10 +213,6 @@ fn read_kv_value<R: Read>(reader: &mut R, value_type: GgufValueType) -> Result<G
             let v = reader.read_f32::<LittleEndian>()?;
             Ok(GgufKvValue::Float32(v))
         }
-        GgufValueType::Float64 => {
-            let v = reader.read_f64::<LittleEndian>()?;
-            Ok(GgufKvValue::Float64(v))
-        }
         GgufValueType::Bool => {
             let v = reader.read_u8()? != 0;
             Ok(GgufKvValue::Bool(v))
@@ -228,11 +224,49 @@ fn read_kv_value<R: Read>(reader: &mut R, value_type: GgufValueType) -> Result<G
         GgufValueType::Array => {
             let element_type = read_value_type(reader)?;
             let count = reader.read_u64::<LittleEndian>()?;
-            let mut values = Vec::with_capacity(count as usize);
-            for _ in 0..count {
-                values.push(read_kv_value(reader, element_type)?);
+            match element_type {
+                GgufValueType::Int8Array => {
+                    let mut vals = Vec::with_capacity(count as usize);
+                    for _ in 0..count {
+                        vals.push(reader.read_i8()?);
+                    }
+                    Ok(GgufKvValue::Int8Array(vals))
+                }
+                GgufValueType::Uint8Array => {
+                    let mut vals = Vec::with_capacity(count as usize);
+                    for _ in 0..count {
+                        vals.push(reader.read_u8()?);
+                    }
+                    Ok(GgufKvValue::Uint8Array(vals))
+                }
+                _ => {
+                    let mut values = Vec::with_capacity(count as usize);
+                    for _ in 0..count {
+                        values.push(read_kv_value(reader, element_type)?);
+                    }
+                    Ok(GgufKvValue::Array(values))
+                }
             }
-            Ok(GgufKvValue::Array(values))
+        }
+        GgufValueType::Float16 => {
+            let raw = reader.read_u16::<LittleEndian>()?;
+            Ok(GgufKvValue::Float16(raw))
+        }
+        GgufValueType::Int8Array => {
+            let count = reader.read_u64::<LittleEndian>()?;
+            let mut vals = Vec::with_capacity(count as usize);
+            for _ in 0..count {
+                vals.push(reader.read_i8()?);
+            }
+            Ok(GgufKvValue::Int8Array(vals))
+        }
+        GgufValueType::Uint8Array => {
+            let count = reader.read_u64::<LittleEndian>()?;
+            let mut vals = Vec::with_capacity(count as usize);
+            for _ in 0..count {
+                vals.push(reader.read_u8()?);
+            }
+            Ok(GgufKvValue::Uint8Array(vals))
         }
         GgufValueType::Bfloat16 => {
             let raw = reader.read_u16::<LittleEndian>()?;
@@ -507,7 +541,7 @@ mod tests {
         let key = "general.architecture";
         buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
         buf.extend_from_slice(key.as_bytes());
-        buf.extend_from_slice(&(8u32).to_le_bytes()); // STRING type
+        buf.extend_from_slice(&(10u32).to_le_bytes()); // STRING type
         buf.extend_from_slice(&(5u64).to_le_bytes()); // "llama" length
         buf.extend_from_slice(b"llama");
 
@@ -654,7 +688,7 @@ mod tests {
         let key = "general.architecture";
         buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
         buf.extend_from_slice(key.as_bytes());
-        buf.extend_from_slice(&(8u32).to_le_bytes()); // STRING type
+        buf.extend_from_slice(&(10u32).to_le_bytes()); // STRING type
         buf.extend_from_slice(&(5u64).to_le_bytes()); // "llama" length
         buf.extend_from_slice(b"llama");
 
@@ -689,7 +723,7 @@ mod tests {
         let key = "general.architecture";
         buf.extend_from_slice(&(key.len() as u64).to_le_bytes());
         buf.extend_from_slice(key.as_bytes());
-        buf.extend_from_slice(&(8u32).to_le_bytes()); // STRING type
+        buf.extend_from_slice(&(10u32).to_le_bytes()); // STRING type
         buf.extend_from_slice(&(5u64).to_le_bytes()); // "qwen2" length
         buf.extend_from_slice(b"qwen2");
 
