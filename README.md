@@ -1,6 +1,8 @@
-# CrabJar
+**⚠️ Disclaimer: Experimental Project ⚠️**
 
-![CrabJar](assets/crabjar-banner.png)
+Please note that CrabJar is an **experimental learning hobby project**. The codebase may contain architectural compromises, undocumented features, and deliberate use of unsafe Rust blocks for educational purposes. This repository is not intended for production use without thorough review and refactoring.
+
+*Unsafe Code Warning:* Currently, the project utilizes approximately `<N>` number of `unsafe` Rust blocks across several libraries (e.g., `<lib1>`, `<lib2>`). These areas require careful security and memory safety auditing before deployment in a critical system. Please treat this codebase with academic curiosity rather than production confidence.
 
 CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), safetensors (model weight storage), tool registry, codeburn CLI, skill script runner, skill reference store, and Zed agent protocol bridge.
 
