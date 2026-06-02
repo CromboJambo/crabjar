@@ -15,6 +15,7 @@
 
 pub mod device;
 pub mod error;
+pub mod gguf_weight_loader;
 pub mod inference_engine;
 pub mod kernel;
 pub mod model;
@@ -27,6 +28,7 @@ pub mod tokenizer;
 
 pub use device::DeviceBackend;
 pub use error::{Result, RunnerError};
+pub use gguf_weight_loader::{load_gguf_tensor, load_gguf_weights, GgufWeights};
 pub use inference_engine::InferenceEngine;
 pub use kernel::{AttentionKernel, CpuAttentionKernel, GemmKernel, GemmBuilder};
 pub use kernel::{DeviceBuffer, HostTmaDescriptor, Kvcache};
