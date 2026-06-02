@@ -43,12 +43,14 @@ pub enum GgufValueType {
     Int32,
     Uint64,
     Int64,
-    String,
     Float32,
-    Float64,
     Bool,
+    String,
     Array,
+    Int8Array,
+    Uint8Array,
     Bfloat16,
+    Float16,
 }
 
 impl GgufValueType {
@@ -62,12 +64,14 @@ impl GgufValueType {
             5 => Some(Self::Int32),
             6 => Some(Self::Uint64),
             7 => Some(Self::Int64),
-            8 => Some(Self::String),
-            9 => Some(Self::Float32),
-            10 => Some(Self::Float64),
-            11 => Some(Self::Bool),
-            12 => Some(Self::Array),
-            15 => Some(Self::Bfloat16),
+            8 => Some(Self::Float32),
+            9 => Some(Self::Bool),
+            10 => Some(Self::String),
+            11 => Some(Self::Array),
+            12 => Some(Self::Int8Array),
+            13 => Some(Self::Uint8Array),
+            14 => Some(Self::Bfloat16),
+            15 => Some(Self::Float16),
             _ => None,
         }
     }
@@ -82,12 +86,14 @@ impl GgufValueType {
             Self::Int32 => 5,
             Self::Uint64 => 6,
             Self::Int64 => 7,
-            Self::String => 8,
-            Self::Float32 => 9,
-            Self::Float64 => 10,
-            Self::Bool => 11,
-            Self::Array => 12,
-            Self::Bfloat16 => 15,
+            Self::Float32 => 8,
+            Self::Bool => 9,
+            Self::String => 10,
+            Self::Array => 11,
+            Self::Int8Array => 12,
+            Self::Uint8Array => 13,
+            Self::Bfloat16 => 14,
+            Self::Float16 => 15,
         }
     }
 
@@ -97,10 +103,10 @@ impl GgufValueType {
 
     pub fn element_size(self) -> Option<usize> {
         match self {
-            Self::Uint8 | Self::Int8 | Self::Bool => Some(1),
-            Self::Uint16 | Self::Int16 | Self::Bfloat16 => Some(2),
+            Self::Uint8 | Self::Int8 | Self::Bool | Self::Int8Array | Self::Uint8Array => Some(1),
+            Self::Uint16 | Self::Int16 | Self::Bfloat16 | Self::Float16 => Some(2),
             Self::Uint32 | Self::Int32 => Some(4),
-            Self::Uint64 | Self::Int64 | Self::Float64 => Some(8),
+            Self::Uint64 | Self::Int64 => Some(8),
             Self::Float32 => Some(4),
             Self::String | Self::Array => None,
         }
@@ -123,19 +129,20 @@ impl GgufKvPair {
             GgufKvValue::Uint8(..)
             | GgufKvValue::Int8(..)
             | GgufKvValue::Bool(..) => 1,
-            GgufKvValue::Uint16(..) | GgufKvValue::Int16(..) => 2,
+            GgufKvValue::Uint16(..) | GgufKvValue::Int16(..) | GgufKvValue::Bfloat16(..) | GgufKvValue::Float16(..) => 2,
             GgufKvValue::Uint32(..)
             | GgufKvValue::Int32(..)
-            | GgufKvValue::Float32(..)
-            | GgufKvValue::Bfloat16(..) => 4,
-            GgufKvValue::Uint64(..) | GgufKvValue::Int64(..) | GgufKvValue::Float64(..) => 8,
+            | GgufKvValue::Float32(..) => 4,
+            GgufKvValue::Uint64(..) | GgufKvValue::Int64(..) => 8,
             GgufKvValue::String(s) => 8 + s.len(),
+            GgufKvValue::Int8Array(arr) => 8 + arr.len(),
+            GgufKvValue::Uint8Array(arr) => 8 + arr.len(),
             GgufKvValue::Array(arr) => {
                 let elem_size = match arr.first().map(|v| v.value_type()) {
-                    Some(GgufValueType::Uint8 | GgufValueType::Int8 | GgufValueType::Bool) => 1,
-                    Some(GgufValueType::Uint16 | GgufValueType::Int16) => 2,
+                    Some(GgufValueType::Uint8 | GgufValueType::Int8 | GgufValueType::Bool | GgufValueType::Int8Array | GgufValueType::Uint8Array) => 1,
+                    Some(GgufValueType::Uint16 | GgufValueType::Int16 | GgufValueType::Float16) => 2,
                     Some(GgufValueType::Uint32 | GgufValueType::Int32 | GgufValueType::Float32) => 4,
-                    Some(GgufValueType::Uint64 | GgufValueType::Int64 | GgufValueType::Float64) => 8,
+                    Some(GgufValueType::Uint64 | GgufValueType::Int64) => 8,
                     Some(GgufValueType::String) => {
                         return arr.iter().map(|v| match v {
                             GgufKvValue::String(s) => 8 + s.len(),
@@ -425,9 +432,11 @@ pub enum GgufKvValue {
     Int64(i64),
     String(String),
     Float32(f32),
-    Float64(f64),
     Bool(bool),
     Array(Vec<GgufKvValue>),
+    Int8Array(Vec<i8>),
+    Uint8Array(Vec<u8>),
+    Float16(u16),
     Bfloat16(f32),
 }
 
@@ -473,7 +482,6 @@ impl GgufKvValue {
     pub fn as_f32(&self) -> Option<f32> {
         match self {
             GgufKvValue::Float32(v) => Some(*v),
-            GgufKvValue::Float64(v) => Some(*v as f32),
             GgufKvValue::Bfloat16(v) => Some(*v),
             _ => None,
         }
@@ -512,9 +520,11 @@ impl GgufKvValue {
             GgufKvValue::Int64(..) => GgufValueType::Int64,
             GgufKvValue::String(..) => GgufValueType::String,
             GgufKvValue::Float32(..) => GgufValueType::Float32,
-            GgufKvValue::Float64(..) => GgufValueType::Float64,
             GgufKvValue::Bool(..) => GgufValueType::Bool,
             GgufKvValue::Array(..) => GgufValueType::Array,
+            GgufKvValue::Int8Array(..) => GgufValueType::Int8Array,
+            GgufKvValue::Uint8Array(..) => GgufValueType::Uint8Array,
+            GgufKvValue::Float16(..) => GgufValueType::Float16,
             GgufKvValue::Bfloat16(..) => GgufValueType::Bfloat16,
         }
     }
@@ -531,9 +541,11 @@ impl GgufKvValue {
             GgufKvValue::Int64(_) => "i64",
             GgufKvValue::String(_) => "str",
             GgufKvValue::Float32(_) => "f32",
-            GgufKvValue::Float64(_) => "f64",
             GgufKvValue::Bool(_) => "bool",
             GgufKvValue::Array(_) => "array",
+            GgufKvValue::Int8Array(_) => "i8[]",
+            GgufKvValue::Uint8Array(_) => "u8[]",
+            GgufKvValue::Float16(_) => "f16",
             GgufKvValue::Bfloat16(_) => "bf16",
         }
     }
@@ -749,14 +761,15 @@ mod tests {
         assert_eq!(GgufValueType::from_u32(0), Some(GgufValueType::Uint8));
         assert_eq!(GgufValueType::from_u32(6), Some(GgufValueType::Uint64));
         assert_eq!(GgufValueType::from_u32(7), Some(GgufValueType::Int64));
-        assert_eq!(GgufValueType::from_u32(8), Some(GgufValueType::String));
-        assert_eq!(GgufValueType::from_u32(9), Some(GgufValueType::Float32));
-        assert_eq!(GgufValueType::from_u32(10), Some(GgufValueType::Float64));
-        assert_eq!(GgufValueType::from_u32(11), Some(GgufValueType::Bool));
-        assert_eq!(GgufValueType::from_u32(12), Some(GgufValueType::Array));
-        assert_eq!(GgufValueType::from_u32(15), Some(GgufValueType::Bfloat16));
-        assert_eq!(GgufValueType::from_u32(13), None); // 13 is reserved
-        assert_eq!(GgufValueType::from_u32(14), None); // 14 is reserved
+        assert_eq!(GgufValueType::from_u32(8), Some(GgufValueType::Float32));
+        assert_eq!(GgufValueType::from_u32(9), Some(GgufValueType::Bool));
+        assert_eq!(GgufValueType::from_u32(10), Some(GgufValueType::String));
+        assert_eq!(GgufValueType::from_u32(11), Some(GgufValueType::Array));
+        assert_eq!(GgufValueType::from_u32(12), Some(GgufValueType::Int8Array));
+        assert_eq!(GgufValueType::from_u32(13), Some(GgufValueType::Uint8Array));
+        assert_eq!(GgufValueType::from_u32(14), Some(GgufValueType::Bfloat16));
+        assert_eq!(GgufValueType::from_u32(15), Some(GgufValueType::Float16));
+        assert_eq!(GgufValueType::from_u32(16), None);
     }
 
     #[test]
@@ -920,8 +933,8 @@ mod tests {
         let f32_val = GgufKvValue::Float32(3.14);
         assert_eq!(f32_val.as_f32(), Some(3.14));
 
-        let f64_val = GgufKvValue::Float64(3.14159);
-        assert_eq!(f64_val.as_f32(), Some(3.14159f64 as f32));
+        let f32_val = GgufKvValue::Float32(3.14159);
+        assert_eq!(f32_val.as_f32(), Some(3.14159f32));
 
         let bool_val = GgufKvValue::Bool(true);
         assert_eq!(bool_val.as_bool(), Some(true));
@@ -1409,8 +1422,9 @@ mod tests {
             GgufValueType::Uint8, GgufValueType::Int8, GgufValueType::Uint16,
             GgufValueType::Int16, GgufValueType::Uint32, GgufValueType::Int32,
             GgufValueType::Uint64, GgufValueType::Int64, GgufValueType::String,
-            GgufValueType::Float32, GgufValueType::Float64, GgufValueType::Bool,
-            GgufValueType::Array, GgufValueType::Bfloat16,
+            GgufValueType::Float32, GgufValueType::Bool,
+            GgufValueType::Array, GgufValueType::Int8Array, GgufValueType::Uint8Array,
+            GgufValueType::Bfloat16, GgufValueType::Float16,
         ];
         for t in types {
             let raw = t.to_u32();
@@ -1420,8 +1434,7 @@ mod tests {
 
     #[test]
     fn test_value_type_from_u32_unmapped_reserved() {
-        assert!(GgufValueType::from_u32(13).is_none());
-        assert!(GgufValueType::from_u32(14).is_none());
+        assert!(GgufValueType::from_u32(17).is_none());
         assert!(GgufValueType::from_u32(16).is_none());
     }
 
