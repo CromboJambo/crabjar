@@ -18,6 +18,7 @@ mod backend;
 mod lm_studio_client;
 
 use backend::InferenceBackend;
+use lm_studio_client::LmStudioClient;
 
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -249,7 +250,7 @@ async fn handle_chat(
     let user_input = payload.prompt;
 
     let mut backend = state.backend.lock().await;
-    info!("Chat request received (backend: {})", backend.kind());
+    info!("Chat request received (backend: {})", (*backend).kind());
 
     let response = backend.chat(user_input).await.map_err(|e| {
         error!("Inference backend error: {}", e);
@@ -796,7 +797,7 @@ struct AppState {
     store: Arc<std::sync::Mutex<Store>>,
     events_db_path: String,
     guard_root: String,
-    backend: Arc<Mutex<backend::Backend>>,
+    backend: Arc<Mutex<LmStudioClient>>,
 }
 
 /// Handler for recent_events — queries the knowledge store.
@@ -935,7 +936,7 @@ async fn main() -> anyhow::Result<()> {
         store: Arc::new(std::sync::Mutex::new(store)),
         events_db_path,
         guard_root,
-        backend: Arc::new(Mutex::new(backend::Backend::try_new().await)),
+        backend: Arc::new(Mutex::new(LmStudioClient::from_env())),
     };
 
     // Define the Axum router with SSE and JSON endpoints.

@@ -2,7 +2,7 @@
 //!
 //! This module provides functionality for loading and managing project-specific
 //! configurations and command metadata for the stripped-down CrabJar CLI.
-use crabjar_config::{ConfigError, ProjectConfig};
+use crate::crabjar_config::{ConfigError, ProjectConfig};
 use std::path::{Path, PathBuf};
 
 /// Result type for project loading operations

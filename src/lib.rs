@@ -246,6 +246,7 @@ pub enum DoctorCommand {
 }
 
 pub mod knowledge_store;
+pub mod crabjar_config;
 
 pub fn cli() -> clap::Command {
     Cli::command()

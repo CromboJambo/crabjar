@@ -3,6 +3,7 @@ use crabjar_lib::{Cli, CliCommand, StateCommand, WorkspaceCommand};
 use serde_json::json;
 
 mod bitwarden;
+mod crabjar_config;
 mod dinit;
 mod dotfile_manager;
 mod knowledge_store;
@@ -193,7 +194,7 @@ async fn handle_workspace_status() -> serde_json::Value {
             return json!({
                 "success": true,
                 "workspace": {
-                    "name": config.workspace_name,
+                    "name": config.name,
                     "description": config.description,
                     "declared_tools": config.tools.len(),
                     "tool_execution_enabled": config.tool_execution_enabled,
@@ -941,7 +942,7 @@ async fn handle_doctor_command(
                         "ok": true,
                         "detail": format!(
                             "name={}, tools={}, exec_enabled={}",
-                            cfg.workspace_name, cfg.tools.len(), cfg.tool_execution_enabled
+                            cfg.name, cfg.tools.len(), cfg.tool_execution_enabled
                         ),
                     }));
                 } else {
