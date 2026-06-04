@@ -19,6 +19,7 @@ members = [
     "src/llm-runner",
     "zed-acp-bridge",
     "zed-acp-server", "src/gguf",
+    "train-extract",
 ]
 
 resolver = "2"
