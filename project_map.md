@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server with unified LM client), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), safetensors (model weight storage), GGUF parsing, tool registry, LLM inference crates, Zed ACP bridge, and agent skills.
+CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server with unified LM client), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), tool registry, codeburn CLI, skill script runner, skill reference store, Zed ACP bridge, and agent skills. LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
 
 ---
 
@@ -73,60 +73,6 @@ crabjar/
 │   ├── src/optimize.rs
 │   └── tests/cli.rs
 │
-│  GGUF crates (nested src/)
-├── src/gguf/                # GGUF parser crate
-│   └── src/
-│       ├── lib.rs
-│       ├── parser.rs
-│       ├── types.rs
-│       └── error.rs
-├── src/gguf-cli/            # GGUF CLI binary
-│   └── src/main.rs
-│
-│  LLM inference crates
-├── src/llm-plug-in/         # LLM plugin protocol (InferenceRequest/Response)
-│   └── src/
-│       ├── lib.rs
-│       ├── protocol.rs
-│       ├── manifest.rs
-│       └── error.rs
-├── src/llm-runner/          # LLM runner (CPU fallback kernels; GPU path stubbed)
-│   ├── Cargo.toml
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── inference_engine.rs
-│   │   ├── model.rs
-│   │   ├── model_loader.rs
-│   │   ├── error.rs
-│   │   ├── tokenizer.rs
-│   │   ├── runner.rs
-│   │   ├── plug_in.rs
-│   │   ├── device.rs
-│   │   ├── gguf_weight_loader.rs
-│   │   ├── model_manager.rs
-│   │   ├── registry.rs
-│   │   └── kernel/
-│   │       ├── mod.rs
-│   │       ├── gemm.rs          # GEMM trait (WGMMA/tcgen05) + CPU fallback
-│   │       ├── attention.rs     # Attention trait (Blackwell) + CPU fallback
-│   │       ├── kvcache.rs       # KV cache with TMA descriptor support
-│   │       ├── device_buf.rs    # DeviceBuffer<T> abstraction
-│   │       ├── tma_descriptor.rs # Blackwell TMA descriptor (128-bit)
-│   │       ├── tma_bridge.rs    # cuda-oxide CUtensorMap bridge
-│   │       ├── builder.rs       # PTX builder, kernel registration (stub)
-│   │       └── tests/
-│   │   ├── device/            # (empty — legacy dir)
-│   │   ├── inference-engine/  # (empty — legacy dir)
-│   │   ├── model-loader/      # (empty — legacy dir)
-│   │   ├── plug-in/           # (empty — legacy dir)
-│   │   ├── runner/            # (empty — legacy dir)
-│   │   └── tokenizer/         # (empty — legacy dir)
-│   └── examples/
-│       ├── tcgen05_attention/
-│       ├── tcgen05_gemm/
-│       ├── tiled_gemm/
-│       └── wgmma_gemm/
-│
 │  Skill crates (nested src/)
 ├── src/skill-script-runner/ # skill script discovery and execution
 │   └── src/
@@ -190,15 +136,6 @@ crabjar/
 │       ├── lib.rs
 │       ├── agent_isolation.rs
 │       ├── schema.rs
-│       └── error.rs
-├── safetensors/             # Model weight storage (SQLite, checksum verification)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── safetensors_store.rs
-│       ├── schema.rs
-│       ├── gguf_converter.rs
-│       ├── gguf_model_loader.rs
 │       └── error.rs
 ├── tool_registry/           # MCP tool registry (rig/aur patterns)
 │   ├── Cargo.toml
@@ -284,10 +221,7 @@ crabjar/
 | `guard` | Trust layers, annealing, execution gate | Authorization | Active |
 | `telemetry` | Flight recorder, command executor | Telemetry | Active |
 | `sandbox` | Agent isolation (Unix user, dinit-container, cgroup) | Isolation | Active |
-| `safetensors` | Model weight storage (SQLite, checksum verification, GGUF converter) | Storage | Active |
 | `tool_registry` | MCP tool registry | Registry | Active |
-| `gguf` | GGUF parser crate | Inference | Active |
-| `gguf-cli` | GGUF CLI binary | Inference | Active |
 | `codeburn-provider` | ProviderRegistry (Claude/Cursor/OpenCode etc.) | Provider | Active |
 | `codeburn-classifier` | TaskClassifier | Classification | Active |
 | `codeburn-pricing` | PricingEngine with LiteLLM fetch | Pricing | Active |
@@ -295,8 +229,6 @@ crabjar/
 | `codeburn` | codeburn CLI binary | CLI | Active |
 | `skill-script-runner` | Skill script discovery and execution | Skill | Active |
 | `skill-reference-store` | Skill reference indexing and staleness | Reference | Active |
-| `llm-plug-in` | LLM plugin protocol (InferenceRequest/Response) | Plugin | Active |
-| `llm-runner` | LLM runner (CPU fallback kernels; GPU path stubbed) | Inference | Experimental |
 | `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) | Bridge | Active |
 | `zed-acp-server` | stdio JSON-RPC server (ACP protocol execution) | Bridge | Active |
 
@@ -316,12 +248,7 @@ Declared in Cargo.toml `[workspace.members]`:
 - `guard`
 - `telemetry`
 - `sandbox`
-- `safetensors`
 - `tool_registry`
-- `src/llm-plug-in`
-- `src/llm-runner`
-- `src/gguf`
-- `src/gguf-cli`
 - `zed-acp-bridge`
 - `zed-acp-server`
 

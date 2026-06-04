@@ -4,7 +4,7 @@ Please note that CrabJar is an **experimental learning hobby project**. The code
 
 *Unsafe Code Warning:* Currently, the project utilizes approximately `<N>` number of `unsafe` Rust blocks across several libraries (e.g., `<lib1>`, `<lib2>`). These areas require careful security and memory safety auditing before deployment in a critical system. Please treat this codebase with academic curiosity rather than production confidence.
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), safetensors (model weight storage), tool registry, codeburn CLI, skill script runner, skill reference store, and Zed agent protocol bridge.
+CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, codeburn token tracking, orchestrator (Axum SSE server), guard (execution gate), telemetry (flight recorder), sandbox (agent isolation), tool registry, codeburn CLI, skill script runner, skill reference store, and Zed agent protocol bridge. LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
 
 ## Workspace Members
 
@@ -23,10 +23,7 @@ Declared in Cargo.toml `[workspace.members]`:
 - `guard`
 - `telemetry`
 - `sandbox`
-- `safetensors`
 - `tool_registry`
-- `src/llm-plug-in`
-- `src/llm-runner`
 - `zed-acp-bridge`
 - `zed-acp-server`
 
@@ -54,8 +51,6 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 | `codeburn` | codeburn CLI binary |
 | `skill-script-runner` | Skill script discovery and execution |
 | `skill-reference-store` | Skill reference indexing and staleness |
-| `llm-plug-in` | LLM plugin protocol |
-| `llm-runner` | LLM runner (CPU fallback kernels; GPU path experimental) |
 | `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) |
 | `zed-acp-server` | stdio JSON-RPC server (ACP protocol) |
 
@@ -63,7 +58,7 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 21 members, shared deps
+├── Cargo.toml               # Workspace root — 16 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── AGENTS.md               # Repository guidelines
 ├── README.md               # Project overview
@@ -83,7 +78,6 @@ crabjar/
 ├── guard/                   # Trust layers, execution gate
 ├── telemetry/               # Flight recorder
 ├── sandbox/                 # Agent isolation
-├── safetensors/             # Model weight storage
 ├── tool_registry/           # MCP tool registry
 ├── src/codeburn-provider/   # ProviderRegistry
 ├── src/codeburn-classifier/ # TaskClassifier
@@ -92,10 +86,6 @@ crabjar/
 ├── src/codeburn/            # codeburn CLI binary
 ├── src/skill-script-runner/ # Skill script discovery
 ├── src/skill-reference-store/ # Skill reference indexing
-│
-│  LLM inference crates
-├── src/llm-plug-in/         # LLM plugin protocol
-├── src/llm-runner/          # LLM runner (CPU fallback kernels; GPU path experimental)
 │
 │  Documentation
 ├── state-docs/              # Durable Markdown state documentation
