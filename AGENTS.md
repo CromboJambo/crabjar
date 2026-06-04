@@ -55,7 +55,7 @@ Parameter names must match column names, not semantic intent. Semantic naming dr
 ## Workspace Members
 
 Declared in Cargo.toml `[workspace.members]`:
-- `src/crabjar-config`, `memory`, `orchestrator`, `guard`, `telemetry`, `sandbox`, `safetensors`, `tool_registry`, `src/codeburn-provider`, `src/codeburn-config`, `src/codeburn-classifier`, `src/codeburn-pricing`, `src/codeburn`, `src/llm-plug-in`, `src/llm-runner`, `src/gguf`, `src/gguf-cli`, `src/skill-script-runner`, `src/skill-reference-store`, `zed-acp-bridge`, `zed-acp-server`
+- `src/crabjar-config`, `memory`, `orchestrator`, `guard`, `telemetry`, `sandbox`, `tool_registry`, `src/codeburn-provider`, `src/codeburn-config`, `src/codeburn-classifier`, `src/codeburn-pricing`, `src/codeburn`, `src/skill-script-runner`, `src/skill-reference-store`, `zed-acp-bridge`, `zed-acp-server`
 
 Nested crates use `src/<crate>/src/` pattern (not flat `src/<crate>/`).
 
@@ -89,4 +89,4 @@ Use `project_map.md` and `AGENTS.md` as primary navigation tools. Verify paths b
 
 ## LLM Runner Status
 
-`src/llm-runner/` is experimental: CPU fallback kernels (`CpuGemmKernel`, `CpuAttentionKernel`) are operational for verification. GPU path is stubbed (`GemmBuilder::build` returns `KernelFromPtx` with no-op matmul). Weight loading → inference pipeline bridge, RoPE/RMSNorm/activations/LM head/sampling are unimplemented. K-family quantization dequantization is unimplemented. See `llmrunner.md` for gap analysis.
+`llm-runner` (in `llm-workspace/`) is experimental: CPU fallback kernels (`CpuGemmKernel`, `CpuAttentionKernel`) are operational for verification. GPU path is stubbed (`GemmBuilder::build` returns `KernelFromPtx` with no-op matmul). Weight loading → inference pipeline bridge, RoPE/RMSNorm/activations/LM head/sampling are unimplemented. K-family quantization dequantization is unimplemented. See `llmrunner.md` for gap analysis.
