@@ -1,6 +1,8 @@
 ---
 name: skill-creator
 description: Create, write, or improve a skill for corust-agent. Use this skill whenever the user wants to make a new skill, edit an existing skill's SKILL.md, improve a skill's description, add bundled scripts or references to a skill, figure out where to install a skill, or understand how skills work in corust. Also trigger when the user asks "how do I add a skill", "can you turn this workflow into a skill", "what should go in SKILL.md", or "my skill isn't triggering correctly".
+keywords: [skill, creator, documentation, setup]
+trigger: on_manual_call # Triggered when the user explicitly asks to create or modify skills
 ---
 
 # Skill Creator
