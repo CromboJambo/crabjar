@@ -328,7 +328,7 @@ async fn handle_exec(
             let flight_db_path =
                 crabjar_guard::GuardDb::from_mirror_path(project_root.join("guard.db"));
             let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
-            let flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
+            let mut flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
                 &flight_conn,
                 "exec-session",
             );
@@ -340,6 +340,7 @@ async fn handle_exec(
 
             let records = flight_recorder.query_records(1)?;
             let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
+            let receipt = records.first().map(|r| r.receipt.clone()).unwrap_or_default();
 
             let git_dirty = flight_recorder.capture_git_dirty(&effective_cwd).await?;
             let git_diff = flight_recorder.capture_git_diff(&effective_cwd).await?;
@@ -403,6 +404,11 @@ async fn handle_exec(
                     "git_diff_hash": git_diff,
                     "outcome_id": outcome_id,
                     "flight_recorder": true,
+                    "receipt": if receipt.is_empty() {
+                        None::<String>
+                    } else {
+                        Some(receipt)
+                    },
                 },
             }))
         }
