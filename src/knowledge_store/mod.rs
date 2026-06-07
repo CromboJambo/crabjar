@@ -113,6 +113,9 @@ impl KnowledgeBridge {
         project_root: impl Into<PathBuf>,
         mirror_log_db_path: Option<PathBuf>,
     ) -> Result<Self, agent_context::Error> {
+        if let Some(parent) = std::path::Path::new(knowledge_store_path).parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let conn = rusqlite::Connection::open(knowledge_store_path)?;
         agent_context::schema::migrate(&conn)?;
         let knowledge_store = Store { conn };
