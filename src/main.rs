@@ -172,14 +172,18 @@ async fn handle_knowledge_command(
         .map_err(|err| agent_context::Error::Io(std::io::Error::other(err.to_string())))?;
     
     // Build guard DB path for gate
-    let guard_db_path = project_root.join("guard.db");
+    let guard_db_path = project_root.join("guard/guard.db");
     let guard_db = crabjar_guard::GuardDb::open(&guard_db_path)
         .unwrap_or_else(|_| {
             let temp_dir = tempfile::tempdir().unwrap();
             crabjar_guard::GuardDb::open(temp_dir.path().join("guard.db")).unwrap()
         });
     
-    let bridge = KnowledgeBridge::new("knowledge.db", project_root, None)?
+    let bridge = KnowledgeBridge::new(
+        project_root.join("memory/knowledge.db").to_string_lossy().as_ref(),
+        project_root,
+        None,
+    )?
         .with_guard_db(guard_db);
     command.execute(&bridge).await
 }
@@ -268,7 +272,7 @@ async fn handle_exec(
     };
 
     // Guard layer: gate check before execution
-    let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard.db"))
+    let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard/guard.db"))
         .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").expect("guard db fallback"));
 
     let gate = crabjar_guard::ExecutionGate::new(&guard_db, dry_run, &project_root);
@@ -328,8 +332,7 @@ async fn handle_exec(
         }
         crabjar_guard::ActionStatus::TrustApproved => {
             // Telemetry layer: persistent flight recorder
-            let flight_db_path =
-                crabjar_guard::GuardDb::from_mirror_path(project_root.join("guard.db"));
+            let flight_db_path = project_root.join("telemetry/flight.db");
             let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
             let mut flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
                 &flight_conn,
@@ -478,7 +481,7 @@ fn handle_guard_command(
     command: GuardCommand,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let project_root = std::env::current_dir()?;
-    let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard.db"))
+    let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard/guard.db"))
         .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").expect("guard db fallback"));
 
     match command {
@@ -707,7 +710,7 @@ async fn handle_doctor_command(
     match command {
         DoctorCommand::Check => {
             // 1. Guard DB check
-            let guard_path = project_root.join("guard.db");
+            let guard_path = project_root.join("guard/guard.db");
             let guard_exists = guard_path.exists();
             let guard_ok = guard_exists;
             let guard_detail = if guard_exists {
@@ -811,7 +814,7 @@ async fn handle_doctor_command(
             }
 
             // 2. Telemetry / flight recorder DB check
-            let flight_path = project_root.join("flight.db");
+            let flight_path = project_root.join("telemetry/flight.db");
             let flight_exists = flight_path.exists();
             let flight_ok = flight_exists;
             let flight_detail = if flight_exists {
@@ -878,7 +881,7 @@ async fn handle_doctor_command(
             }
 
             // 3. Knowledge store (memory) DB check
-            let memory_path = project_root.join("knowledge.db");
+            let memory_path = project_root.join("memory/knowledge.db");
             let memory_exists = memory_path.exists();
             let memory_ok = memory_exists;
             let memory_detail = if memory_exists {
@@ -1043,9 +1046,9 @@ async fn handle_doctor_command(
                     "checks": checks,
                     "doubt": {
                         "assumptions": [
-                            "guard.db schema tables >= 4 indicates healthy state",
-                            "flight.db schema tables >= 4 indicates healthy state",
-                            "knowledge.db schema tables >= 3 indicates healthy state",
+                            "guard/guard.db schema tables >= 4 indicates healthy state",
+                            "telemetry/flight.db schema tables >= 4 indicates healthy state",
+                            "memory/knowledge.db schema tables >= 3 indicates healthy state",
                         ],
                         "blind_spots": [
                             "Does not verify WAL journal integrity",
