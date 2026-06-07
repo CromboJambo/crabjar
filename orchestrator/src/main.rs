@@ -16,9 +16,11 @@ use std::net::SocketAddr;
 
 mod backend;
 mod lm_studio_client;
+mod native_runner;
 
 use backend::InferenceBackend;
 use lm_studio_client::LmStudioClient;
+use native_runner::{NativeRunnerClient, NativeRunnerConfig};
 
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -797,7 +799,7 @@ struct AppState {
     store: Arc<std::sync::Mutex<Store>>,
     events_db_path: String,
     guard_root: String,
-    backend: Arc<Mutex<LmStudioClient>>,
+    backend: Arc<Mutex<Box<dyn InferenceBackend>>>,
 }
 
 /// Handler for recent_events — queries the knowledge store.
@@ -931,12 +933,25 @@ async fn main() -> anyhow::Result<()> {
     let store = Store::open(&knowledge_db_path)
         .map_err(|e| anyhow::anyhow!("Failed to open knowledge store: {e}"))?;
 
+    // Initialize inference backend based on configuration
+    let backend: Box<dyn InferenceBackend> = match std::env::var("INFERENCE_BACKEND").ok().as_deref() {
+        Some("native") | Some("native-runner") => {
+            info!("Initializing native runner backend");
+            let config = NativeRunnerConfig::from_env();
+            Box::new(NativeRunnerClient::new(config).await?)
+        }
+        _ => {
+            info!("Initializing LM Studio backend");
+            Box::new(LmStudioClient::from_env())
+        }
+    };
+
     // Share state across handlers
     let state = AppState {
         store: Arc::new(std::sync::Mutex::new(store)),
         events_db_path,
         guard_root,
-        backend: Arc::new(Mutex::new(LmStudioClient::from_env())),
+        backend: Arc::new(Mutex::new(backend)),
     };
 
     // Define the Axum router with SSE and JSON endpoints.
