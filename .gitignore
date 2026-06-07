@@ -37,3 +37,4 @@ knowledge.db
 memory/knowledge.db
 llmrunner.md
 src/dinit.rs
+.agents/GitCloneResearch/
