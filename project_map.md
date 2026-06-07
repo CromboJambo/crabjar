@@ -439,6 +439,8 @@ wire orchestrator → guard → telemetry into a `crabjar exec` CLI command ✅;
 
 move completed experiments to archive/ directory; produce clean pre-optimized workspace.
 
+**ZeroClaw influence**: microkernel trait ABI (`zeroclaw-api`), feature-flagged subsystems, tool receipts (HMAC-SHA256 per invocation), SOP engine (declarative `SOP.toml` with approval gates), config schema generation (`schemars`). Crabjar's unique contribution: dynamic confidence tracking + trust evolution (annealing) — ZeroClaw uses static risk profiles.
+
 ### Phase 4 — Inference Integration ✅ DONE
 
 wire orchestrator's `LmStudioClient` into the `handle_chat` handler ✅ (via `InferenceBackend` trait); add mistral.rs as inference substrate ✅ (`MistralRsClient` with lazy model loading); unify LM client to support mistral.rs serve on OpenAI-compatible port ✅ (`LmStudioEndpoint::MistralRsServe` variant + `MISTRALRS_SERVE_URL` env var); replace hardcoded LM Studio URL with env-configurable endpoint ✅ (`INFERENCE_BACKEND`, `LM_STUDIO_URL`, `MISTRALRS_MODEL`, `MISTRALRS_QUANT`, `MISTRALRS_SERVE_URL`).
@@ -454,6 +456,8 @@ Crabjar is a pure observer. It knows what happened but cannot change what happen
 ### Executor Layer Status
 
 Runtime execution is executor-capable. Execution is opt-in via `.crabjar_config.toml` `tool_execution_enabled`. The single pipeline is: `request → guard → concierge → telemetry → outcome → trust update`. Pending actions persist to GuardDb. All actions require real provenance lookup.
+
+*Security model inspired by [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) docs: six-layer security (channel pairing → autonomy → workspace → command policy → OS sandbox → tool receipts), three-level autonomy (ReadOnly/Supervised/Full), per-tool overrides, HMAC tool receipts. Crabjar extends with dynamic confidence bands + annealing (decay/reinforcement) — ZeroClaw uses static risk profiles.*
 
 ### Doubt Output Requirement
 
@@ -567,6 +571,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 | `prov-map-drift-2026-05-30` | project_map.md regenerated — 21 members, gguf/gguf-cli added, orchestrator lm_studio_client documented, test count 741, legacy dirs noted | 2026-05-30 | Structural alignment refresh | crabjar/project_map.md |
 | `prov-phase4-done` | Phase 4 complete: unified InferenceBackend trait, MistralRsServe endpoint, MISTRALRS_SERVE_URL env var, detect_available_endpoints probes mistral.rs serve | 2026-05-31 | Inference integration completion | crabjar/project_map.md |
 | `prov-llm-cross-project` | llm-workspace added as cross-project reference via opencode instructions + dotfiles symlink graph | 2026-06-06 | Cross-project awareness | crabjar/.agents/skills/cross-project |
+| `prov-zeroclaw-credit` | README + project_map credit: ZeroClaw docs for security model, tool receipts, microkernel, SOP, config schema | 2026-06-06 | Attribution for design influence | crabjar/README.md, crabjar/project_map.md |
 
 ---
 

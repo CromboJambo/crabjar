@@ -161,6 +161,17 @@ crabjar exec <action>
 
 Crabjar treats `state-docs/` as a shared project memory surface. Markdown files are the durable source documents; agent/user comments live in `state-docs/overlay/*.overlay.json` so they can be updated without rewriting the base docs.
 
+## Acknowledgments
+
+Crabjar's security and execution model draws from [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) docs:
+- **Guard/trust/annealing** — inspired by ZeroClaw's six-layer security model and autonomy levels (ReadOnly/Supervised/Full)
+- **Tool receipts** — HMAC-SHA256 per-invocation receipts (ZeroClaw's tool-receipt chain)
+- **Microkernel design** — trait-based kernel ABI (`zeroclaw-api`), feature-flagged subsystems
+- **SOP engine** — declarative procedures with approval gates (ZeroClaw's `SOP.toml` pattern)
+- **Config schema generation** — `schemars`-driven docs from live schema
+
+Crabjar's contribution: dynamic confidence tracking + trust evolution (annealing), which ZeroClaw doesn't attempt.
+
 ## Architectural Constraints
 
 ### Detection ≠ Authorization
