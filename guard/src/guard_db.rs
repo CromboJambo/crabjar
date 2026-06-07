@@ -16,6 +16,9 @@ pub enum GuardDbError {
 
     #[error("schema initialization failed: {0}")]
     SchemaError(String),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 /// Manages the guard database connection and schema initialization.
@@ -29,6 +32,9 @@ impl GuardDb {
     /// Open or create the guard database at the given path.
     /// Default path is `guard.db` in the same directory as the mirror database.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, GuardDbError> {
+        if let Some(parent) = path.as_ref().parent() {
+            std::fs::create_dir_all(parent)?;
+        }
         let conn = Connection::open(path)?;
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
