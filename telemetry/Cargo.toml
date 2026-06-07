@@ -22,6 +22,9 @@ path-absolutize.workspace = true
 sha2.workspace = true
 hex.workspace = true
 ignore.workspace = true
+hmac = "0.12"
+getrandom = "0.3"
+base64 = "0.22"
 
 [dev-dependencies]
 tempfile.workspace = true

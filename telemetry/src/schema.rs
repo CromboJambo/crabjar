@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS flight_records (
     git_diff_hash TEXT NOT NULL DEFAULT '',
     reason TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'agent',
-    metadata TEXT NOT NULL DEFAULT '{}'
+    metadata TEXT NOT NULL DEFAULT '{}',
+    receipt TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_flight_records_session ON flight_records(session_id);
@@ -88,13 +89,14 @@ pub fn record_command(
     git_diff_hash: &str,
     reason: &str,
     source: &str,
+    receipt: &str,
 ) -> Result<String, FlightRecorderError> {
     let id = uuid::Uuid::new_v4().to_string();
     let args_json = serde_json::to_string(args).map_err(FlightRecorderError::Json)?;
 
     conn.execute(
-        "INSERT INTO flight_records (id, session_id, command, cwd, args, exit_code, stdout_hash, stderr_hash, stdout_len, stderr_len, git_dirty, git_diff_count, git_diff_hash, reason, source, metadata)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+        "INSERT INTO flight_records (id, session_id, command, cwd, args, exit_code, stdout_hash, stderr_hash, stdout_len, stderr_len, git_dirty, git_diff_count, git_diff_hash, reason, source, metadata, receipt)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
         params![
             id,
             session_id,
@@ -112,6 +114,7 @@ pub fn record_command(
             reason,
             source,
             "{}",
+            receipt,
         ],
     )?;
 
@@ -174,7 +177,7 @@ pub fn query_flight_records(
     limit: usize,
 ) -> Result<Vec<FlightRecordRow>, FlightRecorderError> {
     let mut stmt = conn.prepare(
-        "SELECT id, session_id, timestamp, command, cwd, args, exit_code, stdout_hash, stderr_hash, stdout_len, stderr_len, git_dirty, git_diff_count, git_diff_hash, reason, source FROM flight_records
+        "SELECT id, session_id, timestamp, command, cwd, args, exit_code, stdout_hash, stderr_hash, stdout_len, stderr_len, git_dirty, git_diff_count, git_diff_hash, reason, source, receipt FROM flight_records
          WHERE session_id = ?1
          ORDER BY timestamp DESC LIMIT ?2",
     )?;
@@ -200,6 +203,7 @@ pub fn query_flight_records(
             git_diff_hash: row.get(13)?,
             reason: row.get(14)?,
             source: row.get(15)?,
+            receipt: row.get(16)?,
         })
     })?;
 
@@ -268,7 +272,7 @@ pub fn list_all_records(
     limit: usize,
 ) -> Result<Vec<FlightRecordRow>, FlightRecorderError> {
     let mut stmt = conn.prepare(
-        "SELECT id, session_id, timestamp, command, cwd, args, exit_code, stdout_hash, stderr_hash, stdout_len, stderr_len, git_dirty, git_diff_count, git_diff_hash, reason, source FROM flight_records
+        "SELECT id, session_id, timestamp, command, cwd, args, exit_code, stdout_hash, stderr_hash, stdout_len, stderr_len, git_dirty, git_diff_count, git_diff_hash, reason, source, receipt FROM flight_records
          ORDER BY timestamp DESC LIMIT ?1",
     )?;
 
@@ -293,6 +297,7 @@ pub fn list_all_records(
             git_diff_hash: row.get(13)?,
             reason: row.get(14)?,
             source: row.get(15)?,
+            receipt: row.get(16)?,
         })
     })?;
 
@@ -320,6 +325,7 @@ pub struct FlightRecordRow {
     pub git_diff_hash: String,
     pub reason: String,
     pub source: String,
+    pub receipt: String,
 }
 
 /// A single session checkpoint row.
@@ -386,6 +392,7 @@ mod tests {
             "",
             "task: check workspace",
             "agent",
+            "zc-receipt-1234567890-abc123",
         )
         .unwrap();
 
@@ -395,6 +402,7 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].command, "cargo check");
         assert_eq!(rows[0].exit_code, 0);
+        assert_eq!(rows[0].receipt, "zc-receipt-1234567890-abc123");
     }
 
     #[test]
@@ -436,6 +444,7 @@ mod tests {
             "diff_hash",
             "test: run tests",
             "agent",
+            "zc-receipt-1234567890-def456",
         )
         .unwrap();
 
@@ -472,6 +481,7 @@ mod tests {
             "",
             "",
             "agent",
+            "zc-receipt-1234567890-ghi789",
         )
         .unwrap();
 
@@ -491,6 +501,7 @@ mod tests {
             "",
             "",
             "agent",
+            "zc-receipt-1234567890-jkl012",
         )
         .unwrap();
 
@@ -521,6 +532,7 @@ mod tests {
             "",
             "action: deleted test dir",
             "agent",
+            "zc-receipt-1234567890-mno345",
         )
         .unwrap();
         assert!(!id.is_empty());

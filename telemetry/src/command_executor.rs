@@ -17,7 +17,7 @@ impl<'a> StructuredCommandExecutor<'a> {
 
     /// Execute a command with full telemetry capture.
     pub async fn run(
-        &self,
+        &mut self,
         command: &str,
         args: &[String],
         cwd: &str,
@@ -143,10 +143,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
 
-        let recorder = FlightRecorder::new(&conn, "test-session-run");
+        let mut recorder = FlightRecorder::new(&conn, "test-session-run");
         recorder.init().unwrap();
 
-        let executor = StructuredCommandExecutor::new(recorder);
+        let mut executor = StructuredCommandExecutor::new(recorder);
 
         let outcome = executor
             .run(
@@ -168,10 +168,10 @@ mod tests {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
 
-        let recorder = FlightRecorder::new(&conn, "test-session-fail");
+        let mut recorder = FlightRecorder::new(&conn, "test-session-fail");
         recorder.init().unwrap();
 
-        let executor = StructuredCommandExecutor::new(recorder);
+        let mut executor = StructuredCommandExecutor::new(recorder);
 
         let outcome = executor
             .run(
