@@ -1,10 +1,12 @@
 /// Unified inference backend abstraction.
 ///
-/// Currently supports LM Studio via the `lm_studio_client` module.
+/// Currently supports LM Studio via the `lm_studio_client` module and native runner via `native_runner`.
 
 pub use lm_studio_client::UnifiedChatResponse;
+pub use native_runner::{NativeRunnerClient, NativeRunnerConfig};
 
 use crate::lm_studio_client;
+use crate::native_runner;
 
 // ---------------------------------------------------------------------------
 // Trait + enum
@@ -39,12 +41,14 @@ pub trait InferenceBackend: Send + Sync {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendKind {
     LmStudio,
+    Native,
 }
 
 impl std::fmt::Display for BackendKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::LmStudio => write!(f, "lm-studio"),
+            Self::Native => write!(f, "native"),
         }
     }
 }
