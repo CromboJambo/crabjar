@@ -76,6 +76,12 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: DoctorCommand,
     },
+
+    /// Manage inference backend (LM Studio vs Native)
+    Backend {
+        #[command(subcommand)]
+        command: BackendCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -189,6 +195,18 @@ pub enum BitwardenCommand {
         #[arg(long, default_value = "true")]
         special: bool,
     },
+}
+
+/// Inference backend management commands
+#[derive(Debug, Subcommand, Clone)]
+pub enum BackendCommand {
+    /// Set the inference backend (lm-studio or native)
+    Set {
+        #[arg(short, long)]
+        backend: String,
+    },
+    /// Get the current inference backend
+    Get,
 }
 
 #[derive(Debug, Subcommand, Clone)]
