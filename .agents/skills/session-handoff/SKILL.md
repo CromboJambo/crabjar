@@ -1,8 +1,9 @@
 ---
-# Session Handoff
-
-## When to trigger
-Use this skill when the agent wants to produce a structured handoff document for a fresh session. It formats the handoff into a reusable Markdown file that prevents the next agent from repeating mistakes, guessing at rejected decisions, or wasting cycles on ambiguous state.
+skill_name: session-handoff
+description: Produces a structured handoff document for a fresh agent session, detailing built work, rejected approaches, and remaining tasks to prevent regression or re-guessing.
+keywords: [handoff, state management, debugging, session]
+trigger: on_manual_call # Or specify other triggers if applicable (e.g., completion)
+---
 
 ## Core principles
 
