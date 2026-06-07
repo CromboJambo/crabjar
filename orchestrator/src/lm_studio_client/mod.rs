@@ -33,6 +33,8 @@ pub enum LmStudioEndpoint {
     Anthropic,
     /// Mistral.rs serve OpenAI-compatible endpoint.
     MistralRsServe,
+    /// Native local runner (GGUF/Safetensors).
+    NativeRunner,
 }
 
 impl LmStudioEndpoint {
@@ -55,6 +57,7 @@ impl LmStudioEndpoint {
             Self::Openai => "/v1/chat/completions",
             Self::Anthropic => "/v1/messages",
             Self::MistralRsServe => "/v1/chat/completions",
+            Self::NativeRunner => "/v1/chat/completions",
         }
     }
 
@@ -65,6 +68,7 @@ impl LmStudioEndpoint {
             Self::Openai => "openai-compat",
             Self::Anthropic => "anthropic-compat",
             Self::MistralRsServe => "mistralrs-serve",
+            Self::NativeRunner => "native-runner",
         }
     }
 }
@@ -1091,6 +1095,7 @@ impl LmStudioClient {
             LmStudioEndpoint::Openai => self.send_openai(&req).await,
             LmStudioEndpoint::Anthropic => self.send_anthropic(&req).await,
             LmStudioEndpoint::MistralRsServe => self.send_openai(&req).await,
+            LmStudioEndpoint::NativeRunner => self.send_openai(&req).await,
         }?;
 
         // Update session state with the response.
@@ -1123,6 +1128,7 @@ impl LmStudioClient {
             LmStudioEndpoint::Openai => self.send_openai(&req).await,
             LmStudioEndpoint::Anthropic => self.send_anthropic(&req).await,
             LmStudioEndpoint::MistralRsServe => self.send_openai(&req).await,
+            LmStudioEndpoint::NativeRunner => self.send_openai(&req).await,
         }?;
 
         self.session.update_with_response(&response);
