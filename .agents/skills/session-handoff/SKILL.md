@@ -1,3 +1,4 @@
+---
 # Session Handoff
 
 ## When to trigger
@@ -34,7 +35,7 @@ If a remaining work item would be verified by `cargo check`, `cargo test`, or a 
 
 ## Handoff file structure
 
-```markdown
+---```markdown
 # Session handoff: <project> — <progress summary>
 
 ## What was built today

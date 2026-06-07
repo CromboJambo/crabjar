@@ -21,6 +21,7 @@ for version-controlled changes.
 |---------|------|-----------|
 | LinuxFromCrates | `/home/crombo/LinuxFromCrates/` | `AGENTS.md`, `agent_config.md`, `lfc.toml`, `Justfile` |
 | .dotfiles | `/home/crombo/.dotfiles/` | `AGENTS.md`, `environment_manifest.json`, `state-docs/`, `symlinks/` |
+| llm-workspace | `/home/crombo/projects/llm-workspace/` | `AGENTS.md`, `ROADMAP.md`, `llmrunner.md`, `rust-toolchain.toml` |
 
 ## Access Control
 
