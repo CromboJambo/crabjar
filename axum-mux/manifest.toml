@@ -1,0 +1,16 @@
+# Set this to the host's tailscale IP, not a LAN/public address —
+# this is the whole reason the box doesn't need its own TLS or auth
+# layer: only tailnet peers can route to it at all.
+bind_addr = "100.x.x.x"
+
+[[vms]]
+name = "build-box"
+protocol = "spice"
+target = "127.0.0.1:5930"
+listen_port = 7001
+
+[[vms]]
+name = "scratch-win11"
+protocol = "vnc"
+target = "unix:/run/vm-sockets/scratch-win11.sock"
+listen_port = 7002
