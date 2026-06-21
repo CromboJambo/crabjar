@@ -447,6 +447,39 @@ wire orchestrator's `LmStudioClient` into the `handle_chat` handler ✅ (via `In
 
 ---
 
+
+### Phase 5: vm-bridge Integration
+
+**Goal:** Integrate vm-bridge as the display/screen sharing layer for crabjar's agent orchestration.
+
+- [ ] Add vm-bridge as crabjar dependency (or workspace member)
+- [ ] Add `crabjar-vm` crate for VM lifecycle management
+  - [ ] Manifest parsing (reuse vm-bridge's `toml` format)
+  - [ ] Worker process management (reuse supervisor logic)
+  - [ ] WebSocket relay integration (reuse proxy logic)
+- [ ] Add `crabjar-screen` crate for screen capture
+  - [ ] PipeWire integration for screen share sources
+  - [ ] XDG-Portal integration for Wayland screen capture
+  - [ ] Preview thumbnail generation (320x180 like Electron)
+  - [ ] Audio capture (microphone + system audio)
+- [ ] Add `crabjar-terminal` crate for shared terminal
+  - [ ] Terminal multiplexer integration (wezterm/zellij)
+  - [ ] Shared terminal protocol over websocket
+  - [ ] Terminal state sync across multiple clients
+- [ ] Wire into crabjar-host for Teams plugin integration
+
+**Why vm-bridge?**
+- Already has WebSocket relay for display protocols
+- Process-isolated per-VM architecture
+- Hardened (no protocol parsing, just byte transport)
+- Can be extended with screen sharing in future
+
+**Integration Points:**
+1. `crabjar` → vm-bridge (VM lifecycle management)
+2. `crabjar` → `crabjar-host` (screen sharing API)
+3. `crabjar-host` → Teams plugin (display protocol routing)
+
+
 ## 8. Architectural Constraints
 
 ### Detection ≠ Authorization
