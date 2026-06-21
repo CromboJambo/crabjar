@@ -45,10 +45,9 @@ crabjar-telemetry = { path = "../telemetry" }
 # Knowledge store
 agent-context = { path = "../memory" }
 
-# Local LLM inference
+# Local LLM inference (placeholder — llm-runner moved to PESTI portable execution substrate)
+# The native runner was removed; inference now delegates to external LLM servers.
 futures.workspace = true
-crabjar-llm-runner = { path = "../../llm-workspace/llm-runner", package = "pesti-runner" }
-candle-core = { version = "0.10.2", package = "candle-core" }
 
 # Testing
 tempfile = "3.10"
