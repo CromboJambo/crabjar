@@ -47,7 +47,7 @@ agent-context = { path = "../memory" }
 
 # Local LLM inference
 futures.workspace = true
-crabjar-llm-runner = { path = "../../llm-workspace/llm-runner" }
+crabjar-llm-runner = { path = "../../llm-workspace/llm-runner", package = "pesti-runner" }
 candle-core = { version = "0.10.2", package = "candle-core" }
 
 # Testing
