@@ -16,11 +16,9 @@ use std::net::SocketAddr;
 
 mod backend;
 mod lm_studio_client;
-mod native_runner;
 
 use backend::InferenceBackend;
 use lm_studio_client::LmStudioClient;
-use native_runner::{NativeRunnerClient, NativeRunnerConfig};
 
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -933,20 +931,11 @@ async fn main() -> anyhow::Result<()> {
     let store = Store::open(&knowledge_db_path)
         .map_err(|e| anyhow::anyhow!("Failed to open knowledge store: {e}"))?;
 
-    // Initialize inference backend based on configuration
-    let backend: Box<dyn InferenceBackend> = match std::env::var("INFERENCE_BACKEND").ok().as_deref() {
-        Some("native") | Some("native-runner") => {
-            info!("Initializing native runner backend");
-            let config = NativeRunnerConfig::from_env();
-            Box::new(NativeRunnerClient::new(config).await?)
-        }
-        _ => {
-            info!("Initializing LM Studio backend");
-            Box::new(LmStudioClient::from_env())
-        }
-    };
+    // Initialize default inference backend (LM Studio client).
+    // Native/PESTI inference was moved to the PESTI portable execution substrate.
+    let backend: Box<dyn InferenceBackend> = Box::new(LmStudioClient::from_env());
 
-    // Share state across handlers
+    // Shared state across request handlers
     let state = AppState {
         store: Arc::new(std::sync::Mutex::new(store)),
         events_db_path,
