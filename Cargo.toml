@@ -10,6 +10,7 @@ members = [
     "src/skill-reference-store",
     "zed-acp-bridge",
     "zed-acp-server",
+    "axum-mux"
 ]
 
 resolver = "2"
@@ -154,3 +155,7 @@ clap_mangen = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# vm-bridge: Per-VM websocket relay for display protocols (for screen sharing)
+vm-bridge = { path = "axum-mux" }
+
