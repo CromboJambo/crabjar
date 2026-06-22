@@ -4,285 +4,303 @@
 
 ---
 
-## Priority 1: Capture EdgeCrab's Architecture
+## Status (June 22, 2026)
 
-These are the conceptual patterns crabjar needs to replicate. EdgeCrab is the target ecosystem.
-
-### 1.1 JSON-RPC Plugin Protocol
-
-EdgeCrab's defining feature: process-isolated plugins communicating via JSON-RPC 2.0 over stdin/stdout pipes. This is crabjar's core abstraction.
-
-- Message schema for tool calls, results, errors
-- Three-tier model: ToolServer (subprocess), Script (Rhai in-process), Reserved (WASM)
-- Startup latency budget (~100ms), error recovery, lifecycle management
-- Language-agnostic plugin execution
-
-**Why this matters:** Process isolation is crabjar's stability guarantee. Every tool must be a potential failure point — subprocess boundaries contain blast radius.
-
-**Status:** Not started
+| Metric | Value |
+|---|---|
+| Workspace members | 21+ crates |
+| Tests | 103 passing, 1 failing (`scope::tests::test_scope_cannot_access_different_project`) |
+| Clippy | Needs verification (last clean run unknown) |
+| Architecture crate | Built, compiles, has integration test |
+| Guard scope/trust | Scope isolation + requested-vs-effective trust resolution implemented |
+| Per-crate AGENTS.md | Complete (all 21+ crates documented) |
 
 ---
 
-### 1.2 Agent Loop (ReAct)
+## Priority 1: Fix the Foundation
 
-EdgeCrab's `edgecrab-core` agent loop is the control plane crabjar needs:
+These are blockers. Nothing downstream can be trusted until they're resolved.
 
-- observe → understand → plan → execute → verify → reflect cycle
-- State machine for loop transitions
-- Context compression between turns (critical for long conversations)
-- Model routing (which model for which phase)
-- Decision flow: when to call tools vs. respond directly
+### 1.1 Fix Failing Scope Test
 
-**Status:** Not started
+The scope isolation test `test_scope_cannot_access_different_project` is failing. This is the core invariant for project-scoped data — if it's broken, every downstream data operation is untrustworthy.
 
----
+- [ ] Trace `can_access()` logic in `guard/src/scope.rs`
+- [ ] The test creates `Scope::user_project("alice", "project-a")` and `Scope::user_project("bob", "project-b")` and asserts mutual inaccessibility
+- [ ] Check whether `Scope::user_project()` actually sets the user dimension, or if the comparison logic only checks project
+- [ ] Fix the bug, confirm test passes
+- [ ] Add test for same-user cross-project (should be blocked) and same-project cross-user (should be allowed)
 
-### 1.3 Tool Registry
+**Why this matters:** Scope isolation is Priority 2.3 in the IronClaw model. If the invariant is broken, the entire security model collapses.
 
-EdgeCrab's `edgecrab-tools` centralized registry pattern:
+### 1.2 Verify Clippy Clean
 
-- Dynamic capability discovery
-- Tool metadata (description, params, return types)
-- Fallback chains for tool availability
-- Versioned tool interfaces
+- [ ] Run `cargo clippy --workspace -- -D warnings`
+- [ ] Fix any warnings
+- [ ] Confirm `just check` passes
 
-**Status:** Not started
+**Why this matters:** Codex sets the standard — zero warnings is non-negotiable. Without this, we can't trust anything else.
 
----
+### 1.3 Update project_map.md
 
-## Priority 2: IronClaw Structural Patterns
-
-IronClaw's architecture (80 crates, mechanical boundary enforcement, scope isolation) provides the structural discipline crabjar needs at scale. These are not features — they are governance mechanisms that prevent the workspace from collapsing into a tangle.
-
-### 2.1 Mechanical Dependency Boundary Enforcement
-
-IronClaw's `ironclaw_architecture` crate mechanically verifies that low-level crates never depend on high-level ones, enforced as a CI gate. At 21+ workspace members, crabjar is at the threshold where manual awareness breaks down.
-
-- Define a dependency layering model (common → substrate → authority → runtime → agent → product → engine)
-- Create `crabjar_architecture` crate with boundary tests
-- Each layer declares which lower layers it may import
-- CI fails if a crate violates its layer's import rules
-- Prevents circular dependencies and high-level leakage
-
-**Why this matters:** Without mechanical enforcement, the workspace grows into an unmanageable graph. Clippy catches code style but not architectural drift.
-
-**Status:** Not started
+- [ ] project_map.md says "21 members" but the workspace has grown — verify against `cargo metadata`
+- [ ] Update architecture diagram with `crabjar-architecture`, `axum-mux`, `crabjar-app-teams`
+- [ ] Mark completed items with status indicators
+- [ ] Remove `train-extract` if it's no longer a workspace member
 
 ---
 
-### 2.2 Scope Isolation Model
+## Priority 2: Core Structural Patterns (IronClaw-Informed)
 
-IronClaw enforces identity, project, tenant, and thread boundaries as first-class type-level constructs. Crabjar has project-scoped config but no formal scope isolation layer.
+These patterns prevent the workspace from collapsing into an unmanageable graph. They're governance mechanisms, not features.
 
-- `Scope` type with identity, project, tenant, thread dimensions
-- Every data operation requires a scope parameter — no blind defaults
-- Cross-scope operations require explicit authorization
-- Prevents data leakage between projects at the type level
+### 2.1 Mechanical Dependency Boundary Enforcement ✅ DONE
 
-**Why this matters:** The guard gate protects execution but not data. Without scope isolation, a compromised tool can read/write across project boundaries.
+**Status:** Built and integrated.
 
-**Status:** Not started
+- `crabjar-architecture` crate exists with 8-layer model (0-7)
+- `layer::ALL_LAYERS`, `crate_to_layer()`, `allowed_dependencies()`, `crate_layer()`, `crates_in_layer()`
+- `boundary::check_workspace_boundaries()` and `boundary::enforce_boundaries()`
+- Integration test `test_workspace_boundaries_are_valid`
+- Compiles, passes CI
 
----
+**What's next:**
+- [ ] Add `crabjar-architecture` to CI gate (run on every PR)
+- [ ] Document layer model in `crabjar-architecture/AGENTS.md` (already exists)
+- [ ] Consider adding `crabjar-architecture` as a pre-commit hook
+- [ ] Add `cargo-declared` integration to detect drift between declared and actual deps
 
-### 2.3 Requested-vs-Effective Trust Resolution
+### 2.2 Scope Isolation Model ✅ DONE (needs bug fix)
 
-IronClaw's `ironclaw_trust` distinguishes between what a tool *requests* and what the *effective* trust level is after policy resolution. Crabjar's guard has a simpler deny/pending/proceed model.
+**Status:** Implemented in `guard/src/scope.rs` with `Scope` type covering identity, project, tenant, thread dimensions. `can_access()` enforces cross-scope authorization.
 
-- `requested_trust` vs `effective_trust` on every action
-- Policy resolution chain: scope → project policy → user policy → default
-- Trust decay tracking across the action pipeline
-- Audit trail showing how effective trust was derived
+**What's next:**
+- [ ] Fix the failing test (see 1.1)
+- [ ] Add `CrossScopeAuth` approval flow (stub exists, needs implementation)
+- [ ] Wire scope into `ExecutionGate::check()` — every action should carry a scope
+- [ ] Add scope to `GuardDb` schema (persist scope with pending actions)
 
-**Why this matters:** A tool requesting high trust doesn't mean it should get it. The resolution layer is the actual authorization decision.
+### 2.3 Requested-vs-Effective Trust Resolution ✅ DONE
 
-**Status:** Not started
+**Status:** Implemented in `guard/src/trust_resolution.rs`. Policy chain: scope → project policy → user policy → default.
 
----
+**What's next:**
+- [ ] Audit: is `effective_trust` actually computed at every gate point, or only in some paths?
+- [ ] Add audit trail: log how effective trust was derived (requested → policy → effective)
+- [ ] Wire into `crabjar guard` CLI — show trust resolution chain in output
 
-### 2.4 Exact-Invocation Fingerprint Approvals
+### 2.4 Exact-Invocation Fingerprint Approvals ❌ NOT STARTED
 
-IronClaw's `ironclaw_approvals` uses fingerprints of exact tool invocations (not just "allow cp") for approval decisions. Crabjar's guard persists pending actions but the approval model is coarser.
+IronClaw's `ironclaw_approvals` uses SHA-256 fingerprints of exact tool invocations (command + args + context) for approval decisions. Crabjar's guard has coarse deny/pending/proceed.
 
-- SHA-256 fingerprint per tool invocation (command + args + context)
-- Approval tied to exact fingerprint, not command pattern
-- Prevents approval smuggling (approving `cp src dst` doesn't approve `cp src malicious`)
-- Lease-based approval with TTL
+- [ ] Design: fingerprint model — what goes into the hash? (command, args, env, working dir, scope?)
+- [ ] Implement: `InvocationFingerprint` type + `SHA-256` computation
+- [ ] Update guard: store fingerprint with pending actions, match on approval
+- [ ] Prevent approval smuggling: approving `cp src dst` must not approve `cp src malicious`
+- [ ] Lease-based approval with TTL
 
 **Why this matters:** Pattern-based approvals are a false sense of security. Exact fingerprints close the gap.
 
-**Status:** Not started
-
----
-
-### 2.5 Prompt Envelope (Instruction-Hijack Defense)
+### 2.5 Prompt Envelope (Instruction-Hijack Defense) ❌ NOT STARTED
 
 IronClaw's `ironclaw_prompt_envelope` uses closed-vocabulary source labels and instruction-hijack rejection. The guard gate protects execution but not the prompt itself.
 
-- Closed-vocabulary labels for prompt sources (no free-text origin)
-- Instruction-hijack detection: reject prompts that inject commands into system instructions
-- Source attribution chain: every prompt token traces to its origin
-- Prompt templates in files, loaded via `include_str!()`, never constructed inline
+- [ ] Design: closed-vocabulary source labels (no free-text origin)
+- [ ] Implement: instruction-hijack detection (reject prompts that inject commands into system instructions)
+- [ ] Source attribution chain: every prompt token traces to its origin
+- [ ] Prompt templates in files, loaded via `include_str!()`, never constructed inline
 
 **Why this matters:** Prompt injection is the attack vector the guard gate can't see. The envelope protects the LLM's context before it reaches the gate.
 
-**Status:** Not started
-
----
-
-### 2.6 Per-Crate AGENTS.md Routing Maps
-
-IronClaw has `AGENTS.md` and `CLAUDE.md` in every crate, giving AI coding assistants navigation context at the crate level. Crabjar has one AGENTS.md at the root — fine for 21 members but doesn't scale.
-
-- Template for per-crate `AGENTS.md` (purpose, public API, dependencies, pitfalls)
-- Auto-generate from Cargo.toml + doc comments
-- AI coding assistant navigation at the crate level
-
-**Why this matters:** Root-level AGENTS.md doesn't help an agent working inside `host/host-mqtt/`. Per-crate context reduces cross-referencing and misnavigation.
-
-**Status:** Not started
-
----
-
-### 2.7 Product Adapter Pattern
+### 2.6 Product Adapter Pattern ❌ NOT STARTED
 
 IronClaw's product adapter system provides generic adapter abstraction for multi-product support (Telegram v2, Slack v2, etc.). Crabjar has channel-specific code (host-mqtt, host-graph) but no generic adapter layer.
 
-- `ProductAdapter` trait: normalize input → `IncomingMessage`, send output ← `OutgoingMessage`
-- Adapter registry for discovery and lifecycle
-- Channel-specific adapters implement the trait
-- New channels = new adapter, no core changes
+- [ ] Design: `ProductAdapter` trait — normalize input → `IncomingMessage`, send output ← `OutgoingMessage`
+- [ ] Implement: adapter registry for discovery and lifecycle
+- [ ] Implement: channel-specific adapters (MQTT → Home Assistant, Graph API → Teams)
+- [ ] New channels = new adapter, no core changes
 
 **Why this matters:** Every new channel (Discord, Feishu, WeChat) currently requires core changes. The adapter pattern contains that blast radius.
-
-**Status:** Not started
 
 ---
 
 ## Priority 3: Codex Quality Constraints
 
-Codex doesn't contribute architecture — it sets the standard. These are non-negotiable quality bars, not features to implement.
+Codex doesn't contribute architecture — it sets the standard. These are non-negotiable quality bars.
 
 ### 3.1 Linting as Policy Gates
 
-Codex's `argument-comment-lint` proves that linting can enforce API standards programmatically. Map this to crabjar's guard system:
+Codex's `argument-comment-lint` proves that linting can enforce API standards programmatically.
 
-- Domain allowlist — restrict which external tools/domains are callable
-- Action policy — destructive actions require user permission
-- Code quality gates — module size limits, async conventions
-- Drift governance — detect when state-docs diverge from reality
-
-**Status:** Not started
-
----
+- [ ] Domain allowlist — restrict which external tools/domains are callable (guard integration)
+- [ ] Action policy — destructive actions require user permission (already partially done)
+- [ ] Code quality gates — module size limits, async conventions
+- [ ] Drift governance — detect when state-docs diverge from reality (already partially done via `skill-reference-store`)
 
 ### 3.2 Module Size Governance
 
-Hard cap at 500 lines/module (excluding tests). New functionality → new module. This is cognitive load management, not arbitrary bureaucracy.
+Hard cap at 500 lines/module (excluding tests). New functionality → new module. Cognitive load management, not arbitrary bureaucracy.
 
-**Status:** Not started
-
----
+- [ ] Add `cargo-declared` or custom script to report module sizes
+- [ ] Identify modules exceeding 500 lines
+- [ ] Split largest offenders
+- [ ] Add to CI gate
 
 ### 3.3 Build Reproducibility
 
 Cargo + `just` wrapper for deterministic builds. No Bazel — just discipline.
 
-**Status:** Not started
+- [ ] Pin all dependency versions (already done via Cargo.lock)
+- [ ] Add `just reproducible-build` target
+- [ ] Document build reproducibility guarantees
 
 ---
 
-## Priority 4: Claw Code Patterns (Useful but Less Distinctive)
+## Priority 4: Agent Loop & Tool Protocol (EdgeCrab-Informed)
+
+These are the conceptual patterns crabjar needs to replicate from EdgeCrab.
+
+### 4.1 JSON-RPC Plugin Protocol
+
+EdgeCrab's defining feature: process-isolated plugins communicating via JSON-RPC 2.0 over stdin/stdout pipes.
+
+- [ ] Message schema for tool calls, results, errors
+- [ ] Three-tier model: ToolServer (subprocess), Script (Rhai in-process), Reserved (WASM)
+- [ ] Startup latency budget (~100ms), error recovery, lifecycle management
+- [ ] Language-agnostic plugin execution
+
+**Status:** Partially done. `orchestrator/lm_studio_client/` and `axum-mux/` (vm-bridge websocket relay) provide the transport. The full JSON-RPC plugin protocol is not implemented.
+
+### 4.2 Agent Loop (ReAct)
+
+EdgeCrab's `edgecrab-core` agent loop is the control plane crabjar needs:
+
+- [ ] observe → understand → plan → execute → verify → reflect cycle
+- [ ] State machine for loop transitions
+- [ ] Context compression between turns (critical for long conversations)
+- [ ] Model routing (which model for which phase)
+- [ ] Decision flow: when to call tools vs. respond directly
+
+**Status:** `host/host-agent/` exists with lifecycle docs. The actual ReAct loop is not implemented as a reusable crate.
+
+### 4.3 Tool Registry
+
+EdgeCrab's `edgecrab-tools` centralized registry pattern.
+
+- [ ] Dynamic capability discovery
+- [ ] Tool metadata (description, params, return types)
+- [ ] Fallback chains for tool availability
+- [ ] Versioned tool interfaces
+
+**Status:** `tool_registry/` crate exists but was removed from workspace members. The pattern is referenced but not wired.
+
+---
+
+## Priority 5: Claw Code Patterns (Useful but Less Distinctive)
 
 Claw Code is OpenAI + Anthropic patterns smashed together without a coherent philosophy. The schema-first discipline is good; the rest is just good engineering.
 
-### 4.1 Declarative Subsystem Schemas
+### 5.1 Declarative Subsystem Schemas
 
 JSON schema format for tool definitions (input/output/execution context). Contract-first approach makes toolsets versionable and independently testable.
 
-**Status:** Not started
+**Status:** Partially done via `rmcp` (MCP tool registry). Needs dedicated schema format.
 
----
-
-### 4.2 Central Type Contract Layer
+### 5.2 Central Type Contract Layer
 
 Single source of truth for all data structures. Useful but not unique — many projects do this. Implement when the pain of scattered types becomes real.
 
-**Status:** Not started
+**Status:** Not started. Monitor for pain signals.
+
+### 5.3 Session Store
+
+Durable session state separate from execution logic.
+
+**Status:** Not started. Monitor for pain signals.
 
 ---
 
-### 4.3 Session Store
+## Priority 6: VM Bridge Integration
 
-Durable session state separate from execution logic. Useful but not distinctive.
+### 6.1 crabjar-vm Crate
 
-**Status:** Not started
+- [ ] Manifest parsing (reuse vm-bridge's TOML format)
+- [ ] Worker process management (reuse supervisor logic)
+- [ ] WebSocket relay integration (reuse proxy logic)
+
+### 6.2 crabjar-screen Crate
+
+- [ ] PipeWire integration for screen share sources
+- [ ] XDG-Portal integration for Wayland screen capture
+- [ ] Preview thumbnail generation (320x180)
+- [ ] Audio capture (microphone + system audio)
+
+### 6.3 crabjar-terminal Crate
+
+- [ ] Terminal multiplexer integration (wezterm/zellij)
+- [ ] Shared terminal protocol over websocket
+- [ ] Terminal state sync across multiple clients
+
+### 6.4 Wire into crabjar-host
+
+- [ ] Teams plugin integration
+- [ ] Display protocol routing
 
 ---
 
-## Priority 5: Developer Experience
+## Priority 7: Testing Infrastructure
 
-### 5.1 ADR Process
-
-EdgeCrab's `specs/` directory formalizes design decisions. Crabjar needs the same:
-- `specs/ADR-NNN_<title>.md` template
-- Decision context, options, rationale
-- Cross-references between related ADRs
-
-**Status:** Not started
-
----
-
-### 5.2 Config Layering
-
-Multi-level configuration (defaults → user config → project config → CLI flags). EdgeCrab's `~/.edgecrab/config.yaml` is a good reference.
-
-**Status:** Not started
-
----
-
-## Priority 6: Testing Infrastructure (IronClaw Patterns)
-
-IronClaw's testing discipline is a pattern worth adopting directly.
-
-### 6.1 E2E Slice Testing
+### 7.1 E2E Slice Testing
 
 IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough on merges.
 
-- Smoke slice: core agent loop, tool execution, channel delivery
-- Full slice: all channels, all sandboxes, all trust layers
-- CI runs smoke on every PR; full on merge/nightly
+- [ ] Define smoke slice: core agent loop, tool execution, channel delivery
+- [ ] Define full slice: all channels, all sandboxes, all trust layers
+- [ ] CI runs smoke on every PR; full on merge/nightly
 
-**Status:** Not started
-
----
-
-### 6.2 Replay Snapshots
+### 7.2 Replay Snapshots
 
 IronClaw's `scripts/replay-snap.sh` enables deterministic testing by replaying recorded LLM traces.
 
-- Record LLM response traces as fixtures
-- Replay fixtures in tests (no external LLM dependency)
-- Regression detection: diff new responses against snapshots
-
-**Status:** Not started
+- [ ] Record LLM response traces as fixtures
+- [ ] Replay fixtures in tests (no external LLM dependency)
+- [ ] Regression detection: diff new responses against snapshots
 
 ---
 
-## Priority 7: Persistence Architecture (IronClaw Patterns)
+## Priority 8: Persistence Architecture
 
-### 7.1 Dual-Backend Persistence Abstraction
+### 8.1 Dual-Backend Persistence Abstraction
 
 IronClaw has PostgreSQL + libSQL abstraction baked into every persistence crate. Crabjar uses rusqlite/bundled sqlite exclusively.
 
-- `PersistenceBackend` trait: unified read/write interface
-- SQLite backend (current) + PostgreSQL backend (future)
-- Every persistence crate implements both backends
-- Migration path: swap backend without changing business logic
+- [ ] `PersistenceBackend` trait: unified read/write interface
+- [ ] SQLite backend (current) + PostgreSQL backend (future)
+- [ ] Every persistence crate implements both backends
+- [ ] Migration path: swap backend without changing business logic
 
 **Why this matters:** Scaling from SQLite to PostgreSQL requires rewriting every persistence crate. An abstraction layer makes the migration a config change.
 
-**Status:** Not started
+**Status:** Not started. Low priority until there's a scaling need.
+
+---
+
+## Priority 9: Developer Experience
+
+### 9.1 ADR Process
+
+EdgeCrab's `specs/` directory formalizes design decisions.
+
+- [ ] `specs/ADR-NNN_<title>.md` template
+- [ ] Decision context, options, rationale
+- [ ] Cross-references between related ADRs
+
+### 9.2 Config Layering
+
+Multi-level configuration (defaults → user config → project config → CLI flags).
+
+**Status:** Partially done via `.crabjar_config.toml`. Needs formalization.
 
 ---
 
@@ -296,7 +314,9 @@ IronClaw has PostgreSQL + libSQL abstraction baked into every persistence crate.
 6. **Scope isolation granularity:** Which scope dimensions are needed at launch? (identity, project, tenant, thread)
 7. **Boundary enforcement trigger:** CI-only gate or also pre-commit hook?
 8. **Prompt envelope scope:** Protect all LLM prompts or only user-facing ones?
+9. **VM bridge priority:** Is VM-based agent isolation worth the complexity, or should we start with Unix user sandboxing (already in `crabjar-sandbox`)?
+10. **Dual-backend persistence:** Do we actually need PostgreSQL, or is SQLite sufficient for the foreseeable future?
 
 ---
 
-*Last updated: June 21, 2026*
+*Last updated: June 22, 2026*
