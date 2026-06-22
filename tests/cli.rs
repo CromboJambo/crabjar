@@ -77,7 +77,7 @@ fn state_show_returns_doc_contents() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(&docs_dir).unwrap();
-    fs::write(docs_dir.join("alpha_state.md"), "# Alpha\nbody\n").unwrap();
+    fs::write(docs_dir.join("alpha_state.md"), "---\nname: alpha_state\n---\n# Alpha\nbody\n").unwrap();
 
     // First index the docs
     let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
