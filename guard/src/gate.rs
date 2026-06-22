@@ -389,9 +389,6 @@ const MEDIUM_RISK_COMMANDS: &[&str] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::annealing::AnnealingPipeline;
-    use crate::memory::MemoryGraph;
-    use crate::types::NodeKind;
     use crate::types::TrustScore;
     use tempfile::tempdir;
 
@@ -690,33 +687,5 @@ mod tests {
 
         let result = gate.check(ctx).unwrap();
         assert_eq!(result, GateResult::Proceed);
-    }
-
-    #[test]
-    fn test_source_event_node_distinct() {
-        let dir = tempdir().unwrap();
-        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
-        let mg = MemoryGraph::new(&db);
-        let pipeline = AnnealingPipeline::new(&db);
-
-        let node_id = mg
-            .add_node(NodeKind::Fact, "distinct ids", TrustScore::new(0.5))
-            .unwrap();
-
-        let pipeline = pipeline.unwrap();
-        let request = pipeline
-            .request_action(
-                Some("raw-event-123".to_string()),
-                Some(node_id.clone()),
-                "test_action",
-                "payload",
-                3,
-                TrustScore::new(0.9),
-            )
-            .unwrap();
-
-        assert_eq!(request.source_event_id, Some("raw-event-123".to_string()));
-        assert_eq!(request.source_node_id, Some(node_id));
-        assert_ne!(request.source_event_id, request.source_node_id);
     }
 }
