@@ -1,0 +1,35 @@
+[package]
+name = "crabjar-host"
+version = "0.12.0"
+edition = "2024"
+license.workspace = true
+description = "CrabJar host runtime — CLI entry point and Mission Control (Ratatui)"
+
+[[bin]]
+name = "crabjar"
+path = "main.rs"
+
+[dependencies]
+tokio.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+toml.workspace = true
+crabjar-host-core = { path = "../../host/host-core" }
+crabjar-host-system = { path = "../../host/host-system" }
+crabjar-host-observe = { path = "../../host/host-observe" }
+crabjar-host-agent = { path = "../../host/host-agent" }
+crabjar-host-webview = { path = "../../host/host-webview" }
+crabjar-app-teams = { path = "../../apps/teams" }
+ratatui.workspace = true
+crossterm.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

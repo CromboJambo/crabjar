@@ -235,22 +235,12 @@ crabjar/
 ### 2.3 Workspace Members
 
 Declared in Cargo.toml `[workspace.members]`:
-- `src/crabjar-config`
-- `memory`
-- `orchestrator`
-- `src/codeburn-provider`
-- `src/codeburn-config`
-- `src/codeburn-classifier`
-- `src/codeburn-pricing`
-- `src/codeburn`
-- `src/skill-script-runner`
-- `src/skill-reference-store`
-- `guard`
-- `telemetry`
-- `sandbox`
-- `tool_registry`
-- `zed-acp-bridge`
-- `zed-acp-server`
+- **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`
+- **Host**: `host/host-core`, `host/host-system`, `host/host-observe`, `host/host-agent`, `host/host-webview`, `host/host-mqtt`, `host/host-graph`, `host/host-screen`
+- **Apps**: `apps/teams`
+- **Binary**: `src/host-binary`
+- **Skills**: `src/skill-script-runner`, `src/skill-reference-store`
+- **Zed ACP**: `zed-acp-bridge`, `zed-acp-server`
 
 ### 2.4 Shared Dependencies
 

@@ -1,31 +1,55 @@
 [workspace]
 members = [
+    # Core crates
     "memory",
-    "orchestrator",
     "guard",
     "telemetry",
+    "orchestrator",
+    "sandbox",
+    "tool_registry",
+    "axum-mux",
+    # Host runtime
+    "host/host-core",
+    "host/host-system",
+    "host/host-observe",
+    "host/host-agent",
+    "host/host-webview",
+    "host/host-mqtt",
+    "host/host-graph",
+    "host/host-screen",
+    # Host apps
+    "apps/teams",
+    # Host binary
+    "src/host-binary",
+    # Skill crates
     "src/skill-script-runner",
     "src/skill-reference-store",
+    # Zed ACP
     "zed-acp-bridge",
     "zed-acp-server",
-    "axum-mux"
 ]
 
 resolver = "2"
 
 [workspace.package]
-version = "0.11.0"
+version = "0.12.0"
 edition = "2024"
-license = "MIT OR Apache-2.0"
+license = "AGPL-3.0-or-later"
 authors = ["CrabJar Contributors"]
 repository = "https://github.com/crombojambo/crabjar"
 documentation = "https://docs.crabjar.io"
 homepage = "https://crabjar.io"
 description = "CrabJar workspace"
-keywords = ["ml", "mcp", "cli"]
+keywords = ["ml", "mcp", "cli", "runtime"]
 categories = ["science", "network-programming", "asynchronous"]
 
 [workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+missing_docs_in_private_items = "allow"
+
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
 invalid_html_tags = "deny"
@@ -53,8 +77,26 @@ rusqlite = { version = "0.37", features = ["bundled"] }
 clap = { version = "4.5", features = ["derive", "env"] }
 clap_mangen = "0.2"
 
+# UI / TTY
+crossterm = "0.28"
+ratatui = "0.30"
+
+# WebView / Tauri
+tauri = { version = "2", features = [] }
+tauri-plugin-notification = "2"
+tauri-plugin-shell = "2"
+tauri-plugin-tray = "2"
+
+# System integration
+libnotify = "1.0"
+arboard = "3"
+keyring = "3"
+
+# MQTT
+rumqttc = "0.24"
+
 # UUID / time
-uuid = { version = "1.23.0", features = ["v4"] }
+uuid = { version = "1.23.0", features = ["v4", "serde"] }
 chrono = { version = "0.4.38", default-features = false, features = ["serde", "now"] }
 tempfile = "3.24.0"
 
@@ -67,6 +109,8 @@ futures-util = "0.3"
 # Tracing
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+tracing-error = "0.2"
 
 # Cargo tools
 cargo-declared = "0.1.3"
@@ -79,6 +123,8 @@ hex = "0.4"
 
 # Utility
 which = "7"
+dirs = "6.0"
+base64 = "0.22"
 
 # Zed extension API
 zed_extension_api = "0.2"
@@ -96,6 +142,11 @@ serial_test = "3.2.0"
 [profile.profiling]
 inherits = "release"
 debug = 2
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
 
 [package]
 name = "crabjar"
@@ -156,4 +207,3 @@ tempfile.workspace = true
 
 # vm-bridge: Per-VM websocket relay for display protocols (for screen sharing)
 vm-bridge = { path = "axum-mux" }
-

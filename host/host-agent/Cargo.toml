@@ -1,0 +1,23 @@
+[package]
+name = "crabjar-host-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Agent loop: observe, understand, plan, execute, verify, reflect, persist"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
+crabjar-host-core = { path = "../host-core" }
+crabjar-host-observe = { path = "../host-observe" }
+rusqlite = { workspace = true, features = ["bundled"] }
+reqwest = { workspace = true, default-features = false, features = ["json", "rustls"] }
+
+[dev-dependencies]
+tempfile.workspace = true

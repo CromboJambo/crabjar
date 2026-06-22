@@ -1,0 +1,22 @@
+[package]
+name = "crabjar-app-teams"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Teams app plugin — hosts Microsoft Teams web app on the CrabJar host runtime"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+crabjar-host-core = { path = "../../host/host-core" }
+crabjar-host-system = { path = "../../host/host-system" }
+crabjar-host-webview = { path = "../../host/host-webview" }
+vm-bridge = { path = "../../axum-mux" }
+
+[dev-dependencies]
+tempfile.workspace = true

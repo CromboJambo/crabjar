@@ -1,0 +1,22 @@
+[package]
+name = "crabjar-host-system"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "System integration: system tray, notifications, clipboard, secrets backend"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+libnotify.workspace = true
+arboard.workspace = true
+keyring.workspace = true
+crabjar-host-core = { path = "../host-core" }
+
+[dev-dependencies]
+tempfile.workspace = true
