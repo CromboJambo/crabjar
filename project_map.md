@@ -417,23 +417,32 @@ The `handle_chat` handler uses the `InferenceBackend` trait — switches between
 
 ## 7. Integration Roadmap
 
-### Phase 1 — Standardization ✅ DONE
+> See `ROADMAP.md` for the full ironclaw-informed priority structure. This section summarizes completed work and maps old phases to the new framework.
 
-clippy passes across all members (0 warnings); unified error-handling patterns (libraries: thiserror, binaries: anyhow); CI passes across all members (fmt + clippy + build + test); 741 tests passing (0 failed, 1 ignored).
+### Completed Phases
 
-### Phase 2 — Feature Integration ✅ DONE
+**Phase 1 — Standardization ✅** (clippy clean, CI verified, 741 tests passing)
+→ Now maps to **Priority 2: Codex Quality Constraints** in ROADMAP.md
 
-wire orchestrator → guard → telemetry into a `crabjar exec` CLI command ✅; implement actual safetensors weight parsing ✅ (uses real safetensors crate with actual tensor loading + SHA-256 checksums); implement tool discovery in tool_registry ✅ (MCP scanning, state-based discovery, auto-registration, binary validation); implement optimize_engine in codeburn ✅ (extracted to dedicated module with 4 heuristic rules, configurable thresholds, markdown output).
+**Phase 2 — Feature Integration ✅** (safetensors, tool_registry, codeburn optimize_engine, crabjar exec pipeline)
+→ Now maps to **Priority 1: EdgeCrab Architecture** + **Priority 3: Claw Code Patterns** in ROADMAP.md
 
-### Phase 3 — Consolidation
+**Phase 3 — Consolidation** (move experiments to archive/)
+→ Deferred. Focus is on structural patterns from ironclaw.
 
-move completed experiments to archive/ directory; produce clean pre-optimized workspace.
+**Phase 4 — Inference Integration ✅** (unified InferenceBackend, mistral.rs, env-configurable endpoints)
+→ Completed. LLM runner remains in separate `llm-workspace/` repo.
 
-**ZeroClaw influence**: microkernel trait ABI (`zeroclaw-api`), feature-flagged subsystems, tool receipts (HMAC-SHA256 per invocation), SOP engine (declarative `SOP.toml` with approval gates), config schema generation (`schemars`). Crabjar's unique contribution: dynamic confidence tracking + trust evolution (annealing) — ZeroClaw uses static risk profiles.
+### Next Priorities (from ROADMAP.md)
 
-### Phase 4 — Inference Integration ✅ DONE
-
-wire orchestrator's `LmStudioClient` into the `handle_chat` handler ✅ (via `InferenceBackend` trait); add mistral.rs as inference substrate ✅ (`MistralRsClient` with lazy model loading); unify LM client to support mistral.rs serve on OpenAI-compatible port ✅ (`LmStudioEndpoint::MistralRsServe` variant + `MISTRALRS_SERVE_URL` env var); replace hardcoded LM Studio URL with env-configurable endpoint ✅ (`INFERENCE_BACKEND`, `LM_STUDIO_URL`, `MISTRALRS_MODEL`, `MISTRALRS_QUANT`, `MISTRALRS_SERVE_URL`).
+1. **Mechanical dependency boundary enforcement** (`crabjar_architecture` crate) — highest-value structural pattern
+2. **Scope isolation model** — type-level project boundary enforcement
+3. **Requested-vs-effective trust resolution** — enhance guard's authorization model
+4. **Exact-invocation fingerprint approvals** — close approval smuggling gap
+5. **Prompt envelope** — instruction-hijack defense for LLM context
+6. **Per-crate AGENTS.md** — scale agent navigation to 21+ members
+7. **Product adapter pattern** — generic channel abstraction
+8. **Dual-backend persistence** — PostgreSQL + SQLite abstraction layer
 
 ---
 
