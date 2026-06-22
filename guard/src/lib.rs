@@ -1,15 +1,13 @@
-//! mirror-guard: Annealing knowledge distillation, trust-layer retrieval, and execution gating.
+//! mirror-guard: Trust-layer gating and execution authorization.
 //!
 //! Provides the action-gating layer for the mirror-lab workspace, maintaining
 //! strict separation between detection (mirror-log) and authorization (mirror-guard).
 //!
 //! ## Core Components
 //!
-//! - **Memory Graph** (`memory`): Nodes and edges representing knowledge structures
 //! - **Trust Layers** (`trust`): Confidence bands that determine auto-execute behavior
-//! - **Annealing Pipeline** (`annealing`): Iterative confidence decay and reinforcement
-//! - **Retrieval Engine** (`retrieval`): Layer-based querying with trust filtering
 //! - **Execution Gate** (`gate`): The single point where detection becomes authorized action
+//! - **Concierge** (`concierge`): Pending queue management and provenance verification
 //!
 //! ## Architecture
 //!
@@ -21,24 +19,20 @@
 //! ## Key Principles
 //!
 //! - **Detection != Authorization**: Knowing what happened doesn't grant the right to act
-//! - **Confidence Decay**: Patterns decay over time unless reinforced by success
 //! - **Every Abstraction Carries Doubt**: Outputs include uncertainty, assumptions, and staleness info
 
-pub mod annealing;
 pub mod concierge;
 pub mod gate;
 pub mod guard_db;
+#[cfg(test)]
 pub mod memory;
-pub mod retrieval;
-pub mod reversibility;
 pub mod trust;
 pub mod types;
 
-pub use annealing::AnnealingPipeline;
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
 pub use gate::{CommandRisk, ExecutionGate, GateContext, GateResult};
 pub use guard_db::{GuardDb, GuardDbError};
+#[cfg(test)]
 pub use memory::MemoryGraph;
-pub use retrieval::RetrievalEngine;
 pub use trust::TrustManager;
 pub use types::*;
