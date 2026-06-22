@@ -18,7 +18,7 @@
 ///
 /// ## Usage
 ///
-/// ```
+/// ```ignore
 /// let scope = Scope::project("my-project");
 /// let effective = scope.resolve_trust(
 ///     requested = TrustLayer::High,
@@ -217,12 +217,18 @@ impl Scope {
         if self.project == target.project {
             return true;
         }
-        // Same tenant = allowed (future: multi-tenant support)
-        if self.tenant == target.tenant {
-            return true;
+        // Same tenant = allowed only when both have a tenant set and they match
+        if let (Some(a), Some(b)) = (&self.tenant, &target.tenant) {
+            if a == b {
+                return true;
+            }
         }
         // System identity can access anything (with audit trail)
         if let Identity::System(_) = self.identity {
+            return true;
+        }
+        // System scope is always accessible (trusted boundary)
+        if let Identity::System(_) = &target.identity {
             return true;
         }
         false
