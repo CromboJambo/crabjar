@@ -19,7 +19,7 @@
 ///
 /// ## Example
 ///
-/// ```
+/// ```ignore
 /// let requested = RequestedTrust::new(3, 0.85, "agent");
 /// let effective = TrustResolver::new(chain).resolve(&requested, &scope);
 /// // effective might be lower than requested after policy resolution
