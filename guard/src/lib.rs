@@ -26,7 +26,9 @@ pub mod gate;
 pub mod guard_db;
 #[cfg(test)]
 pub mod memory;
+pub mod scope;
 pub mod trust;
+pub mod trust_resolution;
 pub mod types;
 
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
@@ -34,5 +36,7 @@ pub use gate::{CommandRisk, ExecutionGate, GateContext, GateResult};
 pub use guard_db::{GuardDb, GuardDbError};
 #[cfg(test)]
 pub use memory::MemoryGraph;
+pub use scope::{CrossScopeAuth, Identity, ProjectId, Scope, ScopedAccess, ScopeError, TenantId, ThreadId};
 pub use trust::TrustManager;
+pub use trust_resolution::{EffectiveTrust, Policy, PolicyChain, PolicySource, RequestedTrust, TrustResolution, TrustResolver};
 pub use types::*;
