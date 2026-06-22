@@ -1,3 +1,4 @@
+use crate::fingerprint::{ApprovalLease, ApprovalScope, InvocationFingerprint};
 use crate::GateResult;
 use crate::guard_db::{GuardDb, GuardDbError};
 use crate::types::ActionStatus;
@@ -42,15 +43,65 @@ pub struct InterruptedLogEntry {
 #[derive(Default)]
 pub struct GateConcierge {
     pub db: Option<GuardDb>,
+    /// In-memory store for exact-invocation fingerprint approval leases.
+    /// IronClaw's `ironclaw_approvals` uses this pattern to prevent
+    /// approval smuggling: approving `cp src dst` does NOT approve `cp src malicious`.
+    pub approval_store: ApprovalStore,
+}
+
+/// Wrapper for the approval store with a default in-memory implementation.
+#[derive(Default)]
+pub struct ApprovalStore {
+    inner: crate::fingerprint::InMemoryApprovalStore,
+}
+
+impl ApprovalStore {
+    pub fn new() -> Self {
+        Self {
+            inner: crate::fingerprint::InMemoryApprovalStore::new(),
+        }
+    }
+
+    pub fn insert(&self, lease: ApprovalLease) {
+        self.inner.insert(lease);
+    }
+
+    pub fn find_matching(
+        &self,
+        fingerprint: &InvocationFingerprint,
+        scope: &ApprovalScope,
+    ) -> Option<ApprovalLease> {
+        self.inner.find_matching(fingerprint, scope)
+    }
+
+    pub fn list_valid(&self) -> Vec<ApprovalLease> {
+        self.inner.list_valid()
+    }
+
+    pub fn cleanup_expired(&self) {
+        self.inner.cleanup_expired();
+    }
+
+    pub fn revoke_scope(&self, scope: &ApprovalScope) {
+        self.inner.revoke_scope(scope);
+    }
 }
 
 impl GateConcierge {
     pub fn new() -> Self {
-        Self { db: None }
+        Self {
+            db: None,
+            approval_store: ApprovalStore::new(),
+        }
     }
 
     pub fn with_db(mut self, db: GuardDb) -> Self {
         self.db = Some(db);
+        self
+    }
+
+    pub fn with_approval_store(mut self, store: ApprovalStore) -> Self {
+        self.approval_store = store;
         self
     }
 
@@ -198,6 +249,77 @@ impl GateConcierge {
             Ok(Vec::new())
         }
     }
+
+    #[allow(clippy::too_many_arguments)]
+    /// Approve a pending action with exact-invocation fingerprint.
+    ///
+    /// IronClaw's `ironclaw_approvals` pattern: the approval is tied to
+    /// the exact SHA-256 fingerprint of the command+args, not a pattern.
+    /// Approving `cp src dst` does NOT approve `cp src malicious`.
+    ///
+    /// Returns the approval lease if granted, or an error if the action
+    /// doesn't match any existing approval.
+    pub fn approve_with_fingerprint(
+        &mut self,
+        action_id: &str,
+        command: &str,
+        args: &[String],
+        source_event_id: Option<String>,
+        ttl_seconds: u64,
+        granted_by: &str,
+        is_persistent: bool,
+    ) -> Result<ApprovalLease, String> {
+        let fingerprint = InvocationFingerprint::from_command(command, args);
+
+        let scope = ApprovalScope::new(
+            None, // project context — would come from scope resolution
+            None, // user context — would come from scope resolution
+            source_event_id,
+        );
+
+        let lease = if is_persistent {
+            ApprovalLease::persistent(fingerprint.clone(), scope.clone(), granted_by.to_string())
+        } else {
+            ApprovalLease::new(fingerprint.clone(), scope.clone(), ttl_seconds, granted_by.to_string())
+        };
+
+        // Store the lease so it can be matched later
+        self.approval_store.insert(lease.clone());
+
+        info!(
+            action_id = %action_id,
+            fingerprint = %lease.fingerprint,
+            ttl = ttl_seconds,
+            "Fingerprint approval granted"
+        );
+
+        Ok(lease)
+    }
+
+    /// Check if a pending action matches an existing approval lease.
+    ///
+    /// IronClaw's key insight: fingerprint matching is scope-isolated.
+    /// A fingerprint approved in one scope does NOT match in another.
+    pub fn check_fingerprint_approval(
+        &self,
+        command: &str,
+        args: &[String],
+        source_event_id: Option<String>,
+    ) -> Option<ApprovalLease> {
+        let fingerprint = InvocationFingerprint::from_command(command, args);
+        let scope = ApprovalScope::new(None, None, source_event_id);
+        self.approval_store.find_matching(&fingerprint, &scope)
+    }
+
+    /// Clean up expired approval leases.
+    pub fn cleanup_expired_approvals(&self) {
+        self.approval_store.cleanup_expired();
+    }
+
+    /// List all valid approval leases (for audit/debug).
+    pub fn list_valid_approvals(&self) -> Vec<ApprovalLease> {
+        self.approval_store.list_valid()
+    }
 }
 
 #[cfg(test)]
@@ -305,5 +427,110 @@ mod tests {
         assert!(pending.is_some());
         assert!(interrupted.is_none());
         assert!(status != ActionStatus::TrustApproved);
+    }
+
+    #[test]
+    fn test_approve_with_fingerprint() {
+        let mut concierge = GateConcierge::new();
+        let lease = concierge
+            .approve_with_fingerprint(
+                "action-1",
+                "rm",
+                &["-rf".to_string(), "/tmp/test".to_string()],
+                Some("evt-1".to_string()),
+                3600,
+                "user",
+                false,
+            )
+            .unwrap();
+
+        assert!(!lease.persistent);
+        assert!(lease.is_valid());
+    }
+
+    #[test]
+    fn test_check_fingerprint_approval_no_match() {
+        let concierge = GateConcierge::new();
+        let result = concierge.check_fingerprint_approval(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+            Some("evt-1".to_string()),
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_fingerprint_prevents_smuggling() {
+        let mut concierge = GateConcierge::new();
+
+        // Approve the exact command
+        let lease = concierge
+            .approve_with_fingerprint(
+                "action-1",
+                "cp",
+                &["src".to_string(), "dst".to_string()],
+                Some("evt-1".to_string()),
+                3600,
+                "user",
+                false,
+            )
+            .unwrap();
+
+        // Try to check a different command with same fingerprint check
+        let result = concierge.check_fingerprint_approval(
+            "cp",
+            &["src".to_string(), "malicious".to_string()],
+            Some("evt-1".to_string()),
+        );
+        assert!(result.is_none());
+
+        // Exact match should work
+        let result = concierge.check_fingerprint_approval(
+            "cp",
+            &["src".to_string(), "dst".to_string()],
+            Some("evt-1".to_string()),
+        );
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().fingerprint, lease.fingerprint);
+    }
+
+    #[test]
+    fn test_cleanup_expired_approvals() {
+        let mut concierge = GateConcierge::new();
+
+        // Add a valid lease
+        concierge
+            .approve_with_fingerprint(
+                "action-1",
+                "echo",
+                &["hello".to_string()],
+                Some("evt-1".to_string()),
+                3600,
+                "user",
+                false,
+            )
+            .unwrap();
+
+        // Add an expired lease (TTL=0 means expires_at == now, is_valid checks now < expires_at)
+        concierge
+            .approve_with_fingerprint(
+                "action-2",
+                "echo",
+                &["world".to_string()],
+                Some("evt-2".to_string()),
+                0,
+                "user",
+                false,
+            )
+            .unwrap();
+
+        // Only the valid lease is valid (TTL=0 expires immediately)
+        let valid = concierge.list_valid_approvals();
+        assert_eq!(valid.len(), 1);
+
+        concierge.cleanup_expired_approvals();
+
+        let valid = concierge.list_valid_approvals();
+        assert_eq!(valid.len(), 1);
     }
 }
