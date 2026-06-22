@@ -553,9 +553,9 @@ crabjar contains:
 
 crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + safetensors + tool_registry + codeburn-provider + codeburn-classifier + codeburn-pricing + codeburn-config + codeburn + skill-script-runner + skill-reference-store + llm-plug-in + llm-runner + gguf + gguf-cli + zed-acp-bridge + zed-acp-server
 
-### 9.3 Test Count
+### Test Count
 
-741 tests passing across all workspace members (0 failed, 1 ignored). Clippy: clean.
+103 passing in guard crate (scope isolation + trust); full workspace test count TBD on clippy verification. Clippy: pending verification (last clean run unknown).
 
 ---
 
@@ -580,10 +580,15 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 - `orchestrator/src/lm_studio_client/` — unified LM client with SessionStore; `LmStudioEndpoint::MistralRsServe` variant for mistral.rs serve
 - `orchestrator/src/backend/` — unified `InferenceBackend` trait + `Backend` enum (LM Studio / mistral.rs)
 - Phase 4 complete — unified inference backend, mistral.rs serve support, env-configurable endpoints
-- Phase 2 complete — 741 tests passing, clippy clean
-- Phase 1 complete — clippy clean, CI verified
 - `.agents/skills/` — 29 agent skills
 - `.agents/references/` — agent reference files
+- `crabjar-architecture/` — mechanical dependency boundary enforcement (8-layer model, CI gate candidate)
+- `guard/src/scope.rs` — scope isolation model (identity, project, tenant, thread dimensions)
+- `guard/src/trust_resolution.rs` — requested-vs-effective trust resolution
+- `axum-mux/` — vm-bridge (per-VM websocket relay, screen capture, terminal multiplexer)
+- `crabjar-app-teams/` — Teams plugin (reference application)
+- `crabjar-sandbox/` — agent isolation (Unix user sandbox, container, cgroup)
+- Per-crate AGENTS.md — complete (all 21+ workspace members documented)
 - `llm-runner` — CPU fallback kernels (CpuGemmKernel, CpuAttentionKernel) operational; GPU path stubbed (GemmBuilder::build returns KernelFromPtx with no-op matmul); weight loading → inference pipeline bridge missing; K-family dequantization unimplemented; RoPE/RMSNorm/activations/LM head/sampling not yet coded
 - **Cross-project: llm-workspace** — configured via opencode.jsonc instructions + dotfiles symlink graph (`llm-workspace-rules.md` → AGENTS.md + ROADMAP.md + llmrunner.md)
 
