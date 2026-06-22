@@ -4,8 +4,6 @@ members = [
     "orchestrator",
     "guard",
     "telemetry",
-    "sandbox",
-    "tool_registry",
     "src/skill-script-runner",
     "src/skill-reference-store",
     "zed-acp-bridge",
