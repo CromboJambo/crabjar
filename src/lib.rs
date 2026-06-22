@@ -86,16 +86,75 @@ pub enum CliCommand {
 
 #[derive(Debug, Subcommand, Clone)]
 pub enum StateCommand {
-    /// List all state-docs
-    List,
-    /// Show a state-doc with annotations
-    Show { doc: String },
-    /// Add a note annotation
-    Annotate { doc: String, message: String },
-    /// Add a question annotation
-    Question { doc: String, message: String },
-    /// Resolve an annotation
-    Resolve { doc: String, id: String },
+    /// Index all state-docs into SQLite
+    Index {
+        /// Path to the state-docs directory
+        #[arg(long, default_value = "state-docs")]
+        docs_dir: String,
+        /// Path to the SQLite database
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
+    /// Show a state-doc with configurable zoom depth
+    Show {
+        /// State-doc name
+        doc_name: String,
+        /// Zoom level: 1=overview, 2=section, 3=paragraph
+        #[arg(long, default_value_t = 2)]
+        zoom: u8,
+    },
+    /// Query a state-doc by section or keyword
+    Query {
+        /// State-doc name
+        doc_name: String,
+        /// Section name to query
+        #[arg(long)]
+        section: Option<String>,
+        /// Keyword to search
+        #[arg(long)]
+        keyword: Option<String>,
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
+    /// List all indexed state-docs
+    List {
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
+    /// Get confidence assessment for a state-doc
+    Confidence {
+        /// State-doc name
+        doc_name: String,
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
+    /// Get annotations for a state-doc
+    Annotations {
+        /// State-doc name
+        doc_name: String,
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
+    /// Get tables extracted from a state-doc
+    Tables {
+        /// State-doc name
+        doc_name: String,
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
+    /// Get code blocks extracted from a state-doc
+    CodeBlocks {
+        /// State-doc name
+        doc_name: String,
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -265,6 +324,12 @@ pub enum DoctorCommand {
 
 pub mod knowledge_store;
 pub mod crabjar_config;
+pub mod project_loader;
+pub mod doctor;
+pub mod bitwarden;
+
+pub use crabjar_config::ProjectConfig;
+pub use project_loader::ProjectLoader;
 
 pub fn cli() -> clap::Command {
     Cli::command()
