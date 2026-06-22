@@ -5,6 +5,7 @@
 pub mod cli;
 #[allow(dead_code)]
 pub mod store;
+pub mod commands;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
