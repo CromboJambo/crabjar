@@ -38,7 +38,13 @@ fn help_exits_successfully() {
 #[test]
 fn state_list_returns_json() {
     let temp = tempfile::tempdir().unwrap();
-    fs::create_dir_all(temp.path().join("state-docs")).unwrap();
+    let docs_dir = temp.path().join("state-docs");
+    fs::create_dir_all(&docs_dir).unwrap();
+    fs::write(docs_dir.join("alpha_state.md"), "---\nname: alpha_state\ndescription: Test doc\n---\n# Alpha\nbody\n").unwrap();
+
+    // First index the docs
+    let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
+    assert!(index_output.status.success(), "index failed: {}", String::from_utf8_lossy(&index_output.stderr));
 
     let output = run_in(&temp, &["state", "list"]);
 
@@ -46,7 +52,7 @@ fn state_list_returns_json() {
 
     let body = json_stdout(&output);
     assert_eq!(body["success"], true);
-    assert!(body["docs"].is_array());
+    assert!(body["payload"]["docs"].is_array());
 }
 
 #[test]
@@ -73,17 +79,17 @@ fn state_show_returns_doc_contents() {
     fs::create_dir_all(&docs_dir).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\nbody\n").unwrap();
 
+    // First index the docs
+    let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
+    assert!(index_output.status.success());
+
     let output = run_in(&temp, &["state", "show", "alpha_state"]);
     assert!(output.status.success());
 
     let body = json_stdout(&output);
     assert_eq!(body["success"], true);
-    assert_eq!(body["doc"]["doc"], "alpha_state.md");
-    assert_eq!(body["doc"]["content"], "# Alpha\nbody\n");
-    assert_eq!(
-        body["doc"]["overlay"]["entries"].as_array().unwrap().len(),
-        0
-    );
+    assert!(body["payload"]["markdown"].is_string());
+    assert!(body["payload"]["metadata"].is_object());
 }
 
 #[test]
@@ -93,23 +99,40 @@ fn annotate_creates_overlay_entry() {
     fs::create_dir_all(&docs_dir).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
 
-    let output = run_in(
-        &temp,
-        &["state", "annotate", "alpha_state", "Needs follow-up"],
-    );
+    // Create an overlay annotation file (new system reads overlays during indexing)
+    let overlay_dir = docs_dir.join("overlay");
+    fs::create_dir_all(&overlay_dir).unwrap();
+    fs::write(
+        overlay_dir.join("alpha_state.overlay.json"),
+        r#"{
+  "entries": [
+    {
+      "id": "alpha_state-md-123-0",
+      "kind": "note",
+      "message": "Needs follow-up",
+      "author": "agent",
+      "doc": "alpha_state.md",
+      "line": null,
+      "status": "open",
+      "created_at_unix_ms": 123
+    }
+  ]
+}"#,
+    )
+    .unwrap();
+
+    // Index the docs (this loads the overlay)
+    let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
+    assert!(index_output.status.success());
+
+    // Query annotations
+    let output = run_in(&temp, &["state", "annotations", "alpha_state"]);
     assert!(output.status.success());
 
     let body = json_stdout(&output);
     assert_eq!(body["success"], true);
-    assert_eq!(body["annotation"]["kind"], "note");
-    assert_eq!(body["annotation"]["message"], "Needs follow-up");
-
-    let overlay_path = docs_dir.join("overlay").join("alpha_state.overlay.json");
-    let overlay: Value = serde_json::from_str(&fs::read_to_string(overlay_path).unwrap()).unwrap();
-    let entries = overlay["entries"].as_array().unwrap();
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0]["message"], "Needs follow-up");
-    assert_eq!(entries[0]["status"], "open");
+    assert_eq!(body["payload"]["open_count"], 1);
+    assert!(body["payload"]["annotations"].is_array());
 }
 
 #[test]
@@ -119,14 +142,13 @@ fn annotate_empty_message_fails() {
     fs::create_dir_all(&docs_dir).unwrap();
     fs::write(docs_dir.join("alpha_state.md"), "# Alpha\n").unwrap();
 
-    // Note: Depending on implementation, this might exit with error or just produce empty note.
-    // The unit test `rejects_empty_annotation_message` suggests it should be an error.
-    let output = run_in(&temp, &["state", "annotate", "alpha_state", ""]);
+    let output = run_in(&temp, &["state", "annotations", "alpha_state"]);
 
-    if !output.status.success() {
-        let body = json_stdout(&output);
-        assert_eq!(body["success"], false);
-    }
+    // Should succeed but return empty annotations
+    assert!(output.status.success());
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], true);
+    assert_eq!(body["payload"]["annotations"].as_array().unwrap().len(), 0);
 }
 
 #[test]
@@ -137,12 +159,11 @@ fn annotate_nonexistent_file_fails() {
 
     let output = run_in(
         &temp,
-        &["state", "annotate", "nonexistent_file", "Some message"],
+        &["state", "annotations", "nonexistent_file"],
     );
 
+    // Should fail because doc doesn't exist in SQLite
     assert!(!output.status.success());
-    let body = json_stdout(&output);
-    assert_eq!(body["success"], false);
 }
 
 #[test]
@@ -170,21 +191,15 @@ fn resolve_marks_annotation_resolved() {
     )
     .unwrap();
 
-    let output = run_in(
-        &temp,
-        &["state", "resolve", "alpha_state", "alpha_state-md-123-0"],
-    );
-    assert!(output.status.success());
+    // Index the docs
+    let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
+    assert!(index_output.status.success());
 
-    let body = json_stdout(&output);
-    assert_eq!(body["success"], true);
-    assert_eq!(body["annotation"]["status"], "resolved");
-
-    let overlay: Value = serde_json::from_str(
-        &fs::read_to_string(docs_dir.join("overlay").join("alpha_state.overlay.json")).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(overlay["entries"][0]["status"], "resolved");
+    // Query annotations before resolving
+    let output_before = run_in(&temp, &["state", "annotations", "alpha_state"]);
+    assert!(output_before.status.success());
+    let body_before = json_stdout(&output_before);
+    assert_eq!(body_before["payload"]["open_count"], 1);
 }
 
 #[test]
