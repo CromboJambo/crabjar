@@ -218,10 +218,10 @@ impl Scope {
             return true;
         }
         // Same tenant = allowed only when both have a tenant set and they match
-        if let (Some(a), Some(b)) = (&self.tenant, &target.tenant) {
-            if a == b {
-                return true;
-            }
+        if let (Some(a), Some(b)) = (&self.tenant, &target.tenant)
+            && a == b
+        {
+            return true;
         }
         // System identity can access anything (with audit trail)
         if let Identity::System(_) = self.identity {
@@ -245,7 +245,7 @@ impl Scope {
     }
 
     /// Serialize scope to a string for logging/audit.
-    pub fn to_string(&self) -> String {
+    pub fn to_scope_string(&self) -> String {
         let mut parts = Vec::new();
         parts.push(format!("identity={}", self.identity));
         if let Some(ref p) = self.project {
@@ -263,7 +263,7 @@ impl Scope {
 
 impl fmt::Display for Scope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        write!(f, "{}", self.to_scope_string())
     }
 }
 

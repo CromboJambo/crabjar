@@ -22,6 +22,7 @@
 //! - **Every Abstraction Carries Doubt**: Outputs include uncertainty, assumptions, and staleness info
 
 pub mod concierge;
+pub mod fingerprint;
 pub mod gate;
 pub mod guard_db;
 #[cfg(test)]
@@ -32,6 +33,7 @@ pub mod trust_resolution;
 pub mod types;
 
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
+pub use fingerprint::{ApprovalLease, ApprovalScope, InMemoryApprovalStore, InvocationFingerprint};
 pub use gate::{CommandRisk, ExecutionGate, GateContext, GateResult};
 pub use guard_db::{GuardDb, GuardDbError};
 #[cfg(test)]
