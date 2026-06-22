@@ -4,11 +4,10 @@ use serde_json::json;
 
 mod bitwarden;
 mod crabjar_config;
-mod dinit;
 mod dotfile_manager;
 mod knowledge_store;
 mod project_loader;
-mod state_docs;
+mod doctor;
 
 use crabjar_lib::{
     BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand, KnowledgeCommand,
@@ -18,7 +17,8 @@ use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
 use project_loader::ProjectLoader;
-use state_docs::{AnnotationKind, StateDocsManager};
+use bitwarden::commands::handle_bitwarden_command;
+use doctor::handle_doctor_command;
 
 fn is_help_request(args: &[String]) -> bool {
     args.iter()
@@ -100,54 +100,205 @@ fn print_json(response: &serde_json::Value) {
     );
 }
 
-/// Handle state-docs commands
+/// Handle state-docs commands (SQLite-backed via agent_context::state_docs)
 fn handle_state_command(
     command: StateCommand,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    let project_root = std::env::current_dir()?;
-    let state_docs = StateDocsManager::new(project_root);
-
     match command {
-        StateCommand::List => {
-            let docs = state_docs.list_docs()?;
+        StateCommand::Index { docs_dir, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let count = agent_context::state_docs::indexer::index_all_docs(&conn, std::path::Path::new(&docs_dir))?;
             Ok(json!({
                 "success": true,
-                "docs": docs,
+                "message": format!("indexed {} state-docs", count),
+                "payload": {
+                    "count": count,
+                    "docs_dir": docs_dir,
+                    "db_path": db_path,
+                }
             }))
         }
-        StateCommand::Show { doc } => {
-            let view = state_docs.show_doc(&doc)?;
+        StateCommand::Show { doc_name, zoom } => {
+            let conn = rusqlite::Connection::open("state-docs.db")?;
+            agent_context::state_docs::migrate(&conn)?;
+            let renderer = agent_context::state_docs::Renderer::new(&conn);
+            let (markdown, metadata) = renderer.render_doc(&doc_name, zoom)?;
             Ok(json!({
                 "success": true,
-                "doc": view,
+                "message": format!("rendered {} at zoom level {}", doc_name, zoom),
+                "payload": {
+                    "doc": doc_name,
+                    "zoom": zoom,
+                    "markdown": markdown,
+                    "metadata": metadata,
+                }
             }))
         }
-        StateCommand::Annotate { doc, message } => {
-            let entry =
-                state_docs.add_annotation(&doc, AnnotationKind::Note, &message, "user", None)?;
-            Ok(json!({
-                "success": true,
-                "annotation": entry,
-            }))
+        StateCommand::Query { doc_name, section, keyword, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            let querier = agent_context::state_docs::StateDocQuerier::new(conn, std::path::PathBuf::from(&db_path));
+            if let Some(section) = section {
+                let result = querier.query_by_section(&doc_name, &section);
+                Ok(json!({
+                    "success": true,
+                    "message": format!("queried section '{}' in {}", section, doc_name),
+                    "payload": result,
+                }))
+            } else if let Some(keyword) = keyword {
+                let result = querier.query_by_keyword(&doc_name, &keyword);
+                Ok(json!({
+                    "success": true,
+                    "message": format!("searched keyword '{}' in {}", keyword, doc_name),
+                    "payload": result,
+                }))
+            } else {
+                Ok(json!({
+                    "success": false,
+                    "error": "must provide --section or --keyword",
+                }))
+            }
         }
-        StateCommand::Question { doc, message } => {
-            let entry = state_docs.add_annotation(
-                &doc,
-                AnnotationKind::Question,
-                &message,
-                "user",
-                None,
+        StateCommand::List { db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let mut stmt = conn.prepare(
+                "SELECT doc_name, description, last_modified, line_count, checksum FROM doc_metadata ORDER BY last_modified DESC"
             )?;
+            let rows = stmt.query_map([], |row| {
+                Ok(json!({
+                    "name": row.get::<_, String>(0)?,
+                    "description": row.get::<_, String>(1)?,
+                    "last_modified": row.get::<_, String>(2)?,
+                    "line_count": row.get::<_, i64>(3)?,
+                    "checksum": row.get::<_, String>(4)?,
+                }))
+            })?;
+            let mut results = Vec::new();
+            for row in rows {
+                results.push(row?);
+            }
             Ok(json!({
                 "success": true,
-                "annotation": entry,
+                "message": format!("listed {} state-docs", results.len()),
+                "payload": {
+                    "docs": results,
+                }
             }))
         }
-        StateCommand::Resolve { doc, id } => {
-            let resolved = state_docs.resolve_annotation(&doc, &id)?;
+        StateCommand::Confidence { doc_name, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let mut stmt = conn.prepare(
+                "SELECT what_captured, what_missed, assumptions, blind_spots, stale_after FROM confidence WHERE doc_id = ?1"
+            )?;
+            let row = stmt.query_row(rusqlite::params![doc_name], |row| {
+                Ok(json!({
+                    "what_captured": row.get::<_, String>(0)?,
+                    "what_missed": row.get::<_, String>(1)?,
+                    "assumptions": row.get::<_, String>(2)?,
+                    "blind_spots": row.get::<_, String>(3)?,
+                    "stale_after": row.get::<_, String>(4)?,
+                }))
+            }).map_err(|e| {
+                if e == rusqlite::Error::QueryReturnedNoRows {
+                    format!("no confidence assessment for {}", doc_name)
+                } else {
+                    e.to_string()
+                }
+            })?;
             Ok(json!({
-                "success": resolved.is_some(),
-                "annotation": resolved,
+                "success": true,
+                "message": format!("retrieved confidence for {}", doc_name),
+                "payload": {
+                    "doc": doc_name,
+                    "confidence": row,
+                }
+            }))
+        }
+        StateCommand::Annotations { doc_name, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let mut stmt = conn.prepare(
+                "SELECT line, kind, message, author, status, created_at FROM annotations WHERE doc_id = ?1 ORDER BY line ASC"
+            )?;
+            let rows = stmt.query_map(rusqlite::params![doc_name], |row| {
+                Ok(json!({
+                    "line": row.get::<_, i64>(0)?,
+                    "kind": row.get::<_, String>(1)?,
+                    "message": row.get::<_, String>(2)?,
+                    "author": row.get::<_, String>(3)?,
+                    "status": row.get::<_, String>(4)?,
+                    "created_at": row.get::<_, String>(5)?,
+                }))
+            })?;
+            let mut results = Vec::new();
+            for row in rows {
+                results.push(row?);
+            }
+            let open_count = results.iter().filter(|a| a.get("status").and_then(|s| s.as_str()) == Some("open")).count();
+            Ok(json!({
+                "success": true,
+                "message": format!("retrieved {} annotations for {}", results.len(), doc_name),
+                "payload": {
+                    "doc": doc_name,
+                    "annotations": results,
+                    "open_count": open_count,
+                }
+            }))
+        }
+        StateCommand::Tables { doc_name, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let mut stmt = conn.prepare(
+                "SELECT start_line, end_line, headers, rows FROM tables WHERE doc_id = ?1 ORDER BY start_line ASC"
+            )?;
+            let rows = stmt.query_map(rusqlite::params![doc_name], |row| {
+                Ok(json!({
+                    "start_line": row.get::<_, i64>(0)?,
+                    "end_line": row.get::<_, i64>(1)?,
+                    "headers": row.get::<_, String>(2)?,
+                    "rows": row.get::<_, String>(3)?,
+                }))
+            })?;
+            let mut results = Vec::new();
+            for row in rows {
+                results.push(row?);
+            }
+            Ok(json!({
+                "success": true,
+                "message": format!("retrieved {} tables for {}", results.len(), doc_name),
+                "payload": {
+                    "doc": doc_name,
+                    "tables": results,
+                }
+            }))
+        }
+        StateCommand::CodeBlocks { doc_name, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let mut stmt = conn.prepare(
+                "SELECT start_line, end_line, language, content_hash FROM code_blocks WHERE doc_id = ?1 ORDER BY start_line ASC"
+            )?;
+            let rows = stmt.query_map(rusqlite::params![doc_name], |row| {
+                Ok(json!({
+                    "start_line": row.get::<_, i64>(0)?,
+                    "end_line": row.get::<_, i64>(1)?,
+                    "language": row.get::<_, String>(2)?,
+                    "line_count": row.get::<_, i64>(3)?,
+                }))
+            })?;
+            let mut results = Vec::new();
+            for row in rows {
+                results.push(row?);
+            }
+            Ok(json!({
+                "success": true,
+                "message": format!("retrieved {} code blocks for {}", results.len(), doc_name),
+                "payload": {
+                    "doc": doc_name,
+                    "code_blocks": results,
+                }
             }))
         }
     }
@@ -438,10 +589,10 @@ fn execute_via_dinitctl(
     socket_path: &Option<String>,
     args: &[String],
     cwd: &str,
-) -> Result<i32, dinit::DinitError> {
+) -> Result<i32, Box<dyn std::error::Error>> {
     let effective_socket = match socket_path {
         Some(s) => s.clone(),
-        None => dinit::default_socket_path(),
+        None => "/var/run/dinit.sock".to_string(),
     };
 
     // Build dinitctl args with crabjar-dinit socket
@@ -456,15 +607,13 @@ fn execute_via_dinitctl(
         .args(&dinit_args)
         .current_dir(cwd)
         .output()
-        .map_err(|e| dinit::DinitError::DinitctlError(e.to_string()))?;
+        .map_err(|e| format!("dinitctl failed: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     if !output.status.success() {
-        return Err(dinit::DinitError::DinitctlError(
-            stderr.trim().to_string(),
-        ));
+        return Err(stderr.trim().to_string().into());
     }
 
     // Parse exit code from output if present
@@ -572,494 +721,6 @@ fn handle_guard_command(
                         "pid": pid,
                         "old_layer": result.map(|(l, _)| l),
                         "status": "revoked",
-                    },
-                },
-            }))
-        }
-    }
-}
-
-/// Handle bitwarden commands
-fn handle_bitwarden_command(
-    command: BitwardenCommand,
-) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    match command {
-        BitwardenCommand::Status => {
-            if !bitwarden::cli::is_available() {
-                return Ok(json!({
-                    "success": false,
-                    "bitwarden": {
-                        "status": "not_available",
-                        "error": "bitwarden CLI not found",
-                    },
-                }));
-            }
-
-            let status = bitwarden::cli::status()?;
-            Ok(json!({
-                "success": true,
-                "bitwarden": {
-                    "status": "available",
-                    "session": status,
-                },
-            }))
-        }
-        BitwardenCommand::List { folder, collection } => {
-            if !bitwarden::cli::is_available() {
-                return Ok(json!({
-                    "success": false,
-                    "bitwarden": {
-                        "items": [],
-                        "error": "bitwarden CLI not found",
-                    },
-                }));
-            }
-
-            let items = bitwarden::cli::list_items(folder.as_deref(), collection.as_deref())?;
-            Ok(json!({
-                "success": true,
-                "bitwarden": {
-                    "items": items,
-                },
-            }))
-        }
-        BitwardenCommand::Get { id } => {
-            if !bitwarden::cli::is_available() {
-                return Ok(json!({
-                    "success": false,
-                    "bitwarden": {
-                        "item": null,
-                        "error": "bitwarden CLI not found",
-                    },
-                }));
-            }
-
-            let item = bitwarden::cli::get_item(&id)?;
-            Ok(json!({
-                "success": true,
-                "bitwarden": {
-                    "item": item,
-                },
-            }))
-        }
-        BitwardenCommand::Search { query } => {
-            if !bitwarden::cli::is_available() {
-                return Ok(json!({
-                    "success": false,
-                    "bitwarden": {
-                        "items": [],
-                        "error": "bitwarden CLI not found",
-                    },
-                }));
-            }
-
-            let items = bitwarden::cli::search_items(&query)?;
-            Ok(json!({
-                "success": true,
-                "bitwarden": {
-                    "items": items,
-                    "query": query,
-                },
-            }))
-        }
-        BitwardenCommand::Generate {
-            length,
-            uppercase,
-            lowercase,
-            numbers,
-            special,
-        } => {
-            if !bitwarden::cli::is_available() {
-                return Ok(json!({
-                    "success": false,
-                    "bitwarden": {
-                        "password": null,
-                        "error": "bitwarden CLI not found",
-                    },
-                }));
-            }
-
-            let password =
-                bitwarden::cli::generate_password(length, uppercase, lowercase, numbers, special)?;
-            Ok(json!({
-                "success": true,
-                "bitwarden": {
-                    "password": password,
-                },
-            }))
-        }
-    }
-}
-
-/// Doctor status for a single check
-fn doctor_status(name: &str, ok: bool, detail: impl Into<String>) -> serde_json::Value {
-    json!({
-        "check": name,
-        "ok": ok,
-        "detail": detail.into(),
-    })
-}
-
-/// Handle doctor commands
-async fn handle_doctor_command(
-    command: DoctorCommand,
-) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    let project_root = std::env::current_dir()?;
-    let mut checks = Vec::new();
-
-    match command {
-        DoctorCommand::Check => {
-            // 1. Guard DB check
-            let guard_path = project_root.join("guard/guard.db");
-            let guard_exists = guard_path.exists();
-            let guard_ok = guard_exists;
-            let guard_detail = if guard_exists {
-                format!("exists at {}", guard_path.display())
-            } else {
-                "not found".to_string()
-            };
-            checks.push(doctor_status("guard_db", guard_ok, &guard_detail));
-
-            if guard_exists {
-                match crabjar_guard::GuardDb::open(&guard_path) {
-                    Ok(guard_db) => {
-                        let conn = guard_db.conn();
-                        let table_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM sqlite_master WHERE type='table'",
-                                [],
-                                |r| r.get(0),
-                            )
-                            .unwrap_or(0);
-                        let schema_ok = table_count >= 4;
-                        let schema_detail = if schema_ok {
-                            format!("schema intact ({} tables)", table_count)
-                        } else {
-                            format!("schema degraded ({} tables, expected >= 4)", table_count)
-                        };
-                        checks.push(doctor_status("guard_schema", schema_ok, &schema_detail));
-
-                        let pending_count: i64 = conn
-                            .query_row("SELECT count(*) FROM pending_queue WHERE 1=1", [], |r| {
-                                r.get(0)
-                            })
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "guard_pending_queue",
-                            true,
-                            format!("{} pending entries", pending_count),
-                        ));
-
-                        let interrupted_count: i64 = conn
-                            .query_row("SELECT count(*) FROM interrupted_log WHERE 1=1", [], |r| {
-                                r.get(0)
-                            })
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "guard_interrupted_log",
-                            true,
-                            format!("{} interrupted entries", interrupted_count),
-                        ));
-
-                        let outcomes_count: i64 = conn
-                            .query_row("SELECT count(*) FROM action_outcomes WHERE 1=1", [], |r| {
-                                r.get(0)
-                            })
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "guard_action_outcomes",
-                            true,
-                            format!("{} recorded outcomes", outcomes_count),
-                        ));
-
-                        let pid_trust_count: i64 = conn
-                            .query_row("SELECT count(*) FROM pid_trust WHERE 1=1", [], |r| r.get(0))
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "guard_pid_trust",
-                            true,
-                            format!("{} PID trust records", pid_trust_count),
-                        ));
-
-                        let node_count: i64 = conn
-                            .query_row("SELECT count(*) FROM memory_nodes WHERE 1=1", [], |r| {
-                                r.get(0)
-                            })
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "guard_memory_graph",
-                            true,
-                            format!("{} memory nodes", node_count),
-                        ));
-
-                        let action_count: i64 = conn
-                            .query_row("SELECT count(*) FROM action_requests WHERE 1=1", [], |r| {
-                                r.get(0)
-                            })
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "guard_action_requests",
-                            true,
-                            format!("{} action requests", action_count),
-                        ));
-                    }
-                    Err(e) => {
-                        checks.push(doctor_status(
-                            "guard_schema",
-                            false,
-                            format!("open failed: {}", e),
-                        ));
-                    }
-                }
-            }
-
-            // 2. Telemetry / flight recorder DB check
-            let flight_path = project_root.join("telemetry/flight.db");
-            let flight_exists = flight_path.exists();
-            let flight_ok = flight_exists;
-            let flight_detail = if flight_exists {
-                format!("exists at {}", flight_path.display())
-            } else {
-                "not found (created on first exec)".to_string()
-            };
-            checks.push(doctor_status(
-                "flight_recorder_db",
-                flight_ok,
-                &flight_detail,
-            ));
-
-            if flight_exists {
-                match rusqlite::Connection::open(&flight_path) {
-                    Ok(conn) => {
-                        let table_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM sqlite_master WHERE type='table'",
-                                [],
-                                |r| r.get(0),
-                            )
-                            .unwrap_or(0);
-                        let schema_ok = table_count >= 4;
-                        let schema_detail = if schema_ok {
-                            format!("schema intact ({} tables)", table_count)
-                        } else {
-                            format!("schema degraded ({} tables, expected >= 4)", table_count)
-                        };
-                        checks.push(doctor_status("flight_schema", schema_ok, &schema_detail));
-
-                        let record_count: i64 = conn
-                            .query_row("SELECT count(*) FROM flight_records WHERE 1=1", [], |r| {
-                                r.get(0)
-                            })
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "flight_records",
-                            true,
-                            format!("{} records", record_count),
-                        ));
-
-                        let checkpoint_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM session_checkpoint WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "flight_checkpoints",
-                            true,
-                            format!("{} checkpoints", checkpoint_count),
-                        ));
-                    }
-                    Err(e) => {
-                        checks.push(doctor_status(
-                            "flight_schema",
-                            false,
-                            format!("open failed: {}", e),
-                        ));
-                    }
-                }
-            }
-
-            // 3. Knowledge store (memory) DB check
-            let memory_path = project_root.join("memory/knowledge.db");
-            let memory_exists = memory_path.exists();
-            let memory_ok = memory_exists;
-            let memory_detail = if memory_exists {
-                format!("exists at {}", memory_path.display())
-            } else {
-                "not found (created on first knowledge operation)".to_string()
-            };
-            checks.push(doctor_status("knowledge_db", memory_ok, &memory_detail));
-
-            if memory_exists {
-                match rusqlite::Connection::open(&memory_path) {
-                    Ok(conn) => {
-                        let table_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM sqlite_master WHERE type='table'",
-                                [],
-                                |r| r.get(0),
-                            )
-                            .unwrap_or(0);
-                        let schema_ok = table_count >= 3;
-                        let schema_detail = if schema_ok {
-                            format!("schema intact ({} tables)", table_count)
-                        } else {
-                            format!("schema degraded ({} tables, expected >= 3)", table_count)
-                        };
-                        checks.push(doctor_status("knowledge_schema", schema_ok, &schema_detail));
-
-                        let entry_count: i64 = conn
-                            .query_row(
-                                "SELECT count(*) FROM knowledge_entries WHERE 1=1",
-                                [],
-                                |r| r.get(0),
-                            )
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "knowledge_entries",
-                            true,
-                            format!("{} entries", entry_count),
-                        ));
-
-                        let event_count: i64 = conn
-                            .query_row("SELECT count(*) FROM event_rows WHERE 1=1", [], |r| {
-                                r.get(0)
-                            })
-                            .unwrap_or(0);
-                        checks.push(doctor_status(
-                            "knowledge_events",
-                            true,
-                            format!("{} events", event_count),
-                        ));
-                    }
-                    Err(e) => {
-                        checks.push(doctor_status(
-                            "knowledge_schema",
-                            false,
-                            format!("open failed: {}", e),
-                        ));
-                    }
-                }
-            }
-
-            // 4. Workspace config check
-            let project_root_path = project_root.to_string_lossy().to_string();
-            let _ = project_root_path; // suppress unused warning
-            let mut loader = ProjectLoader::new();
-            if loader.load_from_directory(&project_root).await.is_ok() {
-                if let Some(cfg) = loader.get_current_config() {
-                    checks.push(json!({
-                        "check": "workspace_config",
-                        "ok": true,
-                        "detail": format!(
-                            "name={}, tools={}, exec_enabled={}",
-                            cfg.name, cfg.tools.len(), cfg.tool_execution_enabled
-                        ),
-                    }));
-                } else {
-                    checks.push(json!({
-                        "check": "workspace_config",
-                        "ok": false,
-                        "detail": "loaded but no valid config found",
-                    }));
-                }
-            } else {
-                checks.push(json!({
-                    "check": "workspace_config",
-                    "ok": false,
-                    "detail": "load failed",
-                }));
-            }
-
-            // 5. Dinit integration check
-            let dinit_path = which::which("dinitctl").ok();
-            let dinit_ok = dinit_path.is_some();
-            let dinit_detail = if dinit_ok {
-                format!("found at {}", dinit_path.unwrap().display())
-            } else {
-                "not found".to_string()
-            };
-            checks.push(doctor_status("tool_dinitctl", dinit_ok, &dinit_detail));
-
-            if let Some(ref cfg) = loader.get_current_config() {
-                if let Some(ref socket) = cfg.user_dinit_socket {
-                    let socket_exists = std::path::Path::new(socket).exists();
-                    checks.push(doctor_status(
-                        "dinit_socket",
-                        socket_exists,
-                        format!("{}: {}", socket, if socket_exists { "exists" } else { "not found" }),
-                    ));
-                }
-            }
-
-            // 6. Tool availability
-            let git_path = which::which("git").ok();
-            checks.push(doctor_status(
-                "tool_git",
-                git_path.is_some(),
-                git_path
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "not found".to_string()),
-            ));
-
-            let cargo_path = which::which("cargo").ok();
-            checks.push(doctor_status(
-                "tool_cargo",
-                cargo_path.is_some(),
-                cargo_path
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "not found".to_string()),
-            ));
-
-            // 7. Bitwarden availability
-            let bw_available = bitwarden::cli::is_available();
-            checks.push(doctor_status(
-                "tool_bitwarden",
-                bw_available,
-                if bw_available {
-                    "available"
-                } else {
-                    "not found or not logged in"
-                },
-            ));
-
-            // 8. State-docs directory check
-            let state_docs_path = project_root.join("state-docs");
-            let state_docs_exists = state_docs_path.exists();
-            checks.push(doctor_status(
-                "state_docs_dir",
-                state_docs_exists,
-                if state_docs_exists {
-                    format!("exists at {}", state_docs_path.display())
-                } else {
-                    "not found".to_string()
-                },
-            ));
-
-            let all_ok = checks.iter().all(|c| c["ok"].as_bool() == Some(true));
-
-            Ok(json!({
-                "success": true,
-                "doctor": {
-                    "ok": all_ok,
-                    "checks": checks,
-                    "doubt": {
-                        "assumptions": [
-                            "guard/guard.db schema tables >= 4 indicates healthy state",
-                            "telemetry/flight.db schema tables >= 4 indicates healthy state",
-                            "memory/knowledge.db schema tables >= 3 indicates healthy state",
-                        ],
-                        "blind_spots": [
-                            "Does not verify WAL journal integrity",
-                            "Does not verify index health",
-                            "Schema table count thresholds are heuristic",
-                        ],
-                        "last_validation": chrono::Utc::now().to_rfc3339(),
-                        "stale_after": chrono::Utc::now()
-                            .checked_add_signed(chrono::Duration::hours(24))
-                            .unwrap_or_default()
-                            .to_rfc3339(),
                     },
                 },
             }))
