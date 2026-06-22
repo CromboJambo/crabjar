@@ -133,7 +133,7 @@ If the data acquisition is opaque, this is surveillance.
 If the data acquisition is enough, auditable, and owned by the user,
 this is reflection.
 
-mirror-log exists because that distinction matters enough to enough to build for.
+mirror-log exists because that distinction matters enough to build for.
 
 ---
 
