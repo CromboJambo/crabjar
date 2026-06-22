@@ -298,11 +298,11 @@ impl PolicyChain {
         }
 
         // Apply default policy (lowest priority)
-        if let Some(ref policy) = self.default_policy {
-            if policy.would_change(effective_layer) {
-                effective_layer = policy.apply(effective_layer);
-                determined_by = format!("default-policy:{}", policy.source);
-            }
+        if let Some(ref policy) = self.default_policy
+            && policy.would_change(effective_layer)
+        {
+            effective_layer = policy.apply(effective_layer);
+            determined_by = format!("default-policy:{policy}");
         }
 
         // Compute effective confidence based on the gap between requested and effective
@@ -433,10 +433,10 @@ impl TrustResolver {
             }
         }
 
-        if let Some(ref policy) = self.policy_chain.default_policy {
-            if policy.would_change(original_layer) {
-                applied.push(format!("default:{}", policy.source));
-            }
+        if let Some(ref policy) = self.policy_chain.default_policy
+            && policy.would_change(original_layer)
+        {
+            applied.push(format!("default:{policy}"));
         }
 
         applied
