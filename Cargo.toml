@@ -8,6 +8,7 @@ members = [
     "sandbox",
     "tool_registry",
     "axum-mux",
+    "crabjar-architecture",
     # Host runtime
     "host/host-core",
     "host/host-system",
