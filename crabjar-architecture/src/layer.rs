@@ -2,7 +2,6 @@
 ///
 /// Each layer declares which lower layers it may depend on.
 /// A crate in layer N may only depend on crates in layers 0..=N.
-
 use std::collections::HashMap;
 
 /// All defined layers in the crabjar workspace.
@@ -20,6 +19,7 @@ pub const ALL_LAYERS: &[&str] = &[
 /// Map of crate name → layer it belongs to.
 /// This is the authoritative mapping — if a crate is not here,
 /// it is not part of the workspace architecture model.
+#[must_use]
 pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     let mut map = HashMap::new();
 
@@ -69,6 +69,7 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
 
 /// Layers that a given layer may depend on (inclusive of itself).
 /// Returns the set of allowed layer indices for each layer.
+#[must_use]
 pub fn allowed_dependencies(layer: usize) -> &'static [usize] {
     match layer {
         0 => &[0],                    // common → common only
@@ -84,6 +85,7 @@ pub fn allowed_dependencies(layer: usize) -> &'static [usize] {
 }
 
 /// Layer name for a given layer index.
+#[must_use]
 pub fn layer_name(layer: usize) -> Option<&'static str> {
     match layer {
         0 => Some("common"),
