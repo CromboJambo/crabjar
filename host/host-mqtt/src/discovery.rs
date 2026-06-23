@@ -8,7 +8,6 @@
 ///
 /// Mirrors the Teams-for-Linux homeAssistantDiscovery.js pattern:
 /// sensors for state, buttons for one-shot actions.
-
 use serde_json::json;
 use tracing::info;
 
