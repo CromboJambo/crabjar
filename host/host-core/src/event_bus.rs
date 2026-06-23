@@ -92,13 +92,13 @@ impl EventBus {
 
     /// Publish an event to all subscribers.
     /// Returns the number of receivers that got the event.
-    pub fn publish(&self, event: Event) -> Result<usize, broadcast::error::SendError<Event>> {
+    pub fn publish(&self, event: Event) -> Result<usize, Box<broadcast::error::SendError<Event>>> {
         tracing::debug!(event = %event.kind, source = %event.source, "event published");
-        self.sender.send(event)
+        self.sender.send(event).map_err(Box::new)
     }
 
     /// Publish a typed event shorthand.
-    pub fn publish_typed<T>(&self, kind: EventType, source: T) -> Result<usize, broadcast::error::SendError<Event>>
+    pub fn publish_typed<T>(&self, kind: EventType, source: T) -> Result<usize, Box<broadcast::error::SendError<Event>>>
     where
         T: Into<String>,
     {
