@@ -2,7 +2,6 @@
 ///
 /// Every agent loop operates on exactly one WorkItem at a time.
 /// No hidden state, everything inspectable, replayable, checkpointable.
-
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 
