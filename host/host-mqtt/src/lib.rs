@@ -1,6 +1,6 @@
-/// MQTT integration for CrabJar host.
+/// `mqtt` — MQTT integration module for CrabJar.
 ///
-/// Provides a bidirectional MQTT client for Teams status publishing
+/// Provides MQTT client, discovery, and media bridge functionality.
 /// and command reception. Mirrors the Teams-for-Linux MQTT integration:
 /// - Status publishing: presence, call state, camera, mic, screen-sharing
 /// - Command reception: toggle-mute, toggle-video, toggle-hand-raise

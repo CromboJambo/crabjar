@@ -1,12 +1,12 @@
 /// Home Assistant auto-discovery for CrabJar MQTT integration.
 ///
 /// Publishes Home Assistant discovery configs for:
-/// - Presence sensor (available / busy / dnd / away)
-/// - Microphone sensor (speaking / silent / muted / off)
-/// - Binary sensors (in-call, screen-sharing, camera)
-/// - Buttons (toggle-mute, toggle-video, toggle-hand-raise)
+/// - Presence sensor (`available` / `busy` / `dnd` / `away`)
+/// - Microphone sensor (`speaking` / `silent` / `muted` / `off`)
+/// - Binary sensors (`in-call`, `screen-sharing`, `camera`)
+/// - Buttons (`toggle-mute`, `toggle-video`, `toggle-hand-raise`)
 ///
-/// Mirrors the Teams-for-Linux homeAssistantDiscovery.js pattern:
+/// Mirrors the Teams-for-Linux `homeAssistantDiscovery.js` pattern:
 /// sensors for state, buttons for one-shot actions.
 use serde_json::json;
 use tracing::info;

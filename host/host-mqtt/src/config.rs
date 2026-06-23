@@ -1,7 +1,7 @@
 /// MQTT configuration.
 ///
 /// Mirrors the Teams-for-Linux config.json mqtt section:
-/// https://github.com/IsmaelMartinez/teams-for-linux/blob/main/docs-site/docs/mqtt-integration.md
+/// <https://github.com/IsmaelMartinez/teams-for-linux/blob/main/docs-site/docs/mqtt-integration.md>
 use serde::{Deserialize, Serialize};
 
 /// MQTT broker configuration.

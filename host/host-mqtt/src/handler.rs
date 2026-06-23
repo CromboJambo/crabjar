@@ -9,7 +9,6 @@
 ///
 /// Security: validates incoming commands against an allowed-actions whitelist
 /// (mirrors the Electron app's `allowedActions` check in mqtt/index.js).
-
 use tracing::{debug, warn};
 
 /// Allowed MQTT command actions (mirrors Electron's `allowedActions`).

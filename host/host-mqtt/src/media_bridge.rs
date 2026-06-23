@@ -8,7 +8,6 @@
 /// - `{topicPrefix}/microphone` — Microphone state: 'speaking' | 'silent' | 'muted' | 'off'
 /// - `{topicPrefix}/in-call` — Active call state (true/false)
 /// - `{topicPrefix}/screen-sharing` — Screen sharing active state (bool string)
-
 use crate::config::MqttConfig;
 use crate::MqttClient;
 use tokio::sync::broadcast;
