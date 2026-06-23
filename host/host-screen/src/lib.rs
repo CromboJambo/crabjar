@@ -128,20 +128,15 @@ pub struct ScreenManager {
 }
 
 /// Resolution preset
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Resolution {
     /// 1280x720
     _HD,
     /// 1920x1080
     _FHD,
     /// Auto-detect
+    #[default]
     _Auto,
-}
-
-impl Default for Resolution {
-    fn default() -> Self {
-        Self::_Auto
-    }
 }
 
 impl ScreenCapture {
@@ -172,6 +167,12 @@ impl ScreenCapture {
     /// Get capture source info
     pub fn source(&self) -> &CaptureSource {
         &self.source
+    }
+}
+
+impl Default for ScreenCapture {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

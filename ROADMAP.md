@@ -221,9 +221,9 @@ Durable session state separate from execution logic.
 
 ---
 
-## Priority 6: VM Bridge Integration
+## Priority 12: VM Bridge Integration
 
-### 6.1 crabjar-vm Crate
+### 12.1 crabjar-vm Crate
 
 - [ ] Manifest parsing (reuse vm-bridge's TOML format)
 - [ ] Worker process management (reuse supervisor logic)
@@ -249,9 +249,9 @@ Durable session state separate from execution logic.
 
 ---
 
-## Priority 7: Testing Infrastructure
+## Priority 11: Testing Infrastructure
 
-### 7.1 E2E Slice Testing
+### 11.1 E2E Slice Testing
 
 IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough on merges.
 
@@ -259,7 +259,7 @@ IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough 
 - [ ] Define full slice: all channels, all sandboxes, all trust layers
 - [ ] CI runs smoke on every PR; full on merge/nightly
 
-### 7.2 Replay Snapshots
+### 11.2 Replay Snapshots
 
 IronClaw's `scripts/replay-snap.sh` enables deterministic testing by replaying recorded LLM traces.
 
@@ -286,9 +286,75 @@ IronClaw has PostgreSQL + libSQL abstraction baked into every persistence crate.
 
 ---
 
-## Priority 9: Developer Experience
+## Priority 9: Codex Pattern Imports
 
-### 9.1 ADR Process
+Derived from parity analysis against OpenAI Codex (2026-06-23). Codex sets the quality bar; these patterns are worth importing into Crabjar's architecture.
+
+### 9.1 Bounded Context Management
+
+Codex's `context-fragments/` crate enforces hard token caps on everything injected into model context. No unbounded items, no items larger than 10K tokens, highlight items crossing 1k tokens as P0 requiring manual review.
+
+- [ ] Design: `ContextFragment` type with token-bounded size + hard cap
+- [ ] Implement: bounded injection API in knowledge store (`memory/`)
+- [ ] Add: per-fragment token accounting (not byte counting)
+- [ ] Add: P0 alert for fragments exceeding 1k tokens
+- [ ] Wire into guard: reject actions that would produce unbounded context fragments
+
+**Why this matters:** Crabjar's knowledge store has no token budget. Without bounded context, long conversations will silently degrade model quality. Codex's approach: everything injected must have a bounded size and a hard cap.
+
+### 9.2 Module Size Governance
+
+Codex enforces a hard cap at 500 lines/module (excluding tests). Modules exceeding ~800 LoC must extract new functionality into new modules. This prevents the codex-core bloat that Crabjar is already seeing.
+
+- [ ] Add `cargo-declared` or custom script to report module sizes
+- [ ] Identify modules exceeding 500 lines (current offenders)
+- [ ] Split largest offenders — target `guard/` and `orchestrator/` first
+- [ ] Add to CI gate as a codex-quality constraint
+- [ ] Document module size rule in AGENTS.md (already in Codex's AGENTS.md)
+
+**Why this matters:** Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy.
+
+### 9.3 Snapshot Testing for TUI
+
+Codex uses `insta` extensively for TUI regression testing. Any change affecting user-visible UI must include corresponding insta snapshot coverage. This catches regressions in rendering, styling, and output format.
+
+- [ ] Add `insta` to workspace dependencies
+- [ ] Add snapshot tests for `codeburn` TUI output
+- [ ] Add snapshot tests for `crabjar` CLI JSON output format
+- [ ] Document snapshot testing workflow in AGENTS.md
+- [ ] CI gate: fail on pending snapshots (require `cargo insta accept`)
+
+**Why this matters:** Crabjar has no regression testing for structured output. Snapshot tests catch format drift before it reaches users. Codex's pattern: UI/text changes must update snapshots as part of the PR.
+
+### 9.4 File Search Engine
+
+Codex's `file-search/` crate provides BM25-based file indexing for agent context. Agents need to find relevant files without scanning the entire workspace.
+
+- [ ] Design: `FileSearch` trait with BM25 indexing backend
+- [ ] Implement: incremental file indexing (watch + poll)
+- [ ] Implement: query API (keyword, fuzzy, path-based)
+- [ ] Add: file relevance scoring with path-aware weighting
+- [ ] Wire into knowledge store: `file_search` subcommand
+
+**Why this matters:** Crabjar currently uses `ignore` for file traversal — no indexing, no ranking. For a 21-crate workspace, agents need fast, relevant file discovery. Codex's BM25 approach is battle-tested.
+
+### 9.5 Starlark Execution Policy
+
+Codex's `execpolicy/` uses Starlark (Go-Sanitized) for programmable command execution rules. More flexible than Crabjar's static guard deny/pending/proceed model.
+
+- [ ] Design: `PolicyEngine` trait abstracting static vs. scriptable policies
+- [ ] Evaluate: Go-Sanitized Starlark as execution policy language
+- [ ] Implement: Starlark policy loader + sandboxed evaluator
+- [ ] Add: policy hot-reload without binary restart
+- [ ] Backward compat: static guard rules as default policy
+
+**Why this matters:** Static deny/pending/proceed is sufficient for launch but too rigid for production. Starlark enables per-project, per-user, per-command policies without code changes. Codex's `execpolicy/` is the reference implementation.
+
+---
+
+## Priority 10: Developer Experience
+
+### 10.1 ADR Process
 
 EdgeCrab's `specs/` directory formalizes design decisions.
 
@@ -319,4 +385,4 @@ Multi-level configuration (defaults → user config → project config → CLI f
 
 ---
 
-*Last updated: June 22, 2026*
+*Last updated: June 23, 2026*

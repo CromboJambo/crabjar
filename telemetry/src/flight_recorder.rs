@@ -12,6 +12,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Tool receipt prefix for leak detector compatibility.
+#[allow(dead_code)]
 const RECEIPT_PREFIX: &str = "zc-receipt-";
 
 /// Flight recorder that captures command transcripts, stdout/stderr, exit codes, git diff snapshots, and session checkpoints.

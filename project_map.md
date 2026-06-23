@@ -609,6 +609,7 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 | `prov-phase4-done` | Phase 4 complete: unified InferenceBackend trait, MistralRsServe endpoint, MISTRALRS_SERVE_URL env var, detect_available_endpoints probes mistral.rs serve | 2026-05-31 | Inference integration completion | crabjar/project_map.md |
 | `prov-llm-cross-project` | llm-workspace added as cross-project reference via opencode instructions + dotfiles symlink graph | 2026-06-06 | Cross-project awareness | crabjar/.agents/skills/cross-project |
 | `prov-zeroclaw-credit` | README + project_map credit: ZeroClaw docs for security model, tool receipts, microkernel, SOP, config schema | 2026-06-06 | Attribution for design influence | crabjar/README.md, crabjar/project_map.md |
+| `prov-codex-parity` | ROADMAP.md Priority 9: 5 Codex pattern imports (bounded context, module size governance, snapshot testing, file search, Starlark exec policy) | 2026-06-23 | Feature parity analysis — Codex vs CrabJar | crabjar/README.md, crabjar/project_map.md, codex/AGENTS.md, codex/codex-rs/Cargo.toml |
 
 ---
 

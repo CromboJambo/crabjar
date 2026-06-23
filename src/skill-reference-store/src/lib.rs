@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+pub mod skillset;
+
 #[derive(Error, Debug)]
 pub enum ReferenceStoreError {
     #[error("file not found: {path}")]
