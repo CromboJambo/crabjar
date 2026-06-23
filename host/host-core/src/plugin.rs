@@ -2,7 +2,6 @@
 ///
 /// Plugins are the "apps" that run on top of the host — Teams, Slack, etc.
 /// Each plugin declares its lifecycle hooks and registers with the PluginRegistry.
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use async_trait::async_trait;

@@ -1,7 +1,6 @@
 /// Configuration for the CrabJar host runtime.
 ///
 /// Loaded from ~/.config/crabjar-host/config.toml or a project-scoped path.
-
 use serde::{Deserialize, Serialize};
 
 /// Host configuration.

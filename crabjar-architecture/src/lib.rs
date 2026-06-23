@@ -18,7 +18,6 @@
 ///
 /// Boundary rule: a crate in layer N may only depend on crates in layers 0..=N.
 /// This prevents high-level crates from leaking into low-level ones.
-
 pub mod layer;
 pub mod boundary;
 

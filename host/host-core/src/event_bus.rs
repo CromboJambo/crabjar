@@ -2,7 +2,6 @@
 ///
 /// All subsystems communicate through this async pub/sub channel.
 /// Events flow from system hooks, plugins, and the agent loop.
-
 use std::fmt;
 use tokio::sync::broadcast;
 use uuid::Uuid;
