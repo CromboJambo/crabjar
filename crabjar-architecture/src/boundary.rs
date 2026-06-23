@@ -1,8 +1,7 @@
 /// Boundary enforcement: verify that crate dependencies respect layer ordering.
 ///
 /// Parses Cargo.toml files in the workspace and checks that each crate
-/// only depends on crates in allowed layers (its own layer or below).
-
+/// Only depends on crates in allowed layers (its own layer or below).
 use crate::layer::{allowed_dependencies, crate_to_layer, layer_name};
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -12,11 +11,11 @@ use std::fs;
 pub struct Violation {
     /// The crate that has the invalid dependency.
     pub from_crate: String,
-    /// The layer the from_crate belongs to.
+    /// The layer the `from_crate` belongs to.
     pub from_layer: usize,
     /// The dependency that violates the boundary.
     pub to_crate: String,
-    /// The layer the to_crate belongs to.
+    /// The layer the `to_crate` belongs to.
     pub to_layer: usize,
 }
 
@@ -60,21 +59,21 @@ fn parse_crate_info(manifest_path: &Path) -> Option<CrateInfo> {
         .get("package")
         .and_then(|p| p.get("name"))
         .and_then(|n| n.as_str())
-        .map(|s| s.to_string())?;
+        .map(std::string::ToString::to_string)?;
 
     // Extract direct (non-workspace) dependencies from [dependencies], [dev-dependencies], [build-dependencies]
     let mut direct_deps = Vec::new();
 
     for section in &["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(deps) = parsed.get(section) {
-            if let Some(table) = deps.as_table() {
-                for (dep_name, dep_val) in table {
-                    // Skip workspace = true deps — they are shared dependency versions, not structural deps
-                    if dep_val.get("workspace").and_then(|w| w.as_bool()) == Some(true) {
-                        continue;
-                    }
-                    direct_deps.push(dep_name.clone());
+        if let Some(deps) = parsed.get(section)
+            && let Some(table) = deps.as_table()
+        {
+            for (dep_name, dep_val) in table {
+                // Skip workspace = true deps — they are shared dependency versions, not structural deps
+                if dep_val.get("workspace").and_then(toml::Value::as_bool) == Some(true) {
+                    continue;
                 }
+                direct_deps.push(dep_name.clone());
             }
         }
     }
@@ -90,9 +89,9 @@ fn parse_crate_info(manifest_path: &Path) -> Option<CrateInfo> {
 fn discover_workspace_members(workspace_root: &Path) -> Result<Vec<CrateInfo>, String> {
     let workspace_cargo = workspace_root.join("Cargo.toml");
     let content = fs::read_to_string(&workspace_cargo)
-        .map_err(|e| format!("Cannot read workspace Cargo.toml: {}", e))?;
+        .map_err(|e| format!("Cannot read workspace Cargo.toml: {e}"))?;
     let parsed = content.parse::<toml::Value>()
-        .map_err(|e| format!("Cannot parse workspace Cargo.toml: {}", e))?;
+        .map_err(|e| format!("Cannot parse workspace Cargo.toml: {e}"))?;
 
     let members = parsed
         .get("workspace")
@@ -105,10 +104,10 @@ fn discover_workspace_members(workspace_root: &Path) -> Result<Vec<CrateInfo>, S
         let member_path = member.as_str().ok_or("Invalid member entry")?;
         let manifest_path = workspace_root.join(member_path).join("Cargo.toml");
 
-        if manifest_path.exists() {
-            if let Some(info) = parse_crate_info(&manifest_path) {
-                crates.push(info);
-            }
+        if manifest_path.exists()
+            && let Some(info) = parse_crate_info(&manifest_path)
+        {
+            crates.push(info);
         }
     }
 
@@ -124,28 +123,24 @@ pub fn check_workspace_boundaries(workspace_root: &Path) -> Result<Vec<Violation
     let mut violations = Vec::new();
 
     for crate_info in &crates {
-        let from_layer = match layer_map.get(crate_info.name.as_str()) {
-            Some(&layer) => layer,
-            None => {
-                // Crate not in the architecture model — skip it (could be an external dep)
-                continue;
-            }
+        let Some(&layer) = layer_map.get(crate_info.name.as_str()) else {
+            // Crate not in the architecture model — skip it (could be an external dep)
+            continue;
         };
 
-        let allowed = allowed_dependencies(from_layer);
+        let allowed = allowed_dependencies(layer);
 
         for dep in &crate_info.direct_deps {
             // Only check deps that are workspace members (not external crates)
-            let to_layer = match layer_map.get(dep.as_str()) {
-                Some(&layer) => layer,
-                None => continue, // External crate, not our concern
+            let Some(&to_layer) = layer_map.get(dep.as_str()) else {
+                continue; // External crate, not our concern
             };
 
             // Check if to_layer is in the allowed set
             if !allowed.contains(&to_layer) {
                 violations.push(Violation {
                     from_crate: crate_info.name.clone(),
-                    from_layer,
+                    from_layer: layer,
                     to_crate: dep.clone(),
                     to_layer,
                 });
@@ -170,6 +165,7 @@ pub fn enforce_boundaries(workspace_root: &Path) -> Result<(), Vec<Violation>> {
 }
 
 /// Get all crates in a specific layer.
+#[must_use]
 pub fn crates_in_layer(layer: usize) -> Vec<String> {
     crate_to_layer()
         .into_iter()
@@ -179,6 +175,7 @@ pub fn crates_in_layer(layer: usize) -> Vec<String> {
 }
 
 /// Get the layer name for a crate.
+#[must_use]
 pub fn crate_layer(crate_name: &str) -> Option<(usize, &'static str)> {
     crate_to_layer()
         .get(crate_name)
