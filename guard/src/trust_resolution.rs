@@ -172,6 +172,16 @@ pub struct Policy {
     pub description: String,
 }
 
+impl fmt::Display for Policy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}(max={}, min={}, active={})",
+            self.source, self.max_layer, self.min_layer, self.active
+        )
+    }
+}
+
 impl Policy {
     /// Create a capping policy (limits maximum trust layer).
     pub fn cap(source: PolicySource, max_layer: u32, description: impl Into<String>) -> Self {
