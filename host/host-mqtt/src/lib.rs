@@ -7,7 +7,6 @@
 /// - Home Assistant auto-discovery
 /// - Last Will and Testament (LWT) for connection state
 /// - Automatic reconnection with backoff
-
 pub mod client;
 pub mod config;
 pub mod discovery;
