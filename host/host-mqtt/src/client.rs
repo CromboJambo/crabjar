@@ -2,7 +2,6 @@
 ///
 /// Handles the MQTT lifecycle: connect, publish, subscribe, reconnect, LWT.
 /// Mirrors the Electron app's mqtt.js client behavior.
-
 use crate::config::MqttConfig;
 use rumqttc::{
     AsyncClient, Event, EventLoop, Incoming, MqttOptions, QoS,
