@@ -159,7 +159,7 @@ impl WorkItem {
 
     /// Update the overall confidence score.
     pub fn set_confidence(&mut self, confidence: f32) {
-        self.confidence = confidence.min(1.0).max(0.0);
+        self.confidence = confidence.clamp(0.0, 1.0);
         self.updated_at = chrono::Utc::now();
     }
 
