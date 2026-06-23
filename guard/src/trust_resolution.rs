@@ -24,7 +24,6 @@
 /// let effective = TrustResolver::new(chain).resolve(&requested, &scope);
 /// // effective might be lower than requested after policy resolution
 /// ```
-
 use crate::scope::Scope;
 use std::fmt;
 

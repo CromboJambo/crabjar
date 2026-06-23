@@ -25,7 +25,6 @@
 ///     via = PolicyChain::default()
 /// );
 /// ```
-
 use std::fmt;
 
 /// Scope dimensions that define the boundary of a data operation.
@@ -294,8 +293,8 @@ pub trait ScopedAccess {
 pub enum ScopeError {
     /// The scope cannot access the target — requires CrossScopeAuth.
     InsufficientScope {
-        actor: Scope,
-        target: Scope,
+        actor: Box<Scope>,
+        target: Box<Scope>,
     },
     /// Cross-scope authorization expired.
     AuthorizationExpired {
@@ -468,8 +467,8 @@ mod tests {
         let actor = Scope::project("project-a");
         let target = Scope::project("project-b");
         let err = ScopeError::InsufficientScope {
-            actor: actor.clone(),
-            target: target.clone(),
+            actor: Box::new(actor.clone()),
+            target: Box::new(target.clone()),
         };
         let display = format!("{}", err);
         assert!(display.contains("Insufficient scope"));
