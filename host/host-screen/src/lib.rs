@@ -36,7 +36,9 @@
 //! async fn main() -> anyhow::Result<()> {
 //!     let capture = ScreenCapture::new();
 //!     let session = capture.start_session().await?;
-//!     println!("WebSocket URL: {}", session.ws_url());
+//!     if let Some(session) = session {
+//!         println!("WebSocket URL: {}", session.ws_url());
+//!     }
 //!     Ok(())
 //! }
 //! ```
