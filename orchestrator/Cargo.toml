@@ -51,3 +51,4 @@ futures.workspace = true
 
 # Testing
 tempfile = "3.10"
+serial_test = "3.2"
