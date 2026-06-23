@@ -115,7 +115,7 @@ impl HostConfig {
     /// Save config to a TOML file.
     pub fn to_file(&self, path: &str) -> Result<(), ConfigError> {
         let contents = toml::to_string_pretty(self)
-            .map_err(|e| ConfigError::SerializeFailed(e))?;
+            .map_err(ConfigError::SerializeFailed)?;
         // Ensure parent directory exists
         if let Some(parent) = std::path::Path::new(path).parent() {
             std::fs::create_dir_all(parent)
