@@ -5,7 +5,6 @@
 /// - Token caching with 5-minute expiry buffer
 /// - Calendar, mail, people, and chat endpoints
 /// - OData query parameter building
-
 use std::time::{Duration, Instant};
 
 use anyhow::anyhow;

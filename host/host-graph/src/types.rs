@@ -1,5 +1,4 @@
-/// Types for Graph API responses and requests.
-
+//! Types for Graph API responses and requests.
 use serde::{Deserialize, Serialize};
 
 /// Calendar event from Microsoft Graph API.

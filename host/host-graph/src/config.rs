@@ -1,5 +1,4 @@
-/// Configuration for the Graph API client.
-
+//! Configuration for the Graph API client.
 use serde::{Deserialize, Serialize};
 
 /// Graph API configuration.
