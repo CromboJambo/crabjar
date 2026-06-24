@@ -38,3 +38,4 @@ memory/knowledge.db
 llmrunner.md
 src/dinit.rs
 .agents/GitCloneResearch/
+state-docs.db
