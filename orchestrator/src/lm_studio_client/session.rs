@@ -1,6 +1,6 @@
 //! Session state management and SQLite-backed session persistence.
 
-use crate::types::{MessageRole, UnifiedChatResponse, UnifiedMessage};
+use super::types::{MessageRole, UnifiedChatResponse, UnifiedMessage};
 use thiserror::Error;
 
 // ---------------------------------------------------------------------------

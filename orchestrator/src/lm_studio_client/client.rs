@@ -1,8 +1,8 @@
 //! The unified LM Studio client that abstracts endpoint differences.
 
-use crate::endpoints::{anthropic, native, openai};
-use crate::session::{SessionError, SessionState, SessionStore};
-use crate::types::*;
+use super::endpoints::{anthropic, native, openai};
+use super::session::{SessionError, SessionState, SessionStore};
+use super::types::*;
 use tracing::{debug, info, warn};
 
 /// The unified LM Studio client that abstracts endpoint differences.

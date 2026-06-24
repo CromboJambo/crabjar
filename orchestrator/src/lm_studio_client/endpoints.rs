@@ -1,6 +1,6 @@
 //! Endpoint implementations for native, OpenAI-compatible, and Anthropic-compatible APIs.
 
-use crate::types::*;
+use super::types::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::debug;
@@ -10,7 +10,7 @@ use tracing::debug;
 // ---------------------------------------------------------------------------
 
 // Native `/api/v1/chat` endpoint implementation.
-mod native {
+pub(super) mod native {
     use super::*;
 
     /// Converts a unified request to the native endpoint format.
@@ -188,7 +188,7 @@ mod native {
 }
 
 // OpenAI-compatible `/v1/chat/completions` endpoint implementation.
-mod openai {
+pub(super) mod openai {
     use super::*;
 
     /// Converts a unified request to the OpenAI format.
@@ -324,7 +324,7 @@ mod openai {
 }
 
 // Anthropic-compatible `/v1/messages` endpoint implementation.
-mod anthropic {
+pub(super) mod anthropic {
     use super::*;
 
     /// Converts a unified request to the Anthropic format.
