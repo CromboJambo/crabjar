@@ -43,27 +43,27 @@ impl TeamsPlugin {
     }
 
     /// Handle Teams-specific actions from the tray or GUI.
-    async fn handle_teams_action(&self, action: &str, ctx: &PluginContext) -> Result<serde_json::Value, PluginError> {
+    async fn handle_teams_action(
+        &self,
+        action: &str,
+        ctx: &PluginContext,
+    ) -> Result<serde_json::Value, PluginError> {
         match action {
             "show" => {
                 if let Some(_sid) = self.session_id {
-                    let _ = ctx.emit(
-                        crabjar_host_core::event_bus::EventType::WebView {
-                            event: "show".into(),
-                            url: Some("https://teams.microsoft.com".into()),
-                        },
-                    );
+                    let _ = ctx.emit(crabjar_host_core::event_bus::EventType::WebView {
+                        event: "show".into(),
+                        url: Some("https://teams.microsoft.com".into()),
+                    });
                 }
                 Ok(serde_json::json!({ "status": "shown" }))
             }
             "hide" => {
                 if let Some(_sid) = self.session_id {
-                    let _ = ctx.emit(
-                        crabjar_host_core::event_bus::EventType::WebView {
-                            event: "hide".into(),
-                            url: Some("https://teams.microsoft.com".into()),
-                        },
-                    );
+                    let _ = ctx.emit(crabjar_host_core::event_bus::EventType::WebView {
+                        event: "hide".into(),
+                        url: Some("https://teams.microsoft.com".into()),
+                    });
                 }
                 Ok(serde_json::json!({ "status": "hidden" }))
             }
@@ -121,7 +121,12 @@ impl Plugin for TeamsPlugin {
         Ok(())
     }
 
-    async fn on_action(&self, ctx: &PluginContext, action: &str, _data: Option<serde_json::Value>) -> Result<serde_json::Value, PluginError> {
+    async fn on_action(
+        &self,
+        ctx: &PluginContext,
+        action: &str,
+        _data: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value, PluginError> {
         self.handle_teams_action(action, ctx).await
     }
 
