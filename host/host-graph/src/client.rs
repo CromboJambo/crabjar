@@ -4,7 +4,7 @@
 /// - Token acquisition via a `TokenProvider` trait
 /// - Token caching with 5-minute expiry buffer
 /// - Calendar, mail, people, and chat endpoints
-/// - OData query parameter building
+/// - `OData` query parameter building
 use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
@@ -13,11 +13,11 @@ use reqwest::Client as HttpClient;
 use tracing::{debug, warn};
 
 use crate::config::GraphApiConfig;
-use crate::types::*;
+use crate::types::{GraphApiResponse, UserProfile, CalendarEventsResponse, CalendarEvent, MailMessagesResponse, PeopleResponse, ChatMessageRequest};
 
 /// Trait for acquiring Microsoft Graph API tokens.
 ///
-/// Implementations typically wrap the WebView session manager's
+/// Implementations typically wrap the `WebView` session manager's
 /// token acquisition (which communicates with the Electron Chromium session).
 #[async_trait]
 pub trait TokenProvider: Send + Sync {
@@ -41,7 +41,7 @@ impl TokenEntry {
     fn is_valid(&self) -> bool {
         match self.expires_at {
             Some(expiry) => {
-                let buffer = Duration::from_secs(5 * 60);
+                let buffer = Duration::from_mins(5);
                 let elapsed = Instant::now().duration_since(self.acquired_at);
                 elapsed < (expiry - self.acquired_at) - buffer
             }
@@ -63,6 +63,7 @@ pub struct GraphApiClient {
 
 impl GraphApiClient {
     /// Create a new Graph API client.
+    #[must_use]
     pub fn new(config: GraphApiConfig) -> Self {
         Self {
             config,
@@ -72,11 +73,13 @@ impl GraphApiClient {
     }
 
     /// Check if the client is enabled.
+    #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.config.enabled
     }
 
     /// Get the base URL.
+    #[must_use]
     pub fn base_url(&self) -> &str {
         &self.config.base_url
     }
@@ -87,31 +90,29 @@ impl GraphApiClient {
         provider: &P,
         force_refresh: bool,
     ) -> Option<String> {
-        if !force_refresh {
-            if let Some(ref entry) = self.token_cache {
-                if entry.is_valid() {
+        if !force_refresh
+            && let Some(ref entry) = self.token_cache
+                && entry.is_valid() {
                     debug!(
                         time_until_expiry = ?entry.expires_at.map(|e| e.saturating_duration_since(Instant::now())),
                         "Using cached Graph API token"
                     );
                     return Some(entry.token.clone());
                 }
-            }
-        }
 
         let token = provider.acquire_token("https://graph.microsoft.com", force_refresh).await?;
 
         self.token_cache = Some(TokenEntry {
             token: token.clone(),
             acquired_at: Instant::now(),
-            expires_at: Some(Instant::now() + Duration::from_secs(3600)),
+            expires_at: Some(Instant::now() + Duration::from_hours(1)),
         });
 
         debug!("Graph API token acquired and cached");
         Some(token)
     }
 
-    /// Build OData query string from options.
+    /// Build `OData` query string from options.
     fn build_odata_query(params: &std::collections::HashMap<String, String>) -> String {
         let supported = [
             "startDateTime",
@@ -129,7 +130,7 @@ impl GraphApiClient {
         let query: Vec<_> = params
             .iter()
             .filter(|(k, v)| supported.contains(&k.as_str()) && !v.is_empty())
-            .map(|(k, v)| format!("{}={}", k, v))
+            .map(|(k, v)| format!("{k}={v}"))
             .collect();
 
         query.join("&")
@@ -150,11 +151,8 @@ impl GraphApiClient {
             return Err(anyhow!("Graph API is disabled"));
         }
 
-        let token = match self.acquire_token(provider, false).await {
-            Some(t) => t,
-            None => {
-                return Err(anyhow!("Failed to acquire token"));
-            }
+        let Some(token) = self.acquire_token(provider, false).await else {
+            return Err(anyhow!("Failed to acquire token"));
         };
 
         let url = if endpoint.starts_with("http") {
@@ -167,7 +165,7 @@ impl GraphApiClient {
         let url = if query.is_empty() {
             url
         } else {
-            format!("{}?{}", url, query)
+            format!("{url}?{query}")
         };
 
         debug!(method = ?method, endpoint = %url, "Making Graph API request");
@@ -175,7 +173,7 @@ impl GraphApiClient {
         let mut request = self
             .http_client
             .request(method.clone(), &url)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .header("Content-Type", "application/json");
 
         for (key, value) in headers {
@@ -202,7 +200,7 @@ impl GraphApiClient {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to parse user profile: {}", e);
-                        return GraphApiResponse::err(format!("Failed to parse response: {}", e));
+                        return GraphApiResponse::err(format!("Failed to parse response: {e}"));
                     }
                 };
                 debug!(
@@ -213,12 +211,12 @@ impl GraphApiClient {
             }
             Err(e) => {
                 warn!("Graph API request failed: {}", e);
-                GraphApiResponse::err(format!("Request failed: {}", e))
+                GraphApiResponse::err(format!("Request failed: {e}"))
             }
         }
     }
 
-    /// Get calendar events with optional OData query options.
+    /// Get calendar events with optional `OData` query options.
     pub async fn get_calendar_events<P: TokenProvider>(        &mut self,
         provider: &mut P,
         params: std::collections::HashMap<String, String>,
@@ -227,7 +225,7 @@ impl GraphApiClient {
         let endpoint = if query.is_empty() {
             "/me/calendar/events".to_string()
         } else {
-            format!("/me/calendar/events?{}", query)
+            format!("/me/calendar/events?{query}")
         };
 
         match self
@@ -239,13 +237,13 @@ impl GraphApiClient {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to parse calendar events: {}", e);
-                        return GraphApiResponse::err(format!("Failed to parse response: {}", e));
+                        return GraphApiResponse::err(format!("Failed to parse response: {e}"));
                     }
                 };
                 debug!(event_count = data.value.len(), "Calendar events retrieved");
                 GraphApiResponse::ok(data)
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 
@@ -264,7 +262,7 @@ impl GraphApiClient {
         let endpoint = if query.is_empty() {
             "/me/calendar/calendarView".to_string()
         } else {
-            format!("/me/calendar/calendarView?{}", query)
+            format!("/me/calendar/calendarView?{query}")
         };
 
         match self
@@ -276,13 +274,13 @@ impl GraphApiClient {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to parse calendar view: {}", e);
-                        return GraphApiResponse::err(format!("Failed to parse response: {}", e));
+                        return GraphApiResponse::err(format!("Failed to parse response: {e}"));
                     }
                 };
                 debug!(event_count = data.value.len(), "Calendar view retrieved");
                 GraphApiResponse::ok(data)
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 
@@ -300,7 +298,7 @@ impl GraphApiClient {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to parse created event: {}", e);
-                        return GraphApiResponse::err(format!("Failed to parse response: {}", e));
+                        return GraphApiResponse::err(format!("Failed to parse response: {e}"));
                     }
                 };
                 debug!(
@@ -310,7 +308,7 @@ impl GraphApiClient {
                 );
                 GraphApiResponse::ok(data)
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 
@@ -321,7 +319,7 @@ impl GraphApiClient {
         updates: serde_json::Value,
     ) -> GraphApiResponse<CalendarEvent> {
         let event_id_str = event_id.into();
-        let endpoint = format!("/me/calendar/events/{}", event_id_str);
+        let endpoint = format!("/me/calendar/events/{event_id_str}");
 
         match self
             .make_request(provider, &endpoint, &reqwest::Method::PATCH, &Default::default(), &Default::default(), Some(updates))
@@ -332,13 +330,13 @@ impl GraphApiClient {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to parse updated event: {}", e);
-                        return GraphApiResponse::err(format!("Failed to parse response: {}", e));
+                        return GraphApiResponse::err(format!("Failed to parse response: {e}"));
                     }
                 };
                 debug!(event_id = %event_id_str, "Calendar event updated");
                 GraphApiResponse::ok(data)
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 
@@ -348,7 +346,7 @@ impl GraphApiClient {
         event_id: impl Into<String>,
     ) -> GraphApiResponse<serde_json::Value> {
         let event_id_str = event_id.into();
-        let endpoint = format!("/me/calendar/events/{}", event_id_str);
+        let endpoint = format!("/me/calendar/events/{event_id_str}");
 
         match self
             .make_request(provider, &endpoint, &reqwest::Method::DELETE, &Default::default(), &Default::default(), None)
@@ -358,11 +356,11 @@ impl GraphApiClient {
                 debug!(event_id = %event_id_str, "Calendar event deleted");
                 GraphApiResponse::ok(serde_json::Value::Null)
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 
-    /// Get mail messages with optional OData query options.
+    /// Get mail messages with optional `OData` query options.
     pub async fn get_mail_messages<P: TokenProvider>(        &mut self,
         provider: &mut P,
         params: std::collections::HashMap<String, String>,
@@ -371,7 +369,7 @@ impl GraphApiClient {
         let endpoint = if query.is_empty() {
             "/me/messages".to_string()
         } else {
-            format!("/me/messages?{}", query)
+            format!("/me/messages?{query}")
         };
 
         match self
@@ -383,13 +381,13 @@ impl GraphApiClient {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to parse mail messages: {}", e);
-                        return GraphApiResponse::err(format!("Failed to parse response: {}", e));
+                        return GraphApiResponse::err(format!("Failed to parse response: {e}"));
                     }
                 };
                 debug!(message_count = data.value.len(), "Mail messages retrieved");
                 GraphApiResponse::ok(data)
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 
@@ -404,14 +402,14 @@ impl GraphApiClient {
         if !q.is_empty() {
             // Escape quotes and backslashes (mirrors Electron app)
             let escaped = q.replace('\\', "\\\\").replace('"', "\\\"");
-            params.insert("$search".to_string(), format!("\"{}\"", escaped));
+            params.insert("$search".to_string(), format!("\"{escaped}\""));
         }
 
         let query_str = Self::build_odata_query(&params);
         let endpoint = if query_str.is_empty() {
             "/me/people".to_string()
         } else {
-            format!("/me/people?{}", query_str)
+            format!("/me/people?{query_str}")
         };
 
         match self
@@ -423,13 +421,13 @@ impl GraphApiClient {
                     Ok(d) => d,
                     Err(e) => {
                         warn!("Failed to parse people results: {}", e);
-                        return GraphApiResponse::err(format!("Failed to parse response: {}", e));
+                        return GraphApiResponse::err(format!("Failed to parse response: {e}"));
                     }
                 };
                 debug!(result_count = data.value.len(), "People search results");
                 GraphApiResponse::ok(data)
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 
@@ -443,7 +441,7 @@ impl GraphApiClient {
         let message = ChatMessageRequest::new(content);
         let body = serde_json::to_value(message).unwrap_or_default();
 
-        let endpoint = format!("/chats/{}/messages", chat_id_str);
+        let endpoint = format!("/chats/{chat_id_str}/messages");
 
         match self
             .make_request(provider, &endpoint, &reqwest::Method::POST, &Default::default(), &Default::default(), Some(body))
@@ -465,7 +463,7 @@ impl GraphApiClient {
                     GraphApiResponse::err(format!("API returned status {}: {}", status, error_text.chars().take(200).collect::<String>()))
                 }
             }
-            Err(e) => GraphApiResponse::err(format!("Request failed: {}", e)),
+            Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
         }
     }
 }
