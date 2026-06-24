@@ -100,7 +100,7 @@ impl MetricsStore {
             name.to_string()
         } else {
             let mut parts: Vec<_> = labels.iter().collect();
-            parts.sort_by_key(|(k, _)| k.clone());
+            parts.sort_by_key(|(k, _)| (*k).clone());
             format!("{}{{{}}}", name, parts.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join(","))
         }
     }
