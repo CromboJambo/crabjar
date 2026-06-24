@@ -28,6 +28,7 @@ impl From<io::Error> for ConfigError {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolDef {
     pub path: String,
+    #[allow(dead_code)]
     #[serde(default)]
     pub commands: Vec<String>,
 }
@@ -51,6 +52,7 @@ pub struct ProjectConfig {
 
 impl ProjectConfig {
     /// Returns the workspace name (alias for name).
+    #[allow(dead_code)]
     pub fn workspace_name(&self) -> &str {
         &self.name
     }
@@ -89,6 +91,7 @@ impl ProjectConfig {
     }
 
     /// Returns all commands defined across all tool entries.
+    #[allow(dead_code)]
     pub fn get_all_commands(&self) -> Vec<String> {
         self.tools.iter().flat_map(|t| t.commands.clone()).collect()
     }
