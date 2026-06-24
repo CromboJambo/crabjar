@@ -2,13 +2,17 @@ mod cli;
 mod dashboard;
 
 use clap::{Parser, Subcommand};
-use std::sync::Arc;
-use crabjar_host_core::{HostConfig, EventBus, PluginRegistry};
-use crabjar_host_observe::MetricsCollector;
 use crabjar_host_agent::AgentLoop;
+use crabjar_host_core::{EventBus, HostConfig, PluginRegistry};
+use crabjar_host_observe::MetricsCollector;
+use std::sync::Arc;
 
 #[derive(Parser, Debug)]
-#[command(name = "crabjar", version, about = "CrabJar host runtime — Rust-native application host with agent loop")]
+#[command(
+    name = "crabjar",
+    version,
+    about = "CrabJar host runtime — Rust-native application host with agent loop"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -82,7 +86,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Commands::Start { plugin } => {
-            tracing::info!("starting host runtime (plugin: {}, config: {})", plugin, config_path);
+            tracing::info!(
+                "starting host runtime (plugin: {}, config: {})",
+                plugin,
+                config_path
+            );
 
             // Register the requested plugin
             let teams_plugin = Box::new(crabjar_app_teams::TeamsPlugin::new());
@@ -97,7 +105,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Initialize notifications
             let notifications = crabjar_host_system::NotificationService::new(event_bus.clone());
             if config.notifications.enabled {
-                notifications.notify("CrabJar Host", "Runtime started", None).ok();
+                notifications
+                    .notify("CrabJar Host", "Runtime started", None)
+                    .ok();
             }
 
             tracing::info!("host runtime running — press Ctrl+C to stop");
@@ -147,8 +157,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 iterations += 1;
                 let result = loop_engine.tick().await?;
                 match &result {
-                    crabjar_host_agent::LoopResult::IterationComplete { confidence, tasks_completed, .. } => {
-                        println!("  Iteration {}: confidence={:.0}%, tasks={}/{}", iterations, confidence * 100.0, tasks_completed, tasks_completed);
+                    crabjar_host_agent::LoopResult::IterationComplete {
+                        confidence,
+                        tasks_completed,
+                        ..
+                    } => {
+                        println!(
+                            "  Iteration {}: confidence={:.0}%, tasks={}/{}",
+                            iterations,
+                            confidence * 100.0,
+                            tasks_completed,
+                            tasks_completed
+                        );
                     }
                     crabjar_host_agent::LoopResult::Completed { .. } => {
                         println!("  Completed after {} iterations", iterations);
