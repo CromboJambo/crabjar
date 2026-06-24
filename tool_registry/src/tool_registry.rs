@@ -228,17 +228,15 @@ impl<'a> ToolRegistry<'a> {
                             && let Some(args) = parsed["args"].as_array()
                         {
                             let tool_name = format!(
-                                    "{}-{}",
-                                    cmd.rsplit('/').next().unwrap_or("mcp"),
-                                    args.first()
-                                        .and_then(|a| a.as_str())
-                                        .unwrap_or("server")
-                                );
-                                if !discovered.contains(&tool_name) {
-                                    let name_clone = tool_name.clone();
-                                    discovered.push(tool_name);
-                                    self.record_discovery(source, &name_clone)?;
-                                }
+                                "{}-{}",
+                                cmd.rsplit('/').next().unwrap_or("mcp"),
+                                args.first().and_then(|a| a.as_str()).unwrap_or("server")
+                            );
+                            if !discovered.contains(&tool_name) {
+                                let name_clone = tool_name.clone();
+                                discovered.push(tool_name);
+                                self.record_discovery(source, &name_clone)?;
+                            }
                         }
                     }
                 }
@@ -253,7 +251,9 @@ impl<'a> ToolRegistry<'a> {
                 let path = entry.path();
                 if path.is_file()
                     && path.extension().is_some_and(|ext| ext == "md")
-                    && path.file_name().is_some_and(|n| n.to_string_lossy().starts_with("tool_"))
+                    && path
+                        .file_name()
+                        .is_some_and(|n| n.to_string_lossy().starts_with("tool_"))
                     && let Some(name) = path
                         .file_stem()
                         .and_then(|s| s.to_str())
@@ -302,7 +302,9 @@ impl<'a> ToolRegistry<'a> {
             };
 
             match which::which(binary_name) {
-                Ok(path) => results.push((name.clone(), true, Some(path.to_string_lossy().to_string()))),
+                Ok(path) => {
+                    results.push((name.clone(), true, Some(path.to_string_lossy().to_string())))
+                }
                 Err(_) => results.push((name.clone(), false, None)),
             }
         }
@@ -608,13 +610,23 @@ mod tests {
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
 
-        let results = registry.validate_tools(&["cargo_check".to_string(), "git_diff".to_string()]).unwrap();
+        let results = registry
+            .validate_tools(&["cargo_check".to_string(), "git_diff".to_string()])
+            .unwrap();
         assert_eq!(results.len(), 2);
 
         // cargo_check maps to "cargo" which should exist
-        assert!(results.iter().any(|(name, ok, _)| name == "cargo_check" && *ok));
+        assert!(
+            results
+                .iter()
+                .any(|(name, ok, _)| name == "cargo_check" && *ok)
+        );
         // git_diff maps to "git" which should exist
-        assert!(results.iter().any(|(name, ok, _)| name == "git_diff" && *ok));
+        assert!(
+            results
+                .iter()
+                .any(|(name, ok, _)| name == "git_diff" && *ok)
+        );
     }
 
     #[test]
@@ -625,7 +637,9 @@ mod tests {
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
 
-        let results = registry.validate_tools(&["nonexistent_tool_xyz".to_string()]).unwrap();
+        let results = registry
+            .validate_tools(&["nonexistent_tool_xyz".to_string()])
+            .unwrap();
         assert_eq!(results.len(), 1);
         assert!(!results[0].1);
         assert!(results[0].2.is_none());
