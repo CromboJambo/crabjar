@@ -24,7 +24,11 @@ pub enum EventType {
     /// Configuration reload
     ConfigReload { source: String },
     /// Application-specific (plugin-defined)
-    App { app_id: String, event: String, data: serde_json::Value },
+    App {
+        app_id: String,
+        event: String,
+        data: serde_json::Value,
+    },
     /// Heartbeat / timer tick
     Tick { interval_ms: u64 },
     /// User input (from Ratatui or GUI)
@@ -98,7 +102,11 @@ impl EventBus {
     }
 
     /// Publish a typed event shorthand.
-    pub fn publish_typed<T>(&self, kind: EventType, source: T) -> Result<usize, Box<broadcast::error::SendError<Event>>>
+    pub fn publish_typed<T>(
+        &self,
+        kind: EventType,
+        source: T,
+    ) -> Result<usize, Box<broadcast::error::SendError<Event>>>
     where
         T: Into<String>,
     {
@@ -125,10 +133,7 @@ mod tests {
         let bus = EventBus::new(16);
         let mut sub = bus.subscriber();
 
-        let event = Event::new(
-            EventType::Tick { interval_ms: 1000 },
-            "test",
-        );
+        let event = Event::new(EventType::Tick { interval_ms: 1000 }, "test");
         bus.publish(event.clone()).unwrap();
 
         let received = sub.recv().await.unwrap();
@@ -139,7 +144,9 @@ mod tests {
     #[test]
     fn test_event_display() {
         let event = Event::new(
-            EventType::TrayChanged { action: "shown".into() },
+            EventType::TrayChanged {
+                action: "shown".into(),
+            },
             "test",
         );
         assert!(format!("{}", event.kind).starts_with("tray:"));

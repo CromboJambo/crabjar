@@ -1,9 +1,9 @@
+use serde::{Deserialize, Serialize};
 /// WorkItem — the first-class unit of agent work.
 ///
 /// Every agent loop operates on exactly one WorkItem at a time.
 /// No hidden state, everything inspectable, replayable, checkpointable.
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
 
 /// Status of a WorkItem through its lifecycle.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -34,7 +34,15 @@ impl Status {
     }
 
     pub fn is_active(&self) -> bool {
-        matches!(self, Status::Pending | Status::Understanding | Status::Planning | Status::Executing { .. } | Status::Verifying | Status::Reflecting)
+        matches!(
+            self,
+            Status::Pending
+                | Status::Understanding
+                | Status::Planning
+                | Status::Executing { .. }
+                | Status::Verifying
+                | Status::Reflecting
+        )
     }
 }
 
@@ -107,7 +115,12 @@ impl WorkItem {
     }
 
     /// Add an observation to this WorkItem.
-    pub fn observe(&mut self, stage: impl Into<String>, kind: impl Into<String>, details: impl Into<String>) {
+    pub fn observe(
+        &mut self,
+        stage: impl Into<String>,
+        kind: impl Into<String>,
+        details: impl Into<String>,
+    ) {
         self.observations.push(Observation {
             id: Uuid::new_v4(),
             stage: stage.into(),
@@ -207,14 +220,21 @@ mod tests {
         wi.set_confidence(0.75);
         assert!((wi.confidence - 0.75).abs() < f32::EPSILON);
 
-        wi.progress_to(Status::Executing { current_task: Some(1) });
+        wi.progress_to(Status::Executing {
+            current_task: Some(1),
+        });
         assert!(matches!(wi.status, Status::Executing { .. }));
     }
 
     #[test]
     fn test_status_terminal() {
         assert!(Status::Completed.is_terminal());
-        assert!(Status::Failed { reason: "test".into() }.is_terminal());
+        assert!(
+            Status::Failed {
+                reason: "test".into()
+            }
+            .is_terminal()
+        );
         assert!(!Status::Pending.is_terminal());
         assert!(!Status::Executing { current_task: None }.is_terminal());
     }

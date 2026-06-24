@@ -105,24 +105,22 @@ impl Default for HostConfig {
 impl HostConfig {
     /// Load config from a TOML file.
     pub fn from_file(path: &str) -> Result<Self, ConfigError> {
-        let contents = std::fs::read_to_string(path)
-            .map_err(|e| ConfigError::ReadFailed(path.into(), e))?;
-        let config = toml::from_str(&contents)
-            .map_err(|e| ConfigError::ParseFailed(path.into(), e))?;
+        let contents =
+            std::fs::read_to_string(path).map_err(|e| ConfigError::ReadFailed(path.into(), e))?;
+        let config =
+            toml::from_str(&contents).map_err(|e| ConfigError::ParseFailed(path.into(), e))?;
         Ok(config)
     }
 
     /// Save config to a TOML file.
     pub fn to_file(&self, path: &str) -> Result<(), ConfigError> {
-        let contents = toml::to_string_pretty(self)
-            .map_err(ConfigError::SerializeFailed)?;
+        let contents = toml::to_string_pretty(self).map_err(ConfigError::SerializeFailed)?;
         // Ensure parent directory exists
         if let Some(parent) = std::path::Path::new(path).parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| ConfigError::WriteFailed(path.into(), e))?;
         }
-        std::fs::write(path, contents)
-            .map_err(|e| ConfigError::WriteFailed(path.into(), e))?;
+        std::fs::write(path, contents).map_err(|e| ConfigError::WriteFailed(path.into(), e))?;
         Ok(())
     }
 

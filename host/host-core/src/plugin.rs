@@ -1,13 +1,13 @@
+use crate::event_bus::EventBus;
+use async_trait::async_trait;
 /// Plugin API for the CrabJar host runtime.
 ///
 /// Plugins are the "apps" that run on top of the host — Teams, Slack, etc.
 /// Each plugin declares its lifecycle hooks and registers with the PluginRegistry.
 use std::collections::HashMap;
 use std::sync::Arc;
-use async_trait::async_trait;
-use uuid::Uuid;
 use tokio::sync::RwLock;
-use crate::event_bus::EventBus;
+use uuid::Uuid;
 
 /// Context available to plugins during their lifecycle.
 pub struct PluginContext {
@@ -56,7 +56,12 @@ pub trait Plugin: Send + Sync {
     async fn on_hide(&self, ctx: &PluginContext) -> Result<(), PluginError>;
 
     /// Called when the plugin should handle a user action (e.g., tray click).
-    async fn on_action(&self, ctx: &PluginContext, action: &str, data: Option<serde_json::Value>) -> Result<serde_json::Value, PluginError>;
+    async fn on_action(
+        &self,
+        ctx: &PluginContext,
+        action: &str,
+        data: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value, PluginError>;
 
     /// Health check — returns plugin status info.
     async fn health(&self, _ctx: &PluginContext) -> Result<serde_json::Value, PluginError> {
@@ -104,7 +109,8 @@ impl PluginRegistry {
     /// Unregister a plugin.
     pub async fn unregister(&self, id: &str) -> Result<(), PluginError> {
         let mut map = self.plugins.write().await;
-        map.remove(id).ok_or_else(|| PluginError::NotFound(id.to_string()))?;
+        map.remove(id)
+            .ok_or_else(|| PluginError::NotFound(id.to_string()))?;
         tracing::info!("plugin unregistered: {}", id);
         Ok(())
     }
