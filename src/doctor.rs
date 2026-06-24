@@ -4,8 +4,8 @@
 use serde_json::json;
 
 use crate::DoctorCommand;
-use crate::bitwarden;
 use crate::ProjectLoader;
+use crate::bitwarden;
 
 /// Doctor status for a single check
 pub fn doctor_status(name: &str, ok: bool, detail: impl Into<String>) -> serde_json::Value {
@@ -297,14 +297,19 @@ pub async fn handle_doctor_command(
             checks.push(doctor_status("tool_dinitctl", dinit_ok, &dinit_detail));
 
             if let Some(cfg) = loader.get_current_config()
-                && let Some(ref socket) = cfg.user_dinit_socket {
-                    let socket_exists = std::path::Path::new(socket).exists();
-                    checks.push(doctor_status(
-                        "dinit_socket",
-                        socket_exists,
-                        format!("{}: {}", socket, if socket_exists { "exists" } else { "not found" }),
-                    ));
-                }
+                && let Some(ref socket) = cfg.user_dinit_socket
+            {
+                let socket_exists = std::path::Path::new(socket).exists();
+                checks.push(doctor_status(
+                    "dinit_socket",
+                    socket_exists,
+                    format!(
+                        "{}: {}",
+                        socket,
+                        if socket_exists { "exists" } else { "not found" }
+                    ),
+                ));
+            }
 
             // 6. Tool availability
             let git_path = which::which("git").ok();
