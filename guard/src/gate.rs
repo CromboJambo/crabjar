@@ -166,7 +166,10 @@ impl<'a> ExecutionGate<'a> {
         match source {
             "external" => {
                 // External writes always go to quarantine — requires human promotion
-                debug!(source = source, "Knowledge write from external source → quarantine");
+                debug!(
+                    source = source,
+                    "Knowledge write from external source → quarantine"
+                );
                 Ok(GateResult::Pending)
             }
             "agent" | "system" => {
@@ -179,7 +182,10 @@ impl<'a> ExecutionGate<'a> {
                 Ok(GateResult::Proceed)
             }
             _ => {
-                warn!(source = source, "Unknown knowledge write source → quarantine");
+                warn!(
+                    source = source,
+                    "Unknown knowledge write source → quarantine"
+                );
                 Ok(GateResult::Pending)
             }
         }

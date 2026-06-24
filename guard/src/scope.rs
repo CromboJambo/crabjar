@@ -278,11 +278,7 @@ pub trait ScopedAccess {
     fn read_with_scope(&self, scope: &Self::Scope) -> Result<String, ScopeError>;
 
     /// Write data with a scope — returns error if scope is insufficient.
-    fn write_with_scope(
-        &self,
-        scope: &Self::Scope,
-        data: &str,
-    ) -> Result<(), ScopeError>;
+    fn write_with_scope(&self, scope: &Self::Scope, data: &str) -> Result<(), ScopeError>;
 
     /// Check if a scope can access this data.
     fn can_access(&self, scope: &Self::Scope) -> bool;
@@ -302,20 +298,14 @@ pub enum ScopeError {
         ttl_seconds: i64,
     },
     /// The scope is missing required dimensions.
-    MissingScopeDimension {
-        dimension: &'static str,
-    },
+    MissingScopeDimension { dimension: &'static str },
 }
 
 impl fmt::Display for ScopeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ScopeError::InsufficientScope { actor, target } => {
-                write!(
-                    f,
-                    "Insufficient scope: {} cannot access {}",
-                    actor, target
-                )
+                write!(f, "Insufficient scope: {} cannot access {}", actor, target)
             }
             ScopeError::AuthorizationExpired {
                 authorized_at,
@@ -367,10 +357,7 @@ mod tests {
         let base = Scope::project("my-project");
         let with_thread = base.with_thread("thread-123");
         assert!(with_thread.thread.is_some());
-        assert_eq!(
-            with_thread.thread.as_ref().unwrap().as_str(),
-            "thread-123"
-        );
+        assert_eq!(with_thread.thread.as_ref().unwrap().as_str(), "thread-123");
     }
 
     #[test]
@@ -378,10 +365,7 @@ mod tests {
         let base = Scope::project("my-project");
         let with_tenant = base.with_tenant("tenant-abc");
         assert!(with_tenant.tenant.is_some());
-        assert_eq!(
-            with_tenant.tenant.as_ref().unwrap().as_str(),
-            "tenant-abc"
-        );
+        assert_eq!(with_tenant.tenant.as_ref().unwrap().as_str(), "tenant-abc");
     }
 
     #[test]
@@ -421,12 +405,7 @@ mod tests {
     fn test_cross_scope_auth_creation() {
         let actor = Scope::project("project-a");
         let target = Scope::project("project-b");
-        let auth = CrossScopeAuth::new(
-            target.clone(),
-            actor.clone(),
-            "migration",
-            "admin-policy",
-        );
+        let auth = CrossScopeAuth::new(target.clone(), actor.clone(), "migration", "admin-policy");
         assert_eq!(auth.target_scope, target);
         assert_eq!(auth.actor_scope, actor);
         assert_eq!(auth.reason, "migration");
@@ -438,12 +417,7 @@ mod tests {
     fn test_cross_scope_auth_expiry() {
         let actor = Scope::project("project-a");
         let target = Scope::project("project-b");
-        let auth = CrossScopeAuth::new(
-            target.clone(),
-            actor.clone(),
-            "migration",
-            "admin-policy",
-        );
+        let auth = CrossScopeAuth::new(target.clone(), actor.clone(), "migration", "admin-policy");
         // Simulate time passing
         let expired_auth = CrossScopeAuth {
             authorized_at: chrono::Utc::now().timestamp() - 3700, // > 1 hour ago
@@ -454,8 +428,7 @@ mod tests {
 
     #[test]
     fn test_scope_display() {
-        let scope = Scope::user_project("alice", "project-a")
-            .with_thread("thread-123");
+        let scope = Scope::user_project("alice", "project-a").with_thread("thread-123");
         let display = format!("{}", scope);
         assert!(display.contains("identity=user:alice"));
         assert!(display.contains("project=project-a"));

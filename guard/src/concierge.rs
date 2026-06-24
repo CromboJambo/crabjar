@@ -1,5 +1,5 @@
-use crate::fingerprint::{ApprovalLease, ApprovalScope, InvocationFingerprint};
 use crate::GateResult;
+use crate::fingerprint::{ApprovalLease, ApprovalScope, InvocationFingerprint};
 use crate::guard_db::{GuardDb, GuardDbError};
 use crate::types::ActionStatus;
 use serde::{Deserialize, Serialize};
@@ -280,7 +280,12 @@ impl GateConcierge {
         let lease = if is_persistent {
             ApprovalLease::persistent(fingerprint.clone(), scope.clone(), granted_by.to_string())
         } else {
-            ApprovalLease::new(fingerprint.clone(), scope.clone(), ttl_seconds, granted_by.to_string())
+            ApprovalLease::new(
+                fingerprint.clone(),
+                scope.clone(),
+                ttl_seconds,
+                granted_by.to_string(),
+            )
         };
 
         // Store the lease so it can be matched later

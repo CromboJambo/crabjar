@@ -38,7 +38,12 @@ pub use gate::{CommandRisk, ExecutionGate, GateContext, GateResult};
 pub use guard_db::{GuardDb, GuardDbError};
 #[cfg(test)]
 pub use memory::MemoryGraph;
-pub use scope::{CrossScopeAuth, Identity, ProjectId, Scope, ScopedAccess, ScopeError, TenantId, ThreadId};
+pub use scope::{
+    CrossScopeAuth, Identity, ProjectId, Scope, ScopeError, ScopedAccess, TenantId, ThreadId,
+};
 pub use trust::TrustManager;
-pub use trust_resolution::{EffectiveTrust, Policy, PolicyChain, PolicySource, RequestedTrust, TrustResolution, TrustResolver};
+pub use trust_resolution::{
+    EffectiveTrust, Policy, PolicyChain, PolicySource, RequestedTrust, TrustResolution,
+    TrustResolver,
+};
 pub use types::*;

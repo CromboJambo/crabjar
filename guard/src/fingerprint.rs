@@ -88,7 +88,11 @@ pub struct ApprovalScope {
 }
 
 impl ApprovalScope {
-    pub fn new(project: Option<String>, user: Option<String>, source_event_id: Option<String>) -> Self {
+    pub fn new(
+        project: Option<String>,
+        user: Option<String>,
+        source_event_id: Option<String>,
+    ) -> Self {
         Self {
             project,
             user,
@@ -160,7 +164,11 @@ impl ApprovalLease {
     }
 
     /// Create a persistent (never-expiring) approval lease.
-    pub fn persistent(fingerprint: InvocationFingerprint, scope: ApprovalScope, granted_by: String) -> Self {
+    pub fn persistent(
+        fingerprint: InvocationFingerprint,
+        scope: ApprovalScope,
+        granted_by: String,
+    ) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
@@ -187,9 +195,7 @@ impl ApprovalLease {
 
     /// Check if this lease matches a given fingerprint and scope.
     pub fn matches(&self, fingerprint: &InvocationFingerprint, scope: &ApprovalScope) -> bool {
-        self.fingerprint.matches(fingerprint)
-            && self.scope.is_compatible(scope)
-            && self.is_valid()
+        self.fingerprint.matches(fingerprint) && self.scope.is_compatible(scope) && self.is_valid()
     }
 }
 
@@ -273,24 +279,40 @@ mod tests {
 
     #[test]
     fn test_fingerprint_from_command() {
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
-        let fp2 = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
+        let fp2 = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         assert_eq!(fp, fp2);
         assert_eq!(fp.as_str().len(), 64);
     }
 
     #[test]
     fn test_fingerprint_prevents_approval_smuggling() {
-        let fp1 = InvocationFingerprint::from_command("cp", &["src".to_string(), "dst".to_string()]);
-        let fp2 = InvocationFingerprint::from_command("cp", &["src".to_string(), "malicious".to_string()]);
+        let fp1 =
+            InvocationFingerprint::from_command("cp", &["src".to_string(), "dst".to_string()]);
+        let fp2 = InvocationFingerprint::from_command(
+            "cp",
+            &["src".to_string(), "malicious".to_string()],
+        );
         assert!(!fp1.matches(&fp2));
         assert!(!fp2.matches(&fp1));
     }
 
     #[test]
     fn test_fingerprint_different_commands() {
-        let fp1 = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
-        let fp2 = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string(), "-v".to_string()]);
+        let fp1 = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
+        let fp2 = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string(), "-v".to_string()],
+        );
         assert!(!fp1.matches(&fp2));
     }
 
@@ -298,12 +320,17 @@ mod tests {
     fn test_fingerprint_matches_hex() {
         let fp = InvocationFingerprint::from_command("echo", &["hello".to_string()]);
         assert!(fp.matches_hex(fp.as_str()));
-        assert!(!fp.matches_hex("0000000000000000000000000000000000000000000000000000000000000000"));
+        assert!(
+            !fp.matches_hex("0000000000000000000000000000000000000000000000000000000000000000")
+        );
     }
 
     #[test]
     fn test_approval_lease_new() {
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -316,7 +343,10 @@ mod tests {
 
     #[test]
     fn test_approval_lease_expires() {
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -329,7 +359,10 @@ mod tests {
 
     #[test]
     fn test_approval_lease_persistent() {
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -342,7 +375,10 @@ mod tests {
 
     #[test]
     fn test_approval_lease_matches_fingerprint() {
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -354,7 +390,10 @@ mod tests {
 
     #[test]
     fn test_approval_lease_scope_mismatch() {
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope_a = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -372,7 +411,10 @@ mod tests {
 
     #[test]
     fn test_approval_lease_user_mismatch() {
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope_a = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -420,7 +462,10 @@ mod tests {
     #[test]
     fn test_approval_store_insert_and_find() {
         let store = InMemoryApprovalStore::new();
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -437,8 +482,12 @@ mod tests {
     #[test]
     fn test_approval_store_no_match() {
         let store = InMemoryApprovalStore::new();
-        let fp1 = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
-        let fp2 = InvocationFingerprint::from_command("cp", &["src".to_string(), "dst".to_string()]);
+        let fp1 = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
+        let fp2 =
+            InvocationFingerprint::from_command("cp", &["src".to_string(), "dst".to_string()]);
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -454,14 +503,22 @@ mod tests {
     #[test]
     fn test_approval_store_cleanup_expired() {
         let store = InMemoryApprovalStore::new();
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
             Some("evt-1".to_string()),
         );
         // Add a valid lease
-        store.insert(ApprovalLease::new(fp.clone(), scope.clone(), 3600, "user".to_string()));
+        store.insert(ApprovalLease::new(
+            fp.clone(),
+            scope.clone(),
+            3600,
+            "user".to_string(),
+        ));
         // Add an expired lease
         store.insert(ApprovalLease::new(fp.clone(), scope, 0, "user".to_string()));
 
@@ -472,7 +529,10 @@ mod tests {
     #[test]
     fn test_approval_store_revoke_scope() {
         let store = InMemoryApprovalStore::new();
-        let fp = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         let scope = ApprovalScope::new(
             Some("project-a".to_string()),
             Some("alice".to_string()),
@@ -488,8 +548,14 @@ mod tests {
     #[test]
     fn test_fingerprint_from_path_command() {
         // Command with path should use basename only
-        let fp1 = InvocationFingerprint::from_command("/usr/bin/rm", &["-rf".to_string(), "/tmp/test".to_string()]);
-        let fp2 = InvocationFingerprint::from_command("rm", &["-rf".to_string(), "/tmp/test".to_string()]);
+        let fp1 = InvocationFingerprint::from_command(
+            "/usr/bin/rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
+        let fp2 = InvocationFingerprint::from_command(
+            "rm",
+            &["-rf".to_string(), "/tmp/test".to_string()],
+        );
         assert_eq!(fp1, fp2);
     }
 

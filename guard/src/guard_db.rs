@@ -425,34 +425,35 @@ impl GuardDb {
             .collect::<Result<_, _>>()?
         } else {
             let mut stmt2 = conn.prepare(&query)?;
-            stmt2.query_map(params![limit as i64], |row| {
-                Ok(ActionRequest {
-                    id: row.get(0)?,
-                    source_event_id: row.get(1)?,
-                    source_node_id: row.get(2)?,
-                    action_type: row.get(3)?,
-                    payload: row.get(4)?,
-                    trust_layer: row.get(5)?,
-                    confidence: crate::types::TrustScore::new(
-                        row.get::<_, String>(6)?
-                            .parse::<f64>()
-                            .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
-                            .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
-                    ),
-                    status: match row.get::<_, String>(7)?.as_str() {
-                        "pending" => crate::types::ActionStatus::Pending,
-                        "trust-approved" => crate::types::ActionStatus::TrustApproved,
-                        "denied" => crate::types::ActionStatus::Denied,
-                        "executed" => crate::types::ActionStatus::Executed,
-                        "interrupted" => crate::types::ActionStatus::Interrupted,
-                        _ => crate::types::ActionStatus::Pending,
-                    },
-                    gate_result: row.get(8)?,
-                    requested_at: row.get(9)?,
-                    resolved_at: row.get(10)?,
-                })
-            })?
-            .collect::<Result<_, _>>()?
+            stmt2
+                .query_map(params![limit as i64], |row| {
+                    Ok(ActionRequest {
+                        id: row.get(0)?,
+                        source_event_id: row.get(1)?,
+                        source_node_id: row.get(2)?,
+                        action_type: row.get(3)?,
+                        payload: row.get(4)?,
+                        trust_layer: row.get(5)?,
+                        confidence: crate::types::TrustScore::new(
+                            row.get::<_, String>(6)?
+                                .parse::<f64>()
+                                .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
+                                .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
+                        ),
+                        status: match row.get::<_, String>(7)?.as_str() {
+                            "pending" => crate::types::ActionStatus::Pending,
+                            "trust-approved" => crate::types::ActionStatus::TrustApproved,
+                            "denied" => crate::types::ActionStatus::Denied,
+                            "executed" => crate::types::ActionStatus::Executed,
+                            "interrupted" => crate::types::ActionStatus::Interrupted,
+                            _ => crate::types::ActionStatus::Pending,
+                        },
+                        gate_result: row.get(8)?,
+                        requested_at: row.get(9)?,
+                        resolved_at: row.get(10)?,
+                    })
+                })?
+                .collect::<Result<_, _>>()?
         };
         Ok(entries)
     }

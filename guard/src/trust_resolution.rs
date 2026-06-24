@@ -92,11 +92,7 @@ pub struct EffectiveTrust {
 }
 
 impl EffectiveTrust {
-    pub fn new(
-        layer: u32,
-        confidence: f64,
-        determined_by: impl Into<String>,
-    ) -> Self {
+    pub fn new(layer: u32, confidence: f64, determined_by: impl Into<String>) -> Self {
         Self {
             layer,
             confidence: confidence.clamp(0.0, 1.0),
@@ -320,11 +316,7 @@ impl PolicyChain {
             effective_confidence = requested.confidence * ratio;
         }
 
-        EffectiveTrust::new(
-            effective_layer,
-            effective_confidence,
-            determined_by,
-        )
+        EffectiveTrust::new(effective_layer, effective_confidence, determined_by)
     }
 }
 
@@ -378,7 +370,9 @@ impl TrustResolution {
         let downgrade = if self.was_downgraded() {
             format!(
                 " DOWNGRADED from layer {} to {} ({} policies applied)",
-                self.requested.layer, self.effective.layer, self.applied_policies.len()
+                self.requested.layer,
+                self.effective.layer,
+                self.applied_policies.len()
             )
         } else {
             String::new()
@@ -403,15 +397,16 @@ impl TrustResolver {
     }
 
     /// Resolve trust with a scope and return the resolution record.
-    pub fn resolve_with_scope(
-        &self,
-        requested: &RequestedTrust,
-        scope: &Scope,
-    ) -> TrustResolution {
+    pub fn resolve_with_scope(&self, requested: &RequestedTrust, scope: &Scope) -> TrustResolution {
         let effective = self.policy_chain.resolve(requested, scope);
         let applied_policies = self.collect_applied_policies(requested.layer, &effective);
 
-        TrustResolution::new(requested.clone(), effective, applied_policies, scope.clone())
+        TrustResolution::new(
+            requested.clone(),
+            effective,
+            applied_policies,
+            scope.clone(),
+        )
     }
 
     /// Resolve trust with default scope (no project/tenant/thread).
@@ -421,7 +416,11 @@ impl TrustResolver {
     }
 
     /// Collect the policies that actually changed the trust level.
-    fn collect_applied_policies(&self, original_layer: u32, _effective: &EffectiveTrust) -> Vec<String> {
+    fn collect_applied_policies(
+        &self,
+        original_layer: u32,
+        _effective: &EffectiveTrust,
+    ) -> Vec<String> {
         let mut applied = Vec::new();
 
         for policy in &self.policy_chain.user_policies {
@@ -490,11 +489,7 @@ mod tests {
 
     #[test]
     fn test_policy_require_minimum() {
-        let policy = Policy::require(
-            PolicySource::Scope,
-            2,
-            "min layer 2",
-        );
+        let policy = Policy::require(PolicySource::Scope, 2, "min layer 2");
         assert_eq!(policy.apply(0), 2);
         assert_eq!(policy.apply(4), 4);
         assert!(policy.would_change(0));
@@ -513,12 +508,11 @@ mod tests {
 
     #[test]
     fn test_policy_chain_caps_trust() {
-        let chain = PolicyChain::new()
-            .with_project_policy(Policy::cap(
-                PolicySource::Project("secure-project".into()),
-                2,
-                "secure project cap",
-            ));
+        let chain = PolicyChain::new().with_project_policy(Policy::cap(
+            PolicySource::Project("secure-project".into()),
+            2,
+            "secure project cap",
+        ));
 
         let requested = RequestedTrust::new(4, 0.95, "agent");
         let scope = Scope::project("secure-project");
@@ -531,12 +525,11 @@ mod tests {
 
     #[test]
     fn test_policy_chain_minimum() {
-        let chain = PolicyChain::new()
-            .with_scope_policy(Policy::require(
-                PolicySource::Scope,
-                2,
-                "min trust 2",
-            ));
+        let chain = PolicyChain::new().with_scope_policy(Policy::require(
+            PolicySource::Scope,
+            2,
+            "min trust 2",
+        ));
 
         let requested = RequestedTrust::new(0, 0.1, "raw-tool");
         let scope = Scope::project("test");
@@ -569,12 +562,11 @@ mod tests {
 
     #[test]
     fn test_trust_resolution_audit_log() {
-        let chain = PolicyChain::new()
-            .with_project_policy(Policy::cap(
-                PolicySource::Project("secure".into()),
-                2,
-                "secure cap",
-            ));
+        let chain = PolicyChain::new().with_project_policy(Policy::cap(
+            PolicySource::Project("secure".into()),
+            2,
+            "secure cap",
+        ));
 
         let requested = RequestedTrust::new(4, 0.95, "agent");
         let scope = Scope::project("secure");
@@ -603,12 +595,11 @@ mod tests {
 
     #[test]
     fn test_effective_confidence_reduction_on_downgrade() {
-        let chain = PolicyChain::new()
-            .with_project_policy(Policy::cap(
-                PolicySource::Project("project".into()),
-                2,
-                "cap",
-            ));
+        let chain = PolicyChain::new().with_project_policy(Policy::cap(
+            PolicySource::Project("project".into()),
+            2,
+            "cap",
+        ));
 
         let requested = RequestedTrust::new(4, 0.90, "agent");
         let scope = Scope::project("project");
