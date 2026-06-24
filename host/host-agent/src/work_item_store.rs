@@ -2,7 +2,6 @@
 ///
 /// Mirrors the cookie_store pattern: Arc<RwLock<Connection>>, async CRUD.
 /// Each WorkItem is serialized to JSON and stored in a single row keyed by id.
-
 use rusqlite::{params, Connection, Result as SqlResult};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -108,20 +107,18 @@ impl WorkItemStore {
         Ok(WorkItem {
             id: Uuid::parse_str(&id_str)?,
             objective,
-            status: serde_json::from_str(&status_json).map_err(|e| WorkItemStoreError::Serialization(e))?,
-            observations: serde_json::from_str(&observations_json).map_err(|e| WorkItemStoreError::Serialization(e))?,
+            status: serde_json::from_str(&status_json).map_err(WorkItemStoreError::Serialization)?,
+            observations: serde_json::from_str(&observations_json).map_err(WorkItemStoreError::Serialization)?,
             hypothesis: hypothesis_json
-                .map(|h| serde_json::from_str(&h).map_err(|e| WorkItemStoreError::Serialization(e)))
+                .map(|h| serde_json::from_str(&h).map_err(WorkItemStoreError::Serialization))
                 .transpose()?,
-            plan: serde_json::from_str(&plan_json).map_err(|e| WorkItemStoreError::Serialization(e))?,
-            artifacts: serde_json::from_str(&artifacts_json).map_err(|e| WorkItemStoreError::Serialization(e))?,
+            plan: serde_json::from_str(&plan_json).map_err(WorkItemStoreError::Serialization)?,
+            artifacts: serde_json::from_str(&artifacts_json).map_err(WorkItemStoreError::Serialization)?,
             confidence: confidence as f32,
             created_at: chrono::DateTime::<chrono::Utc>::from_timestamp(created_at, 0)
-                .ok_or_else(|| rusqlite::Error::InvalidQuery)?
-                .into(),
+                .ok_or_else(|| rusqlite::Error::InvalidQuery)?,
             updated_at: chrono::DateTime::<chrono::Utc>::from_timestamp(updated_at, 0)
-                .ok_or_else(|| rusqlite::Error::InvalidQuery)?
-                .into(),
+                .ok_or_else(|| rusqlite::Error::InvalidQuery)?,
         })
     }
 
