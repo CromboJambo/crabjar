@@ -14,13 +14,17 @@
 mod backend;
 mod http_backend;
 
-pub use backend::{InferenceBackend, HeuristicBackend, InferenceConfig};
+pub use backend::{HeuristicBackend, InferenceBackend, InferenceConfig};
 pub use http_backend::HttpBackend;
 
 /// Create the appropriate backend based on the INFERENCE_BACKEND env var.
 pub fn create_backend(config: &InferenceConfig) -> Box<dyn InferenceBackend> {
     match config.mode.as_str() {
-        "http" => Box::new(HttpBackend::new(&config.endpoint, &config.model, config.api_key.clone())),
+        "http" => Box::new(HttpBackend::new(
+            &config.endpoint,
+            &config.model,
+            config.api_key.clone(),
+        )),
         _ => Box::new(HeuristicBackend),
     }
 }

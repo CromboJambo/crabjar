@@ -81,9 +81,7 @@ impl InferenceBackend for HttpBackend {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
-            return Err(InferenceError::Failed(format!(
-                "HTTP {status}: {body}"
-            )));
+            return Err(InferenceError::Failed(format!("HTTP {status}: {body}")));
         }
 
         let chat_response: ChatResponse = response.json().await?;
