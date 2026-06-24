@@ -1,6 +1,6 @@
 //! Error types and endpoint auto-detection for the LM Studio client.
 
-use crate::types::{LmStudioEndpoint, ToolProviderInfo};
+use super::types::{LmStudioEndpoint, ToolProviderInfo};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::debug;

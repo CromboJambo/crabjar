@@ -2,6 +2,7 @@
 
 use super::types::{MessageRole, UnifiedChatResponse, UnifiedMessage};
 use thiserror::Error;
+use tracing::debug;
 
 // ---------------------------------------------------------------------------
 // Session state management

@@ -1,6 +1,7 @@
 //! The unified LM Studio client that abstracts endpoint differences.
 
 use super::endpoints::{anthropic, native, openai};
+use super::error::{LmStudioError, ToolCallInfo};
 use super::session::{SessionError, SessionState, SessionStore};
 use super::types::*;
 use tracing::{debug, info, warn};
