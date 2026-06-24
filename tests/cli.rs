@@ -40,11 +40,19 @@ fn state_list_returns_json() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(&docs_dir).unwrap();
-    fs::write(docs_dir.join("alpha_state.md"), "---\nname: alpha_state\ndescription: Test doc\n---\n# Alpha\nbody\n").unwrap();
+    fs::write(
+        docs_dir.join("alpha_state.md"),
+        "---\nname: alpha_state\ndescription: Test doc\n---\n# Alpha\nbody\n",
+    )
+    .unwrap();
 
     // First index the docs
     let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
-    assert!(index_output.status.success(), "index failed: {}", String::from_utf8_lossy(&index_output.stderr));
+    assert!(
+        index_output.status.success(),
+        "index failed: {}",
+        String::from_utf8_lossy(&index_output.stderr)
+    );
 
     let output = run_in(&temp, &["state", "list"]);
 
@@ -77,7 +85,11 @@ fn state_show_returns_doc_contents() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(&docs_dir).unwrap();
-    fs::write(docs_dir.join("alpha_state.md"), "---\nname: alpha_state\n---\n# Alpha\nbody\n").unwrap();
+    fs::write(
+        docs_dir.join("alpha_state.md"),
+        "---\nname: alpha_state\n---\n# Alpha\nbody\n",
+    )
+    .unwrap();
 
     // First index the docs
     let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
@@ -99,11 +111,19 @@ fn annotate_creates_overlay_entry() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(&docs_dir).unwrap();
-    fs::write(docs_dir.join("alpha_state.md"), "---\nname: alpha_state\n---\n# Alpha\n").unwrap();
+    fs::write(
+        docs_dir.join("alpha_state.md"),
+        "---\nname: alpha_state\n---\n# Alpha\n",
+    )
+    .unwrap();
 
     // Index the docs
     let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
-    assert!(index_output.status.success(), "index failed: {}", String::from_utf8_lossy(&index_output.stdout));
+    assert!(
+        index_output.status.success(),
+        "index failed: {}",
+        String::from_utf8_lossy(&index_output.stdout)
+    );
 
     // Query annotations (should return empty since no overlay data)
     let output = run_in(&temp, &["state", "annotations", "alpha_state.md"]);
@@ -119,7 +139,11 @@ fn annotate_empty_message_fails() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(&docs_dir).unwrap();
-    fs::write(docs_dir.join("alpha_state.md"), "---\nname: alpha_state\n---\n# Alpha\n").unwrap();
+    fs::write(
+        docs_dir.join("alpha_state.md"),
+        "---\nname: alpha_state\n---\n# Alpha\n",
+    )
+    .unwrap();
 
     let output = run_in(&temp, &["state", "annotations", "alpha_state.md"]);
 
@@ -136,10 +160,7 @@ fn annotate_nonexistent_file_fails() {
     let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(&docs_dir).unwrap();
 
-    let output = run_in(
-        &temp,
-        &["state", "annotations", "nonexistent_file.md"],
-    );
+    let output = run_in(&temp, &["state", "annotations", "nonexistent_file.md"]);
 
     // Should succeed but return empty annotations (no error for missing doc)
     assert!(output.status.success());
@@ -153,11 +174,19 @@ fn resolve_marks_annotation_resolved() {
     let temp = tempfile::tempdir().unwrap();
     let docs_dir = temp.path().join("state-docs");
     fs::create_dir_all(&docs_dir).unwrap();
-    fs::write(docs_dir.join("alpha_state.md"), "---\nname: alpha_state\n---\n# Alpha\n").unwrap();
+    fs::write(
+        docs_dir.join("alpha_state.md"),
+        "---\nname: alpha_state\n---\n# Alpha\n",
+    )
+    .unwrap();
 
     // Index the docs
     let index_output = run_in(&temp, &["state", "index", "--docs-dir", "state-docs"]);
-    assert!(index_output.status.success(), "index failed: {}", String::from_utf8_lossy(&index_output.stdout));
+    assert!(
+        index_output.status.success(),
+        "index failed: {}",
+        String::from_utf8_lossy(&index_output.stdout)
+    );
 
     // Query annotations (should be empty)
     let output_before = run_in(&temp, &["state", "annotations", "alpha_state.md"]);
