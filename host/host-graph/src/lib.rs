@@ -10,6 +10,7 @@
 /// Token acquisition is delegated to a `TokenProvider` trait
 /// because the actual token comes from the `WebView` session manager
 /// (which communicates with the Electron Chromium session).
+#![allow(clippy::default_trait_access)]
 pub mod client;
 pub mod config;
 pub mod types;
