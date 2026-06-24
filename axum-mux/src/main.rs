@@ -56,11 +56,7 @@ async fn supervise_vm(exe: PathBuf, name: String) {
     let mut backoff = Duration::from_secs(1);
     loop {
         tracing::info!(vm = %name, "starting worker");
-        let status = Command::new(&exe)
-            .arg("--worker")
-            .arg(&name)
-            .status()
-            .await;
+        let status = Command::new(&exe).arg("--worker").arg(&name).status().await;
 
         match status {
             Ok(s) if s.success() => {

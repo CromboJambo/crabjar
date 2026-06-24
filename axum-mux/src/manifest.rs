@@ -80,7 +80,10 @@ listen_port = 7002
         assert_eq!(manifest.vms[0].listen_port, 7001);
         assert_eq!(manifest.vms[1].name, "scratch-win11");
         assert_eq!(manifest.vms[1].protocol, Protocol::Vnc);
-        assert_eq!(manifest.vms[1].target, "unix:/run/vm-sockets/scratch-win11.sock");
+        assert_eq!(
+            manifest.vms[1].target,
+            "unix:/run/vm-sockets/scratch-win11.sock"
+        );
         assert_eq!(manifest.vms[1].listen_port, 7002);
     }
 
