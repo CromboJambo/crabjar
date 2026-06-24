@@ -291,53 +291,51 @@ impl<'a> FlightRecorder<'a> {
         Ok(hash)
     }
 
-/// Generate a tool receipt for a command invocation.
-///
-/// Receipt format: `zc-receipt-<epoch>-<base64url(HMAC)>`
-/// The HMAC covers command name, args, result, and timestamp — bound to the ephemeral session key.
-/// This prevents the model from fabricating tool calls or results.
-pub fn generate_receipt(
-    &self,
-    command: &str,
-    args: &[String],
-    result: &str,
-    exit_code: i32,
-) -> Result<String, FlightRecorderError> {
-    let key = self.get_key().ok_or_else(|| {
-        FlightRecorderError::Internal("HMAC key not initialized".into())
-    })?;
+    /// Generate a tool receipt for a command invocation.
+    ///
+    /// Receipt format: `zc-receipt-<epoch>-<base64url(HMAC)>`
+    /// The HMAC covers command name, args, result, and timestamp — bound to the ephemeral session key.
+    /// This prevents the model from fabricating tool calls or results.
+    pub fn generate_receipt(
+        &self,
+        command: &str,
+        args: &[String],
+        result: &str,
+        exit_code: i32,
+    ) -> Result<String, FlightRecorderError> {
+        let key = self
+            .get_key()
+            .ok_or_else(|| FlightRecorderError::Internal("HMAC key not initialized".into()))?;
 
-    let mut mac =
-        Hmac::<sha2::Sha256>::new_from_slice(key).map_err(|_| {
-            FlightRecorderError::Internal("HMAC key initialization failed".into())
-        })?;
+        let mut mac = Hmac::<sha2::Sha256>::new_from_slice(key)
+            .map_err(|_| FlightRecorderError::Internal("HMAC key initialization failed".into()))?;
 
-    let epoch = chrono::Utc::now().timestamp();
-    mac.update(command.as_bytes());
-    mac.update(b"|");
-    mac.update(args.join(" ").as_bytes());
-    mac.update(b"|");
-    mac.update(result.as_bytes());
-    mac.update(b"|");
-    mac.update(exit_code.to_string().as_bytes());
-    mac.update(b"|");
-    mac.update(epoch.to_string().as_bytes());
+        let epoch = chrono::Utc::now().timestamp();
+        mac.update(command.as_bytes());
+        mac.update(b"|");
+        mac.update(args.join(" ").as_bytes());
+        mac.update(b"|");
+        mac.update(result.as_bytes());
+        mac.update(b"|");
+        mac.update(exit_code.to_string().as_bytes());
+        mac.update(b"|");
+        mac.update(epoch.to_string().as_bytes());
 
-    let digest = mac.finalize().into_bytes();
-    let digest_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest);
+        let digest = mac.finalize().into_bytes();
+        let digest_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest);
 
-    // Format: zc-receipt-<epoch>-<digest>
-    // Note: digest is base64url encoded (no padding), so it won't contain '=' characters.
-    // We use a known prefix to parse reliably.
-    let receipt = format!("zc-receipt-{}-{}", epoch, digest_b64);
-    debug!(
-        session_id = %self.session_id,
-        command = %command,
-        "Tool receipt generated"
-    );
+        // Format: zc-receipt-<epoch>-<digest>
+        // Note: digest is base64url encoded (no padding), so it won't contain '=' characters.
+        // We use a known prefix to parse reliably.
+        let receipt = format!("zc-receipt-{}-{}", epoch, digest_b64);
+        debug!(
+            session_id = %self.session_id,
+            command = %command,
+            "Tool receipt generated"
+        );
 
-    Ok(receipt)
-}
+        Ok(receipt)
+    }
 
     /// Verify a tool receipt against the session key.
     ///
@@ -356,7 +354,7 @@ pub fn generate_receipt(
 
         // Remove the prefix and find the epoch (which is a numeric string followed by '-').
         let after_prefix = &receipt["zc-receipt-".len()..];
-        
+
         // Find the first '-' after the epoch (epoch is always at the start after prefix).
         let first_sep = after_prefix.find('-').ok_or_else(|| {
             FlightRecorderError::Internal("Invalid receipt format: missing epoch separator".into())
@@ -369,14 +367,14 @@ pub fn generate_receipt(
             FlightRecorderError::Internal("Invalid receipt format: bad epoch".into())
         })?;
 
-        let digest = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(digest_b64).map_err(|_| {
-            FlightRecorderError::Internal("Invalid receipt format: bad digest".into())
-        })?;
-
-        let mac =
-            Hmac::<sha2::Sha256>::new_from_slice(key).map_err(|_| {
-                FlightRecorderError::Internal("HMAC key initialization failed".into())
+        let digest = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(digest_b64)
+            .map_err(|_| {
+                FlightRecorderError::Internal("Invalid receipt format: bad digest".into())
             })?;
+
+        let mac = Hmac::<sha2::Sha256>::new_from_slice(key)
+            .map_err(|_| FlightRecorderError::Internal("HMAC key initialization failed".into()))?;
 
         // We need to reconstruct the input — but we don't have the original command/args/result.
         // Verification is only meaningful when the runtime has the original data.
