@@ -3,10 +3,10 @@
 /// Replaces the Electron PartitionsManager (app/partitions/manager.js).
 /// Each partition maps to an isolated cookie/session store in the SQLite DB.
 /// Mirrors the Electron pattern of named `session` partitions.
-use crate::cookie_store::{CookieStore, Cookie};
+use crate::cookie_store::{Cookie, CookieStore};
+use chrono::Utc;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use chrono::Utc;
 
 /// A named session partition with isolation boundaries.
 #[derive(Debug, Clone)]
@@ -46,10 +46,11 @@ impl PartitionManager {
 
     /// Initialize partitions from the persistent store.
     pub async fn initialize(&self) {
-        let stored = match self.cookie_store.list_partitions().await {
-            Ok(p) => p,
-            Err(_) => Vec::new(),
-        };
+        let stored = self
+            .cookie_store
+            .list_partitions()
+            .await
+            .unwrap_or_default();
         let mut parts = self.partitions.write().await;
         *parts = stored
             .into_iter()
@@ -141,10 +142,10 @@ impl PartitionManager {
         // In a full implementation, each partition would have its own cookie jar.
         // For now, we use the shared store but scope by partition name.
         let _ = partition_name;
-        match self.cookie_store.get_cookies_by_domain(domain).await {
-            Ok(cookies) => cookies,
-            Err(_) => Vec::new(),
-        }
+        self.cookie_store
+            .get_cookies_by_domain(domain)
+            .await
+            .unwrap_or_default()
     }
 
     /// Get the default partition (used when no partition is specified).

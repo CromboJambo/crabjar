@@ -4,15 +4,15 @@
 /// into a unified session management API that replaces Electron's
 /// `session` API (cookies, partitions, auth).
 use crate::auth::{AuthManager, TokenResponse};
-use crate::cookie_store::{CookieStore, Cookie};
+use crate::cookie_store::{Cookie, CookieStore};
 use crate::partition::{PartitionManager, SessionPartition};
 use crate::token_cache::SecureTokenCache;
+use chrono::Utc;
 use crabjar_host_core::event_bus::EventBus;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// A managed webview session with full session management.
 #[derive(Debug, Clone)]
@@ -42,6 +42,7 @@ impl std::fmt::Display for WebViewEngine {
 }
 
 /// Main session controller — replaces Electron's session API.
+#[allow(clippy::arc_with_non_send_sync)]
 pub struct WebViewController {
     event_bus: Arc<EventBus>,
     cookie_store: Arc<CookieStore>,
@@ -65,13 +66,16 @@ impl WebViewController {
         std::fs::create_dir_all(&db_path).ok();
 
         let cookie_db_path = db_path.join("cookies.db");
-        let cookie_store = Arc::new(
-            CookieStore::open(cookie_db_path).expect("Failed to open cookie store")
-        );
+        #[allow(clippy::arc_with_non_send_sync)]
+        let cookie_store =
+            Arc::new(CookieStore::open(cookie_db_path).expect("Failed to open cookie store"));
 
+        #[allow(clippy::arc_with_non_send_sync)]
         let token_cache = Arc::new(SecureTokenCache::new(cookie_store.clone()));
+        #[allow(clippy::arc_with_non_send_sync)]
         let partition_manager = Arc::new(PartitionManager::new(cookie_store.clone()));
 
+        #[allow(clippy::arc_with_non_send_sync)]
         let auth_manager = Arc::new(AuthManager::new(
             cookie_store.clone(),
             token_cache.clone(),
@@ -100,7 +104,11 @@ impl WebViewController {
 
     // --- Session Management ---
 
-    pub async fn open(&self, url: impl Into<String>, title: impl Into<String>) -> Result<Uuid, WebViewError> {
+    pub async fn open(
+        &self,
+        url: impl Into<String>,
+        title: impl Into<String>,
+    ) -> Result<Uuid, WebViewError> {
         let session_id = Uuid::new_v4();
         let url = url.into();
         let title = title.into();
@@ -132,7 +140,9 @@ impl WebViewController {
 
     pub async fn close(&self, session_id: Uuid) -> Result<(), WebViewError> {
         let mut sessions = self.sessions.write().await;
-        let idx = sessions.iter().position(|s| s.id == session_id)
+        let idx = sessions
+            .iter()
+            .position(|s| s.id == session_id)
             .ok_or(WebViewError::SessionNotFound(session_id))?;
 
         let session = sessions.remove(idx);
@@ -156,16 +166,24 @@ impl WebViewController {
     // --- Cookie Management (replaces Electron session.cookies) ---
 
     pub async fn get_cookies(&self, url: &str) -> Result<Vec<Cookie>, WebViewError> {
-        let domain = extract_domain(url)
-            .ok_or_else(|| WebViewError::InvalidUrl(url.to_string()))?;
-        let cookies = self.cookie_store.get_cookies_by_domain(&domain).await
+        let domain =
+            extract_domain(url).ok_or_else(|| WebViewError::InvalidUrl(url.to_string()))?;
+        let cookies = self
+            .cookie_store
+            .get_cookies_by_domain(&domain)
+            .await
             .map_err(|e| WebViewError::Storage(format!("get cookies: {e}")))?;
         Ok(cookies)
     }
 
-    pub async fn set_cookie(&self, url: &str, name: &str, value: &str) -> Result<Uuid, WebViewError> {
-        let domain = extract_domain(url)
-            .ok_or_else(|| WebViewError::InvalidUrl(url.to_string()))?;
+    pub async fn set_cookie(
+        &self,
+        url: &str,
+        name: &str,
+        value: &str,
+    ) -> Result<Uuid, WebViewError> {
+        let domain =
+            extract_domain(url).ok_or_else(|| WebViewError::InvalidUrl(url.to_string()))?;
 
         let cookie = Cookie {
             name: name.to_string(),
@@ -178,7 +196,10 @@ impl WebViewController {
             same_site: "Lax".into(),
         };
 
-        let id = self.cookie_store.save_cookie(&cookie).await
+        let id = self
+            .cookie_store
+            .save_cookie(&cookie)
+            .await
             .map_err(|e| WebViewError::Storage(format!("save cookie: {e}")))?;
 
         tracing::debug!(cookie_id = %id, domain, name, "cookie set");
@@ -186,21 +207,30 @@ impl WebViewController {
     }
 
     pub async fn remove_cookie(&self, url: &str, name: &str) -> Result<bool, WebViewError> {
-        let domain = extract_domain(url)
-            .ok_or_else(|| WebViewError::InvalidUrl(url.to_string()))?;
-        let removed = self.cookie_store.remove_cookie(&domain, name).await
+        let domain =
+            extract_domain(url).ok_or_else(|| WebViewError::InvalidUrl(url.to_string()))?;
+        let removed = self
+            .cookie_store
+            .remove_cookie(&domain, name)
+            .await
             .map_err(|e| WebViewError::Storage(format!("remove cookie: {e}")))?;
         Ok(removed)
     }
 
     pub async fn clear_cookies(&self) -> Result<usize, WebViewError> {
-        let cleared = self.cookie_store.clear_all().await
+        let cleared = self
+            .cookie_store
+            .clear_all()
+            .await
             .map_err(|e| WebViewError::Storage(format!("clear cookies: {e}")))?;
         Ok(cleared)
     }
 
     pub async fn list_all_cookies(&self) -> Result<Vec<Cookie>, WebViewError> {
-        let cookies = self.cookie_store.list_cookies().await
+        let cookies = self
+            .cookie_store
+            .list_cookies()
+            .await
             .map_err(|e| WebViewError::Storage(format!("list cookies: {e}")))?;
         Ok(cookies)
     }
@@ -212,7 +242,8 @@ impl WebViewController {
     }
 
     pub async fn set_token(&self, key: &str, value: &str) -> Result<(), WebViewError> {
-        self.token_cache.set_item(key, value)
+        self.token_cache
+            .set_item(key, value)
             .await
             .map_err(|e| WebViewError::Storage(format!("set token: {e}")))?;
         Ok(())
@@ -245,7 +276,9 @@ impl WebViewController {
     }
 
     pub async fn save_zoom_level(&self, partition_name: &str, zoom_level: f64) -> bool {
-        self.partition_manager.save_zoom_level(partition_name, zoom_level).await
+        self.partition_manager
+            .save_zoom_level(partition_name, zoom_level)
+            .await
     }
 
     pub async fn get_zoom_level(&self, partition_name: &str) -> f64 {
@@ -258,20 +291,27 @@ impl WebViewController {
         self.auth_manager.build_auth_url(extra_params)
     }
 
-    pub async fn handle_auth_callback(&self, code: &str, state: &str) -> Result<TokenResponse, WebViewError> {
-        self.auth_manager.handle_callback(code, state)
+    pub async fn handle_auth_callback(
+        &self,
+        code: &str,
+        state: &str,
+    ) -> Result<TokenResponse, WebViewError> {
+        self.auth_manager
+            .handle_callback(code, state)
             .await
             .map_err(WebViewError::Auth)
     }
 
     pub async fn refresh_auth_token(&self) -> Result<TokenResponse, WebViewError> {
-        self.auth_manager.refresh_token()
+        self.auth_manager
+            .refresh_token()
             .await
             .map_err(WebViewError::Auth)
     }
 
     pub async fn force_refresh_auth_token(&self) -> Result<TokenResponse, WebViewError> {
-        self.auth_manager.force_refresh()
+        self.auth_manager
+            .force_refresh()
             .await
             .map_err(WebViewError::Auth)
     }
@@ -289,9 +329,7 @@ impl WebViewController {
     }
 
     pub async fn logout(&self) -> Result<(), WebViewError> {
-        self.auth_manager.logout()
-            .await
-            .map_err(WebViewError::Auth)
+        self.auth_manager.logout().await.map_err(WebViewError::Auth)
     }
 
     /// Database path for external access (e.g., debugging).
@@ -311,7 +349,9 @@ impl WebViewController {
 /// Extract domain from a URL string.
 fn extract_domain(url: &str) -> Option<String> {
     let url = url.trim();
-    let url = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
+    let url = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))?;
     let domain = url.split('/').next()?;
     Some(domain.to_string())
 }
@@ -372,7 +412,10 @@ mod tests {
             "User.Read".into(),
         );
 
-        let id = controller.open("https://teams.microsoft.com", "Teams").await.unwrap();
+        let id = controller
+            .open("https://teams.microsoft.com", "Teams")
+            .await
+            .unwrap();
         let sessions = controller.list_sessions().await;
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].id, id);
@@ -396,14 +439,16 @@ mod tests {
             "User.Read".into(),
         );
 
-        let cookie_id = controller.set_cookie(
-            "https://teams.microsoft.com",
-            "session",
-            "abc123",
-        ).await.unwrap();
+        let cookie_id = controller
+            .set_cookie("https://teams.microsoft.com", "session", "abc123")
+            .await
+            .unwrap();
         assert!(!cookie_id.is_nil());
 
-        let cookies = controller.get_cookies("https://teams.microsoft.com").await.unwrap();
+        let cookies = controller
+            .get_cookies("https://teams.microsoft.com")
+            .await
+            .unwrap();
         assert!(!cookies.is_empty());
         assert_eq!(cookies[0].name, "session");
         assert_eq!(cookies[0].value, "abc123");
@@ -438,8 +483,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_extract_domain() {
-        assert_eq!(extract_domain("https://teams.microsoft.com/path"), Some("teams.microsoft.com".into()));
-        assert_eq!(extract_domain("http://example.com"), Some("example.com".into()));
+        assert_eq!(
+            extract_domain("https://teams.microsoft.com/path"),
+            Some("teams.microsoft.com".into())
+        );
+        assert_eq!(
+            extract_domain("http://example.com"),
+            Some("example.com".into())
+        );
         assert_eq!(extract_domain("https://a.b.c/d/e"), Some("a.b.c".into()));
         assert!(extract_domain("not-a-url").is_none());
     }

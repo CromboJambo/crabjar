@@ -176,7 +176,9 @@ impl AuthManager {
     pub async fn refresh_token(&self) -> Result<TokenResponse, AuthError> {
         let state = self.state.read().await;
 
-        let _refresh_token = state.refresh_token.as_ref()
+        let _refresh_token = state
+            .refresh_token
+            .as_ref()
             .ok_or(AuthError::NoRefreshToken)?;
 
         // In production:
@@ -192,7 +194,9 @@ impl AuthManager {
     pub async fn force_refresh(&self) -> Result<TokenResponse, AuthError> {
         let state = self.state.read().await;
 
-        let _refresh_token = state.refresh_token.as_ref()
+        let _refresh_token = state
+            .refresh_token
+            .as_ref()
             .ok_or(AuthError::NoRefreshToken)?;
 
         // Same as refresh_token but with explicit force flags
@@ -207,9 +211,7 @@ impl AuthManager {
     pub async fn is_token_expired(&self, buffer_seconds: i64) -> bool {
         let state = self.state.read().await;
         match state.token_expires_at {
-            Some(expires_at) => {
-                Utc::now().timestamp() + buffer_seconds >= expires_at
-            }
+            Some(expires_at) => Utc::now().timestamp() + buffer_seconds >= expires_at,
             None => true,
         }
     }
@@ -238,7 +240,9 @@ impl AuthManager {
             created_at: now,
             expires_at: Some(expires_at),
         };
-        self.cookie_store.save_token(&access_token).await
+        self.cookie_store
+            .save_token(&access_token)
+            .await
             .map_err(|e| AuthError::Storage(format!("save access token: {e}")))?;
 
         // Save refresh token
@@ -250,7 +254,9 @@ impl AuthManager {
             created_at: now,
             expires_at: None,
         };
-        self.cookie_store.save_token(&refresh_token).await
+        self.cookie_store
+            .save_token(&refresh_token)
+            .await
             .map_err(|e| AuthError::Storage(format!("save refresh token: {e}")))?;
 
         // Update in-memory auth state
@@ -333,17 +339,14 @@ mod tests {
         let store = tempfile::tempdir().unwrap();
         let db_path = store.path().join("auth.db");
         std::fs::File::create(&db_path).unwrap();
-        let cookie_store = Arc::new(
-            crate::cookie_store::CookieStore::open(db_path).unwrap()
-        );
-        let token_cache = Arc::new(
-            SecureTokenCache::new(cookie_store)
-        );
+        let cookie_store = Arc::new(crate::cookie_store::CookieStore::open(db_path).unwrap());
+        let token_cache = Arc::new(SecureTokenCache::new(cookie_store));
         let manager = AuthManager::new(
             Arc::new(
                 crate::cookie_store::CookieStore::open(
-                    tempfile::tempdir().unwrap().path().join("auth2.db")
-                ).unwrap()
+                    tempfile::tempdir().unwrap().path().join("auth2.db"),
+                )
+                .unwrap(),
             ),
             token_cache,
             "client-id-123".into(),

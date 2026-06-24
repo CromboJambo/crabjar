@@ -1,14 +1,14 @@
+use chrono::Utc;
 /// SQLite-backed cookie and session store.
 ///
 /// Replaces Electron's `session.cookies.get/set/remove` API.
 /// Persists cookies, session tokens, and partition data to a local SQLite database.
-use rusqlite::{params, Connection, Result as SqlResult};
+use rusqlite::{Connection, Result as SqlResult, params};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use chrono::Utc;
 
 /// A persisted cookie entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +56,7 @@ impl CookieStore {
         Self::init(&conn)?;
         Ok(Self {
             db_path,
+            #[allow(clippy::arc_with_non_send_sync)]
             conn: Arc::new(RwLock::new(conn)),
         })
     }
@@ -208,8 +209,11 @@ impl CookieStore {
             "INSERT OR REPLACE INTO tokens (key, value, encrypted, created_at, expires_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
-                token.key, token.value, token.encrypted as i32,
-                token.created_at, token.expires_at
+                token.key,
+                token.value,
+                token.encrypted as i32,
+                token.created_at,
+                token.expires_at
             ],
         )?;
         Ok(())
@@ -242,9 +246,8 @@ impl CookieStore {
 
     pub async fn list_tokens(&self) -> SqlResult<Vec<SessionToken>> {
         let tx = self.conn.read().await;
-        let mut stmt = tx.prepare(
-            "SELECT key, value, encrypted, created_at, expires_at FROM tokens",
-        )?;
+        let mut stmt =
+            tx.prepare("SELECT key, value, encrypted, created_at, expires_at FROM tokens")?;
         let tokens = stmt.query_map(params![], |row| {
             Ok(SessionToken {
                 key: row.get(0)?,
@@ -282,9 +285,8 @@ impl CookieStore {
 
     pub async fn get_partition(&self, name: &str) -> SqlResult<Option<Partition>> {
         let tx = self.conn.read().await;
-        let mut stmt = tx.prepare(
-            "SELECT name, zoom_level, created_at FROM partitions WHERE name = ?1",
-        )?;
+        let mut stmt =
+            tx.prepare("SELECT name, zoom_level, created_at FROM partitions WHERE name = ?1")?;
         let mut rows = stmt.query(params![name])?;
         if let Some(row) = rows.next()? {
             Ok(Some(Partition {
@@ -299,9 +301,8 @@ impl CookieStore {
 
     pub async fn list_partitions(&self) -> SqlResult<Vec<Partition>> {
         let tx = self.conn.read().await;
-        let mut stmt = tx.prepare(
-            "SELECT name, zoom_level, created_at FROM partitions ORDER BY name",
-        )?;
+        let mut stmt =
+            tx.prepare("SELECT name, zoom_level, created_at FROM partitions ORDER BY name")?;
         let partitions = stmt.query_map(params![], |row| {
             Ok(Partition {
                 name: row.get(0)?,
@@ -353,7 +354,10 @@ mod tests {
         let id = store.save_cookie(&cookie).await.unwrap();
         assert!(!id.is_nil());
 
-        let found = store.get_cookie("teams.microsoft.com", "session").await.unwrap();
+        let found = store
+            .get_cookie("teams.microsoft.com", "session")
+            .await
+            .unwrap();
         assert!(found.is_some());
         assert_eq!(found.unwrap().value, "abc123");
     }
@@ -392,7 +396,11 @@ mod tests {
         assert_eq!(count, 1);
 
         let remaining = store.list_tokens().await.unwrap();
-        assert!(remaining.is_empty(), "expected no tokens, got: {:?}", remaining);
+        assert!(
+            remaining.is_empty(),
+            "expected no tokens, got: {:?}",
+            remaining
+        );
     }
 
     #[tokio::test]

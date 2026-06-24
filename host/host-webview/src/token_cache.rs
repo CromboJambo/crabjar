@@ -10,7 +10,6 @@
 use crate::cookie_store::{CookieStore, SessionToken};
 use chrono::Utc;
 use keyring::Entry;
-use sha2::Digest;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -86,10 +85,9 @@ impl SecureTokenCache {
     /// Store item in cache (mirrors tokenCache.js setItem).
     pub async fn set_item(&self, key: &str, value: &str) -> Result<(), TokenCacheError> {
         // Try keyring first
-        if self.keyring_enabled
-            && self.set_secure_item(key, value).await.is_ok() {
-                return Ok(());
-            }
+        if self.keyring_enabled && self.set_secure_item(key, value).await.is_ok() {
+            return Ok(());
+        }
 
         // Fallback: SQLite store
         let token = SessionToken {
@@ -99,7 +97,8 @@ impl SecureTokenCache {
             created_at: Utc::now().timestamp(),
             expires_at: None,
         };
-        self.cookie_store.save_token(&token)
+        self.cookie_store
+            .save_token(&token)
             .await
             .map_err(|e| TokenCacheError::Storage(format!("SQLite save failed: {e}")))?;
 
@@ -135,8 +134,14 @@ impl SecureTokenCache {
     /// Get cache statistics (mirrors tokenCache.js getCacheStats).
     pub async fn get_stats(&self) -> TokenCacheStats {
         let auth_keys = self.get_auth_related_keys().await;
-        let refresh_tokens = auth_keys.iter().filter(|k| k.contains("refresh_token")).count();
-        let msal_keys = auth_keys.iter().filter(|k| k.contains("msal.token")).count();
+        let refresh_tokens = auth_keys
+            .iter()
+            .filter(|k| k.contains("refresh_token"))
+            .count();
+        let msal_keys = auth_keys
+            .iter()
+            .filter(|k| k.contains("msal.token"))
+            .count();
 
         let storage_type = if self.keyring_enabled {
             "keyring"
@@ -169,7 +174,8 @@ impl SecureTokenCache {
         let entry_key = format!("{}{}", KEYRING_PREFIX, key);
         let entry = Entry::new("crabjar-host", &entry_key)
             .map_err(|e| TokenCacheError::Keyring(format!("create entry: {e}")))?;
-        entry.set_password(value)
+        entry
+            .set_password(value)
             .map_err(|e| TokenCacheError::Keyring(format!("set password: {e}")))?;
         Ok(())
     }
@@ -198,9 +204,7 @@ impl SecureTokenCache {
     }
 
     fn is_auth_related_key(key: &str) -> bool {
-        AUTH_PATTERNS
-            .iter()
-            .any(|pattern| key.contains(pattern))
+        AUTH_PATTERNS.iter().any(|pattern| key.contains(pattern))
     }
 
     /// Sanitize a key for logging (hide UUIDs, mirroring tokenCache.js _sanitizeKey).
@@ -239,11 +243,11 @@ impl SecureTokenCache {
                 return false;
             }
         }
-        for i in 0..36 {
+        for (i, ch) in chars.iter().enumerate().take(36) {
             if i == 8 || i == 13 || i == 18 || i == 23 {
                 continue;
             }
-            if !"0123456789abcdef".contains(chars[i]) {
+            if !"0123456789abcdef".contains(*ch) {
                 return false;
             }
         }
