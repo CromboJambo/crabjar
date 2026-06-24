@@ -3,8 +3,8 @@
 /// Extracted from main.rs to reduce bloat.
 use serde_json::json;
 
-use crate::bitwarden;
 use crate::BitwardenCommand;
+use crate::bitwarden;
 
 /// Handle bitwarden commands
 pub fn handle_bitwarden_command(
