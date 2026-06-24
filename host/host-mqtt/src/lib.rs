@@ -7,6 +7,11 @@
 /// - Home Assistant auto-discovery
 /// - Last Will and Testament (LWT) for connection state
 /// - Automatic reconnection with backoff
+#![allow(clippy::type_complexity)]
+#![allow(clippy::let_underscore_future)]
+#![allow(clippy::struct_field_names)]
+#![allow(clippy::too_many_lines)]
+#![allow(clippy::match_same_arms)]
 pub mod client;
 pub mod config;
 pub mod discovery;
@@ -79,10 +84,7 @@ impl PresenceUpdate {
     /// status has changed or no previous status exists.
     #[must_use]
     pub fn should_publish(&self, last_published_status: Option<&str>) -> bool {
-        match last_published_status {
-            Some(prev) if prev == self.status => false,
-            _ => true,
-        }
+        !matches!(last_published_status, Some(prev) if prev == self.status)
     }
 }
 
