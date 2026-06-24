@@ -11,11 +11,10 @@
 /// Session state is managed via `SessionStore` — for the native endpoint
 /// this tracks `response_id` for continuation; for OpenAI/Anthropic it
 /// tracks the full message history.
-
 use serde::{Deserialize, Serialize};
 use std::env;
 use thiserror::Error;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 // ---------------------------------------------------------------------------
 // Endpoint selection
@@ -351,13 +350,11 @@ impl SessionState {
                         content: content.clone(),
                     });
                 }
-                UnifiedOutputItem::ToolCall { tool, output, .. } => {
-                    if let Some(result) = output {
-                        self.message_history.push(UnifiedMessage {
-                            role: MessageRole::Assistant,
-                            content: format!("Tool '{}' executed: {}", tool, result),
-                        });
-                    }
+                UnifiedOutputItem::ToolCall { tool, output: Some(result), .. } => {
+                    self.message_history.push(UnifiedMessage {
+                        role: MessageRole::Assistant,
+                        content: format!("Tool '{}' executed: {}", tool, result),
+                    });
                 }
                 UnifiedOutputItem::Reasoning { content } => {
                     self.message_history.push(UnifiedMessage {
@@ -486,7 +483,7 @@ impl SessionStore {
             None => (String::new(), String::new(), String::new()),
         };
 
-        let system_prompt: Option<String> = serde_json::from_str(&system_prompt).unwrap_or(None);
+        let _system_prompt: Option<String> = serde_json::from_str(&system_prompt).unwrap_or(None);
         let message_history: Vec<UnifiedMessage> = serde_json::from_str(&message_history).unwrap_or_default();
         let response_id = if response_id.is_empty() { None } else { Some(response_id) };
 
@@ -553,7 +550,7 @@ pub enum SessionError {
 /// Native `/api/v1/chat` endpoint implementation.
 mod native {
     use super::*;
-    use reqwest::Client;
+    
 
     /// Converts a unified request to the native endpoint format.
     pub fn to_native_request(req: &UnifiedChatRequest) -> serde_json::Value {
@@ -640,7 +637,7 @@ mod native {
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|item| parse_output_item(item))
+                    .filter_map(parse_output_item)
                     .collect()
             })
             .unwrap_or_default();
@@ -724,7 +721,7 @@ mod native {
 /// OpenAI-compatible `/v1/chat/completions` endpoint implementation.
 mod openai {
     use super::*;
-    use reqwest::Client;
+    
 
     /// Converts a unified request to the OpenAI format.
     pub fn to_openai_request(req: &UnifiedChatRequest) -> serde_json::Value {
@@ -802,7 +799,7 @@ mod openai {
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|tc| parse_tool_call(tc))
+                    .filter_map(parse_tool_call)
                     .collect()
             })
             .unwrap_or_default();
@@ -862,7 +859,7 @@ mod openai {
 /// Anthropic-compatible `/v1/messages` endpoint implementation.
 mod anthropic {
     use super::*;
-    use reqwest::Client;
+    
 
     /// Converts a unified request to the Anthropic format.
     pub fn to_anthropic_request(req: &UnifiedChatRequest) -> serde_json::Value {
