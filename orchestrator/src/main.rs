@@ -1,18 +1,18 @@
+use agent_context::state_docs::schema as state_schema;
+use agent_context::{Store, store::StoreError};
 use axum::{
     Router,
     extract::Json,
+    extract::State,
     response::sse::{Event as SseEvent, Sse},
     routing::post,
-    extract::State,
 };
-use agent_context::{store::StoreError, Store};
-use agent_context::state_docs::schema as state_schema;
 use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
 use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
-use std::sync::Arc;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 mod backend;
 mod lm_studio_client;
@@ -22,8 +22,8 @@ use lm_studio_client::LmStudioClient;
 
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
@@ -42,6 +42,7 @@ struct PromptRequest {
 }
 
 /// Represents an OpenAI-compatible Chat Completion request.
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct ChatCompletionRequest {
     model: String,
@@ -49,6 +50,7 @@ struct ChatCompletionRequest {
 }
 
 /// Represents a single message in the chat history.
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "lowercase")]
 enum MessageRole {
@@ -57,6 +59,7 @@ enum MessageRole {
     Assistant,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct ChatMessage {
     role: MessageRole,
@@ -67,21 +70,25 @@ struct ChatMessage {
 #[derive(Debug, Deserialize)]
 struct ChatRequest {
     prompt: String,
+    #[allow(dead_code)]
     model: Option<String>,
 }
 
 /// Represents an OpenAI-compatible Chat Completion response content.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct ChatCompletionResponse {
     choices: Vec<ChatChoice>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct ChatChoice {
     message: ChatMessage,
     tool_calls: Option<Vec<ToolCall>>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct ToolCall {
     #[allow(dead_code)]
@@ -91,6 +98,7 @@ struct ToolCall {
     function: FunctionCall,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct FunctionCall {
     name: String,
@@ -262,7 +270,10 @@ async fn handle_chat(
     if !tool_calls.is_empty() {
         let mut results = Vec::new();
         for tc in tool_calls {
-            info!("LLM requested tool call: {} with args: {}", tc.tool, tc.arguments);
+            info!(
+                "LLM requested tool call: {} with args: {}",
+                tc.tool, tc.arguments
+            );
 
             let args: Vec<String> = match serde_json::from_str(&tc.arguments.to_string()) {
                 Ok(parsed) => parsed,
@@ -281,7 +292,9 @@ async fn handle_chat(
             ));
         }
 
-        Ok(Json(AcpResponse::Output { data: results.join("\n") }))
+        Ok(Json(AcpResponse::Output {
+            data: results.join("\n"),
+        }))
     } else {
         let content = backend.extract_text(&response);
         if content.is_empty() {
@@ -294,7 +307,11 @@ async fn handle_chat(
 }
 
 /// Execute a tool call based on the function name and arguments.
-async fn execute_tool_call(function_name: &str, args: &[String], store: Arc<std::sync::Mutex<Store>>) -> Result<String, String> {
+async fn execute_tool_call(
+    function_name: &str,
+    args: &[String],
+    store: Arc<std::sync::Mutex<Store>>,
+) -> Result<String, String> {
     match function_name {
         "run_command" => {
             if args.len() < 2 {
@@ -541,7 +558,11 @@ async fn execute_tool_call(function_name: &str, args: &[String], store: Arc<std:
                     }
                 };
 
-            let events = match store.lock().unwrap().search_content(&search_req.term, search_req.limit.map(|l| l as usize)) {
+            let events = match store
+                .lock()
+                .unwrap()
+                .search_content(&search_req.term, search_req.limit.map(|l| l as usize))
+            {
                 Ok(events) => events,
                 Err(StoreError::DatabaseError(e)) => {
                     return Err(format!("Error searching events: {e}"));
@@ -760,7 +781,13 @@ async fn execute_tool_call(function_name: &str, args: &[String], store: Arc<std:
                     }
                 };
 
-            let events = match store.lock().unwrap().query(&[&source_req.source], source_req.limit.unwrap_or(50) as usize, "", "", "") {
+            let events = match store.lock().unwrap().query(
+                &[&source_req.source],
+                source_req.limit.unwrap_or(50) as usize,
+                "",
+                "",
+                "",
+            ) {
                 Ok(events) => events,
                 Err(StoreError::DatabaseError(e)) => {
                     return Err(format!("Error fetching events by source: {e}"));
@@ -876,7 +903,12 @@ async fn search_logs(
     State(state): State<AppState>,
     Json(payload): Json<SearchLogsRequest>,
 ) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
-    let events = match state.store.lock().unwrap().search_content(&payload.term, payload.limit.map(|l| l as usize)) {
+    let events = match state
+        .store
+        .lock()
+        .unwrap()
+        .search_content(&payload.term, payload.limit.map(|l| l as usize))
+    {
         Ok(events) => events,
         Err(StoreError::DatabaseError(_e)) => {
             return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
@@ -920,14 +952,13 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|_| "/home/crombo/crabjar/memory/knowledge.db".to_string());
     let events_db_path = std::env::var("MIRROR_LOG_DB_PATH")
         .unwrap_or_else(|_| "/home/crombo/crabjar/memory/events.db".to_string());
-    let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-        .unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
+    let guard_root =
+        std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
 
     // Initialize knowledge store schema
     let kconn = rusqlite::Connection::open(&knowledge_db_path)
         .map_err(|e| anyhow::anyhow!("Failed to open knowledge DB: {e}"))?;
-    state_schema::migrate(&kconn)
-        .map_err(|e| anyhow::anyhow!("Schema migration failed: {e}"))?;
+    state_schema::migrate(&kconn).map_err(|e| anyhow::anyhow!("Schema migration failed: {e}"))?;
     let store = Store::open(&knowledge_db_path)
         .map_err(|e| anyhow::anyhow!("Failed to open knowledge store: {e}"))?;
 
@@ -963,4 +994,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
