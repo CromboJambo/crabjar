@@ -20,15 +20,24 @@ pub trait InferenceBackend: Send + Sync {
     fn extract_text(&self, response: &UnifiedChatResponse) -> String;
 
     /// Extract tool calls from a response.
-    fn extract_tool_calls(&self, response: &UnifiedChatResponse) -> Vec<lm_studio_client::ToolCallInfo>;
+    fn extract_tool_calls(
+        &self,
+        response: &UnifiedChatResponse,
+    ) -> Vec<lm_studio_client::ToolCallInfo>;
 
     /// Create a new session with an optional system prompt.
-    fn create_session(&mut self, system_prompt: Option<String>) -> Result<String, lm_studio_client::SessionError>;
+    #[allow(dead_code)]
+    fn create_session(
+        &mut self,
+        system_prompt: Option<String>,
+    ) -> Result<String, lm_studio_client::SessionError>;
 
     /// Load an existing session by ID.
+    #[allow(dead_code)]
     fn load_session(&mut self, session_id: &str) -> Result<(), lm_studio_client::SessionError>;
 
     /// Save the current session state.
+    #[allow(dead_code)]
     fn save_session(&self) -> Result<(), lm_studio_client::SessionError>;
 
     /// Returns which backend this is.
@@ -50,6 +59,8 @@ impl std::fmt::Display for BackendKind {
 }
 
 /// Errors from inference backend operations.
+#[allow(dead_code)]
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 pub enum InferenceError {
     #[error("backend request failed: {0}")]
@@ -72,18 +83,26 @@ pub enum InferenceError {
 #[async_trait::async_trait]
 impl InferenceBackend for lm_studio_client::LmStudioClient {
     async fn chat(&mut self, user_input: String) -> Result<UnifiedChatResponse, InferenceError> {
-        self.chat(user_input).await.map_err(|e| InferenceError::RequestError(e.to_string()))
+        self.chat(user_input)
+            .await
+            .map_err(|e| InferenceError::RequestError(e.to_string()))
     }
 
     fn extract_text(&self, response: &UnifiedChatResponse) -> String {
         self.extract_text(response)
     }
 
-    fn extract_tool_calls(&self, response: &UnifiedChatResponse) -> Vec<lm_studio_client::ToolCallInfo> {
+    fn extract_tool_calls(
+        &self,
+        response: &UnifiedChatResponse,
+    ) -> Vec<lm_studio_client::ToolCallInfo> {
         self.extract_tool_calls(response)
     }
 
-    fn create_session(&mut self, system_prompt: Option<String>) -> Result<String, lm_studio_client::SessionError> {
+    fn create_session(
+        &mut self,
+        system_prompt: Option<String>,
+    ) -> Result<String, lm_studio_client::SessionError> {
         self.create_session(system_prompt)
     }
 
