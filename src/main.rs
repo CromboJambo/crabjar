@@ -4,21 +4,20 @@ use serde_json::json;
 
 mod bitwarden;
 mod crabjar_config;
+mod doctor;
 mod dotfile_manager;
 mod knowledge_store;
 mod project_loader;
-mod doctor;
 
+use bitwarden::commands::handle_bitwarden_command;
 use crabjar_lib::{
-    BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand, KnowledgeCommand,
-    BackendCommand,
+    BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand, KnowledgeCommand,
 };
+use doctor::handle_doctor_command;
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
 use project_loader::ProjectLoader;
-use bitwarden::commands::handle_bitwarden_command;
-use doctor::handle_doctor_command;
 
 fn is_help_request(args: &[String]) -> bool {
     args.iter()
@@ -108,7 +107,10 @@ fn handle_state_command(
         StateCommand::Index { docs_dir, db_path } => {
             let conn = rusqlite::Connection::open(&db_path)?;
             agent_context::state_docs::migrate(&conn)?;
-            let count = agent_context::state_docs::indexer::index_all_docs(&conn, std::path::Path::new(&docs_dir))?;
+            let count = agent_context::state_docs::indexer::index_all_docs(
+                &conn,
+                std::path::Path::new(&docs_dir),
+            )?;
             Ok(json!({
                 "success": true,
                 "message": format!("indexed {} state-docs", count),
@@ -135,9 +137,17 @@ fn handle_state_command(
                 }
             }))
         }
-        StateCommand::Query { doc_name, section, keyword, db_path } => {
+        StateCommand::Query {
+            doc_name,
+            section,
+            keyword,
+            db_path,
+        } => {
             let conn = rusqlite::Connection::open(&db_path)?;
-            let querier = agent_context::state_docs::StateDocQuerier::new(conn, std::path::PathBuf::from(&db_path));
+            let querier = agent_context::state_docs::StateDocQuerier::new(
+                conn,
+                std::path::PathBuf::from(&db_path),
+            );
             if let Some(section) = section {
                 let result = querier.query_by_section(&doc_name, &section);
                 Ok(json!({
@@ -192,21 +202,23 @@ fn handle_state_command(
             let mut stmt = conn.prepare(
                 "SELECT what_captured, what_missed, assumptions, blind_spots, stale_after FROM confidence WHERE doc_id = ?1"
             )?;
-            let row = stmt.query_row(rusqlite::params![doc_name], |row| {
-                Ok(json!({
-                    "what_captured": row.get::<_, String>(0)?,
-                    "what_missed": row.get::<_, String>(1)?,
-                    "assumptions": row.get::<_, String>(2)?,
-                    "blind_spots": row.get::<_, String>(3)?,
-                    "stale_after": row.get::<_, String>(4)?,
-                }))
-            }).map_err(|e| {
-                if e == rusqlite::Error::QueryReturnedNoRows {
-                    format!("no confidence assessment for {}", doc_name)
-                } else {
-                    e.to_string()
-                }
-            })?;
+            let row = stmt
+                .query_row(rusqlite::params![doc_name], |row| {
+                    Ok(json!({
+                        "what_captured": row.get::<_, String>(0)?,
+                        "what_missed": row.get::<_, String>(1)?,
+                        "assumptions": row.get::<_, String>(2)?,
+                        "blind_spots": row.get::<_, String>(3)?,
+                        "stale_after": row.get::<_, String>(4)?,
+                    }))
+                })
+                .map_err(|e| {
+                    if e == rusqlite::Error::QueryReturnedNoRows {
+                        format!("no confidence assessment for {}", doc_name)
+                    } else {
+                        e.to_string()
+                    }
+                })?;
             Ok(json!({
                 "success": true,
                 "message": format!("retrieved confidence for {}", doc_name),
@@ -236,7 +248,10 @@ fn handle_state_command(
             for row in rows {
                 results.push(row?);
             }
-            let open_count = results.iter().filter(|a| a.get("status").and_then(|s| s.as_str()) == Some("open")).count();
+            let open_count = results
+                .iter()
+                .filter(|a| a.get("status").and_then(|s| s.as_str()) == Some("open"))
+                .count();
             Ok(json!({
                 "success": true,
                 "message": format!("retrieved {} annotations for {}", results.len(), doc_name),
@@ -321,21 +336,23 @@ async fn handle_knowledge_command(
 ) -> Result<serde_json::Value, agent_context::Error> {
     let project_root = std::env::current_dir()
         .map_err(|err| agent_context::Error::Io(std::io::Error::other(err.to_string())))?;
-    
+
     // Build guard DB path for gate
     let guard_db_path = project_root.join("guard/guard.db");
-    let guard_db = crabjar_guard::GuardDb::open(&guard_db_path)
-        .unwrap_or_else(|_| {
-            let temp_dir = tempfile::tempdir().unwrap();
-            crabjar_guard::GuardDb::open(temp_dir.path().join("guard.db")).unwrap()
-        });
-    
+    let guard_db = crabjar_guard::GuardDb::open(&guard_db_path).unwrap_or_else(|_| {
+        let temp_dir = tempfile::tempdir().unwrap();
+        crabjar_guard::GuardDb::open(temp_dir.path().join("guard.db")).unwrap()
+    });
+
     let bridge = KnowledgeBridge::new(
-        project_root.join("memory/knowledge.db").to_string_lossy().as_ref(),
+        project_root
+            .join("memory/knowledge.db")
+            .to_string_lossy()
+            .as_ref(),
         project_root,
         None,
     )?
-        .with_guard_db(guard_db);
+    .with_guard_db(guard_db);
     command.execute(&bridge).await
 }
 
@@ -497,7 +514,10 @@ async fn handle_exec(
 
             let records = flight_recorder.query_records(1)?;
             let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
-            let receipt = records.first().map(|r| r.receipt.clone()).unwrap_or_default();
+            let receipt = records
+                .first()
+                .map(|r| r.receipt.clone())
+                .unwrap_or_default();
 
             let git_dirty = flight_recorder.capture_git_dirty(&effective_cwd).await?;
             let git_diff = flight_recorder.capture_git_diff(&effective_cwd).await?;
@@ -596,10 +616,7 @@ fn execute_via_dinitctl(
     };
 
     // Build dinitctl args with crabjar-dinit socket
-    let mut dinit_args: Vec<String> = vec![
-        "-p".to_string(),
-        effective_socket.clone(),
-    ];
+    let mut dinit_args: Vec<String> = vec!["-p".to_string(), effective_socket.clone()];
     dinit_args.extend(args.iter().cloned());
     let dinit_args: Vec<&str> = dinit_args.iter().map(|s| s.as_str()).collect();
 
@@ -784,17 +801,23 @@ fn handle_backend_command(command: BackendCommand) -> Result<serde_json::Value, 
             match backend.as_str() {
                 "lm-studio" | "native" => {
                     // Update environment variable for the orchestrator
-                    unsafe { std::env::set_var("INFERENCE_BACKEND", &backend); }
+                    unsafe {
+                        std::env::set_var("INFERENCE_BACKEND", &backend);
+                    }
                     Ok(json!({
                         "success": true,
                         "message": format!("Inference backend set to: {}", backend),
                     }))
                 }
-                _ => Err(format!("Invalid backend: {}. Use 'lm-studio' or 'native'.", backend)),
+                _ => Err(format!(
+                    "Invalid backend: {}. Use 'lm-studio' or 'native'.",
+                    backend
+                )),
             }
         }
         BackendCommand::Get => {
-            let current_backend = std::env::var("INFERENCE_BACKEND").unwrap_or_else(|_| "lm-studio".to_string());
+            let current_backend =
+                std::env::var("INFERENCE_BACKEND").unwrap_or_else(|_| "lm-studio".to_string());
             Ok(json!({
                 "success": true,
                 "current_backend": current_backend,

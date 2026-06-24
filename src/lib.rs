@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use clap::{CommandFactory, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -322,11 +324,11 @@ pub enum DoctorCommand {
     Check,
 }
 
-pub mod knowledge_store;
-pub mod crabjar_config;
-pub mod project_loader;
-pub mod doctor;
 pub mod bitwarden;
+pub mod crabjar_config;
+pub mod doctor;
+pub mod knowledge_store;
+pub mod project_loader;
 
 pub use crabjar_config::ProjectConfig;
 pub use project_loader::ProjectLoader;
