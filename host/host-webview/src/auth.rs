@@ -9,7 +9,6 @@
 /// - Silent token refresh using refresh tokens
 /// - Token caching in keyring (via SecureTokenCache)
 /// - D-Bus identity broker (stubbed for Linux)
-
 use crate::cookie_store::{CookieStore, SessionToken};
 use crate::token_cache::SecureTokenCache;
 use base64::Engine;
@@ -153,8 +152,8 @@ impl AuthManager {
     /// Handle the OAuth2 callback — exchange authorization code for tokens.
     pub async fn handle_callback(
         &self,
-        code: &str,
-        state: &str,
+        _code: &str,
+        _state: &str,
     ) -> Result<TokenResponse, AuthError> {
         // In a real implementation, this would:
         // 1. Validate the state parameter (CSRF protection)
@@ -177,7 +176,7 @@ impl AuthManager {
     pub async fn refresh_token(&self) -> Result<TokenResponse, AuthError> {
         let state = self.state.read().await;
 
-        let refresh_token = state.refresh_token.as_ref()
+        let _refresh_token = state.refresh_token.as_ref()
             .ok_or(AuthError::NoRefreshToken)?;
 
         // In production:
@@ -193,7 +192,7 @@ impl AuthManager {
     pub async fn force_refresh(&self) -> Result<TokenResponse, AuthError> {
         let state = self.state.read().await;
 
-        let refresh_token = state.refresh_token.as_ref()
+        let _refresh_token = state.refresh_token.as_ref()
             .ok_or(AuthError::NoRefreshToken)?;
 
         // Same as refresh_token but with explicit force flags
