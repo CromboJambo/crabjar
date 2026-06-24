@@ -1,8 +1,8 @@
+use chrono::Utc;
 /// Health reporting for the host runtime.
 ///
 /// Aggregates health status from all subsystems and plugins.
 use std::collections::HashMap;
-use chrono::Utc;
 
 /// Health status of a component.
 #[derive(Debug, Clone, PartialEq)]
@@ -35,33 +35,40 @@ impl HealthReporter {
 
     /// Register a health report.
     pub fn report(&mut self, component: &str, status: HealthStatus, details: serde_json::Value) {
-        self.reports.insert(component.to_string(), HealthReport {
-            component: component.to_string(),
-            status,
-            details,
-            timestamp: Utc::now(),
-        });
+        self.reports.insert(
+            component.to_string(),
+            HealthReport {
+                component: component.to_string(),
+                status,
+                details,
+                timestamp: Utc::now(),
+            },
+        );
     }
 
     /// Get the overall health status.
     pub fn overall_health(&self) -> HealthStatus {
-        let statuses: Vec<_> = self.reports.values()
-            .map(|r| &r.status)
-            .collect();
+        let statuses: Vec<_> = self.reports.values().map(|r| &r.status).collect();
 
         if statuses.is_empty() {
             return HealthStatus::Unknown;
         }
 
         // If any component is unhealthy, overall is unhealthy
-        if statuses.iter().any(|s| matches!(s, HealthStatus::Unhealthy { .. })) {
+        if statuses
+            .iter()
+            .any(|s| matches!(s, HealthStatus::Unhealthy { .. }))
+        {
             return HealthStatus::Unhealthy {
                 reason: "One or more components unhealthy".into(),
             };
         }
 
         // If any is degraded, overall is degraded
-        if statuses.iter().any(|s| matches!(s, HealthStatus::Degraded { .. })) {
+        if statuses
+            .iter()
+            .any(|s| matches!(s, HealthStatus::Degraded { .. }))
+        {
             return HealthStatus::Degraded {
                 reason: "One or more components degraded".into(),
             };

@@ -1,8 +1,8 @@
+use std::error::Error;
 /// Tracing initialization for the host runtime.
 ///
 /// Sets up tracing-subscriber with both console and file output.
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt, Registry};
-use std::error::Error;
+use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Initialize the global tracing subscriber.
 ///
@@ -24,11 +24,12 @@ pub fn init_tracing(log_dir: &str) -> Result<(), Box<dyn Error>> {
         .with_ansi(false)
         .with_target(true);
 
-    let _env_filter = EnvFilter::try_from_env("TRACING_LEVEL")
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let _env_filter =
+        EnvFilter::try_from_env("TRACING_LEVEL").unwrap_or_else(|_| EnvFilter::new("info"));
 
-    let filter_layer = EnvFilter::try_from_env("TRACING_FILTER")
-        .unwrap_or_else(|_| EnvFilter::new("crabjar_host=debug,crabjar_host_system=debug,crabjar_host_observe=debug"));
+    let filter_layer = EnvFilter::try_from_env("TRACING_FILTER").unwrap_or_else(|_| {
+        EnvFilter::new("crabjar_host=debug,crabjar_host_system=debug,crabjar_host_observe=debug")
+    });
 
     Registry::default()
         .with(filter_layer)

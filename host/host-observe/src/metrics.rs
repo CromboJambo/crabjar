@@ -1,17 +1,29 @@
+use chrono::Utc;
 /// Metrics collector — lightweight counter/gauge/histogram tracking.
 ///
 /// Designed to be fast and allocation-free in hot paths.
 /// Data is exposed via the Axum service layer for the Ratatui dashboard.
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use chrono::Utc;
 
 /// Metric types.
 #[derive(Debug, Clone)]
 pub enum Metric {
-    Counter { name: String, value: u64, labels: HashMap<String, String> },
-    Gauge { name: String, value: f64, labels: HashMap<String, String> },
-    Histogram { name: String, value: f64, labels: HashMap<String, String> },
+    Counter {
+        name: String,
+        value: u64,
+        labels: HashMap<String, String>,
+    },
+    Gauge {
+        name: String,
+        value: f64,
+        labels: HashMap<String, String>,
+    },
+    Histogram {
+        name: String,
+        value: f64,
+        labels: HashMap<String, String>,
+    },
 }
 
 /// Thread-safe metrics collector.
@@ -101,7 +113,15 @@ impl MetricsStore {
         } else {
             let mut parts: Vec<_> = labels.iter().collect();
             parts.sort_by_key(|(k, _)| (*k).clone());
-            format!("{}{{{}}}", name, parts.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join(","))
+            format!(
+                "{}{{{}}}",
+                name,
+                parts
+                    .iter()
+                    .map(|(k, v)| format!("{k}={v}"))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
         }
     }
 
@@ -117,14 +137,19 @@ impl MetricsStore {
         for (name, values) in &self.histograms {
             let avg = if !values.is_empty() {
                 values.iter().sum::<f64>() / values.len() as f64
-            } else { 0.0 };
-            result.insert(name.clone(), serde_json::json!({
-                "type": "histogram",
-                "count": values.len(),
-                "sum": values.iter().sum::<f64>(),
-                "avg": avg,
-                "ts": Utc::now().to_rfc3339(),
-            }));
+            } else {
+                0.0
+            };
+            result.insert(
+                name.clone(),
+                serde_json::json!({
+                    "type": "histogram",
+                    "count": values.len(),
+                    "sum": values.iter().sum::<f64>(),
+                    "avg": avg,
+                    "ts": Utc::now().to_rfc3339(),
+                }),
+            );
         }
 
         serde_json::Value::Object(result)
@@ -135,24 +160,35 @@ impl MetricsStore {
 
         for (key, value) in &self.counters {
             if key.starts_with(name) {
-                result.insert(key.clone(), serde_json::json!({ "type": "counter", "value": *value }));
+                result.insert(
+                    key.clone(),
+                    serde_json::json!({ "type": "counter", "value": *value }),
+                );
             }
         }
         for (key, value) in &self.gauges {
             if key.starts_with(name) {
-                result.insert(key.clone(), serde_json::json!({ "type": "gauge", "value": *value }));
+                result.insert(
+                    key.clone(),
+                    serde_json::json!({ "type": "gauge", "value": *value }),
+                );
             }
         }
         for (key, values) in &self.histograms {
             if key.starts_with(name) {
                 let avg = if !values.is_empty() {
                     values.iter().sum::<f64>() / values.len() as f64
-                } else { 0.0 };
-                result.insert(key.clone(), serde_json::json!({
-                    "type": "histogram",
-                    "count": values.len(),
-                    "avg": avg,
-                }));
+                } else {
+                    0.0
+                };
+                result.insert(
+                    key.clone(),
+                    serde_json::json!({
+                        "type": "histogram",
+                        "count": values.len(),
+                        "avg": avg,
+                    }),
+                );
             }
         }
 
