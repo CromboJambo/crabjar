@@ -2,7 +2,6 @@
 ///
 /// Real-time view of the host runtime: agent loop state, plugin health,
 /// metrics, and WorkItem progress.
-
 use crabjar_host_core::{EventBus, PluginRegistry};
 use crabjar_host_observe::MetricsCollector;
 use crabjar_host_agent::AgentLoop;
@@ -73,8 +72,8 @@ async fn run_tui(
             frame.render_widget(agent_para, chunks[1]);
 
             // Plugin list
-            let plugins = vec!["teams".to_string()];
-            let _plugin_headers = vec!["Plugin", "Status", "Version"];
+            let plugins = ["teams".to_string()];
+            let _plugin_headers = ["Plugin", "Status", "Version"];
             let plugin_rows: Vec<Vec<Line>> = plugins.iter().map(|p| {
                 vec![
                     Line::from(Span::raw(p)),
@@ -114,8 +113,8 @@ async fn run_tui(
 
         // Check for input (non-blocking)
         use crossterm::event::{poll, read, Event, KeyCode};
-        if poll(std::time::Duration::from_millis(100))? {
-            if let Event::Key(key) = read()? {
+        if poll(std::time::Duration::from_millis(100))?
+            && let Event::Key(key) = read()? {
                 match key.code {
                     KeyCode::Char('q') => running = false,
                     KeyCode::F(1) => {
@@ -130,7 +129,6 @@ async fn run_tui(
                     _ => {}
                 }
             }
-        }
     }
 
     Ok(())
