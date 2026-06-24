@@ -447,21 +447,13 @@ impl KnowledgeBridge {
                 let id = self.knowledge_store.insert(pending_entry)?;
                 Ok(GatedInsertResult::Quarantined { id })
             }
-            crabjar_guard::GateResult::Interrupted { reason } => {
-                Err(agent_context::Error::Internal(format!(
-                    "Knowledge write blocked: {}",
-                    reason
-                )))
-            }
-            crabjar_guard::GateResult::DryRun => {
-                Ok(GatedInsertResult::DryRun)
-            }
-            crabjar_guard::GateResult::Revoked { reason } => {
-                Err(agent_context::Error::Internal(format!(
-                    "Knowledge write revoked: {}",
-                    reason
-                )))
-            }
+            crabjar_guard::GateResult::Interrupted { reason } => Err(
+                agent_context::Error::Internal(format!("Knowledge write blocked: {}", reason)),
+            ),
+            crabjar_guard::GateResult::DryRun => Ok(GatedInsertResult::DryRun),
+            crabjar_guard::GateResult::Revoked { reason } => Err(agent_context::Error::Internal(
+                format!("Knowledge write revoked: {}", reason),
+            )),
         }
     }
 
@@ -484,7 +476,7 @@ impl KnowledgeBridge {
     /// Removes the quarantine flag and sets the entry as active.
     pub fn promote_quarantined(&self, id: i64, reason: &str) -> Result<bool, agent_context::Error> {
         let conn = &self.knowledge_store.conn;
-        
+
         let is_quarantined: bool = conn.query_row(
             "SELECT COALESCE(metadata->>'$.quarantined', 'false') = 'true' FROM knowledge_entries WHERE id = ?",
             [id],
@@ -493,7 +485,8 @@ impl KnowledgeBridge {
 
         if !is_quarantined {
             return Err(agent_context::Error::Internal(format!(
-                "Entry {} is not quarantined", id
+                "Entry {} is not quarantined",
+                id
             )));
         }
 
@@ -503,11 +496,7 @@ impl KnowledgeBridge {
                 '$.promoted_at', ?,
                 '$.promotion_reason', ?
             ) WHERE id = ?",
-            rusqlite::params![
-                chrono::Utc::now().to_rfc3339(),
-                reason,
-                id,
-            ],
+            rusqlite::params![chrono::Utc::now().to_rfc3339(), reason, id,],
         )?;
 
         let ts = chrono::Utc::now().to_rfc3339();
@@ -525,9 +514,9 @@ impl KnowledgeBridge {
             "SELECT id, content, tags, metadata, source, source_type, created_at 
              FROM knowledge_entries 
              WHERE metadata->>'$.quarantined' = 'true' 
-             ORDER BY created_at DESC"
+             ORDER BY created_at DESC",
         )?;
-        
+
         let mut rows = Vec::new();
         let cursor = stmt.query_map([], |row| {
             Ok((
@@ -540,7 +529,7 @@ impl KnowledgeBridge {
                 row.get::<usize, String>(6)?,
             ))
         })?;
-        
+
         for row in cursor {
             let (id, content, tags, metadata, source, source_type, created_at) = row?;
             rows.push(json!({
@@ -553,7 +542,7 @@ impl KnowledgeBridge {
                 "created_at": created_at,
             }));
         }
-        
+
         Ok(rows)
     }
 
