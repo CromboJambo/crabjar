@@ -2,10 +2,8 @@
 ///
 /// Wraps the Teams-for-Linux web app with Rust-native system integration.
 /// The web UI stays as-is; Rust handles tray, notifications, auth, caching.
-
 use async_trait::async_trait;
 use crabjar_host_core::{Plugin, PluginContext, plugin::PluginError};
-use std::sync::Arc;
 use uuid::Uuid;
 
 /// The Teams plugin implementation.
@@ -29,7 +27,7 @@ impl TeamsPlugin {
     }
 
     /// Initialize the Teams session (open WebView, authenticate).
-    async fn initialize_session(&mut self, ctx: &PluginContext) -> Result<(), PluginError> {
+    async fn initialize_session(&mut self, _ctx: &PluginContext) -> Result<(), PluginError> {
         // Teams web URL
         let teams_url = "https://teams.microsoft.com";
 
@@ -48,7 +46,7 @@ impl TeamsPlugin {
     async fn handle_teams_action(&self, action: &str, ctx: &PluginContext) -> Result<serde_json::Value, PluginError> {
         match action {
             "show" => {
-                if let Some(sid) = self.session_id {
+                if let Some(_sid) = self.session_id {
                     let _ = ctx.emit(
                         crabjar_host_core::event_bus::EventType::WebView {
                             event: "show".into(),
@@ -59,7 +57,7 @@ impl TeamsPlugin {
                 Ok(serde_json::json!({ "status": "shown" }))
             }
             "hide" => {
-                if let Some(sid) = self.session_id {
+                if let Some(_sid) = self.session_id {
                     let _ = ctx.emit(
                         crabjar_host_core::event_bus::EventType::WebView {
                             event: "hide".into(),
@@ -103,12 +101,12 @@ impl Plugin for TeamsPlugin {
         &self.version
     }
 
-    async fn on_start(&self, ctx: &PluginContext) -> Result<(), PluginError> {
+    async fn on_start(&self, _ctx: &PluginContext) -> Result<(), PluginError> {
         tracing::info!("teams plugin starting");
         Ok(())
     }
 
-    async fn on_stop(&self, ctx: &PluginContext) -> Result<(), PluginError> {
+    async fn on_stop(&self, _ctx: &PluginContext) -> Result<(), PluginError> {
         tracing::info!("teams plugin stopping");
         Ok(())
     }
@@ -123,11 +121,11 @@ impl Plugin for TeamsPlugin {
         Ok(())
     }
 
-    async fn on_action(&self, ctx: &PluginContext, action: &str, data: Option<serde_json::Value>) -> Result<serde_json::Value, PluginError> {
+    async fn on_action(&self, ctx: &PluginContext, action: &str, _data: Option<serde_json::Value>) -> Result<serde_json::Value, PluginError> {
         self.handle_teams_action(action, ctx).await
     }
 
-    async fn health(&self, ctx: &PluginContext) -> Result<serde_json::Value, PluginError> {
+    async fn health(&self, _ctx: &PluginContext) -> Result<serde_json::Value, PluginError> {
         Ok(serde_json::json!({
             "status": "healthy",
             "plugin": self.id(),
