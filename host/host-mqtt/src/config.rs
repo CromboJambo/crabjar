@@ -170,7 +170,13 @@ mod tests {
         assert_eq!(loaded.command_topic, config.command_topic);
         assert_eq!(loaded.status_check_interval, config.status_check_interval);
         assert_eq!(loaded.home_assistant.enabled, config.home_assistant.enabled);
-        assert_eq!(loaded.home_assistant.discovery_prefix, config.home_assistant.discovery_prefix);
-        assert_eq!(loaded.home_assistant.device_name, config.home_assistant.device_name);
+        assert_eq!(
+            loaded.home_assistant.discovery_prefix,
+            config.home_assistant.discovery_prefix
+        );
+        assert_eq!(
+            loaded.home_assistant.device_name,
+            config.home_assistant.device_name
+        );
     }
 }

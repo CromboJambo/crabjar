@@ -1,12 +1,12 @@
-/// `mqtt` — MQTT integration module for `CrabJar`.
-///
-/// Provides MQTT client, discovery, and media bridge functionality.
-/// and command reception. Mirrors the Teams-for-Linux MQTT integration:
-/// - Status publishing: presence, call state, camera, mic, screen-sharing
-/// - Command reception: toggle-mute, toggle-video, toggle-hand-raise
-/// - Home Assistant auto-discovery
-/// - Last Will and Testament (LWT) for connection state
-/// - Automatic reconnection with backoff
+//! `mqtt` — MQTT integration module for `CrabJar`.
+//!
+//! Provides MQTT client, discovery, and media bridge functionality.
+//! and command reception. Mirrors the Teams-for-Linux MQTT integration:
+//! - Status publishing: presence, call state, camera, mic, screen-sharing
+//! - Command reception: toggle-mute, toggle-video, toggle-hand-raise
+//! - Home Assistant auto-discovery
+//! - Last Will and Testament (LWT) for connection state
+//! - Automatic reconnection with backoff
 #![allow(clippy::type_complexity)]
 #![allow(clippy::let_underscore_future)]
 #![allow(clippy::struct_field_names)]
@@ -20,7 +20,7 @@ pub mod media_bridge;
 
 pub use client::MqttClient;
 pub use client::MqttError;
-pub use config::{MqttConfig, HomeAssistantConfig};
+pub use config::{HomeAssistantConfig, MqttConfig};
 pub use discovery::HaDiscovery;
 pub use handler::CommandHandler;
 pub use media_bridge::{MediaBridge, MediaEvent};
@@ -104,7 +104,10 @@ pub enum MqttEvent {
     Disconnected,
     StatusChanged(PresenceUpdate),
     MediaStateChanged(MediaState),
-    CommandReceived { action: String, request_id: Option<String> },
+    CommandReceived {
+        action: String,
+        request_id: Option<String>,
+    },
 }
 
 #[cfg(test)]

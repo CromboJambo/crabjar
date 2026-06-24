@@ -1,3 +1,4 @@
+use crate::MqttClient;
 /// Media status bridge: listens for media state events and publishes them to MQTT topics.
 ///
 /// Mirrors the Electron app's `MQTTMediaStatusService` which bridges IPC events
@@ -9,7 +10,6 @@
 /// - `{topicPrefix}/in-call` — Active call state (true/false)
 /// - `{topicPrefix}/screen-sharing` — Screen sharing active state (bool string)
 use crate::config::MqttConfig;
-use crate::MqttClient;
 use tokio::sync::broadcast;
 use tracing::{debug, warn};
 
@@ -66,27 +66,44 @@ impl MediaBridge {
                 let result = match &event {
                     MediaEvent::Camera { enabled } => {
                         let topic = format!("{}/camera", self.config.topic_prefix);
-                        self.mqtt.publish(&topic, &enabled.to_string(), rumqttc::QoS::AtLeastOnce, true).await
+                        self.mqtt
+                            .publish(
+                                &topic,
+                                &enabled.to_string(),
+                                rumqttc::QoS::AtLeastOnce,
+                                true,
+                            )
+                            .await
                     }
                     MediaEvent::Microphone { state } => {
                         let topic = format!("{}/microphone", self.config.topic_prefix);
-                        self.mqtt.publish(&topic, state, rumqttc::QoS::AtLeastOnce, true).await
+                        self.mqtt
+                            .publish(&topic, state, rumqttc::QoS::AtLeastOnce, true)
+                            .await
                     }
                     MediaEvent::CallConnected => {
                         let topic = format!("{}/in-call", self.config.topic_prefix);
-                        self.mqtt.publish(&topic, "true", rumqttc::QoS::AtLeastOnce, true).await
+                        self.mqtt
+                            .publish(&topic, "true", rumqttc::QoS::AtLeastOnce, true)
+                            .await
                     }
                     MediaEvent::CallDisconnected => {
                         let topic = format!("{}/in-call", self.config.topic_prefix);
-                        self.mqtt.publish(&topic, "false", rumqttc::QoS::AtLeastOnce, true).await
+                        self.mqtt
+                            .publish(&topic, "false", rumqttc::QoS::AtLeastOnce, true)
+                            .await
                     }
                     MediaEvent::ScreenSharingStarted => {
                         let topic = format!("{}/screen-sharing", self.config.topic_prefix);
-                        self.mqtt.publish(&topic, "true", rumqttc::QoS::AtLeastOnce, true).await
+                        self.mqtt
+                            .publish(&topic, "true", rumqttc::QoS::AtLeastOnce, true)
+                            .await
                     }
                     MediaEvent::ScreenSharingStopped => {
                         let topic = format!("{}/screen-sharing", self.config.topic_prefix);
-                        self.mqtt.publish(&topic, "false", rumqttc::QoS::AtLeastOnce, true).await
+                        self.mqtt
+                            .publish(&topic, "false", rumqttc::QoS::AtLeastOnce, true)
+                            .await
                     }
                 };
 

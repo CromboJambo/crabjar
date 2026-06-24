@@ -11,8 +11,8 @@
 use serde_json::json;
 use tracing::info;
 
-use crate::config::HomeAssistantConfig;
 use crate::MqttClient;
+use crate::config::HomeAssistantConfig;
 
 /// Home Assistant auto-discovery payload generator.
 pub struct HaDiscovery {
@@ -63,7 +63,14 @@ impl HaDiscovery {
             "availability": availability.clone(),
             "device": device.clone(),
         });
-        client.publish(&topic, &payload.to_string(), rumqttc::QoS::AtLeastOnce, true).await?;
+        client
+            .publish(
+                &topic,
+                &payload.to_string(),
+                rumqttc::QoS::AtLeastOnce,
+                true,
+            )
+            .await?;
         info!("Published HA presence sensor config");
 
         // === Microphone sensor ===
@@ -76,7 +83,14 @@ impl HaDiscovery {
             "availability": availability.clone(),
             "device": device.clone(),
         });
-        client.publish(&topic, &payload.to_string(), rumqttc::QoS::AtLeastOnce, true).await?;
+        client
+            .publish(
+                &topic,
+                &payload.to_string(),
+                rumqttc::QoS::AtLeastOnce,
+                true,
+            )
+            .await?;
         info!("Published HA microphone sensor config");
 
         // === In-call binary sensor ===
@@ -91,7 +105,14 @@ impl HaDiscovery {
             "availability": availability.clone(),
             "device": device.clone(),
         });
-        client.publish(&topic, &payload.to_string(), rumqttc::QoS::AtLeastOnce, true).await?;
+        client
+            .publish(
+                &topic,
+                &payload.to_string(),
+                rumqttc::QoS::AtLeastOnce,
+                true,
+            )
+            .await?;
         info!("Published HA in-call binary sensor config");
 
         // === Screen-sharing binary sensor ===
@@ -106,7 +127,14 @@ impl HaDiscovery {
             "availability": availability.clone(),
             "device": device.clone(),
         });
-        client.publish(&topic, &payload.to_string(), rumqttc::QoS::AtLeastOnce, true).await?;
+        client
+            .publish(
+                &topic,
+                &payload.to_string(),
+                rumqttc::QoS::AtLeastOnce,
+                true,
+            )
+            .await?;
         info!("Published HA screen-sharing binary sensor config");
 
         // === Camera binary sensor ===
@@ -121,15 +149,32 @@ impl HaDiscovery {
             "availability": availability.clone(),
             "device": device.clone(),
         });
-        client.publish(&topic, &payload.to_string(), rumqttc::QoS::AtLeastOnce, true).await?;
+        client
+            .publish(
+                &topic,
+                &payload.to_string(),
+                rumqttc::QoS::AtLeastOnce,
+                true,
+            )
+            .await?;
         info!("Published HA camera binary sensor config");
 
         // === Buttons (one-shot actions, not switches) ===
         // Mirrors the Electron app's button pattern: payload_press with action.
         let button_actions = [
-            ("toggle_mute", "Toggle Mute", "toggle-mute", "mdi:microphone"),
+            (
+                "toggle_mute",
+                "Toggle Mute",
+                "toggle-mute",
+                "mdi:microphone",
+            ),
             ("toggle_video", "Toggle Video", "toggle-video", "mdi:video"),
-            ("toggle_hand_raise", "Toggle Hand Raise", "toggle-hand-raise", "mdi:hand-back-left"),
+            (
+                "toggle_hand_raise",
+                "Toggle Hand Raise",
+                "toggle-hand-raise",
+                "mdi:hand-back-left",
+            ),
         ];
 
         for (object_id, name, action, icon) in button_actions {
@@ -143,7 +188,14 @@ impl HaDiscovery {
                 "availability": availability.clone(),
                 "device": device.clone(),
             });
-            client.publish(&topic, &payload.to_string(), rumqttc::QoS::AtLeastOnce, true).await?;
+            client
+                .publish(
+                    &topic,
+                    &payload.to_string(),
+                    rumqttc::QoS::AtLeastOnce,
+                    true,
+                )
+                .await?;
             info!("Published HA {name} button config");
         }
 
@@ -156,7 +208,14 @@ impl HaDiscovery {
             "model": "Host Integration",
             "sw_version": env!("CARGO_PKG_VERSION"),
         });
-        client.publish(&topic, &payload.to_string(), rumqttc::QoS::AtLeastOnce, true).await?;
+        client
+            .publish(
+                &topic,
+                &payload.to_string(),
+                rumqttc::QoS::AtLeastOnce,
+                true,
+            )
+            .await?;
         info!("Published HA device registry entry");
 
         Ok(())

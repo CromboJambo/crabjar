@@ -3,10 +3,7 @@
 /// Handles the MQTT lifecycle: connect, publish, subscribe, reconnect, LWT.
 /// Mirrors the Electron app's `mqtt.js` client behavior.
 use crate::config::MqttConfig;
-use rumqttc::{
-    AsyncClient, Event, EventLoop, Incoming, MqttOptions, QoS,
-    Transport,
-};
+use rumqttc::{AsyncClient, Event, EventLoop, Incoming, MqttOptions, QoS, Transport};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info};
@@ -47,9 +44,12 @@ impl MqttClient {
         // Last Will and Testament for connection state
         let lwt_topic = format!("{}/connected", config.topic_prefix);
         let lwt_payload = "false";
-        mqttoptions.set_last_will(
-            rumqttc::LastWill::new(&lwt_topic, lwt_payload, QoS::AtLeastOnce, false),
-        );
+        mqttoptions.set_last_will(rumqttc::LastWill::new(
+            &lwt_topic,
+            lwt_payload,
+            QoS::AtLeastOnce,
+            false,
+        ));
 
         // Credentials if provided
         if !config.username.is_empty() {
@@ -154,9 +154,10 @@ impl MqttClient {
             .await;
 
         let client = self.client.lock().await;
-        client.disconnect().await.map_err(|e| {
-            MqttError::Connection(format!("disconnect failed: {e}"))
-        })?;
+        client
+            .disconnect()
+            .await
+            .map_err(|e| MqttError::Connection(format!("disconnect failed: {e}")))?;
 
         info!("MQTT client stopped");
         Ok(())
@@ -215,7 +216,10 @@ impl MqttClient {
         if self.config.command_topic.is_empty() {
             None
         } else {
-            Some(format!("{}/{}", self.config.topic_prefix, self.config.command_topic))
+            Some(format!(
+                "{}/{}",
+                self.config.topic_prefix, self.config.command_topic
+            ))
         }
     }
 
@@ -237,8 +241,14 @@ impl MqttClient {
 
     /// Broker port from URL.
     fn broker_port(url: &str) -> u16 {
-        let host = url.strip_prefix("mqtt://").or_else(|| url.strip_prefix("mqtts://")).unwrap_or(url);
-        host.split(':').nth(1).and_then(|p| p.parse().ok()).unwrap_or(1883)
+        let host = url
+            .strip_prefix("mqtt://")
+            .or_else(|| url.strip_prefix("mqtts://"))
+            .unwrap_or(url);
+        host.split(':')
+            .nth(1)
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(1883)
     }
 }
 
@@ -264,9 +274,18 @@ mod tests {
 
     #[test]
     fn test_broker_host_parsing() {
-        assert_eq!(MqttClient::broker_host("mqtt://localhost:1883"), "localhost");
-        assert_eq!(MqttClient::broker_host("mqtt://192.168.1.100"), "192.168.1.100");
-        assert_eq!(MqttClient::broker_host("mqtts://broker.example.com:8883"), "broker.example.com");
+        assert_eq!(
+            MqttClient::broker_host("mqtt://localhost:1883"),
+            "localhost"
+        );
+        assert_eq!(
+            MqttClient::broker_host("mqtt://192.168.1.100"),
+            "192.168.1.100"
+        );
+        assert_eq!(
+            MqttClient::broker_host("mqtts://broker.example.com:8883"),
+            "broker.example.com"
+        );
         assert_eq!(MqttClient::broker_host("localhost"), "localhost");
     }
 
@@ -307,9 +326,6 @@ mod tests {
             ..MqttConfig::default()
         };
         let client = MqttClient::new(config);
-        assert_eq!(
-            client.command_topic(),
-            Some("teams/command".to_string())
-        );
+        assert_eq!(client.command_topic(), Some("teams/command".to_string()));
     }
 }

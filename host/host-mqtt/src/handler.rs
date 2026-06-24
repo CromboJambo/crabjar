@@ -24,17 +24,23 @@ pub const ALLOWED_ACTIONS: &[&str] = &[
 /// Handler for incoming MQTT commands.
 pub struct CommandHandler {
     /// Callback for toggle-mute
-    on_toggle_mute: Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
+    on_toggle_mute:
+        Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
     /// Callback for toggle-video
-    on_toggle_video: Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
+    on_toggle_video:
+        Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
     /// Callback for toggle-hand-raise
-    on_toggle_hand_raise: Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
+    on_toggle_hand_raise:
+        Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
     /// Callback for start screen share
-    on_start_screen_share: Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
+    on_start_screen_share:
+        Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
     /// Callback for stop screen share
-    on_stop_screen_share: Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
+    on_stop_screen_share:
+        Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
     /// Callback for get-calendar
-    on_get_calendar: Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
+    on_get_calendar:
+        Option<tokio::sync::Mutex<Option<Box<dyn Fn() -> tokio::task::JoinHandle<()> + Send>>>>,
 }
 
 impl CommandHandler {
