@@ -2,7 +2,6 @@
 ///
 /// Every loop operates on exactly one WorkItem at a time.
 /// Supports persistence via WorkItemStore and model-assisted inference via InferenceBackend.
-
 use crabjar_host_core::{WorkItem, Status, event_bus::EventBus};
 use crabjar_host_observe::MetricsCollector;
 use std::path::PathBuf;
@@ -79,14 +78,13 @@ impl AgentLoop {
             let ids = store.list_ids().await?;
             if !ids.is_empty() {
                 let latest_id = ids[0];
-                if let Ok(resumed) = store.load(latest_id).await {
-                    if !resumed.status.is_terminal() {
+                if let Ok(resumed) = store.load(latest_id).await
+                    && !resumed.status.is_terminal() {
                         tracing::info!(work_item_id = ?latest_id, "resumed persisted work item");
                         self.current_work_item = Some(resumed);
                         self.iteration = 0;
                         return Ok(());
                     }
-                }
             }
         }
 
@@ -159,11 +157,10 @@ impl AgentLoop {
 
     /// Persist the current work item to the store (no-op if no store configured).
     async fn persist_work_item(&self, work_item: &WorkItem) {
-        if let Some(ref store) = self.store {
-            if let Err(e) = store.save(work_item).await {
+        if let Some(ref store) = self.store
+            && let Err(e) = store.save(work_item).await {
                 tracing::warn!(error = ?e, "failed to persist work item");
             }
-        }
     }
 
     /// Run all stages of the agent loop for the current WorkItem.
