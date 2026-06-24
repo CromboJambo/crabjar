@@ -133,15 +133,17 @@ impl Store {
     }
 
     /// Search knowledge entries by free-text content match.
-    pub fn search_content(&self, term: &str, limit: Option<usize>) -> StoreResult<Vec<KnowledgeRow>> {
+    pub fn search_content(
+        &self,
+        term: &str,
+        limit: Option<usize>,
+    ) -> StoreResult<Vec<KnowledgeRow>> {
         let limit = limit.unwrap_or(50);
-        let mut stmt = self
-            .conn
-            .prepare(
-                "SELECT id, content, tags, metadata, active FROM knowledge_entries \
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content, tags, metadata, active FROM knowledge_entries \
                  WHERE active = 1 AND content LIKE ?1 \
                  ORDER BY id DESC LIMIT ?2",
-            )?;
+        )?;
 
         let cursor = stmt.query_map(
             rusqlite::params![format!("%{term}%"), limit],

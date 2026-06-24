@@ -37,7 +37,9 @@ pub enum ContextError {
     #[error("fragment exceeds max tokens: {actual} > {max}")]
     ExceedsMaxTokens { actual: usize, max: usize },
 
-    #[error("fragment would exceed cumulative budget: {used} / {budget} tokens used, {remaining} remaining")]
+    #[error(
+        "fragment would exceed cumulative budget: {used} / {budget} tokens used, {remaining} remaining"
+    )]
     ExceedsBudget {
         used: usize,
         budget: usize,
@@ -137,9 +139,10 @@ impl ContextFragment {
     /// Add metadata key-value pair to this fragment.
     pub fn meta(mut self, key: impl Into<String>, value: impl Serialize) -> Self {
         if let Ok(val) = serde_json::to_value(value)
-            && let Some(obj) = self.metadata.as_object_mut() {
-                obj.insert(key.into(), val);
-            }
+            && let Some(obj) = self.metadata.as_object_mut()
+        {
+            obj.insert(key.into(), val);
+        }
         self
     }
 
@@ -362,16 +365,16 @@ impl ContextFragmentBuilder {
         let content = self.content.unwrap_or_default();
         let token_count = self.token_count.ok_or(ContextError::InvalidTokenCount(0))?;
 
-        ContextFragment::new(id, label, content, token_count)
-            .map(|mut f| {
-                if !self.metadata.is_empty()
-                    && let Some(obj) = f.metadata.as_object_mut() {
-                        for (k, v) in self.metadata {
-                            obj.insert(k, v);
-                        }
-                    }
-                f
-            })
+        ContextFragment::new(id, label, content, token_count).map(|mut f| {
+            if !self.metadata.is_empty()
+                && let Some(obj) = f.metadata.as_object_mut()
+            {
+                for (k, v) in self.metadata {
+                    obj.insert(k, v);
+                }
+            }
+            f
+        })
     }
 
     /// Build without validation (caller guarantees token count is valid).
@@ -383,11 +386,12 @@ impl ContextFragmentBuilder {
 
         let mut f = ContextFragment::new_unchecked(id, label, content, token_count);
         if !self.metadata.is_empty()
-            && let Some(obj) = f.metadata.as_object_mut() {
-                for (k, v) in self.metadata {
-                    obj.insert(k, v);
-                }
+            && let Some(obj) = f.metadata.as_object_mut()
+        {
+            for (k, v) in self.metadata {
+                obj.insert(k, v);
             }
+        }
         f
     }
 }
@@ -419,7 +423,11 @@ pub fn estimate_tokens(text: &str) -> usize {
     // Heuristic: English text ~4 chars/token, code ~2 chars/token
     // Simple heuristic: if the text has many non-ASCII chars, it's likely dense
     let non_ascii = text.chars().filter(|c| !c.is_ascii()).count();
-    let density = if chars > 0 { non_ascii as f64 / chars as f64 } else { 0.0 };
+    let density = if chars > 0 {
+        non_ascii as f64 / chars as f64
+    } else {
+        0.0
+    };
 
     // Adjust divisor based on density: higher density → smaller divisor → more tokens
     let divisor = if density > 0.5 {
@@ -482,13 +490,7 @@ mod tests {
 
     #[test]
     fn test_fragment_new_valid() {
-        let frag = ContextFragment::new(
-            "test-1",
-            "Test Fragment",
-            "hello world",
-            5,
-        )
-        .unwrap();
+        let frag = ContextFragment::new("test-1", "Test Fragment", "hello world", 5).unwrap();
         assert_eq!(frag.id, "test-1");
         assert_eq!(frag.label, "Test Fragment");
         assert_eq!(frag.content, "hello world");
@@ -594,9 +596,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             ContextError::ExceedsBudget {
-                used,
-                remaining,
-                ..
+                used, remaining, ..
             } => {
                 assert_eq!(used, 500);
                 assert_eq!(remaining, 500);
@@ -739,13 +739,7 @@ mod tests {
     #[test]
     fn test_query_result_p0_flagged() {
         let frag1 = ContextFragment::new("f1", "Frag 1", "content1", 100).unwrap();
-        let frag2 = ContextFragment::new(
-            "f2",
-            "Frag 2",
-            "content2",
-            P0_ALERT_TOKENS + 1,
-        )
-        .unwrap();
+        let frag2 = ContextFragment::new("f2", "Frag 2", "content2", P0_ALERT_TOKENS + 1).unwrap();
         let mut budget = ContextBudget::new(2000);
         budget.reserve(100).unwrap();
         budget.reserve(P0_ALERT_TOKENS + 1).unwrap();
