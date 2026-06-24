@@ -1,9 +1,9 @@
-pub mod tray;
-pub mod notifications;
 pub mod clipboard;
+pub mod notifications;
 pub mod secrets;
+pub mod tray;
 
-pub use tray::SystemTray;
-pub use notifications::NotificationService;
 pub use clipboard::ClipboardService;
+pub use notifications::NotificationService;
 pub use secrets::SecretsBackend;
+pub use tray::SystemTray;

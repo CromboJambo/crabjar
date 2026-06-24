@@ -25,9 +25,10 @@ impl ClipboardService {
 
     /// Read the current clipboard text.
     pub fn get_text(&self) -> Result<String, ClipboardError> {
-        let mut clipboard = arboard::Clipboard::new()
-            .map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
-        let text = clipboard.get_text()
+        let mut clipboard =
+            arboard::Clipboard::new().map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
+        let text = clipboard
+            .get_text()
             .map_err(|e| ClipboardError::ReadFailed(e.to_string()))?;
         let _ = self.event_bus.publish_typed(
             crabjar_host_core::event_bus::EventType::ClipboardChanged {
@@ -40,9 +41,10 @@ impl ClipboardService {
 
     /// Write text to the clipboard.
     pub fn set_text(&self, text: &str) -> Result<(), ClipboardError> {
-        let mut clipboard = arboard::Clipboard::new()
-            .map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
-        clipboard.set_text(text)
+        let mut clipboard =
+            arboard::Clipboard::new().map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
+        clipboard
+            .set_text(text)
             .map_err(|e| ClipboardError::WriteFailed(e.to_string()))?;
         let _ = self.event_bus.publish_typed(
             crabjar_host_core::event_bus::EventType::ClipboardChanged {
@@ -55,9 +57,10 @@ impl ClipboardService {
 
     /// Read HTML content from the clipboard.
     pub fn get_html(&self) -> Result<String, ClipboardError> {
-        let mut clipboard = arboard::Clipboard::new()
-            .map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
-        let html = clipboard.get()
+        let mut clipboard =
+            arboard::Clipboard::new().map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
+        let html = clipboard
+            .get()
             .html()
             .map_err(|e| ClipboardError::ReadFailed(e.to_string()))?;
         let _ = self.event_bus.publish_typed(
@@ -71,9 +74,10 @@ impl ClipboardService {
 
     /// Write HTML content to the clipboard.
     pub fn set_html(&self, html: &str) -> Result<(), ClipboardError> {
-        let mut clipboard = arboard::Clipboard::new()
-            .map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
-        clipboard.set_html(html, None::<&str>)
+        let mut clipboard =
+            arboard::Clipboard::new().map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
+        clipboard
+            .set_html(html, None::<&str>)
             .map_err(|e| ClipboardError::WriteFailed(e.to_string()))?;
         let _ = self.event_bus.publish_typed(
             crabjar_host_core::event_bus::EventType::ClipboardChanged {
@@ -86,9 +90,10 @@ impl ClipboardService {
 
     /// Read image from the clipboard.
     pub fn get_image(&self) -> Result<ImageData<'_>, ClipboardError> {
-        let mut clipboard = arboard::Clipboard::new()
-            .map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
-        let image = clipboard.get_image()
+        let mut clipboard =
+            arboard::Clipboard::new().map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
+        let image = clipboard
+            .get_image()
             .map_err(|e| ClipboardError::ReadFailed(e.to_string()))?;
         let _ = self.event_bus.publish_typed(
             crabjar_host_core::event_bus::EventType::ClipboardChanged {
@@ -101,9 +106,10 @@ impl ClipboardService {
 
     /// Write image to the clipboard.
     pub fn set_image(&self, image: ImageData) -> Result<(), ClipboardError> {
-        let mut clipboard = arboard::Clipboard::new()
-            .map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
-        clipboard.set_image(image)
+        let mut clipboard =
+            arboard::Clipboard::new().map_err(|e| ClipboardError::InitFailed(e.to_string()))?;
+        clipboard
+            .set_image(image)
             .map_err(|e| ClipboardError::WriteFailed(e.to_string()))?;
         let _ = self.event_bus.publish_typed(
             crabjar_host_core::event_bus::EventType::ClipboardChanged {

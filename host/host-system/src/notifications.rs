@@ -5,8 +5,7 @@ use crabjar_host_core::event_bus::EventBus;
 use std::sync::Arc;
 
 /// Notification categories supported by Teams.
-#[derive(Debug, Clone, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum NotificationCategory {
     /// New message notification
     #[default]
@@ -16,7 +15,6 @@ pub enum NotificationCategory {
     /// System / status change notification
     System,
 }
-
 
 /// Metadata attached to a notification.
 #[derive(Debug, Clone)]
@@ -67,11 +65,7 @@ impl NotificationService {
         #[cfg(target_os = "linux")]
         {
             if self.enabled {
-                let notification = libnotify::Notification::new(
-                    "crabjar-host",
-                    title,
-                    body,
-                );
+                let notification = libnotify::Notification::new("crabjar-host", title, body);
                 notification.set_timeout(timeout);
                 if let Err(e) = notification.show() {
                     tracing::warn!(error = %e, "failed to show notification");
@@ -94,11 +88,7 @@ impl NotificationService {
     }
 
     /// Send an incoming call notification.
-    pub fn notify_incoming_call(
-        &self,
-        from: &str,
-        title: &str,
-    ) -> Result<(), NotificationError> {
+    pub fn notify_incoming_call(&self, from: &str, title: &str) -> Result<(), NotificationError> {
         self.notify(
             title,
             &format!("Call from {}", from),
@@ -107,11 +97,7 @@ impl NotificationService {
     }
 
     /// Send a system status notification.
-    pub fn notify_system(
-        &self,
-        title: &str,
-        body: &str,
-    ) -> Result<(), NotificationError> {
+    pub fn notify_system(&self, title: &str, body: &str) -> Result<(), NotificationError> {
         self.notify(title, body, Some(3000))
     }
 
