@@ -27,17 +27,17 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     // No crates in this layer yet — all crates have workspace deps
 
     // Layer 1: substrate — low-level storage and isolation
-    map.insert("agent-context", 1);       // memory
-    map.insert("crabjar-guard", 1);       // guard
-    map.insert("crabjar-telemetry", 1);   // telemetry
-    map.insert("crabjar-sandbox", 1);     // sandbox
+    map.insert("agent-context", 1); // memory
+    map.insert("crabjar-guard", 1); // guard
+    map.insert("crabjar-telemetry", 1); // telemetry
+    map.insert("crabjar-sandbox", 1); // sandbox
 
     // Layer 2: authority — capability/registry layer
     map.insert("crabjar-tool-registry", 2); // tool_registry
 
     // Layer 3: runtime — execution runtime
     map.insert("orchestrator", 3);
-    map.insert("vm-bridge", 3);           // axum-mux
+    map.insert("vm-bridge", 3); // axum-mux
 
     // Layer 4: host — host runtime crates
     map.insert("crabjar-host-core", 4);
@@ -50,8 +50,8 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     map.insert("host-screen", 4);
 
     // Layer 5: product — product-facing crates
-    map.insert("crabjar-host", 5);        // host-binary
-    map.insert("crabjar-app-teams", 5);   // apps/teams
+    map.insert("crabjar-host", 5); // host-binary
+    map.insert("crabjar-app-teams", 5); // apps/teams
 
     // Layer 6: bridge — external protocol bridges
     map.insert("zed-acp-bridge", 6);
@@ -72,13 +72,13 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
 #[must_use]
 pub fn allowed_dependencies(layer: usize) -> &'static [usize] {
     match layer {
-        0 => &[0],                    // common → common only
-        1 => &[0, 1],                 // substrate → common + substrate
-        2 => &[0, 1, 2],              // authority → common + substrate + authority
-        3 => &[0, 1, 2, 3],           // runtime → common + substrate + authority + runtime
-        4 => &[0, 1, 2, 3, 4],        // host → all below + host
-        5 => &[0, 1, 2, 3, 4, 5],    // product → all below + product
-        6 => &[0, 1, 2, 3, 4, 5, 6], // bridge → all below + bridge
+        0 => &[0],                      // common → common only
+        1 => &[0, 1],                   // substrate → common + substrate
+        2 => &[0, 1, 2],                // authority → common + substrate + authority
+        3 => &[0, 1, 2, 3],             // runtime → common + substrate + authority + runtime
+        4 => &[0, 1, 2, 3, 4],          // host → all below + host
+        5 => &[0, 1, 2, 3, 4, 5],       // product → all below + product
+        6 => &[0, 1, 2, 3, 4, 5, 6],    // bridge → all below + bridge
         7 => &[0, 1, 2, 3, 4, 5, 6, 7], // skills → all
         _ => &[],
     }

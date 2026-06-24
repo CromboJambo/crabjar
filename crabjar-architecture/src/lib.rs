@@ -1,3 +1,4 @@
+pub mod boundary;
 /// crabjar-architecture: Mechanical dependency boundary enforcement.
 ///
 /// Defines the dependency layering model for the crabjar workspace and
@@ -19,7 +20,6 @@
 /// Boundary rule: a crate in layer N may only depend on crates in layers 0..=N.
 /// This prevents high-level crates from leaking into low-level ones.
 pub mod layer;
-pub mod boundary;
 
-pub use layer::*;
 pub use boundary::*;
+pub use layer::*;

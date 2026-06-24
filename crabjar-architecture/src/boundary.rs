@@ -3,8 +3,8 @@
 /// Parses Cargo.toml files in the workspace and checks that each crate
 /// Only depends on crates in allowed layers (its own layer or below).
 use crate::layer::{allowed_dependencies, crate_to_layer, layer_name};
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 /// A single dependency violation found during boundary checking.
 #[derive(Debug, Clone)]
@@ -90,7 +90,8 @@ fn discover_workspace_members(workspace_root: &Path) -> Result<Vec<CrateInfo>, S
     let workspace_cargo = workspace_root.join("Cargo.toml");
     let content = fs::read_to_string(&workspace_cargo)
         .map_err(|e| format!("Cannot read workspace Cargo.toml: {e}"))?;
-    let parsed = content.parse::<toml::Value>()
+    let parsed = content
+        .parse::<toml::Value>()
         .map_err(|e| format!("Cannot parse workspace Cargo.toml: {e}"))?;
 
     let members = parsed
@@ -154,8 +155,7 @@ pub fn check_workspace_boundaries(workspace_root: &Path) -> Result<Vec<Violation
 /// Check that the workspace boundaries are valid and panic on failure.
 /// This is designed to be called from tests.
 pub fn enforce_boundaries(workspace_root: &Path) -> Result<(), Vec<Violation>> {
-    let violations = check_workspace_boundaries(workspace_root)
-        .expect("Boundary check failed");
+    let violations = check_workspace_boundaries(workspace_root).expect("Boundary check failed");
 
     if !violations.is_empty() {
         return Err(violations);
@@ -213,7 +213,10 @@ mod tests {
     fn test_crate_to_layer_completeness() {
         // All 22 workspace members should be mapped
         let layer_map = crate_to_layer();
-        assert!(layer_map.len() >= 22, "Not all workspace members are mapped");
+        assert!(
+            layer_map.len() >= 22,
+            "Not all workspace members are mapped"
+        );
     }
 
     #[test]
@@ -284,9 +287,12 @@ mod tests {
         let guard_layer = layer_map["crabjar-guard"];
         let context_layer = layer_map["agent-context"];
         let allowed = allowed_dependencies(guard_layer);
-        assert!(allowed.contains(&context_layer),
+        assert!(
+            allowed.contains(&context_layer),
             "guard (layer {}) should be able to depend on agent-context (layer {})",
-            guard_layer, context_layer);
+            guard_layer,
+            context_layer
+        );
     }
 
     #[test]
@@ -296,9 +302,12 @@ mod tests {
         let orch_layer = layer_map["orchestrator"];
         let guard_layer = layer_map["crabjar-guard"];
         let allowed = allowed_dependencies(orch_layer);
-        assert!(allowed.contains(&guard_layer),
+        assert!(
+            allowed.contains(&guard_layer),
             "orchestrator (layer {}) should be able to depend on guard (layer {})",
-            orch_layer, guard_layer);
+            orch_layer,
+            guard_layer
+        );
     }
 
     #[test]
@@ -390,12 +399,20 @@ mod tests {
         let layer_map = crate_to_layer();
         let host_layer = layer_map["crabjar-host"];
         let allowed = allowed_dependencies(host_layer);
-        for host_crate in &["crabjar-host-core", "crabjar-host-system", "crabjar-host-observe",
-                            "crabjar-host-agent", "crabjar-host-webview"] {
+        for host_crate in &[
+            "crabjar-host-core",
+            "crabjar-host-system",
+            "crabjar-host-observe",
+            "crabjar-host-agent",
+            "crabjar-host-webview",
+        ] {
             let crate_layer = layer_map[host_crate];
-            assert!(allowed.contains(&crate_layer),
+            assert!(
+                allowed.contains(&crate_layer),
                 "crabjar-host (layer {}) should depend on {}",
-                host_layer, host_crate);
+                host_layer,
+                host_crate
+            );
         }
     }
 
@@ -460,9 +477,20 @@ mod tests {
     // Integration test: check the actual workspace
     #[test]
     fn test_workspace_boundaries_are_valid() {
-        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
+        let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
         let result = enforce_boundaries(&workspace_root);
-        assert!(result.is_ok(), "Workspace boundaries violated:\n{}",
-            result.unwrap_err().iter().map(|v| v.to_string()).collect::<Vec<_>>().join("\n"));
+        assert!(
+            result.is_ok(),
+            "Workspace boundaries violated:\n{}",
+            result
+                .unwrap_err()
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
     }
 }
