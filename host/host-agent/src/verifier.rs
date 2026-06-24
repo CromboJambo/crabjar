@@ -1,7 +1,6 @@
 /// Verifier — checks task results against expected outcomes.
 ///
 /// Runs cargo check, cargo test, clippy, fmt, and other verification steps.
-
 use crabjar_host_core::WorkItem;
 
 pub struct Verifier;

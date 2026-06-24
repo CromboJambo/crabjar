@@ -2,7 +2,6 @@
 ///
 /// Provides read/write access to the system clipboard via arboard.
 /// Supports text, HTML, and image formats.
-
 use arboard::ImageData;
 use crabjar_host_core::event_bus::EventBus;
 use std::sync::Arc;

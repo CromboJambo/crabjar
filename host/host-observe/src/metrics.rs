@@ -2,7 +2,6 @@
 ///
 /// Designed to be fast and allocation-free in hot paths.
 /// Data is exposed via the Axum service layer for the Ratatui dashboard.
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use chrono::Utc;

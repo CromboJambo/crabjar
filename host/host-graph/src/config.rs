@@ -14,6 +14,7 @@ pub struct GraphApiConfig {
 
 impl GraphApiConfig {
     /// Create a new config with the given enabled flag.
+    #[must_use]
     pub fn new(enabled: bool) -> Self {
         Self {
             enabled,

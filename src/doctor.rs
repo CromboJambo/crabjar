@@ -1,7 +1,6 @@
 /// Doctor subcommand: pre-flight system validation.
 ///
 /// Extracted from main.rs to reduce bloat (was ~300 lines of inline SQL).
-
 use serde_json::json;
 
 use crate::DoctorCommand;
@@ -297,8 +296,8 @@ pub async fn handle_doctor_command(
             };
             checks.push(doctor_status("tool_dinitctl", dinit_ok, &dinit_detail));
 
-            if let Some(ref cfg) = loader.get_current_config() {
-                if let Some(ref socket) = cfg.user_dinit_socket {
+            if let Some(cfg) = loader.get_current_config()
+                && let Some(ref socket) = cfg.user_dinit_socket {
                     let socket_exists = std::path::Path::new(socket).exists();
                     checks.push(doctor_status(
                         "dinit_socket",
@@ -306,7 +305,6 @@ pub async fn handle_doctor_command(
                         format!("{}: {}", socket, if socket_exists { "exists" } else { "not found" }),
                     ));
                 }
-            }
 
             // 6. Tool availability
             let git_path = which::which("git").ok();

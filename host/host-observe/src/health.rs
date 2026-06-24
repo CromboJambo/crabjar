@@ -1,7 +1,6 @@
 /// Health reporting for the host runtime.
 ///
 /// Aggregates health status from all subsystems and plugins.
-
 use std::collections::HashMap;
 use chrono::Utc;
 

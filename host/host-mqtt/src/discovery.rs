@@ -1,4 +1,4 @@
-/// Home Assistant auto-discovery for CrabJar MQTT integration.
+/// Home Assistant auto-discovery for `CrabJar` MQTT integration.
 ///
 /// Publishes Home Assistant discovery configs for:
 /// - Presence sensor (`available` / `busy` / `dnd` / `away`)
@@ -21,6 +21,7 @@ pub struct HaDiscovery {
 
 impl HaDiscovery {
     /// Create a new discovery config generator.
+    #[must_use]
     pub fn new(config: HomeAssistantConfig) -> Self {
         Self { config }
     }

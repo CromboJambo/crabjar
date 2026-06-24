@@ -1,4 +1,4 @@
-/// `mqtt` — MQTT integration module for CrabJar.
+/// `mqtt` — MQTT integration module for `CrabJar`.
 ///
 /// Provides MQTT client, discovery, and media bridge functionality.
 /// and command reception. Mirrors the Teams-for-Linux MQTT integration:
@@ -33,6 +33,7 @@ pub enum PresenceStatus {
 }
 
 impl PresenceStatus {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             PresenceStatus::Unknown => "unknown",
@@ -44,6 +45,7 @@ impl PresenceStatus {
         }
     }
 
+    #[must_use]
     pub fn from_code(code: i32) -> Self {
         match code {
             1 => PresenceStatus::Available,
@@ -75,9 +77,10 @@ impl PresenceUpdate {
     /// Returns `false` if `last_published_status` matches the current status,
     /// indicating a duplicate that should be skipped. Returns `true` if the
     /// status has changed or no previous status exists.
+    #[must_use]
     pub fn should_publish(&self, last_published_status: Option<&str>) -> bool {
         match last_published_status {
-            Some(prev) if prev == &self.status => false,
+            Some(prev) if prev == self.status => false,
             _ => true,
         }
     }

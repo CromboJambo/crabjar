@@ -2,7 +2,6 @@
 ///
 /// Provides a minimal tray API that can be backed by Tauri (Linux/macOS/Windows)
 /// or a native library (libappindicator on Linux).
-
 use crabjar_host_core::event_bus::EventBus;
 use std::sync::Arc;
 

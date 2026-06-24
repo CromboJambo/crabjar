@@ -7,7 +7,6 @@
 ///   1. keyring (OS keychain/KWallet/SecretService) — primary
 ///   2. SQLite in-memory fallback — when keyring unavailable
 ///   3. Rust HashMap — emergency memory fallback
-
 use crate::cookie_store::{CookieStore, SessionToken};
 use chrono::Utc;
 use keyring::Entry;
@@ -87,11 +86,10 @@ impl SecureTokenCache {
     /// Store item in cache (mirrors tokenCache.js setItem).
     pub async fn set_item(&self, key: &str, value: &str) -> Result<(), TokenCacheError> {
         // Try keyring first
-        if self.keyring_enabled {
-            if self.set_secure_item(key, value).await.is_ok() {
+        if self.keyring_enabled
+            && self.set_secure_item(key, value).await.is_ok() {
                 return Ok(());
             }
-        }
 
         // Fallback: SQLite store
         let token = SessionToken {
@@ -164,10 +162,7 @@ impl SecureTokenCache {
             Err(_) => return None,
         };
 
-        match entry.get_password() {
-            Ok(password) => Some(password),
-            Err(_) => None,
-        }
+        entry.get_password().ok()
     }
 
     async fn set_secure_item(&self, key: &str, value: &str) -> Result<(), TokenCacheError> {
@@ -211,7 +206,7 @@ impl SecureTokenCache {
     /// Sanitize a key for logging (hide UUIDs, mirroring tokenCache.js _sanitizeKey).
     pub fn sanitize_key(key: &str) -> String {
         // Simple PII masking: replace hex UUID-like patterns without regex
-        let hex_chars = "0123456789abcdef";
+        let _hex_chars = "0123456789abcdef";
         let chars: Vec<char> = key.chars().collect();
         let len = chars.len();
         let mut result = String::with_capacity(len);

@@ -1,7 +1,6 @@
 /// Planner — generates task plans from understanding phase.
 ///
 /// Takes the WorkItem's observations and produces a structured task list.
-
 use crabjar_host_core::WorkItem;
 
 pub struct Planner;

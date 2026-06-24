@@ -39,6 +39,7 @@ pub struct CommandHandler {
 
 impl CommandHandler {
     /// Create a new command handler with no callbacks registered.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             on_toggle_mute: None,

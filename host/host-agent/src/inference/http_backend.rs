@@ -1,5 +1,4 @@
 /// HTTP-based inference backend — routes to a local/self-hosted OpenAI-compatible endpoint.
-
 use async_trait::async_trait;
 use reqwest::Client;
 

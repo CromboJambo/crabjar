@@ -6,7 +6,6 @@
 /// - Confidence?
 /// - Should I retry?
 /// - Should I ask the user?
-
 use crabjar_host_core::{WorkItem, Status};
 
 pub struct Reflector;

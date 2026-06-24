@@ -1,7 +1,6 @@
 /// Bitwarden subcommand handlers.
 ///
 /// Extracted from main.rs to reduce bloat.
-
 use serde_json::json;
 
 use crate::bitwarden;

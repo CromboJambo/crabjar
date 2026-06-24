@@ -2,7 +2,6 @@
 ///
 /// Currently supports LM Studio via the `lm_studio_client` module.
 /// Native inference was moved to the PESTI portable execution substrate.
-
 pub use lm_studio_client::UnifiedChatResponse;
 
 use crate::lm_studio_client;

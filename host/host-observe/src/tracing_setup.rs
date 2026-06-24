@@ -1,7 +1,6 @@
 /// Tracing initialization for the host runtime.
 ///
 /// Sets up tracing-subscriber with both console and file output.
-
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt, Registry};
 use std::error::Error;
 
@@ -25,7 +24,7 @@ pub fn init_tracing(log_dir: &str) -> Result<(), Box<dyn Error>> {
         .with_ansi(false)
         .with_target(true);
 
-    let env_filter = EnvFilter::try_from_env("TRACING_LEVEL")
+    let _env_filter = EnvFilter::try_from_env("TRACING_LEVEL")
         .unwrap_or_else(|_| EnvFilter::new("info"));
 
     let filter_layer = EnvFilter::try_from_env("TRACING_FILTER")

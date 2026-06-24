@@ -136,11 +136,10 @@ impl ContextFragment {
 
     /// Add metadata key-value pair to this fragment.
     pub fn meta(mut self, key: impl Into<String>, value: impl Serialize) -> Self {
-        if let Ok(val) = serde_json::to_value(value) {
-            if let Some(obj) = self.metadata.as_object_mut() {
+        if let Ok(val) = serde_json::to_value(value)
+            && let Some(obj) = self.metadata.as_object_mut() {
                 obj.insert(key.into(), val);
             }
-        }
         self
     }
 
@@ -365,13 +364,12 @@ impl ContextFragmentBuilder {
 
         ContextFragment::new(id, label, content, token_count)
             .map(|mut f| {
-                if !self.metadata.is_empty() {
-                    if let Some(obj) = f.metadata.as_object_mut() {
+                if !self.metadata.is_empty()
+                    && let Some(obj) = f.metadata.as_object_mut() {
                         for (k, v) in self.metadata {
                             obj.insert(k, v);
                         }
                     }
-                }
                 f
             })
     }
@@ -384,13 +382,12 @@ impl ContextFragmentBuilder {
         let token_count = self.token_count.unwrap_or(0);
 
         let mut f = ContextFragment::new_unchecked(id, label, content, token_count);
-        if !self.metadata.is_empty() {
-            if let Some(obj) = f.metadata.as_object_mut() {
+        if !self.metadata.is_empty()
+            && let Some(obj) = f.metadata.as_object_mut() {
                 for (k, v) in self.metadata {
                     obj.insert(k, v);
                 }
             }
-        }
         f
     }
 }

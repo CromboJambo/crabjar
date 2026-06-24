@@ -3,9 +3,8 @@
 /// Integrates cookie store, token cache, partition manager, and auth flow
 /// into a unified session management API that replaces Electron's
 /// `session` API (cookies, partitions, auth).
-
 use crate::auth::{AuthManager, TokenResponse};
-use crate::cookie_store::{CookieStore, Cookie, SessionToken};
+use crate::cookie_store::{CookieStore, Cookie};
 use crate::partition::{PartitionManager, SessionPartition};
 use crate::token_cache::SecureTokenCache;
 use crabjar_host_core::event_bus::EventBus;
@@ -262,19 +261,19 @@ impl WebViewController {
     pub async fn handle_auth_callback(&self, code: &str, state: &str) -> Result<TokenResponse, WebViewError> {
         self.auth_manager.handle_callback(code, state)
             .await
-            .map_err(|e| WebViewError::Auth(e))
+            .map_err(WebViewError::Auth)
     }
 
     pub async fn refresh_auth_token(&self) -> Result<TokenResponse, WebViewError> {
         self.auth_manager.refresh_token()
             .await
-            .map_err(|e| WebViewError::Auth(e))
+            .map_err(WebViewError::Auth)
     }
 
     pub async fn force_refresh_auth_token(&self) -> Result<TokenResponse, WebViewError> {
         self.auth_manager.force_refresh()
             .await
-            .map_err(|e| WebViewError::Auth(e))
+            .map_err(WebViewError::Auth)
     }
 
     pub async fn is_token_expired(&self, buffer_seconds: i64) -> bool {
@@ -292,7 +291,7 @@ impl WebViewController {
     pub async fn logout(&self) -> Result<(), WebViewError> {
         self.auth_manager.logout()
             .await
-            .map_err(|e| WebViewError::Auth(e))
+            .map_err(WebViewError::Auth)
     }
 
     /// Database path for external access (e.g., debugging).

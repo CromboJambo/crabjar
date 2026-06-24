@@ -3,8 +3,7 @@
 /// Replaces the Electron PartitionsManager (app/partitions/manager.js).
 /// Each partition maps to an isolated cookie/session store in the SQLite DB.
 /// Mirrors the Electron pattern of named `session` partitions.
-
-use crate::cookie_store::{CookieStore, Partition, Cookie};
+use crate::cookie_store::{CookieStore, Cookie};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::Utc;

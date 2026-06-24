@@ -16,9 +16,9 @@ use crate::MqttEvent;
 /// The MQTT client for Teams status publishing and command reception.
 pub struct MqttClient {
     config: MqttConfig,
-    /// MqttOptions stored for cloning in start().
+    /// `MqttOptions` stored for cloning in `start()`.
     mqtt_options: MqttOptions,
-    /// AsyncClient for publish/subscribe operations.
+    /// `AsyncClient` for publish/subscribe operations.
     client: Arc<Mutex<AsyncClient>>,
     /// Channel to forward MQTT events to subscribers.
     event_tx: Arc<tokio::sync::broadcast::Sender<MqttEvent>>,
@@ -28,6 +28,7 @@ impl MqttClient {
     /// Create a new MQTT client from config.
     ///
     /// Does NOT start the client or spawn any tasks. Call `start()` to begin.
+    #[must_use]
     pub fn new(config: MqttConfig) -> Self {
         let mut mqttoptions = MqttOptions::new(
             &config.client_id,
@@ -97,7 +98,7 @@ impl MqttClient {
                         let payload = String::from_utf8_lossy(&publish.payload).to_string();
                         debug!(topic, payload, "MQTT received");
                         let _ = event_tx.send(MqttEvent::CommandReceived {
-                            action: format!("mqtt://{}", topic),
+                            action: format!("mqtt://{topic}"),
                             request_id: None,
                         });
                     }
@@ -154,7 +155,7 @@ impl MqttClient {
 
         let client = self.client.lock().await;
         client.disconnect().await.map_err(|e| {
-            MqttError::Connection(format!("disconnect failed: {}", e))
+            MqttError::Connection(format!("disconnect failed: {e}"))
         })?;
 
         info!("MQTT client stopped");
@@ -173,7 +174,7 @@ impl MqttClient {
         client
             .publish(topic, qos, retain, payload.as_bytes().to_vec())
             .await
-            .map_err(|e| MqttError::Publish(format!("{}", e)))
+            .map_err(|e| MqttError::Publish(format!("{e}")))
     }
 
     /// Subscribe to a topic for command reception.
@@ -182,7 +183,7 @@ impl MqttClient {
         client
             .subscribe(topic, qos)
             .await
-            .map_err(|e| MqttError::Subscribe(format!("{}", e)))
+            .map_err(|e| MqttError::Subscribe(format!("{e}")))
     }
 
     /// Unsubscribe from a topic.
@@ -191,7 +192,7 @@ impl MqttClient {
         client
             .unsubscribe(topic)
             .await
-            .map_err(|e| MqttError::Subscribe(format!("unsubscribe failed: {}", e)))
+            .map_err(|e| MqttError::Subscribe(format!("unsubscribe failed: {e}")))
     }
 
     /// Get the event receiver for MQTT events.

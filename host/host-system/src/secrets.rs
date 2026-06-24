@@ -2,7 +2,6 @@
 ///
 /// Wraps the keyring crate for OS-level secret storage.
 /// Provides a simple key-value store for credentials.
-
 use crabjar_host_core::event_bus::EventBus;
 use std::sync::Arc;
 

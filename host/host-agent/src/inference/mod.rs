@@ -11,7 +11,6 @@
 /// - `INFERENCE_BACKEND=http` also requires `INFERENCE_ENDPOINT` (URL)
 ///   and optionally `INFERENCE_MODEL` (model name, defaults to "gpt-4o-mini")
 ///   and `INFERENCE_API_KEY` (optional, omitted key = no auth header)
-
 mod backend;
 mod http_backend;
 

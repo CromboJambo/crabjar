@@ -1,5 +1,4 @@
 /// InferenceBackend trait and HeuristicBackend (default heuristic stub).
-
 use async_trait::async_trait;
 
 /// Configuration for the inference backend selection.

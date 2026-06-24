@@ -1,7 +1,6 @@
 /// TaskExecutor — runs individual tasks defined in a WorkItem's plan.
 ///
 /// Each task is independently executable. Results are captured and stored.
-
 use crabjar_host_core::{WorkItem, work_item::TaskStatus};
 
 pub struct TaskExecutor;

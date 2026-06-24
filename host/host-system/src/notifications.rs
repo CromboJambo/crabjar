@@ -1,14 +1,15 @@
 /// Desktop notification service.
 ///
 /// Uses libnotify on Linux, Tauri notification plugin on macOS/Windows.
-
 use crabjar_host_core::event_bus::EventBus;
 use std::sync::Arc;
 
 /// Notification categories supported by Teams.
 #[derive(Debug, Clone, PartialEq)]
+#[derive(Default)]
 pub enum NotificationCategory {
     /// New message notification
+    #[default]
     Message,
     /// Incoming call notification
     IncomingCall,
@@ -16,11 +17,6 @@ pub enum NotificationCategory {
     System,
 }
 
-impl Default for NotificationCategory {
-    fn default() -> Self {
-        Self::Message
-    }
-}
 
 /// Metadata attached to a notification.
 #[derive(Debug, Clone)]

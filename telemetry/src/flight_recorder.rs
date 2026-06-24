@@ -324,7 +324,7 @@ pub fn generate_receipt(
     mac.update(epoch.to_string().as_bytes());
 
     let digest = mac.finalize().into_bytes();
-    let digest_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&digest);
+    let digest_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(digest);
 
     // Format: zc-receipt-<epoch>-<digest>
     // Note: digest is base64url encoded (no padding), so it won't contain '=' characters.
