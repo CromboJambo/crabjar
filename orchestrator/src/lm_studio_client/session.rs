@@ -53,13 +53,13 @@ impl SessionState {
         // Collect assistant messages from the response output.
         for item in &response.output {
             match item {
-                crate::types::UnifiedOutputItem::Message { content } => {
+                super::types::UnifiedOutputItem::Message { content } => {
                     self.message_history.push(UnifiedMessage {
                         role: MessageRole::Assistant,
                         content: content.clone(),
                     });
                 }
-                crate::types::UnifiedOutputItem::ToolCall {
+                super::types::UnifiedOutputItem::ToolCall {
                     tool,
                     output: Some(result),
                     ..
@@ -69,7 +69,7 @@ impl SessionState {
                         content: format!("Tool '{}' executed: {}", tool, result),
                     });
                 }
-                crate::types::UnifiedOutputItem::Reasoning { content } => {
+                super::types::UnifiedOutputItem::Reasoning { content } => {
                     self.message_history.push(UnifiedMessage {
                         role: MessageRole::Assistant,
                         content: format!("[reasoning] {}", content),

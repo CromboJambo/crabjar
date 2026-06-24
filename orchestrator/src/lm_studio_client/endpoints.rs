@@ -1,9 +1,6 @@
 //! Endpoint implementations for native, OpenAI-compatible, and Anthropic-compatible APIs.
 
 use super::types::*;
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-use tracing::debug;
 
 // ---------------------------------------------------------------------------
 // Endpoint implementations

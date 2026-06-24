@@ -15,14 +15,14 @@
 #![allow(dead_code)]
 
 // Submodules
-mod types;
-mod session;
-mod endpoints;
 mod client;
+mod endpoints;
 mod error;
+mod session;
+mod types;
 
 // Re-export public API
-pub use types::*;
-pub use session::{SessionState, SessionStore, SessionError};
 pub use client::LmStudioClient;
-pub use error::{LmStudioError, ToolCallInfo, detect_available_endpoints};
+pub use error::ToolCallInfo;
+pub use session::SessionError;
+pub use types::*;

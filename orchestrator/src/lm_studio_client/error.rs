@@ -3,7 +3,6 @@
 use super::types::{LmStudioEndpoint, ToolProviderInfo};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::debug;
 
 // ---------------------------------------------------------------------------
 // Error types
