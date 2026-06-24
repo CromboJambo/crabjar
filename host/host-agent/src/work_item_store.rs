@@ -2,7 +2,7 @@
 ///
 /// Mirrors the cookie_store pattern: Arc<RwLock<Connection>>, async CRUD.
 /// Each WorkItem is serialized to JSON and stored in a single row keyed by id.
-use rusqlite::{params, Connection, Result as SqlResult};
+use rusqlite::{Connection, Result as SqlResult, params};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -24,6 +24,7 @@ pub enum WorkItemStoreError {
 }
 
 /// SQLite-backed persistence layer for WorkItem.
+#[allow(clippy::arc_with_non_send_sync)]
 pub struct WorkItemStore {
     db_path: PathBuf,
     conn: Arc<RwLock<Connection>>,
@@ -36,6 +37,7 @@ impl WorkItemStore {
         Self::init(&conn)?;
         Ok(Self {
             db_path,
+            #[allow(clippy::arc_with_non_send_sync)]
             conn: Arc::new(RwLock::new(conn)),
         })
     }
@@ -89,9 +91,7 @@ impl WorkItemStore {
              FROM work_items WHERE id = ?1",
         )?;
         let mut rows = stmt.query(params![id.to_string()])?;
-        let row = rows
-            .next()?
-            .ok_or(WorkItemStoreError::NotFound(id))?;
+        let row = rows.next()?.ok_or(WorkItemStoreError::NotFound(id))?;
 
         let id_str: String = row.get(0)?;
         let objective: String = row.get(1)?;
@@ -107,13 +107,16 @@ impl WorkItemStore {
         Ok(WorkItem {
             id: Uuid::parse_str(&id_str)?,
             objective,
-            status: serde_json::from_str(&status_json).map_err(WorkItemStoreError::Serialization)?,
-            observations: serde_json::from_str(&observations_json).map_err(WorkItemStoreError::Serialization)?,
+            status: serde_json::from_str(&status_json)
+                .map_err(WorkItemStoreError::Serialization)?,
+            observations: serde_json::from_str(&observations_json)
+                .map_err(WorkItemStoreError::Serialization)?,
             hypothesis: hypothesis_json
                 .map(|h| serde_json::from_str(&h).map_err(WorkItemStoreError::Serialization))
                 .transpose()?,
             plan: serde_json::from_str(&plan_json).map_err(WorkItemStoreError::Serialization)?,
-            artifacts: serde_json::from_str(&artifacts_json).map_err(WorkItemStoreError::Serialization)?,
+            artifacts: serde_json::from_str(&artifacts_json)
+                .map_err(WorkItemStoreError::Serialization)?,
             confidence: confidence as f32,
             created_at: chrono::DateTime::<chrono::Utc>::from_timestamp(created_at, 0)
                 .ok_or_else(|| rusqlite::Error::InvalidQuery)?,
@@ -129,7 +132,11 @@ impl WorkItemStore {
         let ids = stmt.query_map(params![], |row| {
             let s: String = row.get(0)?;
             Uuid::parse_str(&s).map_err(|_| {
-                rusqlite::Error::InvalidColumnType(0, "TEXT".to_string(), rusqlite::types::Type::Text)
+                rusqlite::Error::InvalidColumnType(
+                    0,
+                    "TEXT".to_string(),
+                    rusqlite::types::Type::Text,
+                )
             })
         })?;
         ids.collect()

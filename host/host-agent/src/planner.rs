@@ -29,7 +29,8 @@ impl Planner {
     /// Parse a natural language objective into sub-tasks.
     fn parse_objective(objective: &str) -> Vec<String> {
         // For now, split on common delimiters or create a default task
-        let parts: Vec<_> = objective.split(&[';', ',', '.'][..])
+        let parts: Vec<_> = objective
+            .split(&[';', ',', '.'][..])
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .collect();

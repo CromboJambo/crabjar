@@ -6,7 +6,7 @@
 /// - Confidence?
 /// - Should I retry?
 /// - Should I ask the user?
-use crabjar_host_core::{WorkItem, Status};
+use crabjar_host_core::{Status, WorkItem};
 
 pub struct Reflector;
 
@@ -18,11 +18,25 @@ impl Reflector {
     /// Reflect on the current WorkItem state.
     pub fn reflect(&self, work_item: &mut WorkItem) -> Reflection {
         let total = work_item.plan.len();
-        let completed = work_item.plan.iter()
-            .filter(|t| matches!(t.status, crabjar_host_core::work_item::TaskStatus::Completed))
+        let completed = work_item
+            .plan
+            .iter()
+            .filter(|t| {
+                matches!(
+                    t.status,
+                    crabjar_host_core::work_item::TaskStatus::Completed
+                )
+            })
             .count();
-        let failed = work_item.plan.iter()
-            .filter(|t| matches!(t.status, crabjar_host_core::work_item::TaskStatus::Failed { .. }))
+        let failed = work_item
+            .plan
+            .iter()
+            .filter(|t| {
+                matches!(
+                    t.status,
+                    crabjar_host_core::work_item::TaskStatus::Failed { .. }
+                )
+            })
             .count();
 
         let success_rate = if total > 0 {

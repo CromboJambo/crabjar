@@ -13,7 +13,11 @@ impl TaskExecutor {
     /// Execute a single task by index.
     pub fn execute_task(&self, work_item: &mut WorkItem, task_id: usize) -> Result<String, String> {
         if task_id >= work_item.plan.len() {
-            return Err(format!("task {} out of range (plan has {} tasks)", task_id, work_item.plan.len()));
+            return Err(format!(
+                "task {} out of range (plan has {} tasks)",
+                task_id,
+                work_item.plan.len()
+            ));
         }
 
         let task_desc = work_item.plan[task_id].description.clone();
@@ -35,7 +39,11 @@ impl TaskExecutor {
             .map(|id| (id, self.execute_task(work_item, id)))
             .collect();
 
-        work_item.observe("execute", "batch", format!("Executed {} tasks", results.len()));
+        work_item.observe(
+            "execute",
+            "batch",
+            format!("Executed {} tasks", results.len()),
+        );
         results
     }
 }

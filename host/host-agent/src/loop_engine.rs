@@ -2,7 +2,7 @@
 ///
 /// Every loop operates on exactly one WorkItem at a time.
 /// Supports persistence via WorkItemStore and model-assisted inference via InferenceBackend.
-use crabjar_host_core::{WorkItem, Status, event_bus::EventBus};
+use crabjar_host_core::{Status, WorkItem, event_bus::EventBus};
 use crabjar_host_observe::MetricsCollector;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -46,6 +46,7 @@ impl AgentLoop {
         db_path: PathBuf,
         inference_config: Option<InferenceConfig>,
     ) -> Result<Self, rusqlite::Error> {
+        #[allow(clippy::arc_with_non_send_sync)]
         let store = Arc::new(WorkItemStore::open(db_path)?);
         let inference = inference_config.map(|cfg| {
             let backend: Box<dyn InferenceBackend> = crate::inference::create_backend(&cfg);
@@ -72,19 +73,23 @@ impl AgentLoop {
     }
 
     /// Start a new WorkItem, or resume the most recent persisted one.
-    pub async fn start_with_resume(&mut self, objective: impl Into<String>) -> Result<(), crate::work_item_store::WorkItemStoreError> {
+    pub async fn start_with_resume(
+        &mut self,
+        objective: impl Into<String>,
+    ) -> Result<(), crate::work_item_store::WorkItemStoreError> {
         // Try to resume a persisted work item first
         if let Some(ref store) = self.store {
             let ids = store.list_ids().await?;
             if !ids.is_empty() {
                 let latest_id = ids[0];
                 if let Ok(resumed) = store.load(latest_id).await
-                    && !resumed.status.is_terminal() {
-                        tracing::info!(work_item_id = ?latest_id, "resumed persisted work item");
-                        self.current_work_item = Some(resumed);
-                        self.iteration = 0;
-                        return Ok(());
-                    }
+                    && !resumed.status.is_terminal()
+                {
+                    tracing::info!(work_item_id = ?latest_id, "resumed persisted work item");
+                    self.current_work_item = Some(resumed);
+                    self.iteration = 0;
+                    return Ok(());
+                }
             }
         }
 
@@ -96,8 +101,7 @@ impl AgentLoop {
     /// Run one iteration of the agent loop.
     pub async fn tick(&mut self) -> Result<LoopResult, LoopError> {
         // Take the work item out to avoid borrow overlap with self methods
-        let mut work_item = self.current_work_item.take()
-            .ok_or(LoopError::NoWorkItem)?;
+        let mut work_item = self.current_work_item.take().ok_or(LoopError::NoWorkItem)?;
 
         self.iteration += 1;
 
@@ -119,9 +123,7 @@ impl AgentLoop {
             work_item.set_status(Status::Completed);
             let wid = work_item.id;
             self.persist_work_item(&work_item).await;
-            return Ok(LoopResult::Completed {
-                work_item_id: wid,
-            });
+            return Ok(LoopResult::Completed { work_item_id: wid });
         }
 
         // Record iteration metric
@@ -158,9 +160,10 @@ impl AgentLoop {
     /// Persist the current work item to the store (no-op if no store configured).
     async fn persist_work_item(&self, work_item: &WorkItem) {
         if let Some(ref store) = self.store
-            && let Err(e) = store.save(work_item).await {
-                tracing::warn!(error = ?e, "failed to persist work item");
-            }
+            && let Err(e) = store.save(work_item).await
+        {
+            tracing::warn!(error = ?e, "failed to persist work item");
+        }
     }
 
     /// Run all stages of the agent loop for the current WorkItem.
@@ -195,7 +198,16 @@ impl AgentLoop {
         Ok(LoopResult::IterationComplete {
             work_item_id: work_item.id,
             confidence: work_item.confidence,
-            tasks_completed: work_item.plan.iter().filter(|t| matches!(t.status, crabjar_host_core::work_item::TaskStatus::Completed)).count(),
+            tasks_completed: work_item
+                .plan
+                .iter()
+                .filter(|t| {
+                    matches!(
+                        t.status,
+                        crabjar_host_core::work_item::TaskStatus::Completed
+                    )
+                })
+                .count(),
         })
     }
 
@@ -281,7 +293,11 @@ impl AgentLoop {
             let prompt = format!(
                 "Verify phase for work item '{}'. Task results: {:?}. Are the results satisfactory?",
                 work_item.objective,
-                work_item.plan.iter().map(|t| (t.id, t.result.clone())).collect::<Vec<_>>()
+                work_item
+                    .plan
+                    .iter()
+                    .map(|t| (t.id, t.result.clone()))
+                    .collect::<Vec<_>>()
             );
             match inference.infer(&prompt).await {
                 Ok(response) => {
@@ -296,7 +312,11 @@ impl AgentLoop {
     }
 
     async fn reflect(&self, work_item: &mut WorkItem) -> Result<(), LoopError> {
-        work_item.observe("reflect", "reflection", "Evaluating results and updating confidence");
+        work_item.observe(
+            "reflect",
+            "reflection",
+            "Evaluating results and updating confidence",
+        );
         if let Some(ref inference) = self.inference {
             let prompt = format!(
                 "Reflect phase for work item '{}'. Confidence: {:.2}. Plan progress: {:?}. Should we continue, retry, or conclude?",
@@ -326,8 +346,15 @@ impl AgentLoop {
         if total == 0 {
             return;
         }
-        let completed = work_item.plan.iter()
-            .filter(|t| matches!(t.status, crabjar_host_core::work_item::TaskStatus::Completed))
+        let completed = work_item
+            .plan
+            .iter()
+            .filter(|t| {
+                matches!(
+                    t.status,
+                    crabjar_host_core::work_item::TaskStatus::Completed
+                )
+            })
             .count() as f32;
         let ratio = completed / total as f32;
         // Confidence = weighted average of task completion ratio
@@ -366,14 +393,9 @@ pub enum LoopResult {
         tasks_completed: usize,
     },
     /// WorkItem completed (confidence threshold reached)
-    Completed {
-        work_item_id: Uuid,
-    },
+    Completed { work_item_id: Uuid },
     /// WorkItem failed
-    Failed {
-        work_item_id: Uuid,
-        reason: String,
-    },
+    Failed { work_item_id: Uuid, reason: String },
 }
 
 /// Agent loop errors.
@@ -432,12 +454,8 @@ mod tests {
 
         let bus = Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();
-        let mut loop_engine = AgentLoop::new_with_persistence(
-            bus,
-            metrics,
-            db_path.clone(),
-            None,
-        ).unwrap();
+        let mut loop_engine =
+            AgentLoop::new_with_persistence(bus, metrics, db_path.clone(), None).unwrap();
 
         loop_engine.start("Persistent task");
         let work_item_id = loop_engine.current_work_item().unwrap().id;
@@ -450,15 +468,14 @@ mod tests {
         // Create a new engine and resume
         let bus2 = Arc::new(EventBus::new(16));
         let metrics2 = MetricsCollector::new();
-        let mut loop_engine2 = AgentLoop::new_with_persistence(
-            bus2,
-            metrics2,
-            db_path,
-            None,
-        ).unwrap();
+        let mut loop_engine2 =
+            AgentLoop::new_with_persistence(bus2, metrics2, db_path, None).unwrap();
 
         // start_with_resume should find the persisted work item
-        loop_engine2.start_with_resume("Fallback objective").await.unwrap();
+        loop_engine2
+            .start_with_resume("Fallback objective")
+            .await
+            .unwrap();
         let resumed = loop_engine2.current_work_item().unwrap();
         assert_eq!(resumed.id, work_item_id);
         assert_eq!(resumed.objective, "Persistent task");
@@ -472,12 +489,8 @@ mod tests {
         let bus = Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();
         let config = InferenceConfig::default();
-        let mut loop_engine = AgentLoop::new_with_persistence(
-            bus,
-            metrics,
-            db_path,
-            Some(config),
-        ).unwrap();
+        let mut loop_engine =
+            AgentLoop::new_with_persistence(bus, metrics, db_path, Some(config)).unwrap();
 
         loop_engine.start("Heuristic inference test");
         let result = loop_engine.tick().await.unwrap();
