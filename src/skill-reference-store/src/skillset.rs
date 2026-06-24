@@ -27,7 +27,10 @@ pub enum SkillSetError {
     InvalidMetadata { name: String, reason: String },
 
     #[error("conflicting categories for skill '{name}': {categories:?}")]
-    ConflictingCategories { name: String, categories: Vec<String> },
+    ConflictingCategories {
+        name: String,
+        categories: Vec<String>,
+    },
 
     #[error("duplicate skillset name '{name}'")]
     DuplicateName { name: String },
@@ -134,9 +137,7 @@ impl SkillSet {
 ///
 /// ## Returns
 /// A list of `SkillSet` instances, or an error if grouping fails.
-pub fn convert_to_skillsets(
-    skills: &[SkillRecord],
-) -> Result<Vec<SkillSet>, SkillSetError> {
+pub fn convert_to_skillsets(skills: &[SkillRecord]) -> Result<Vec<SkillSet>, SkillSetError> {
     if skills.is_empty() {
         return Err(SkillSetError::NoSkills);
     }
@@ -184,7 +185,10 @@ pub fn convert_to_skillsets(
     for (key, members) in groups {
         let source = members[0].source.clone();
         let member_ids: Vec<String> = members.iter().map(|s| s.id.clone()).collect();
-        let total_scripts: usize = members.iter().map(|s| if s.has_scripts { 1 } else { 0 }).sum();
+        let total_scripts: usize = members
+            .iter()
+            .map(|s| if s.has_scripts { 1 } else { 0 })
+            .sum();
 
         // Derive skillset name from the key
         let parts: Vec<&str> = key.splitn(2, ':').collect();
@@ -522,17 +526,16 @@ mod tests {
     fn convert_sorts_by_member_count_descending() {
         let skills = vec![
             make_skill(
-                "s1", "A", Some("creative"), SkillSource::User, "/d/s1", false,
+                "s1",
+                "A",
+                Some("creative"),
+                SkillSource::User,
+                "/d/s1",
+                false,
             ),
-            make_skill(
-                "s2", "B", Some("devops"), SkillSource::User, "/d/s2", false,
-            ),
-            make_skill(
-                "s3", "C", Some("devops"), SkillSource::User, "/d/s3", false,
-            ),
-            make_skill(
-                "s4", "D", Some("devops"), SkillSource::User, "/d/s4", false,
-            ),
+            make_skill("s2", "B", Some("devops"), SkillSource::User, "/d/s2", false),
+            make_skill("s3", "C", Some("devops"), SkillSource::User, "/d/s3", false),
+            make_skill("s4", "D", Some("devops"), SkillSource::User, "/d/s4", false),
         ];
 
         let sets = convert_to_skillsets(&skills).unwrap();
@@ -573,9 +576,23 @@ mod tests {
     #[test]
     fn extract_categories_returns_sorted_unique() {
         let skills = vec![
-            make_skill("s1", "A", Some("creative"), SkillSource::User, "/d/s1", false),
+            make_skill(
+                "s1",
+                "A",
+                Some("creative"),
+                SkillSource::User,
+                "/d/s1",
+                false,
+            ),
             make_skill("s2", "B", Some("devops"), SkillSource::User, "/d/s2", false),
-            make_skill("s3", "C", Some("creative"), SkillSource::User, "/d/s3", false),
+            make_skill(
+                "s3",
+                "C",
+                Some("creative"),
+                SkillSource::User,
+                "/d/s3",
+                false,
+            ),
         ];
 
         let cats = extract_categories(&skills);
