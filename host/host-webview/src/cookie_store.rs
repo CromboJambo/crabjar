@@ -2,7 +2,6 @@
 ///
 /// Replaces Electron's `session.cookies.get/set/remove` API.
 /// Persists cookies, session tokens, and partition data to a local SQLite database.
-
 use rusqlite::{params, Connection, Result as SqlResult};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -44,6 +43,7 @@ pub struct Partition {
 }
 
 /// SQLite-backed persistence layer for cookies, tokens, and partitions.
+#[allow(clippy::arc_with_non_send_sync)]
 pub struct CookieStore {
     db_path: PathBuf,
     conn: Arc<RwLock<Connection>>,
@@ -100,7 +100,7 @@ impl CookieStore {
     pub async fn save_cookie(&self, cookie: &Cookie) -> SqlResult<Uuid> {
         let id = Uuid::new_v4();
         let now = Utc::now().timestamp();
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         tx.execute(
             "INSERT OR REPLACE INTO cookies (id, name, value, domain, path, expires, secure, http_only, same_site, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
@@ -158,7 +158,7 @@ impl CookieStore {
     }
 
     pub async fn remove_cookie(&self, domain: &str, name: &str) -> SqlResult<bool> {
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         let rows = tx.execute(
             "DELETE FROM cookies WHERE domain = ?1 AND name = ?2",
             params![domain, name],
@@ -167,12 +167,12 @@ impl CookieStore {
     }
 
     pub async fn remove_cookies_by_domain(&self, domain: &str) -> SqlResult<usize> {
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         tx.execute("DELETE FROM cookies WHERE domain = ?1", params![domain])
     }
 
     pub async fn clear_all(&self) -> SqlResult<usize> {
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         tx.execute("DELETE FROM cookies", params![])?;
         tx.execute("DELETE FROM tokens", params![])?;
         tx.execute("DELETE FROM partitions", params![])?;
@@ -203,7 +203,7 @@ impl CookieStore {
     // --- Token CRUD ---
 
     pub async fn save_token(&self, token: &SessionToken) -> SqlResult<()> {
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         tx.execute(
             "INSERT OR REPLACE INTO tokens (key, value, encrypted, created_at, expires_at)
              VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -235,7 +235,7 @@ impl CookieStore {
     }
 
     pub async fn remove_token(&self, key: &str) -> SqlResult<bool> {
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         let rows = tx.execute("DELETE FROM tokens WHERE key = ?1", params![key])?;
         Ok(rows > 0)
     }
@@ -260,7 +260,7 @@ impl CookieStore {
     /// Remove expired tokens. Returns count of removed tokens.
     pub async fn cleanup_expired(&self) -> SqlResult<usize> {
         let now = Utc::now().timestamp();
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         let rows = tx.execute(
             "DELETE FROM tokens WHERE expires_at IS NOT NULL AND expires_at < ?1",
             params![now],
@@ -271,7 +271,7 @@ impl CookieStore {
     // --- Partition CRUD ---
 
     pub async fn save_partition(&self, partition: &Partition) -> SqlResult<()> {
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         tx.execute(
             "INSERT OR REPLACE INTO partitions (name, zoom_level, created_at)
              VALUES (?1, ?2, ?3)",
@@ -313,7 +313,7 @@ impl CookieStore {
     }
 
     pub async fn remove_partition(&self, name: &str) -> SqlResult<bool> {
-        let mut tx = self.conn.write().await;
+        let tx = self.conn.write().await;
         let rows = tx.execute("DELETE FROM partitions WHERE name = ?1", params![name])?;
         Ok(rows > 0)
     }
