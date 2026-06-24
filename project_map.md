@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: May 31 2026
+> Generated: June 23 2026
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -18,7 +18,7 @@ CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes stat
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 21 members, shared deps
+├── Cargo.toml               # Workspace root — 23 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── build.rs                 # Root build script
 ├── AGENTS.md               # Repository guidelines
