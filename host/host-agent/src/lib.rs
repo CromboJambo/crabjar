@@ -1,3 +1,8 @@
+/// `host-agent` — agent loop engine for CrabJar host.
+///
+/// Implements the observe → understand → plan → execute → verify → reflect → persist
+/// loop with pluggable inference backends and WorkItem persistence.
+#![allow(dead_code)]
 pub mod loop_engine;
 pub mod planner;
 pub mod executor;
