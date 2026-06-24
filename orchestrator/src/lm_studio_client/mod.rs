@@ -1,16 +1,17 @@
-/// lm_studio_client: Unified client for LM Studio's multiple API endpoints.
-///
-/// Supports three endpoints with a toggle:
-/// - Native `/api/v1/chat` — stateful chat via `previous_response_id`
-/// - OpenAI-compatible `/v1/chat/completions` — full message history
-/// - Anthropic-compatible `/v1/messages` — full message history
-///
-/// The client abstracts endpoint differences so the orchestrator doesn't
-/// need to know which endpoint it's talking to.
-///
-/// Session state is managed via `SessionStore` — for the native endpoint
-/// this tracks `response_id` for continuation; for OpenAI/Anthropic it
-/// tracks the full message history.
+//! lm_studio_client: Unified client for LM Studio's multiple API endpoints.
+//!
+//! Supports three endpoints with a toggle:
+//! - Native `/api/v1/chat` — stateful chat via `previous_response_id`
+//! - OpenAI-compatible `/v1/chat/completions` — full message history
+//! - Anthropic-compatible `/v1/messages` — full message history
+//!
+//! The client abstracts endpoint differences so the orchestrator doesn't
+//! need to know which endpoint it's talking to.
+//!
+//! Session state is managed via `SessionStore` — for the native endpoint
+//! this tracks `response_id` for continuation; for OpenAI/Anthropic it
+//! tracks the full message history.
+#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 use std::env;
 use thiserror::Error;
@@ -96,8 +97,8 @@ pub struct LmStudioConfig {
 impl LmStudioConfig {
     /// Loads configuration from environment variables.
     pub fn from_env() -> Self {
-        let base_url = env::var("LM_STUDIO_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:1234".to_string());
+        let base_url =
+            env::var("LM_STUDIO_URL").unwrap_or_else(|_| "http://127.0.0.1:1234".to_string());
 
         let serve_base_url = env::var("MISTRALRS_SERVE_URL").ok();
 
@@ -105,8 +106,8 @@ impl LmStudioConfig {
 
         let api_token = env::var("LM_API_TOKEN").ok();
 
-        let default_model = env::var("LM_STUDIO_MODEL")
-            .unwrap_or_else(|_| "local-model".to_string());
+        let default_model =
+            env::var("LM_STUDIO_MODEL").unwrap_or_else(|_| "local-model".to_string());
 
         let default_context_length = env::var("LM_STUDIO_CONTEXT_LENGTH")
             .ok()
@@ -350,7 +351,11 @@ impl SessionState {
                         content: content.clone(),
                     });
                 }
-                UnifiedOutputItem::ToolCall { tool, output: Some(result), .. } => {
+                UnifiedOutputItem::ToolCall {
+                    tool,
+                    output: Some(result),
+                    ..
+                } => {
                     self.message_history.push(UnifiedMessage {
                         role: MessageRole::Assistant,
                         content: format!("Tool '{}' executed: {}", tool, result),
@@ -408,10 +413,13 @@ impl SessionStore {
     }
 
     /// Opens the database connection lazily.
-    fn open_conn(&self) -> Result<std::sync::MutexGuard<'_, Option<rusqlite::Connection>>, SessionError> {
-        let mut guard = self.conn.lock().map_err(|e| {
-            SessionError::Database(format!("failed to lock connection: {e}"))
-        })?;
+    fn open_conn(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, Option<rusqlite::Connection>>, SessionError> {
+        let mut guard = self
+            .conn
+            .lock()
+            .map_err(|e| SessionError::Database(format!("failed to lock connection: {e}")))?;
         if guard.is_none() {
             let conn = rusqlite::Connection::open(&self.db_path)
                 .map_err(|e| SessionError::Database(format!("failed to open DB: {e}")))?;
@@ -438,7 +446,8 @@ impl SessionStore {
     /// The session is initialized with a system prompt.
     pub fn create_session(&self, system_prompt: Option<String>) -> Result<String, SessionError> {
         let session_id = uuid::Uuid::new_v4().to_string();
-        let system_prompt_json = serde_json::to_string(&system_prompt).unwrap_or_else(|_| "null".to_string());
+        let system_prompt_json =
+            serde_json::to_string(&system_prompt).unwrap_or_else(|_| "null".to_string());
 
         let guard = self.open_conn()?;
         let conn = guard.as_ref().unwrap();
@@ -465,18 +474,20 @@ impl SessionStore {
     pub fn get_session(&self, session_id: &str) -> Result<SessionState, SessionError> {
         let guard = self.open_conn()?;
         let conn = guard.as_ref().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT system_prompt, message_history, response_id FROM sessions WHERE id = ?1",
-        )
-        .map_err(|e| SessionError::Database(format!("failed to prepare query: {e}")))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT system_prompt, message_history, response_id FROM sessions WHERE id = ?1",
+            )
+            .map_err(|e| SessionError::Database(format!("failed to prepare query: {e}")))?;
 
-        let row = stmt.query_row(rusqlite::params![session_id], |row| {
-            let system_prompt: String = row.get(0)?;
-            let message_history: String = row.get(1)?;
-            let response_id: String = row.get(2)?;
-            Ok((system_prompt, message_history, response_id))
-        })
-        .ok(); // stub: return None for missing sessions
+        let row = stmt
+            .query_row(rusqlite::params![session_id], |row| {
+                let system_prompt: String = row.get(0)?;
+                let message_history: String = row.get(1)?;
+                let response_id: String = row.get(2)?;
+                Ok((system_prompt, message_history, response_id))
+            })
+            .ok(); // stub: return None for missing sessions
 
         let (system_prompt, message_history, response_id) = match row {
             Some(r) => (r.0, r.1, r.2),
@@ -484,8 +495,13 @@ impl SessionStore {
         };
 
         let _system_prompt: Option<String> = serde_json::from_str(&system_prompt).unwrap_or(None);
-        let message_history: Vec<UnifiedMessage> = serde_json::from_str(&message_history).unwrap_or_default();
-        let response_id = if response_id.is_empty() { None } else { Some(response_id) };
+        let message_history: Vec<UnifiedMessage> =
+            serde_json::from_str(&message_history).unwrap_or_default();
+        let response_id = if response_id.is_empty() {
+            None
+        } else {
+            Some(response_id)
+        };
 
         let mut state = SessionState::new();
         state.response_id = response_id;
@@ -503,8 +519,8 @@ impl SessionStore {
         session_id: &str,
         state: &SessionState,
     ) -> Result<(), SessionError> {
-        let message_history_json = serde_json::to_string(&state.message_history)
-            .unwrap_or_else(|_| "[]".to_string());
+        let message_history_json =
+            serde_json::to_string(&state.message_history).unwrap_or_else(|_| "[]".to_string());
         let response_id = state.response_id.as_deref().unwrap_or("");
 
         let guard = self.open_conn()?;
@@ -523,11 +539,12 @@ impl SessionStore {
     pub fn delete_session(&self, session_id: &str) -> Result<(), SessionError> {
         let guard = self.open_conn()?;
         let conn = guard.as_ref().unwrap();
-        let _rows = conn.execute(
-            "DELETE FROM sessions WHERE id = ?1",
-            rusqlite::params![session_id],
-        )
-        .map_err(|e| SessionError::Database(format!("failed to delete session: {e}")))?;
+        let _rows = conn
+            .execute(
+                "DELETE FROM sessions WHERE id = ?1",
+                rusqlite::params![session_id],
+            )
+            .map_err(|e| SessionError::Database(format!("failed to delete session: {e}")))?;
 
         debug!("Deleted session {}", session_id);
         Ok(())
@@ -550,20 +567,25 @@ pub enum SessionError {
 /// Native `/api/v1/chat` endpoint implementation.
 mod native {
     use super::*;
-    
 
     /// Converts a unified request to the native endpoint format.
     pub fn to_native_request(req: &UnifiedChatRequest) -> serde_json::Value {
         let mut builder = serde_json::Map::new();
 
-        builder.insert("model".to_string(), serde_json::Value::String(req.model.clone()));
+        builder.insert(
+            "model".to_string(),
+            serde_json::Value::String(req.model.clone()),
+        );
 
         // Convert input to native format.
         let input_obj = serde_json::json!({
             "type": "message",
             "content": req.input.content
         });
-        builder.insert("input".to_string(), serde_json::Value::Array(vec![input_obj]));
+        builder.insert(
+            "input".to_string(),
+            serde_json::Value::Array(vec![input_obj]),
+        );
 
         if let Some(ref system_prompt) = req.system_prompt {
             builder.insert(
@@ -573,11 +595,17 @@ mod native {
         }
 
         if let Some(temp) = req.temperature {
-            builder.insert("temperature".to_string(), serde_json::to_value(temp).unwrap_or(serde_json::Value::Null));
+            builder.insert(
+                "temperature".to_string(),
+                serde_json::to_value(temp).unwrap_or(serde_json::Value::Null),
+            );
         }
 
         if let Some(top_p) = req.top_p {
-            builder.insert("top_p".to_string(), serde_json::to_value(top_p).unwrap_or(serde_json::Value::Null));
+            builder.insert(
+                "top_p".to_string(),
+                serde_json::to_value(top_p).unwrap_or(serde_json::Value::Null),
+            );
         }
 
         if let Some(max_tokens) = req.max_output_tokens {
@@ -635,11 +663,7 @@ mod native {
         let output_items: Vec<UnifiedOutputItem> = value
             .get("output")
             .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(parse_output_item)
-                    .collect()
-            })
+            .map(|arr| arr.iter().filter_map(parse_output_item).collect())
             .unwrap_or_default();
 
         let stats = value
@@ -721,7 +745,6 @@ mod native {
 /// OpenAI-compatible `/v1/chat/completions` endpoint implementation.
 mod openai {
     use super::*;
-    
 
     /// Converts a unified request to the OpenAI format.
     pub fn to_openai_request(req: &UnifiedChatRequest) -> serde_json::Value {
@@ -747,11 +770,17 @@ mod openai {
         }));
 
         let mut builder = serde_json::Map::new();
-        builder.insert("model".to_string(), serde_json::Value::String(req.model.clone()));
+        builder.insert(
+            "model".to_string(),
+            serde_json::Value::String(req.model.clone()),
+        );
         builder.insert("messages".to_string(), serde_json::Value::Array(messages));
 
         if let Some(temp) = req.temperature {
-            builder.insert("temperature".to_string(), serde_json::to_value(temp).unwrap_or(serde_json::Value::Null));
+            builder.insert(
+                "temperature".to_string(),
+                serde_json::to_value(temp).unwrap_or(serde_json::Value::Null),
+            );
         }
 
         if let Some(max_tokens) = req.max_output_tokens {
@@ -768,12 +797,9 @@ mod openai {
     pub fn from_openai_response(
         value: &serde_json::Value,
     ) -> Result<UnifiedChatResponse, openai_error::OpenaiError> {
-        let choices = value
-            .get("choices")
-            .and_then(|v| v.as_array())
-            .ok_or(openai_error::OpenaiError::ParseError(
-                "missing choices in response".to_string(),
-            ))?;
+        let choices = value.get("choices").and_then(|v| v.as_array()).ok_or(
+            openai_error::OpenaiError::ParseError("missing choices in response".to_string()),
+        )?;
 
         if choices.is_empty() {
             return Err(openai_error::OpenaiError::ParseError(
@@ -797,11 +823,7 @@ mod openai {
         let tool_calls: Vec<UnifiedOutputItem> = message
             .get("tool_calls")
             .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(parse_tool_call)
-                    .collect()
-            })
+            .map(|arr| arr.iter().filter_map(parse_tool_call).collect())
             .unwrap_or_default();
 
         // Combine message and tool calls into output items.
@@ -817,10 +839,10 @@ mod openai {
 
         Ok(UnifiedChatResponse {
             model_instance_id: value
-            .get("model")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+                .get("model")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
             output: output_items,
             stats,
             response_id: None,
@@ -859,7 +881,6 @@ mod openai {
 /// Anthropic-compatible `/v1/messages` endpoint implementation.
 mod anthropic {
     use super::*;
-    
 
     /// Converts a unified request to the Anthropic format.
     pub fn to_anthropic_request(req: &UnifiedChatRequest) -> serde_json::Value {
@@ -886,11 +907,17 @@ mod anthropic {
         }));
 
         let mut builder = serde_json::Map::new();
-        builder.insert("model".to_string(), serde_json::Value::String(req.model.clone()));
+        builder.insert(
+            "model".to_string(),
+            serde_json::Value::String(req.model.clone()),
+        );
         builder.insert("messages".to_string(), serde_json::Value::Array(messages));
 
         if let Some(temp) = req.temperature {
-            builder.insert("temperature".to_string(), serde_json::to_value(temp).unwrap_or(serde_json::Value::Null));
+            builder.insert(
+                "temperature".to_string(),
+                serde_json::to_value(temp).unwrap_or(serde_json::Value::Null),
+            );
         }
 
         if let Some(max_tokens) = req.max_output_tokens {
@@ -907,25 +934,53 @@ mod anthropic {
     pub fn from_anthropic_response(
         value: &serde_json::Value,
     ) -> Result<UnifiedChatResponse, anthropic_error::AnthropicError> {
-        let content_blocks = value
-            .get("content")
-            .and_then(|v| v.as_array())
-            .ok_or(anthropic_error::AnthropicError::ParseError(
-                "missing content in response".to_string(),
-            ))?;
+        let content_blocks = value.get("content").and_then(|v| v.as_array()).ok_or(
+            anthropic_error::AnthropicError::ParseError("missing content in response".to_string()),
+        )?;
 
         let mut output_items = Vec::new();
         for block in content_blocks {
-            let block_type = block.get("type").ok_or(anthropic_error::AnthropicError::ParseError("missing type".to_string()))?.as_str().ok_or(anthropic_error::AnthropicError::ParseError("type not a string".to_string()))?;
+            let block_type = block
+                .get("type")
+                .ok_or(anthropic_error::AnthropicError::ParseError(
+                    "missing type".to_string(),
+                ))?
+                .as_str()
+                .ok_or(anthropic_error::AnthropicError::ParseError(
+                    "type not a string".to_string(),
+                ))?;
 
             match block_type {
                 "text" => {
-                    let content = block.get("text").ok_or(anthropic_error::AnthropicError::ParseError("missing text".to_string()))?.as_str().ok_or(anthropic_error::AnthropicError::ParseError("text not a string".to_string()))?.to_string();
+                    let content = block
+                        .get("text")
+                        .ok_or(anthropic_error::AnthropicError::ParseError(
+                            "missing text".to_string(),
+                        ))?
+                        .as_str()
+                        .ok_or(anthropic_error::AnthropicError::ParseError(
+                            "text not a string".to_string(),
+                        ))?
+                        .to_string();
                     output_items.push(UnifiedOutputItem::Message { content });
                 }
                 "tool_use" => {
-                    let name = block.get("name").ok_or(anthropic_error::AnthropicError::ParseError("missing name".to_string()))?.as_str().ok_or(anthropic_error::AnthropicError::ParseError("name not a string".to_string()))?.to_string();
-                    let input = block.get("input").ok_or(anthropic_error::AnthropicError::ParseError("missing input".to_string()))?.clone();
+                    let name = block
+                        .get("name")
+                        .ok_or(anthropic_error::AnthropicError::ParseError(
+                            "missing name".to_string(),
+                        ))?
+                        .as_str()
+                        .ok_or(anthropic_error::AnthropicError::ParseError(
+                            "name not a string".to_string(),
+                        ))?
+                        .to_string();
+                    let input = block
+                        .get("input")
+                        .ok_or(anthropic_error::AnthropicError::ParseError(
+                            "missing input".to_string(),
+                        ))?
+                        .clone();
                     output_items.push(UnifiedOutputItem::ToolCall {
                         tool: name,
                         arguments: input,
@@ -943,10 +998,10 @@ mod anthropic {
 
         Ok(UnifiedChatResponse {
             model_instance_id: value
-            .get("model")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
+                .get("model")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
             output: output_items,
             stats,
             response_id: None,
@@ -1027,7 +1082,10 @@ impl LmStudioClient {
     }
 
     /// Creates a new session and returns its ID.
-    pub fn create_session(&mut self, system_prompt: Option<String>) -> Result<String, SessionError> {
+    pub fn create_session(
+        &mut self,
+        system_prompt: Option<String>,
+    ) -> Result<String, SessionError> {
         let session_id = match &self.session_store {
             Some(store) => store.create_session(system_prompt.clone())?,
             None => uuid::Uuid::new_v4().to_string(),
@@ -1057,7 +1115,11 @@ impl LmStudioClient {
         self.current_session_id = Some(session_id.to_string());
         self.session = state;
 
-        info!("Loaded session {} (endpoint: {})", session_id, self.config.endpoint.name());
+        info!(
+            "Loaded session {} (endpoint: {})",
+            session_id,
+            self.config.endpoint.name()
+        );
         Ok(())
     }
 
@@ -1110,7 +1172,8 @@ impl LmStudioClient {
             _ => None,
         };
 
-        let mut req = UnifiedChatRequest::from_config(&self.config, user_input, previous_response_id);
+        let mut req =
+            UnifiedChatRequest::from_config(&self.config, user_input, previous_response_id);
         req.system_prompt = Some(system_prompt);
 
         let response = match self.config.endpoint {
@@ -1158,7 +1221,9 @@ impl LmStudioClient {
             .iter()
             .filter_map(|item| match item {
                 UnifiedOutputItem::Message { content } => Some(content.clone()),
-                UnifiedOutputItem::Reasoning { content } => Some(format!("[reasoning] {}", content)),
+                UnifiedOutputItem::Reasoning { content } => {
+                    Some(format!("[reasoning] {}", content))
+                }
                 _ => None,
             })
             .collect::<Vec<_>>()
@@ -1173,10 +1238,7 @@ impl LmStudioClient {
         let url = self.config.endpoint_url();
         let body = native::to_native_request(req);
 
-        info!(
-            "Sending native request to {} (model: {})",
-            url, req.model
-        );
+        info!("Sending native request to {} (model: {})", url, req.model);
 
         let mut builder = self.http_client.post(&url);
 
@@ -1216,10 +1278,7 @@ impl LmStudioClient {
         let url = self.config.endpoint_url();
         let body = openai::to_openai_request(req);
 
-        info!(
-            "Sending OpenAI request to {} (model: {})",
-            url, req.model
-        );
+        info!("Sending OpenAI request to {} (model: {})", url, req.model);
 
         let mut builder = self.http_client.post(&url);
 
@@ -1291,7 +1350,8 @@ impl LmStudioClient {
             .await
             .map_err(|e| LmStudioError::ParseError(format!("Anthropic response: {}", e)))?;
 
-        anthropic::from_anthropic_response(&json).map_err(|e| LmStudioError::ParseError(e.to_string()))
+        anthropic::from_anthropic_response(&json)
+            .map_err(|e| LmStudioError::ParseError(e.to_string()))
     }
 }
 
@@ -1309,6 +1369,7 @@ pub struct ToolCallInfo {
 }
 
 /// Errors from LM Studio client operations.
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Error)]
 pub enum LmStudioError {
     #[error("request failed: {0}")]
@@ -1344,19 +1405,37 @@ pub async fn detect_available_endpoints(
 
     // Check OpenAI-compatible endpoint.
     let openai_url = format!("{}/v1/chat/completions", base_url);
-    if client.get(&openai_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+    if client
+        .get(&openai_url)
+        .send()
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
+    {
         available.push(LmStudioEndpoint::Openai);
     }
 
     // Check Anthropic-compatible endpoint.
     let anthropic_url = format!("{}/v1/messages", base_url);
-    if client.get(&anthropic_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+    if client
+        .get(&anthropic_url)
+        .send()
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
+    {
         available.push(LmStudioEndpoint::Anthropic);
     }
 
     // Check native endpoint.
     let native_url = format!("{}/api/v1/chat", base_url);
-    if client.get(&native_url).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+    if client
+        .get(&native_url)
+        .send()
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
+    {
         available.push(LmStudioEndpoint::Native);
     }
 
@@ -1367,12 +1446,20 @@ pub async fn detect_available_endpoints(
             .unwrap_or_else(|_| "http://127.0.0.1:8081".to_string()),
     };
     let mistralrs_endpoint = format!("{}/v1/chat/completions", mistralrs_url);
-    if client.get(&mistralrs_endpoint).send().await.map(|r| r.status().is_success()).unwrap_or(false) {
+    if client
+        .get(&mistralrs_endpoint)
+        .send()
+        .await
+        .map(|r| r.status().is_success())
+        .unwrap_or(false)
+    {
         available.push(LmStudioEndpoint::MistralRsServe);
     }
 
     if available.is_empty() {
-        Err(LmStudioError::RequestError("No LM Studio endpoints available".to_string()))
+        Err(LmStudioError::RequestError(
+            "No LM Studio endpoints available".to_string(),
+        ))
     } else {
         Ok(available)
     }
@@ -1425,7 +1512,9 @@ mod tests {
     #[test]
     #[serial]
     fn endpoint_from_env_default() {
-        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
+        unsafe {
+            std::env::remove_var("LM_STUDIO_ENDPOINT");
+        }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Openai);
     }
@@ -1433,37 +1522,53 @@ mod tests {
     #[test]
     #[serial]
     fn endpoint_from_env_native() {
-        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "native"); }
+        unsafe {
+            std::env::set_var("LM_STUDIO_ENDPOINT", "native");
+        }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Native);
-        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
+        unsafe {
+            std::env::remove_var("LM_STUDIO_ENDPOINT");
+        }
     }
 
     #[test]
     #[serial]
     fn endpoint_from_env_openai() {
-        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "openai"); }
+        unsafe {
+            std::env::set_var("LM_STUDIO_ENDPOINT", "openai");
+        }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Openai);
-        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
+        unsafe {
+            std::env::remove_var("LM_STUDIO_ENDPOINT");
+        }
     }
 
     #[test]
     #[serial]
     fn endpoint_from_env_anthropic() {
-        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "anthropic"); }
+        unsafe {
+            std::env::set_var("LM_STUDIO_ENDPOINT", "anthropic");
+        }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Anthropic);
-        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
+        unsafe {
+            std::env::remove_var("LM_STUDIO_ENDPOINT");
+        }
     }
 
     #[test]
     #[serial]
     fn endpoint_from_env_invalid_defaults_to_openai() {
-        unsafe { std::env::set_var("LM_STUDIO_ENDPOINT", "invalid"); }
+        unsafe {
+            std::env::set_var("LM_STUDIO_ENDPOINT", "invalid");
+        }
         let ep = LmStudioEndpoint::from_env();
         assert_eq!(ep, LmStudioEndpoint::Openai);
-        unsafe { std::env::remove_var("LM_STUDIO_ENDPOINT"); }
+        unsafe {
+            std::env::remove_var("LM_STUDIO_ENDPOINT");
+        }
     }
 
     #[test]
@@ -1788,7 +1893,9 @@ mod tests {
     #[test]
     fn session_store_create_session_with_system_prompt() {
         let store = SessionStore::new(":memory:".to_string());
-        let session_id = store.create_session(Some("You are helpful".to_string())).unwrap();
+        let session_id = store
+            .create_session(Some("You are helpful".to_string()))
+            .unwrap();
         assert!(!session_id.is_empty());
     }
 
@@ -1919,7 +2026,12 @@ mod tests {
         let anthropic = anthropic::to_anthropic_request(&req);
         let messages = anthropic["messages"].as_array().unwrap();
         assert_eq!(messages.len(), 2);
-        assert!(messages[0]["content"].as_str().unwrap().starts_with("[System prompt:"));
+        assert!(
+            messages[0]["content"]
+                .as_str()
+                .unwrap()
+                .starts_with("[System prompt:")
+        );
     }
 
     #[test]
@@ -1944,7 +2056,12 @@ mod tests {
         };
         let cloned = item.clone();
         match cloned {
-            UnifiedOutputItem::ToolCall { tool, arguments, output, .. } => {
+            UnifiedOutputItem::ToolCall {
+                tool,
+                arguments,
+                output,
+                ..
+            } => {
                 assert_eq!(tool, "echo");
                 assert_eq!(arguments["x"], 1);
                 assert_eq!(output, Some("result".to_string()));
@@ -2141,7 +2258,9 @@ mod tests {
             default_max_output_tokens: None,
         };
         let mut client = LmStudioClient::new(config);
-        let session_id = client.create_session(Some("You are helpful".to_string())).unwrap();
+        let session_id = client
+            .create_session(Some("You are helpful".to_string()))
+            .unwrap();
         assert!(!session_id.is_empty());
         assert_eq!(client.session.message_history.len(), 1);
         assert_eq!(client.session.message_history[0].role, MessageRole::System);
