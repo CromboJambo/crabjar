@@ -13,7 +13,10 @@ use reqwest::Client as HttpClient;
 use tracing::{debug, warn};
 
 use crate::config::GraphApiConfig;
-use crate::types::{GraphApiResponse, UserProfile, CalendarEventsResponse, CalendarEvent, MailMessagesResponse, PeopleResponse, ChatMessageRequest};
+use crate::types::{
+    CalendarEvent, CalendarEventsResponse, ChatMessageRequest, GraphApiResponse,
+    MailMessagesResponse, PeopleResponse, UserProfile,
+};
 
 /// Trait for acquiring Microsoft Graph API tokens.
 ///
@@ -38,12 +41,14 @@ struct TokenEntry {
 
 impl TokenEntry {
     /// Check if the token is still valid (with 5-minute buffer).
+    #[allow(clippy::duration_suboptimal_units)]
     fn is_valid(&self) -> bool {
         match self.expires_at {
             Some(expiry) => {
-                let buffer = Duration::from_mins(5);
+                let buffer = Duration::from_secs(300);
                 let elapsed = Instant::now().duration_since(self.acquired_at);
-                elapsed < (expiry - self.acquired_at) - buffer
+                let token_duration = expiry - self.acquired_at;
+                elapsed < token_duration.checked_sub(buffer).unwrap_or(Duration::ZERO)
             }
             None => true,
         }
@@ -92,15 +97,18 @@ impl GraphApiClient {
     ) -> Option<String> {
         if !force_refresh
             && let Some(ref entry) = self.token_cache
-                && entry.is_valid() {
-                    debug!(
-                        time_until_expiry = ?entry.expires_at.map(|e| e.saturating_duration_since(Instant::now())),
-                        "Using cached Graph API token"
-                    );
-                    return Some(entry.token.clone());
-                }
+            && entry.is_valid()
+        {
+            debug!(
+                time_until_expiry = ?entry.expires_at.map(|e| e.saturating_duration_since(Instant::now())),
+                "Using cached Graph API token"
+            );
+            return Some(entry.token.clone());
+        }
 
-        let token = provider.acquire_token("https://graph.microsoft.com", force_refresh).await?;
+        let token = provider
+            .acquire_token("https://graph.microsoft.com", force_refresh)
+            .await?;
 
         self.token_cache = Some(TokenEntry {
             token: token.clone(),
@@ -188,11 +196,19 @@ impl GraphApiClient {
     }
 
     /// Get current user profile from Graph API (`/me`).
-    pub async fn get_user_profile<P: TokenProvider>(        &mut self,
+    pub async fn get_user_profile<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
     ) -> GraphApiResponse<UserProfile> {
         match self
-            .make_request(provider, "/me", &reqwest::Method::GET, &Default::default(), &Default::default(), None)
+            .make_request(
+                provider,
+                "/me",
+                &reqwest::Method::GET,
+                &Default::default(),
+                &Default::default(),
+                None,
+            )
             .await
         {
             Ok(resp) => {
@@ -217,7 +233,8 @@ impl GraphApiClient {
     }
 
     /// Get calendar events with optional `OData` query options.
-    pub async fn get_calendar_events<P: TokenProvider>(        &mut self,
+    pub async fn get_calendar_events<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         params: std::collections::HashMap<String, String>,
     ) -> GraphApiResponse<CalendarEventsResponse> {
@@ -229,7 +246,14 @@ impl GraphApiClient {
         };
 
         match self
-            .make_request(provider, &endpoint, &reqwest::Method::GET, &params, &Default::default(), None)
+            .make_request(
+                provider,
+                &endpoint,
+                &reqwest::Method::GET,
+                &params,
+                &Default::default(),
+                None,
+            )
             .await
         {
             Ok(resp) => {
@@ -248,7 +272,8 @@ impl GraphApiClient {
     }
 
     /// Get calendar view for a time range (ISO 8601 date strings).
-    pub async fn get_calendar_view<P: TokenProvider>(        &mut self,
+    pub async fn get_calendar_view<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         start_datetime: impl Into<String>,
         end_datetime: impl Into<String>,
@@ -266,7 +291,14 @@ impl GraphApiClient {
         };
 
         match self
-            .make_request(provider, &endpoint, &reqwest::Method::GET, &params, &Default::default(), None)
+            .make_request(
+                provider,
+                &endpoint,
+                &reqwest::Method::GET,
+                &params,
+                &Default::default(),
+                None,
+            )
             .await
         {
             Ok(resp) => {
@@ -285,12 +317,20 @@ impl GraphApiClient {
     }
 
     /// Create a calendar event.
-    pub async fn create_calendar_event<P: TokenProvider>(        &mut self,
+    pub async fn create_calendar_event<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         event: serde_json::Value,
     ) -> GraphApiResponse<CalendarEvent> {
         match self
-            .make_request(provider, "/me/calendar/events", &reqwest::Method::POST, &Default::default(), &Default::default(), Some(event))
+            .make_request(
+                provider,
+                "/me/calendar/events",
+                &reqwest::Method::POST,
+                &Default::default(),
+                &Default::default(),
+                Some(event),
+            )
             .await
         {
             Ok(resp) => {
@@ -313,7 +353,8 @@ impl GraphApiClient {
     }
 
     /// Update a calendar event by ID.
-    pub async fn update_calendar_event<P: TokenProvider>(        &mut self,
+    pub async fn update_calendar_event<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         event_id: impl Into<String>,
         updates: serde_json::Value,
@@ -322,7 +363,14 @@ impl GraphApiClient {
         let endpoint = format!("/me/calendar/events/{event_id_str}");
 
         match self
-            .make_request(provider, &endpoint, &reqwest::Method::PATCH, &Default::default(), &Default::default(), Some(updates))
+            .make_request(
+                provider,
+                &endpoint,
+                &reqwest::Method::PATCH,
+                &Default::default(),
+                &Default::default(),
+                Some(updates),
+            )
             .await
         {
             Ok(resp) => {
@@ -341,7 +389,8 @@ impl GraphApiClient {
     }
 
     /// Delete a calendar event by ID.
-    pub async fn delete_calendar_event<P: TokenProvider>(        &mut self,
+    pub async fn delete_calendar_event<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         event_id: impl Into<String>,
     ) -> GraphApiResponse<serde_json::Value> {
@@ -349,7 +398,14 @@ impl GraphApiClient {
         let endpoint = format!("/me/calendar/events/{event_id_str}");
 
         match self
-            .make_request(provider, &endpoint, &reqwest::Method::DELETE, &Default::default(), &Default::default(), None)
+            .make_request(
+                provider,
+                &endpoint,
+                &reqwest::Method::DELETE,
+                &Default::default(),
+                &Default::default(),
+                None,
+            )
             .await
         {
             Ok(_resp) => {
@@ -361,7 +417,8 @@ impl GraphApiClient {
     }
 
     /// Get mail messages with optional `OData` query options.
-    pub async fn get_mail_messages<P: TokenProvider>(        &mut self,
+    pub async fn get_mail_messages<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         params: std::collections::HashMap<String, String>,
     ) -> GraphApiResponse<MailMessagesResponse> {
@@ -373,7 +430,14 @@ impl GraphApiClient {
         };
 
         match self
-            .make_request(provider, &endpoint, &reqwest::Method::GET, &params, &Default::default(), None)
+            .make_request(
+                provider,
+                &endpoint,
+                &reqwest::Method::GET,
+                &params,
+                &Default::default(),
+                None,
+            )
             .await
         {
             Ok(resp) => {
@@ -392,7 +456,8 @@ impl GraphApiClient {
     }
 
     /// Search people using the People API.
-    pub async fn search_people<P: TokenProvider>(        &mut self,
+    pub async fn search_people<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         query: impl Into<String>,
         extra_params: std::collections::HashMap<String, String>,
@@ -413,7 +478,14 @@ impl GraphApiClient {
         };
 
         match self
-            .make_request(provider, &endpoint, &reqwest::Method::GET, &params, &Default::default(), None)
+            .make_request(
+                provider,
+                &endpoint,
+                &reqwest::Method::GET,
+                &params,
+                &Default::default(),
+                None,
+            )
             .await
         {
             Ok(resp) => {
@@ -432,7 +504,8 @@ impl GraphApiClient {
     }
 
     /// Send a chat message to a chat thread.
-    pub async fn send_chat_message<P: TokenProvider>(        &mut self,
+    pub async fn send_chat_message<P: TokenProvider>(
+        &mut self,
         provider: &mut P,
         chat_id: impl Into<String>,
         content: impl Into<String>,
@@ -444,7 +517,14 @@ impl GraphApiClient {
         let endpoint = format!("/chats/{chat_id_str}/messages");
 
         match self
-            .make_request(provider, &endpoint, &reqwest::Method::POST, &Default::default(), &Default::default(), Some(body))
+            .make_request(
+                provider,
+                &endpoint,
+                &reqwest::Method::POST,
+                &Default::default(),
+                &Default::default(),
+                Some(body),
+            )
             .await
         {
             Ok(resp) => {
@@ -460,7 +540,11 @@ impl GraphApiClient {
                         error = %error_text.chars().take(100).collect::<String>(),
                         "Send message failed"
                     );
-                    GraphApiResponse::err(format!("API returned status {}: {}", status, error_text.chars().take(200).collect::<String>()))
+                    GraphApiResponse::err(format!(
+                        "API returned status {}: {}",
+                        status,
+                        error_text.chars().take(200).collect::<String>()
+                    ))
                 }
             }
             Err(e) => GraphApiResponse::err(format!("Request failed: {e}")),
