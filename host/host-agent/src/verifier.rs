@@ -12,16 +12,14 @@ impl Verifier {
 
     /// Run all verification steps on the WorkItem.
     pub fn verify(&self, work_item: &mut WorkItem) -> VerificationResult {
-        let mut checks = Vec::new();
-
-        // Check 1: cargo check (compile)
-        checks.push(self.check_cargo_check(work_item));
-
-        // Check 2: cargo clippy
-        checks.push(self.check_clippy(work_item));
-
-        // Check 3: cargo fmt --check
-        checks.push(self.check_fmt(work_item));
+        let checks = vec![
+            // Check 1: cargo check (compile)
+            self.check_cargo_check(work_item),
+            // Check 2: cargo clippy
+            self.check_clippy(work_item),
+            // Check 3: cargo fmt --check
+            self.check_fmt(work_item),
+        ];
 
         let all_passed = checks.iter().all(|c| c.passed);
         VerificationResult {
