@@ -1,7 +1,13 @@
 //! The unified LM Studio client that abstracts endpoint differences.
+//!
+//! Every outbound prompt is wrapped in a `PromptEnvelope` before sending,
+//! providing instruction-hijack defense and provenance tracking.
 
 use super::endpoints::{anthropic, native, openai};
 use super::error::{LmStudioError, ToolCallInfo};
+use super::prompt_envelope::{
+    PromptEnvelope, PromptValidator, SourceLabel,
+};
 use super::session::{SessionError, SessionState, SessionStore};
 use super::types::*;
 use tracing::{info, warn};
@@ -112,6 +118,10 @@ impl LmStudioClient {
     }
 
     /// Sends a chat request and returns the unified response.
+    ///
+    /// The user input is wrapped in a `PromptEnvelope` with `SourceLabel::UserInput`
+    /// and validated before being sent to the model. Returns `LmStudioError::PromptError`
+    /// if the envelope fails validation (e.g., injection detected).
     pub async fn chat(&mut self, user_input: String) -> Result<UnifiedChatResponse, LmStudioError> {
         // Determine the previous response ID based on the endpoint.
         let previous_response_id = match self.config.endpoint {
@@ -119,15 +129,46 @@ impl LmStudioClient {
             _ => None,
         };
 
-        // Build the unified request.
-        let req = UnifiedChatRequest::from_config(&self.config, user_input, previous_response_id);
+        // Get the system prompt for this session (or use default).
+        let system_prompt = self
+            .session
+            .message_history
+            .iter()
+            .find(|m| m.role == MessageRole::System)
+            .map(|m| m.content.clone())
+            .unwrap_or_else(|| "You are a helpful assistant.".to_string());
+
+        // Build the prompt envelope with the user input.
+        let session_id = self
+            .current_session_id
+            .clone()
+            .unwrap_or_else(|| "no-session".to_string());
+        let envelope = PromptEnvelope::from_raw(
+            system_prompt,
+            SourceLabel::SystemConfig,
+            user_input,
+            SourceLabel::UserInput,
+            session_id,
+            self.config.endpoint,
+        );
+
+        // Validate the envelope before sending.
+        if let Err(e) = PromptValidator::validate(&envelope) {
+            warn!("Prompt envelope validation failed: {}", e);
+            return Err(LmStudioError::PromptError(e.to_string()));
+        }
+
+        // Build the unified request from the validated envelope.
+        let req = UnifiedChatRequest::from_config(&self.config, envelope.user_content_str().to_string(), previous_response_id);
+        let mut req_with_system = req;
+        req_with_system.system_prompt = Some(envelope.system_content().to_string());
 
         // Convert to endpoint-specific format and send.
         let response = match self.config.endpoint {
-            LmStudioEndpoint::Native => self.send_native(&req).await,
-            LmStudioEndpoint::Openai => self.send_openai(&req).await,
-            LmStudioEndpoint::Anthropic => self.send_anthropic(&req).await,
-            LmStudioEndpoint::MistralRsServe => self.send_openai(&req).await,
+            LmStudioEndpoint::Native => self.send_native(&req_with_system).await,
+            LmStudioEndpoint::Openai => self.send_openai(&req_with_system).await,
+            LmStudioEndpoint::Anthropic => self.send_anthropic(&req_with_system).await,
+            LmStudioEndpoint::MistralRsServe => self.send_openai(&req_with_system).await,
         }?;
 
         // Update session state with the response.
@@ -142,6 +183,10 @@ impl LmStudioClient {
     }
 
     /// Sends a chat request with a system prompt.
+    ///
+    /// The system prompt is wrapped with `SourceLabel::SystemInject` and
+    /// validated. The user input is wrapped with `SourceLabel::UserInput`.
+    /// Both are validated before being sent to the model.
     pub async fn chat_with_system(
         &mut self,
         system_prompt: String,
@@ -152,15 +197,36 @@ impl LmStudioClient {
             _ => None,
         };
 
-        let mut req =
-            UnifiedChatRequest::from_config(&self.config, user_input, previous_response_id);
-        req.system_prompt = Some(system_prompt);
+        // Build the prompt envelope with the provided system prompt.
+        let session_id = self
+            .current_session_id
+            .clone()
+            .unwrap_or_else(|| "no-session".to_string());
+        let envelope = PromptEnvelope::from_raw(
+            system_prompt,
+            SourceLabel::SystemInject,
+            user_input,
+            SourceLabel::UserInput,
+            session_id,
+            self.config.endpoint,
+        );
+
+        // Validate the envelope before sending.
+        if let Err(e) = PromptValidator::validate(&envelope) {
+            warn!("Prompt envelope validation failed: {}", e);
+            return Err(LmStudioError::PromptError(e.to_string()));
+        }
+
+        // Build the unified request from the validated envelope.
+        let req = UnifiedChatRequest::from_config(&self.config, envelope.user_content_str().to_string(), previous_response_id);
+        let mut req_with_system = req;
+        req_with_system.system_prompt = Some(envelope.system_content().to_string());
 
         let response = match self.config.endpoint {
-            LmStudioEndpoint::Native => self.send_native(&req).await,
-            LmStudioEndpoint::Openai => self.send_openai(&req).await,
-            LmStudioEndpoint::Anthropic => self.send_anthropic(&req).await,
-            LmStudioEndpoint::MistralRsServe => self.send_openai(&req).await,
+            LmStudioEndpoint::Native => self.send_native(&req_with_system).await,
+            LmStudioEndpoint::Openai => self.send_openai(&req_with_system).await,
+            LmStudioEndpoint::Anthropic => self.send_anthropic(&req_with_system).await,
+            LmStudioEndpoint::MistralRsServe => self.send_openai(&req_with_system).await,
         }?;
 
         self.session.update_with_response(&response);

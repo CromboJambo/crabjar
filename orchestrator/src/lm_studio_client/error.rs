@@ -37,6 +37,9 @@ pub enum LmStudioError {
     },
     #[error("session error: {0}")]
     SessionError(String),
+
+    #[error("prompt error: {0}")]
+    PromptError(String),
 }
 
 // ---------------------------------------------------------------------------

@@ -35,6 +35,7 @@ chrono.workspace = true
 rusqlite.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sha2 = "0.10"
 
 # Security layer
 crabjar-guard = { path = "../guard" }
