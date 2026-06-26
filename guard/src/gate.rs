@@ -129,6 +129,25 @@ impl<'a> ExecutionGate<'a> {
             return Ok(gate_result);
         }
 
+        // 6. Scope isolation check
+        if let (Some(ref actor_scope), Some(ref target_scope)) = (&ctx.scope, &ctx.target_scope) {
+            if !actor_scope.can_access(target_scope) {
+                let reason = format!(
+                    "Scope isolation: {} cannot access {}",
+                    actor_scope.to_scope_string(),
+                    target_scope.to_scope_string()
+                );
+                warn!(
+                    action = %ctx.action_type,
+                    actor = %actor_scope,
+                    target = %target_scope,
+                    %reason,
+                    "Scope isolation blocked"
+                );
+                return Ok(GateResult::Interrupted { reason });
+            }
+        }
+
         // 7. Command risk assessment
         let risk = self.assess_command_risk(ctx.command, &ctx.args);
         match risk {
@@ -293,6 +312,10 @@ pub struct GateContext<'a> {
     pub can_interrupt: bool,
     /// PID of the calling process (for pid_trust lookup)
     pub pid: Option<i32>,
+    /// Scope of the action — project/identity isolation
+    pub scope: Option<crate::scope::Scope>,
+    /// Scope of the target resource being accessed
+    pub target_scope: Option<crate::scope::Scope>,
 }
 
 /// Risk level for a command. Higher risk means more scrutiny.
@@ -431,6 +454,8 @@ mod tests {
             source_event_id: Some("evt-1"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -470,6 +495,8 @@ mod tests {
             source_event_id: Some("evt-2"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -509,6 +536,8 @@ mod tests {
             source_event_id: Some("evt-4"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -530,6 +559,8 @@ mod tests {
             source_event_id: Some("evt-dry-run"),
             can_interrupt: false,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -569,6 +600,8 @@ mod tests {
             source_event_id: Some("evt-5"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -608,6 +641,8 @@ mod tests {
             source_event_id: Some("evt-6"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -629,6 +664,8 @@ mod tests {
             source_event_id: Some("evt-7"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -650,6 +687,8 @@ mod tests {
             source_event_id: Some("nonexistent-provenance"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
@@ -689,6 +728,8 @@ mod tests {
             source_event_id: Some("evt-1"),
             can_interrupt: true,
             pid: None,
+            scope: None,
+            target_scope: None,
         };
 
         let result = gate.check(ctx).unwrap();
