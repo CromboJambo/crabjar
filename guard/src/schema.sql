@@ -81,8 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_reviews_action ON review_records(action);
 CREATE INDEX IF NOT EXISTS idx_reviews_time ON review_records(created_at DESC);
 
 -- ============================================================================
--- Action Tracking: requests and outcomes
--- ============================================================================
+|-- Action Tracking: requests and outcomes
+|-- ============================================================================
 CREATE TABLE IF NOT EXISTS action_requests (
     id TEXT PRIMARY KEY,
     source_event_id TEXT,
@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS action_requests (
     gate_result TEXT,
     requested_at INTEGER NOT NULL DEFAULT (unixepoch()),
     resolved_at INTEGER,
+    scope_actor TEXT,
+    scope_target TEXT,
     FOREIGN KEY (source_node_id) REFERENCES memory_nodes(id) ON DELETE SET NULL
 );
 
