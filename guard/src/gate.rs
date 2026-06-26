@@ -130,8 +130,8 @@ impl<'a> ExecutionGate<'a> {
         }
 
         // 6. Scope isolation check
-        if let (Some(ref actor_scope), Some(ref target_scope)) = (&ctx.scope, &ctx.target_scope) {
-            if !actor_scope.can_access(target_scope) {
+        if let (Some(actor_scope), Some(target_scope)) = (&ctx.scope, &ctx.target_scope) {
+            if !actor_scope.can_access(&target_scope) {
                 let reason = format!(
                     "Scope isolation: {} cannot access {}",
                     actor_scope.to_scope_string(),
