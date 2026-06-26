@@ -17,3 +17,12 @@ test:
 
 clean:
     cargo clean
+
+# Report module sizes across the workspace
+# Fails if any module exceeds threshold (default: 500)
+module-sizes +threshold='500':
+    python scripts/module-sizes.py --threshold {{threshold}}
+
+# CI gate: fail if any module exceeds threshold
+module-sizes-check +threshold='500':
+    python scripts/module-sizes.py --threshold {{threshold}}
