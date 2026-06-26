@@ -150,17 +150,38 @@ Codex doesn't contribute architecture — it sets the standard. These are non-ne
 
 - [ ] Domain allowlist — restrict which external tools/domains are callable (guard integration)
 - [x] Action policy — destructive actions require user permission (implemented in concierge.rs)
-- [ ] Code quality gates — module size limits, async conventions
+- [x] Code quality gates — module size limits + CI gate (see 3.2 below)
 - [ ] Drift governance — detect when state-docs diverge from reality (partially done via `skill-reference-store`)
 
-### 3.2 Module Size Governance ❌ NOT STARTED
+### 3.2 Module Size Governance ✅ PARTIALLY DONE
 
-No module size enforcement exists. No `cargo-declared` or custom script to report module sizes. No 500-line cap. Current largest modules: `guard/src/types.rs` (775 LoC), `guard/src/gate.rs` (697 LoC), `guard/src/fingerprint.rs` (585 LoC), `guard/src/concierge.rs` (541 LoC), `guard/src/guard_db.rs` (511 LoC).
+**Status:** Infrastructure in place, guard crate split.
 
-- [ ] Add `cargo-declared` or custom script to report module sizes
-- [ ] Identify modules exceeding 500 lines
-- [ ] Split largest offenders
-- [ ] Add to CI gate
+- [x] Add `just module-sizes` target (reports modules exceeding threshold)
+- [x] Add `just module-sizes-check` CI gate (fails on >500 LoC)
+- [x] Add CI job to `.github/workflows/rust.yml`
+- [x] Split `guard/src/types.rs` (775 LoC) → `trust.rs`, `memory_types.rs`, `action.rs`, `inference.rs`
+- [x] Split `guard/src/gate.rs` (738 LoC) → `gate.rs`, `gate_context.rs`, `gate_result.rs`, `command_risk.rs`, `risk_config.rs`
+- [x] Split `guard/src/memory.rs` → moved `MemoryGraph` into `memory.rs` (DB-backed impl)
+- [ ] Split `guard/src/guard_db.rs` (640 LoC)
+- [ ] Split `guard/src/trust_resolution.rs` (641 LoC)
+- [ ] Split `guard/src/fingerprint.rs` (585 LoC)
+- [ ] Split `guard/src/concierge.rs` (541 LoC)
+- [ ] Document 500 LoC rule in AGENTS.md
+
+**Why this matters:** Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy.
+
+**Current guard crate modules (post-split):**
+- `trust.rs` — TrustScore, TrustLayer, TrustManager, ReviewAction, AnnealConfig, RetrievalBand (406 LoC)
+- `memory_types.rs` — NodeKind, MemoryNode, EdgeRelation, MemoryEdge (193 LoC)
+- `memory.rs` — MemoryGraph DB-backed impl (380 LoC)
+- `action.rs` — ActionStatus, OutcomeStatus, ActionRequest, ActionOutcome (318 LoC)
+- `inference.rs` — ModelInferenceKind, ModelInferenceRequest, ModelInferenceOutcome (298 LoC)
+- `gate.rs` — ExecutionGate impl (480 LoC)
+- `gate_context.rs` — GateContext struct (108 LoC)
+- `gate_result.rs` — GateResult enum (88 LoC)
+- `command_risk.rs` — CommandRisk, HIGH/MEDIUM_RISK_COMMANDS (130 LoC)
+- `risk_config.rs` — RiskConfig (56 LoC)
 
 ### 3.3 Build Reproducibility ❌ NOT STARTED
 

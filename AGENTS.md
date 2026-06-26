@@ -93,6 +93,50 @@ Nested crates use `src/<crate>/src/` pattern (not flat `src/<crate>/`).
 - `snake_case` functions/variables/modules; `PascalCase` types/traits; `SCREAMING_SNAKE_CASE` constants
 - `thiserror` for library errors; `?` propagation; no `unwrap()` outside tests
 
+## Module Size Governance
+
+**500 LoC rule**: No single `.rs` module may exceed 500 lines. This is a CI gate, not a suggestion.
+
+### Rationale
+
+Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy. When a module grows past 500 LoC, it's a signal to split by concern:
+
+- **Types** → separate file (e.g., `types.rs` → `action.rs`, `trust.rs`, `memory_types.rs`)
+- **Context structs** → separate file (e.g., `GateContext`)
+- **Result types** → separate file (e.g., `GateResult`)
+- **Config** → separate file (e.g., `RiskConfig`)
+- **Risk lists** → separate file (e.g., `CommandRisk`)
+
+### How to split
+
+1. Identify the concern (types, context, config, risk, etc.)
+2. Create the new file with proper module doc comment
+3. Move the relevant types/impls
+4. Update `lib.rs` to `pub mod` the new module and re-export types
+5. Update all `use crate::` imports in other modules
+6. Run `cargo check --workspace` to verify
+
+### Tooling
+
+- `just module-sizes` — report all modules exceeding threshold (default: 500)
+- `just module-sizes-check` — CI gate (fails if any module exceeds threshold)
+- CI job: `.github/workflows/rust.yml` → `module-sizes` job
+
+### Current guard crate structure (post-split)
+
+| Module | LoC | Concern |
+|--------|-----|---------|
+| `trust.rs` | 406 | TrustScore, TrustLayer, TrustManager, ReviewAction, AnnealConfig, RetrievalBand |
+| `memory_types.rs` | 193 | NodeKind, MemoryNode, EdgeRelation, MemoryEdge |
+| `memory.rs` | 380 | MemoryGraph (DB-backed impl) |
+| `action.rs` | 318 | ActionStatus, OutcomeStatus, ActionRequest, ActionOutcome |
+| `inference.rs` | 298 | ModelInferenceKind, ModelInferenceRequest, ModelInferenceOutcome |
+| `gate.rs` | 480 | ExecutionGate impl |
+| `gate_context.rs` | 108 | GateContext struct |
+| `gate_result.rs` | 88 | GateResult enum |
+| `command_risk.rs` | 130 | CommandRisk, HIGH/MEDIUM_RISK_COMMANDS |
+| `risk_config.rs` | 56 | RiskConfig |
+
 ## Testing
 
 - `#[test]` and `#[tokio::test]`; unit tests beside code under `#[cfg(test)]`
