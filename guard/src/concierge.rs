@@ -1,7 +1,7 @@
 use crate::GateResult;
+use crate::action::ActionStatus;
 use crate::fingerprint::{ApprovalLease, ApprovalScope, InvocationFingerprint};
 use crate::guard_db::{GuardDb, GuardDbError};
-use crate::types::ActionStatus;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 use uuid::Uuid;
