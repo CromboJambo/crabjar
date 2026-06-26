@@ -58,7 +58,6 @@ The scope isolation test `test_scope_cannot_access_different_project` in `guard/
 - [x] project_map.md says "21 members" — workspace now has 23 members (confirmed via Cargo.toml)
 - [ ] Update architecture diagram with `crabjar-architecture`, `axum-mux`, `crabjar-app-teams`
 - [ ] Mark completed items with status indicators
-- [ ] Remove `train-extract` if it's no longer a workspace member
 - [x] `crabjar-architecture` added as workspace member (confirmed in Cargo.toml line 11)
 - [ ] Reflect `lm_studio_client` modularization (6 files: types, client, session, error, endpoints, mod)
 - [ ] Update generated date to June 26, 2026
@@ -146,8 +145,6 @@ No generic adapter layer exists. Channel-specific code only (host-mqtt, host-gra
 ## Priority 3: Codex Quality Constraints
 
 Codex doesn't contribute architecture — it sets the standard. These are non-negotiable quality bars.
-
-### 3.1 Linting as Policy Gates
 
 ### 3.1 Linting as Policy Gates
 
