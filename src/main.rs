@@ -454,6 +454,8 @@ async fn handle_exec(
         source_event_id: Some(reason),
         can_interrupt: true,
         pid: None,
+        scope: None,
+        target_scope: None,
     })?;
 
     // Concierge layer: persist gate result to GuardDb
