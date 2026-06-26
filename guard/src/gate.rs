@@ -1,30 +1,19 @@
+//! ExecutionGate — the single authorization boundary for all tool execution.
+//!
+//! This is the single point where the system transitions from detection to action.
+//! Detection != authorization: knowing *** happened does not grant the right to change what happens.
+
 use std::path::PathBuf;
 use tracing::{debug, info, warn};
 
-use crate::guard_db::GuardDb;
-use crate::guard_db::GuardDbError;
-use crate::trust::TrustManager;
-use crate::types::TrustScore;
-
-/// Result of a gate check
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GateResult {
-    Proceed,
-    Interrupted {
-        reason: String,
-    },
-    Pending,
-    DryRun,
-    /// Process was revoked — guide out gracefully, don't block hard.
-    Revoked {
-        reason: String,
-    },
-}
+use crate::command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
+use crate::gate_context::GateContext;
+use crate::gate_result::GateResult;
+use crate::guard_db::{GuardDb, GuardDbError};
+use crate::risk_config::RiskConfig;
+use crate::trust::{TrustManager, TrustScore};
 
 /// Execution gate that combines trust-layer gating with command security checks.
-///
-/// This is the single point where the system transitions from detection to action.
-/// Detection != authorization: knowing what happened does not grant the right to change what happens.
 pub struct ExecutionGate<'a> {
     trust: TrustManager<'a>,
     dry_run: bool,
@@ -129,7 +118,7 @@ impl<'a> ExecutionGate<'a> {
             return Ok(gate_result);
         }
 
-        // 6. Scope isolation check
+        // 7. Scope isolation check
         if let (Some(actor_scope), Some(target_scope)) = (&ctx.scope, &ctx.target_scope) {
             if !actor_scope.can_access(&target_scope) {
                 let reason = format!(
@@ -148,7 +137,7 @@ impl<'a> ExecutionGate<'a> {
             }
         }
 
-        // 7. Command risk assessment
+        // 8. Command risk assessment
         let risk = self.assess_command_risk(ctx.command, &ctx.args);
         match risk {
             CommandRisk::High => {
@@ -184,7 +173,6 @@ impl<'a> ExecutionGate<'a> {
     pub fn check_knowledge_write(&self, source: &str) -> Result<GateResult, GuardDbError> {
         match source {
             "external" => {
-                // External writes always go to quarantine — requires human promotion
                 debug!(
                     source = source,
                     "Knowledge write from external source → quarantine"
@@ -192,12 +180,11 @@ impl<'a> ExecutionGate<'a> {
                 Ok(GateResult::Pending)
             }
             "agent" | "system" => {
-                // Agent/system writes follow normal trust gating
                 debug!(source = source, "Knowledge write from trusted source");
                 Ok(GateResult::Proceed)
             }
             "user" => {
-                // User writes are trusted
+                debug!(source = source, "User writes are trusted");
                 Ok(GateResult::Proceed)
             }
             _ => {
@@ -225,7 +212,11 @@ impl<'a> ExecutionGate<'a> {
 
     /// Check PID trust layer (Option B).
     /// Returns Revoked if trust has decayed below the action's trust layer.
-    fn check_pid_trust(&self, pid: i32, command: &str) -> Result<Option<GateResult>, GuardDbError> {
+    fn check_pid_trust(
+        &self,
+        pid: i32,
+        command: &str,
+    ) -> Result<Option<GateResult>, GuardDbError> {
         let conn = self.trust.conn();
 
         let row = conn.query_row(
@@ -248,7 +239,6 @@ impl<'a> ExecutionGate<'a> {
             match row {
                 Ok(r) => r,
                 Err(rusqlite::Error::QueryReturnedNoRows) => {
-                    // No PID record — treat as layer 0 (raw, requires review)
                     return Ok(Some(GateResult::Pending));
                 }
                 Err(e) => return Err(GuardDbError::Sqlite(e)),
@@ -301,124 +291,10 @@ impl<'a> ExecutionGate<'a> {
     }
 }
 
-/// Context for gate checks
-pub struct GateContext<'a> {
-    pub action_type: &'a str,
-    pub command: &'a str,
-    pub args: Vec<String>,
-    pub trust_layer: u32,
-    pub confidence: TrustScore,
-    pub source_event_id: Option<&'a str>,
-    pub can_interrupt: bool,
-    /// PID of the calling process (for pid_trust lookup)
-    pub pid: Option<i32>,
-    /// Scope of the action — project/identity isolation
-    pub scope: Option<crate::scope::Scope>,
-    /// Scope of the target resource being accessed
-    pub target_scope: Option<crate::scope::Scope>,
-}
-
-/// Risk level for a command. Higher risk means more scrutiny.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommandRisk {
-    Low,
-    Medium,
-    High,
-    Unauthorized,
-}
-
-#[derive(Debug, Clone)]
-pub struct RiskConfig {
-    pub high_risk: Vec<String>,
-    pub medium_risk: Vec<String>,
-    pub confidence_floor: f64,
-    pub set_at: i64,
-    pub reason: String,
-    pub source: String,
-}
-
-impl Default for RiskConfig {
-    fn default() -> Self {
-        Self {
-            high_risk: HIGH_RISK_COMMANDS.iter().map(|s| s.to_string()).collect(),
-            medium_risk: MEDIUM_RISK_COMMANDS.iter().map(|s| s.to_string()).collect(),
-            confidence_floor: 0.6,
-            set_at: chrono::Utc::now().timestamp(),
-            reason: "default risk thresholds".to_string(),
-            source: "mirror-guard".to_string(),
-        }
-    }
-}
-
-impl RiskConfig {
-    pub fn with_high_risk(mut self, commands: Vec<String>) -> Self {
-        self.high_risk = commands;
-        self.set_at = chrono::Utc::now().timestamp();
-        self
-    }
-
-    pub fn with_medium_risk(mut self, commands: Vec<String>) -> Self {
-        self.medium_risk = commands;
-        self.set_at = chrono::Utc::now().timestamp();
-        self
-    }
-
-    pub fn with_confidence_floor(mut self, floor: f64) -> Self {
-        self.confidence_floor = floor.clamp(0.0, 1.0);
-        self.set_at = chrono::Utc::now().timestamp();
-        self
-    }
-}
-
-const HIGH_RISK_COMMANDS: &[&str] = &[
-    "rm",
-    "remove",
-    "del",
-    "delete",
-    "unlink",
-    "sudo",
-    "su",
-    "chmod",
-    "chown",
-    "mkfs",
-    "fdisk",
-    "dd",
-    "iptables",
-    "kill",
-    "killall",
-    "shutdown",
-    "reboot",
-    "halt",
-    "format",
-    "curl",
-    "wget",
-    "nc",
-    "netcat",
-    "socat",
-    "cp",
-    "mv",
-    "tar",
-    "zip",
-    "unzip",
-    "pip install",
-    "npm install",
-    "cargo install",
-    "apt",
-    "apt-get",
-    "yum",
-    "dnf",
-    "pacman",
-];
-
-const MEDIUM_RISK_COMMANDS: &[&str] = &[
-    "git", "clone", "checkout", "branch", "docker", "podman", "ssh", "scp", "rsync", "vim", "vi",
-    "nano", "emacs", "cargo", "rustc", "python", "pip", "node", "npm", "npx",
-];
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::TrustScore;
+    use crate::trust::TrustScore;
     use tempfile::tempdir;
 
     #[test]
