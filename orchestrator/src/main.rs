@@ -347,6 +347,8 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-tc"),
                 can_interrupt: true,
                 pid: None,
+                scope: None,
+                target_scope: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -503,6 +505,8 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-sl"),
                 can_interrupt: true,
                 pid: None,
+                scope: None,
+                target_scope: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -618,6 +622,8 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-re"),
                 can_interrupt: true,
                 pid: None,
+                scope: None,
+                target_scope: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -726,6 +732,8 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-bs"),
                 can_interrupt: true,
                 pid: None,
+                scope: None,
+                target_scope: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
