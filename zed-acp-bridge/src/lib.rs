@@ -127,6 +127,8 @@ impl AcpBridge {
                 source_event_id: None,
                 can_interrupt: true,
                 pid: None,
+                scope: None,
+                target_scope: None,
             })
             .map_err(|e| AcpBridgeError::GuardError(e.to_string()))?;
         Ok(result)
