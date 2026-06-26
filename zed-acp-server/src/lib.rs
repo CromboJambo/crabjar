@@ -208,9 +208,11 @@ impl AcpAgentServer {
                             source_event_id: source_event_id.as_deref(),
                             can_interrupt: true,
                             pid: None,
-                        });
+                            scope: None,
+                            target_scope: None,
+                            });
 
-                        match gate_result {
+                                        match gate_result {
                             Ok(GateResult::Proceed) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
