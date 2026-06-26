@@ -439,10 +439,11 @@ The `handle_chat` handler uses the `InferenceBackend` trait — switches between
 2. **Scope isolation model** — type-level project boundary enforcement
 3. **Requested-vs-effective trust resolution** — enhance guard's authorization model
 4. **Exact-invocation fingerprint approvals** — close approval smuggling gap
-5. **Prompt envelope** — instruction-hijack defense for LLM context
-6. **Per-crate AGENTS.md** — scale agent navigation to 21+ members
-7. **Product adapter pattern** — generic channel abstraction
-8. **Dual-backend persistence** — PostgreSQL + SQLite abstraction layer
+5. **Per-crate AGENTS.md** — scale agent navigation to 21+ members
+6. **Product adapter pattern** — generic channel abstraction
+7. **Dual-backend persistence** — PostgreSQL + SQLite abstraction layer
+
+**Completed from ROADMAP.md:** 2.5 Prompt Envelope (instruction-hijack defense) — `orchestrator/src/lm_studio_client/prompt_envelope.rs`, 40 tests, integrated into `chat()` and `chat_with_system()`.
 
 ---
 
