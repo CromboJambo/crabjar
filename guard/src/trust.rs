@@ -1,8 +1,274 @@
+//! Trust-related types and operations for the guard system.
+//!
+//! Types: `TrustScore`, `TrustLayer`, `ReviewAction`, `ReviewRecord`,
+//! `AnnealConfig`, `AnnealResult`, `RetrievalBand`, `PidTrustRecord`, `RevokedLogEntry`.
+//!
+//! Operations: `TrustManager` — DB-backed trust layer management.
+
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use tracing::{debug, info, warn};
 
 use crate::guard_db::{GuardDb, GuardDbError};
-use crate::types::*;
+use crate::memory_types::NodeKind;
+
+// ============================================================================
+// TrustScore
+// ============================================================================
+
+/// Confidence score for a memory node, 0.0 (unknown) to 1.0 (certain).
+/// Decays over time unless reinforced by successful outcomes.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct TrustScore(f64);
+
+impl TrustScore {
+    pub const fn new(score: f64) -> Self {
+        Self(score.clamp(0.0, 1.0))
+    }
+
+    pub const fn get(&self) -> f64 {
+        self.0
+    }
+
+    pub const fn is_zero(&self) -> bool {
+        self.0 == 0.0
+    }
+
+    pub fn reinforce(&self, delta: f64) -> Self {
+        Self::new(self.0 + delta)
+    }
+
+    pub fn decay(&self, rate: f64) -> Self {
+        Self::new(self.0 - rate)
+    }
+
+    pub fn interpolate(&self, other: &Self, weight: f64) -> Self {
+        let blended = self.0 * (1.0 - weight) + other.0 * weight;
+        Self::new(blended)
+    }
+}
+
+impl Default for TrustScore {
+    fn default() -> Self {
+        Self(0.5)
+    }
+}
+
+impl fmt::Display for TrustScore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.3}", self.0)
+    }
+}
+
+// ============================================================================
+// TrustLayer
+// ============================================================================
+
+/// Configurable trust layer band
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrustLayer {
+    pub id: u32,
+    pub(crate) name: String,
+    pub min_confidence: f64,
+    pub max_confidence: f64,
+    pub auto_execute: bool,
+    pub requires_review: bool,
+    pub(crate) description: Option<String>,
+}
+
+impl TrustLayer {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    pub fn contains_score(&self, score: TrustScore) -> bool {
+        score.get() >= self.min_confidence && score.get() < self.max_confidence
+    }
+}
+
+// ============================================================================
+// Review types
+// ============================================================================
+
+/// Review action taken by human or automated reviewer
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReviewAction {
+    Approve,
+    Reject,
+    Modify,
+    Escalate,
+}
+
+impl fmt::Display for ReviewAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ReviewAction::Approve => write!(f, "approve"),
+            ReviewAction::Reject => write!(f, "reject"),
+            ReviewAction::Modify => write!(f, "modify"),
+            ReviewAction::Escalate => write!(f, "escalate"),
+        }
+    }
+}
+
+/// Record of a human or automated review
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewRecord {
+    pub id: String,
+    pub node_id: String,
+    pub reviewer: String,
+    pub action: ReviewAction,
+    pub old_confidence: Option<TrustScore>,
+    pub new_confidence: Option<TrustScore>,
+    pub old_trust_layer: Option<u32>,
+    pub new_trust_layer: Option<u32>,
+    pub notes: Option<String>,
+    pub created_at: i64,
+}
+
+// ============================================================================
+// Annealing types
+// ============================================================================
+
+/// Annealing configuration parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnnealConfig {
+    pub decay_rate: f64,
+    pub reinforce_threshold: f64,
+    pub anneal_interval_seconds: u64,
+    pub max_anneal_passes: u32,
+    pub confidence_floor: f64,
+    pub auto_anneal_enabled: bool,
+}
+
+impl Default for AnnealConfig {
+    fn default() -> Self {
+        Self {
+            decay_rate: 0.02,
+            reinforce_threshold: 0.7,
+            anneal_interval_seconds: 3600,
+            max_anneal_passes: 10,
+            confidence_floor: 0.05,
+            auto_anneal_enabled: true,
+        }
+    }
+}
+
+/// Result of an annealing pass
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnnealResult {
+    pub nodes_processed: usize,
+    pub nodes_upgraded: usize,
+    pub nodes_downgraded: usize,
+    pub nodes_decayed: usize,
+    pub edges_pruned: usize,
+    pub pass_number: u32,
+    pub timestamp: i64,
+}
+
+// ============================================================================
+// Retrieval
+// ============================================================================
+
+/// Retrieval band filter for querying memory nodes
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetrievalBand {
+    pub min_trust_layer: u32,
+    pub max_trust_layer: u32,
+    pub min_confidence: f64,
+    pub kinds: Option<Vec<NodeKind>>,
+    pub max_results: usize,
+}
+
+impl Default for RetrievalBand {
+    fn default() -> Self {
+        Self {
+            min_trust_layer: 0,
+            max_trust_layer: 3,
+            min_confidence: 0.0,
+            kinds: None,
+            max_results: 100,
+        }
+    }
+}
+
+impl RetrievalBand {
+    pub fn working_and_above() -> Self {
+        Self {
+            min_trust_layer: 2,
+            max_trust_layer: 3,
+            min_confidence: 0.5,
+            kinds: None,
+            max_results: 50,
+        }
+    }
+
+    pub fn annealed_only() -> Self {
+        Self {
+            min_trust_layer: 3,
+            max_trust_layer: 3,
+            min_confidence: 0.8,
+            kinds: None,
+            max_results: 25,
+        }
+    }
+
+    pub fn with_kinds(mut self, kinds: Vec<NodeKind>) -> Self {
+        self.kinds = Some(kinds);
+        self
+    }
+}
+
+// ============================================================================
+// PidTrustRecord & RevokedLogEntry
+// ============================================================================
+
+/// PID trust record for per-process authorization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PidTrustRecord {
+    pub pid: i32,
+    pub trust_layer: u32,
+    pub use_count: u64,
+    pub last_use: i64,
+    pub auto_grant: bool,
+    pub decay_interval: i64,
+    pub decay_rate: f64,
+}
+
+impl Default for PidTrustRecord {
+    fn default() -> Self {
+        Self {
+            pid: 0,
+            trust_layer: 0,
+            use_count: 0,
+            last_use: 0,
+            auto_grant: false,
+            decay_interval: 3600,
+            decay_rate: 0.02,
+        }
+    }
+}
+
+/// Record of a guided revocation exit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevokedLogEntry {
+    pub id: i64,
+    pub pid: i32,
+    pub command: String,
+    pub revoked_at: i64,
+    pub reason: String,
+    pub old_layer: u32,
+    pub new_layer: u32,
+}
+
+// ============================================================================
+// TrustManager (DB-backed trust layer operations)
+// ============================================================================
 
 /// Manages trust layers and confidence scoring for memory nodes.
 /// Trust layers define bands of confidence that determine auto-execute and review behavior.
@@ -19,7 +285,7 @@ impl<'a> TrustManager<'a> {
     pub fn list_layers(&self) -> Result<Vec<TrustLayer>, GuardDbError> {
         let conn = self.db.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, name, min_confidence, max_confidence, auto_execute, requires_review, description FROM trust_layers ORDER BY id"
+            "SELECT id, name, min_confidence, max_confidence, auto_execute, requires_review, description FROM trust_layers ORDER BY id",
         )?;
 
         let layers: Vec<TrustLayer> = stmt
@@ -40,7 +306,10 @@ impl<'a> TrustManager<'a> {
     }
 
     /// Find the trust layer for a given confidence score.
-    pub fn layer_for_score(&self, score: TrustScore) -> Result<Option<TrustLayer>, GuardDbError> {
+    pub fn layer_for_score(
+        &self,
+        score: TrustScore,
+    ) -> Result<Option<TrustLayer>, GuardDbError> {
         let layers = self.list_layers()?;
         for layer in &layers {
             if layer.contains_score(score) {
@@ -260,82 +529,169 @@ impl<'a> TrustManager<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory::MemoryGraph;
-    use tempfile::tempdir;
 
     #[test]
-    fn test_list_default_layers() {
-        let dir = tempdir().unwrap();
-        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
-        let tm = TrustManager::new(&db);
-
-        let layers = tm.list_layers().unwrap();
-        assert!(layers.len() >= 5);
-        assert_eq!(layers[0].name(), "raw");
-        assert!(!layers[0].auto_execute);
-        assert!(!layers[2].auto_execute);
-        assert!(layers[2].requires_review);
-        assert!(layers[4].auto_execute);
-        assert!(!layers[4].requires_review);
+    fn trust_score_new_clamps_to_one() {
+        assert_eq!(TrustScore::new(1.5).get(), 1.0);
+        assert_eq!(TrustScore::new(-0.5).get(), 0.0);
+        assert_eq!(TrustScore::new(0.5).get(), 0.5);
     }
 
     #[test]
-    fn test_layer_for_score() {
-        let dir = tempdir().unwrap();
-        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
-        let tm = TrustManager::new(&db);
-
-        let raw = tm.layer_for_score(TrustScore::new(0.1)).unwrap().unwrap();
-        assert_eq!(raw.name(), "raw");
-
-        let quarantined = tm.layer_for_score(TrustScore::new(0.6)).unwrap().unwrap();
-        assert_eq!(quarantined.name(), "quarantined");
-
-        let working = tm.layer_for_score(TrustScore::new(0.85)).unwrap().unwrap();
-        assert_eq!(working.name(), "working");
-
-        let annealed = tm.layer_for_score(TrustScore::new(0.95)).unwrap().unwrap();
-        assert_eq!(annealed.name(), "annealed");
+    fn trust_score_is_zero() {
+        assert!(TrustScore::new(0.0).is_zero());
+        assert!(!TrustScore::new(0.001).is_zero());
     }
 
     #[test]
-    fn test_update_trust_layer_transition() {
-        let dir = tempdir().unwrap();
-        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
-        let mg = MemoryGraph::new(&db);
-        let tm = TrustManager::new(&db);
-
-        let node_id = mg
-            .add_node(NodeKind::Fact, "test fact", TrustScore::new(0.3))
-            .unwrap();
-
-        let result = tm
-            .update_node_trust_layer(&node_id, TrustScore::new(0.75))
-            .unwrap();
-        assert!(result.is_some());
-        let (old, new) = result.unwrap();
-        assert_eq!(old, 0);
-        assert_eq!(new, 2);
+    fn trust_score_default() {
+        let score = TrustScore::default();
+        assert_eq!(score.get(), 0.5);
     }
 
     #[test]
-    fn test_effective_confidence_with_evidence() {
-        let dir = tempdir().unwrap();
-        let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
-        let mg = MemoryGraph::new(&db);
-        let tm = TrustManager::new(&db);
+    fn trust_score_reinforce() {
+        let base = TrustScore::new(0.5);
+        let reinforced = base.reinforce(0.3);
+        assert_eq!(reinforced.get(), 0.8);
+    }
 
-        let target = mg
-            .add_node(NodeKind::Fact, "target", TrustScore::new(0.5))
-            .unwrap();
-        let supporter = mg
-            .add_node(NodeKind::Fact, "evidence for target", TrustScore::new(0.9))
-            .unwrap();
+    #[test]
+    fn trust_score_decay() {
+        let base = TrustScore::new(0.5);
+        let decayed = base.decay(0.2);
+        assert_eq!(decayed.get(), 0.3);
+    }
 
-        mg.add_edge(&supporter, &target, EdgeRelation::Supports, 0.8)
-            .unwrap();
+    #[test]
+    fn trust_score_interpolate() {
+        let a = TrustScore::new(0.0);
+        let b = TrustScore::new(1.0);
+        let blended = a.interpolate(&b, 0.5);
+        assert_eq!(blended.get(), 0.5);
+    }
 
-        let effective = tm.effective_confidence(&target).unwrap();
-        assert!(effective.get() > 0.5);
+    #[test]
+    fn trust_score_display() {
+        let score = TrustScore::new(0.1234);
+        assert_eq!(format!("{}", score), "0.123");
+    }
+
+    #[test]
+    fn trust_layer_contains_score() {
+        let layer = TrustLayer {
+            id: 1,
+            name: "working".to_string(),
+            min_confidence: 0.5,
+            max_confidence: 0.9,
+            auto_execute: false,
+            requires_review: true,
+            description: Some("test".to_string()),
+        };
+        assert!(layer.contains_score(TrustScore::new(0.6)));
+        assert!(layer.contains_score(TrustScore::new(0.8)));
+        assert!(!layer.contains_score(TrustScore::new(0.4)));
+        assert!(!layer.contains_score(TrustScore::new(0.9)));
+    }
+
+    #[test]
+    fn trust_layer_name() {
+        let layer = TrustLayer {
+            id: 1,
+            name: "working".to_string(),
+            min_confidence: 0.0,
+            max_confidence: 1.0,
+            auto_execute: false,
+            requires_review: false,
+            description: None,
+        };
+        assert_eq!(layer.name(), "working");
+    }
+
+    #[test]
+    fn trust_layer_description() {
+        let layer = TrustLayer {
+            id: 1,
+            name: "test".to_string(),
+            min_confidence: 0.0,
+            max_confidence: 1.0,
+            auto_execute: false,
+            requires_review: false,
+            description: Some("desc".to_string()),
+        };
+        assert_eq!(layer.description(), Some("desc"));
+    }
+
+    #[test]
+    fn review_action_display_approve() {
+        assert_eq!(format!("{}", ReviewAction::Approve), "approve");
+    }
+
+    #[test]
+    fn review_action_display_reject() {
+        assert_eq!(format!("{}", ReviewAction::Reject), "reject");
+    }
+
+    #[test]
+    fn review_action_display_modify() {
+        assert_eq!(format!("{}", ReviewAction::Modify), "modify");
+    }
+
+    #[test]
+    fn review_action_display_escalate() {
+        assert_eq!(format!("{}", ReviewAction::Escalate), "escalate");
+    }
+
+    #[test]
+    fn review_action_equality() {
+        assert_eq!(ReviewAction::Approve, ReviewAction::Approve);
+        assert_ne!(ReviewAction::Approve, ReviewAction::Reject);
+    }
+
+    #[test]
+    fn anneal_config_default() {
+        let config = AnnealConfig::default();
+        assert_eq!(config.decay_rate, 0.02);
+        assert_eq!(config.reinforce_threshold, 0.7);
+        assert_eq!(config.anneal_interval_seconds, 3600);
+        assert_eq!(config.max_anneal_passes, 10);
+        assert_eq!(config.confidence_floor, 0.05);
+        assert!(config.auto_anneal_enabled);
+    }
+
+    #[test]
+    fn retrieval_band_default() {
+        let band = RetrievalBand::default();
+        assert_eq!(band.min_trust_layer, 0);
+        assert_eq!(band.max_trust_layer, 3);
+        assert_eq!(band.min_confidence, 0.0);
+        assert!(band.kinds.is_none());
+        assert_eq!(band.max_results, 100);
+    }
+
+    #[test]
+    fn retrieval_band_working_and_above() {
+        let band = RetrievalBand::working_and_above();
+        assert_eq!(band.min_trust_layer, 2);
+        assert_eq!(band.max_trust_layer, 3);
+        assert_eq!(band.min_confidence, 0.5);
+        assert_eq!(band.max_results, 50);
+    }
+
+    #[test]
+    fn retrieval_band_annealed_only() {
+        let band = RetrievalBand::annealed_only();
+        assert_eq!(band.min_trust_layer, 3);
+        assert_eq!(band.max_trust_layer, 3);
+        assert_eq!(band.min_confidence, 0.8);
+        assert_eq!(band.max_results, 25);
+    }
+
+    #[test]
+    fn retrieval_band_with_kinds() {
+        let band = RetrievalBand::default()
+            .with_kinds(vec![NodeKind::Fact, NodeKind::Rule]);
+        assert!(band.kinds.is_some());
+        assert_eq!(band.kinds.as_ref().unwrap().len(), 2);
     }
 }

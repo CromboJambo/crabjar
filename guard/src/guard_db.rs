@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
+use crate::action::{ActionRequest, ActionStatus};
 use crate::concierge::{InterruptedLogEntry, PendingQueueEntry};
-use crate::types::*;
+use crate::trust::{AnnealConfig, TrustScore};
 
 #[derive(Debug, Error)]
 pub enum GuardDbError {
@@ -304,7 +305,7 @@ impl GuardDb {
     pub fn get_pid_trust(
         &self,
         pid: i32,
-    ) -> Result<Option<crate::types::PidTrustRecord>, GuardDbError> {
+    ) -> Result<Option<crate::trust::PidTrustRecord>, GuardDbError> {
         let conn = self.conn.lock().unwrap();
         let row = conn.query_row(
             "SELECT pid, trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate
@@ -325,7 +326,7 @@ impl GuardDb {
 
         match row {
             Ok((pid, trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate)) => {
-                Ok(Some(crate::types::PidTrustRecord {
+                Ok(Some(crate::trust::PidTrustRecord {
                     pid,
                     trust_layer,
                     use_count,
@@ -403,19 +404,19 @@ impl GuardDb {
                     action_type: row.get(3)?,
                     payload: row.get(4)?,
                     trust_layer: row.get(5)?,
-                    confidence: crate::types::TrustScore::new(
+                    confidence: crate::trust::TrustScore::new(
                         row.get::<_, String>(6)?
                             .parse::<f64>()
                             .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
                             .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
                     ),
                     status: match row.get::<_, String>(7)?.as_str() {
-                        "pending" => crate::types::ActionStatus::Pending,
-                        "trust-approved" => crate::types::ActionStatus::TrustApproved,
-                        "denied" => crate::types::ActionStatus::Denied,
-                        "executed" => crate::types::ActionStatus::Executed,
-                        "interrupted" => crate::types::ActionStatus::Interrupted,
-                        _ => crate::types::ActionStatus::Pending,
+                        "pending" => crate::action::ActionStatus::Pending,
+                        "trust-approved" => crate::action::ActionStatus::TrustApproved,
+                        "denied" => crate::action::ActionStatus::Denied,
+                        "executed" => crate::action::ActionStatus::Executed,
+                        "interrupted" => crate::action::ActionStatus::Interrupted,
+                        _ => crate::action::ActionStatus::Pending,
                     },
                     gate_result: row.get(8)?,
                     requested_at: row.get(9)?,
@@ -434,19 +435,19 @@ impl GuardDb {
                         action_type: row.get(3)?,
                         payload: row.get(4)?,
                         trust_layer: row.get(5)?,
-                        confidence: crate::types::TrustScore::new(
+                        confidence: crate::trust::TrustScore::new(
                             row.get::<_, String>(6)?
                                 .parse::<f64>()
                                 .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
                                 .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
                         ),
                         status: match row.get::<_, String>(7)?.as_str() {
-                            "pending" => crate::types::ActionStatus::Pending,
-                            "trust-approved" => crate::types::ActionStatus::TrustApproved,
-                            "denied" => crate::types::ActionStatus::Denied,
-                            "executed" => crate::types::ActionStatus::Executed,
-                            "interrupted" => crate::types::ActionStatus::Interrupted,
-                            _ => crate::types::ActionStatus::Pending,
+                            "pending" => crate::action::ActionStatus::Pending,
+                            "trust-approved" => crate::action::ActionStatus::TrustApproved,
+                            "denied" => crate::action::ActionStatus::Denied,
+                            "executed" => crate::action::ActionStatus::Executed,
+                            "interrupted" => crate::action::ActionStatus::Interrupted,
+                            _ => crate::action::ActionStatus::Pending,
                         },
                         gate_result: row.get(8)?,
                         requested_at: row.get(9)?,
@@ -538,19 +539,19 @@ impl GuardDb {
                             action_type: row.get(3)?,
                             payload: row.get(4)?,
                             trust_layer: row.get(5)?,
-                            confidence: crate::types::TrustScore::new(
+                            confidence: crate::trust::TrustScore::new(
                                 row.get::<_, String>(6)?
                                     .parse::<f64>()
                                     .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
                                     .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
                             ),
                             status: match row.get::<_, String>(7)?.as_str() {
-                                "pending" => crate::types::ActionStatus::Pending,
-                                "trust-approved" => crate::types::ActionStatus::TrustApproved,
-                                "denied" => crate::types::ActionStatus::Denied,
-                                "executed" => crate::types::ActionStatus::Executed,
-                                "interrupted" => crate::types::ActionStatus::Interrupted,
-                                _ => crate::types::ActionStatus::Pending,
+                                "pending" => crate::action::ActionStatus::Pending,
+                                "trust-approved" => crate::action::ActionStatus::TrustApproved,
+                                "denied" => crate::action::ActionStatus::Denied,
+                                "executed" => crate::action::ActionStatus::Executed,
+                                "interrupted" => crate::action::ActionStatus::Interrupted,
+                                _ => crate::action::ActionStatus::Pending,
                             },
                             gate_result: row.get(8)?,
                             requested_at: row.get(9)?,
@@ -573,19 +574,19 @@ impl GuardDb {
                                 action_type: row.get(3)?,
                                 payload: row.get(4)?,
                                 trust_layer: row.get(5)?,
-                                confidence: crate::types::TrustScore::new(
+                                confidence: crate::trust::TrustScore::new(
                                     row.get::<_, String>(6)?
                                         .parse::<f64>()
                                         .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
                                         .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
                                 ),
                                 status: match row.get::<_, String>(7)?.as_str() {
-                                    "pending" => crate::types::ActionStatus::Pending,
-                                    "trust-approved" => crate::types::ActionStatus::TrustApproved,
-                                    "denied" => crate::types::ActionStatus::Denied,
-                                    "executed" => crate::types::ActionStatus::Executed,
-                                    "interrupted" => crate::types::ActionStatus::Interrupted,
-                                    _ => crate::types::ActionStatus::Pending,
+                                    "pending" => crate::action::ActionStatus::Pending,
+                                    "trust-approved" => crate::action::ActionStatus::TrustApproved,
+                                    "denied" => crate::action::ActionStatus::Denied,
+                                    "executed" => crate::action::ActionStatus::Executed,
+                                    "interrupted" => crate::action::ActionStatus::Interrupted,
+                                    _ => crate::action::ActionStatus::Pending,
                                 },
                                 gate_result: row.get(8)?,
                                 requested_at: row.get(9)?,

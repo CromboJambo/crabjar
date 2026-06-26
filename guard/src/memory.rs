@@ -1,8 +1,14 @@
+//! Memory graph implementation — DB-backed node/edge management.
+//!
+//! `MemoryGraph` wraps GuardDb to manage memory nodes and edges.
+
 use rusqlite::params;
 use uuid::Uuid;
 
 use crate::guard_db::{GuardDb, GuardDbError};
-use crate::types::*;
+use crate::memory_types::{EdgeRelation, MemoryEdge, MemoryNode, NodeKind};
+use crate::trust::TrustScore;
+use crate::trust::RetrievalBand;
 
 /// Manages the memory graph: nodes, edges, and graph queries.
 pub struct MemoryGraph<'a> {
@@ -40,7 +46,7 @@ impl<'a> MemoryGraph<'a> {
     pub fn get_node(&self, id: &str) -> Result<Option<MemoryNode>, GuardDbError> {
         let conn = self.db.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, kind, content, trust_layer, confidence, created_at, last_touched, anneal_count, metadata FROM memory_nodes WHERE id = ?1"
+            "SELECT id, kind, content, trust_layer, confidence, created_at, last_touched, anneal_count, metadata FROM memory_nodes WHERE id = ?1",
         )?;
 
         let node = stmt
@@ -133,7 +139,7 @@ impl<'a> MemoryGraph<'a> {
     pub fn outgoing_edges(&self, node_id: &str) -> Result<Vec<MemoryEdge>, GuardDbError> {
         let conn = self.db.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, from_id, to_id, relation, weight, created_at FROM memory_edges WHERE from_id = ?1"
+            "SELECT id, from_id, to_id, relation, weight, created_at FROM memory_edges WHERE from_id = ?1",
         )?;
 
         let edges: Vec<MemoryEdge> = stmt
@@ -156,7 +162,7 @@ impl<'a> MemoryGraph<'a> {
     pub fn incoming_edges(&self, node_id: &str) -> Result<Vec<MemoryEdge>, GuardDbError> {
         let conn = self.db.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, from_id, to_id, relation, weight, created_at FROM memory_edges WHERE to_id = ?1"
+            "SELECT id, from_id, to_id, relation, weight, created_at FROM memory_edges WHERE to_id = ?1",
         )?;
 
         let edges: Vec<MemoryEdge> = stmt
@@ -184,7 +190,7 @@ impl<'a> MemoryGraph<'a> {
         let mut query = String::from(
             "SELECT n.id, n.kind, n.content, n.trust_layer, n.confidence, n.created_at, n.last_touched, n.anneal_count, n.metadata
              FROM memory_nodes n
-             WHERE n.trust_layer >= ? AND n.trust_layer <= ? AND n.confidence >= ?"
+             WHERE n.trust_layer >= ? AND n.trust_layer <= ? AND n.confidence >= ?",
         );
         let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = vec![
             Box::new(band.min_trust_layer),
@@ -195,10 +201,7 @@ impl<'a> MemoryGraph<'a> {
         if let Some(ref kinds) = band.kinds {
             query.push_str(&format!(
                 " AND n.kind IN ({})",
-                (0..kinds.len())
-                    .map(|_| "?".to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                (0..kinds.len()).map(|_| "?".to_string()).collect::<Vec<_>>().join(", ")
             ));
             for kind in kinds {
                 params.push(Box::new(format!("{}", kind)));
@@ -243,7 +246,7 @@ impl<'a> MemoryGraph<'a> {
              FROM memory_nodes
              WHERE content LIKE ?1
              ORDER BY confidence DESC
-             LIMIT ?2"
+             LIMIT ?2",
         )?;
 
         let nodes: Vec<MemoryNode> = stmt

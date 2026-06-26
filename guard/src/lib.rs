@@ -21,29 +21,43 @@
 //! - **Detection != Authorization**: Knowing what happened doesn't grant the right to act
 //! - **Every Abstraction Carries Doubt**: Outputs include uncertainty, assumptions, and staleness info
 
+pub mod action;
+pub mod command_risk;
 pub mod concierge;
 pub mod fingerprint;
 pub mod gate;
+pub mod gate_context;
+pub mod gate_result;
 pub mod guard_db;
-#[cfg(test)]
+pub mod inference;
 pub mod memory;
+pub mod memory_types;
+pub mod risk_config;
 pub mod scope;
 pub mod trust;
 pub mod trust_resolution;
-pub mod types;
 
+// Re-export types from split modules for backward compatibility
+pub use action::{ActionOutcome, ActionRequest, ActionStatus, OutcomeStatus};
+pub use command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
 pub use fingerprint::{ApprovalLease, ApprovalScope, InMemoryApprovalStore, InvocationFingerprint};
-pub use gate::{CommandRisk, ExecutionGate, GateContext, GateResult};
+pub use gate::ExecutionGate;
+pub use gate_context::GateContext;
+pub use gate_result::GateResult;
 pub use guard_db::{GuardDb, GuardDbError};
-#[cfg(test)]
 pub use memory::MemoryGraph;
+pub use memory_types::{EdgeRelation, MemoryEdge, MemoryNode, NodeKind};
+pub use risk_config::RiskConfig;
 pub use scope::{
     CrossScopeAuth, Identity, ProjectId, Scope, ScopeError, ScopedAccess, TenantId, ThreadId,
 };
-pub use trust::TrustManager;
+pub use trust::{
+    AnnealConfig, AnnealResult, PidTrustRecord, RevokedLogEntry, RetrievalBand, ReviewAction,
+    ReviewRecord, TrustLayer, TrustManager, TrustScore,
+};
 pub use trust_resolution::{
     EffectiveTrust, Policy, PolicyChain, PolicySource, RequestedTrust, TrustResolution,
     TrustResolver,
 };
-pub use types::*;
+pub use inference::{ModelInferenceKind, ModelInferenceOutcome, ModelInferenceRequest};
