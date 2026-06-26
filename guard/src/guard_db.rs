@@ -470,6 +470,135 @@ impl GuardDb {
         )?;
         Ok(())
     }
+
+    /// Persist an action request with scope information.
+    pub fn persist_action_request_with_scope(
+        &self,
+        action_id: &str,
+        source_event_id: Option<&str>,
+        source_node_id: Option<&str>,
+        action_type: &str,
+        payload: &str,
+        trust_layer: u32,
+        confidence: f64,
+        scope_actor: Option<&str>,
+        scope_target: Option<&str>,
+    ) -> Result<(), GuardDbError> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO action_requests \
+             (id, source_event_id, source_node_id, action_type, payload, trust_layer, \
+              confidence, status, requested_at, scope_actor, scope_target) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', unixepoch(), ?8, ?9)",
+            params![
+                action_id,
+                source_event_id,
+                source_node_id,
+                action_type,
+                payload,
+                trust_layer,
+                confidence.to_string(),
+                scope_actor,
+                scope_target,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Read action requests with scope information.
+    pub fn read_action_requests_with_scope(
+        &self,
+        status: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<(ActionRequest, Option<String>, Option<String>)>, GuardDbError> {
+        let conn = self.conn.lock().unwrap();
+
+        let query = if let Some(_s) = status {
+            "SELECT id, source_event_id, source_node_id, action_type, payload, trust_layer, \
+             confidence, status, gate_result, requested_at, resolved_at, scope_actor, scope_target \
+             FROM action_requests WHERE status = ? ORDER BY requested_at DESC LIMIT ?"
+                .to_string()
+        } else {
+            "SELECT id, source_event_id, source_node_id, action_type, payload, trust_layer, \
+             confidence, status, gate_result, requested_at, resolved_at, scope_actor, scope_target \
+             FROM action_requests ORDER BY requested_at DESC LIMIT ?"
+                .to_string()
+        };
+
+        let mut stmt = conn.prepare(&query)?;
+
+        let entries: Vec<(ActionRequest, Option<String>, Option<String>)> =
+            if let Some(s) = status {
+                stmt.query_map(params![s, limit as i64], |row| {
+                    Ok((
+                        ActionRequest {
+                            id: row.get(0)?,
+                            source_event_id: row.get(1)?,
+                            source_node_id: row.get(2)?,
+                            action_type: row.get(3)?,
+                            payload: row.get(4)?,
+                            trust_layer: row.get(5)?,
+                            confidence: crate::types::TrustScore::new(
+                                row.get::<_, String>(6)?
+                                    .parse::<f64>()
+                                    .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
+                                    .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
+                            ),
+                            status: match row.get::<_, String>(7)?.as_str() {
+                                "pending" => crate::types::ActionStatus::Pending,
+                                "trust-approved" => crate::types::ActionStatus::TrustApproved,
+                                "denied" => crate::types::ActionStatus::Denied,
+                                "executed" => crate::types::ActionStatus::Executed,
+                                "interrupted" => crate::types::ActionStatus::Interrupted,
+                                _ => crate::types::ActionStatus::Pending,
+                            },
+                            gate_result: row.get(8)?,
+                            requested_at: row.get(9)?,
+                            resolved_at: row.get(10)?,
+                        },
+                        row.get(11)?,
+                        row.get(12)?,
+                    ))
+                })?
+                .collect::<Result<_, _>>()?
+            } else {
+                let mut stmt2 = conn.prepare(&query)?;
+                stmt2
+                    .query_map(params![limit as i64], |row| {
+                        Ok((
+                            ActionRequest {
+                                id: row.get(0)?,
+                                source_event_id: row.get(1)?,
+                                source_node_id: row.get(2)?,
+                                action_type: row.get(3)?,
+                                payload: row.get(4)?,
+                                trust_layer: row.get(5)?,
+                                confidence: crate::types::TrustScore::new(
+                                    row.get::<_, String>(6)?
+                                        .parse::<f64>()
+                                        .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
+                                        .map_err(|_e| rusqlite::Error::QueryReturnedNoRows)?,
+                                ),
+                                status: match row.get::<_, String>(7)?.as_str() {
+                                    "pending" => crate::types::ActionStatus::Pending,
+                                    "trust-approved" => crate::types::ActionStatus::TrustApproved,
+                                    "denied" => crate::types::ActionStatus::Denied,
+                                    "executed" => crate::types::ActionStatus::Executed,
+                                    "interrupted" => crate::types::ActionStatus::Interrupted,
+                                    _ => crate::types::ActionStatus::Pending,
+                                },
+                                gate_result: row.get(8)?,
+                                requested_at: row.get(9)?,
+                                resolved_at: row.get(10)?,
+                            },
+                            row.get(11)?,
+                            row.get(12)?,
+                        ))
+                    })?
+                    .collect::<Result<_, _>>()?
+            };
+        Ok(entries)
+    }
 }
 
 #[cfg(test)]
