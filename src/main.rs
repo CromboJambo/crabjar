@@ -744,6 +744,39 @@ fn handle_guard_command(
                 },
             }))
         }
+        GuardCommand::Resolution { limit, effective_layer } => {
+            let entries = guard_db.list_trust_resolutions(effective_layer, limit)?;
+            let items: Vec<serde_json::Value> = entries
+                .iter()
+                .map(|e| {
+                    json!({
+                        "id": e.id,
+                        "action_id": e.action_id,
+                        "requested_layer": e.requested_layer,
+                        "requested_confidence": e.requested_confidence,
+                        "requested_source": e.requested_source,
+                        "effective_layer": e.effective_layer,
+                        "effective_confidence": e.effective_confidence,
+                        "effective_by": e.effective_by,
+                        "scope_actor": e.scope_actor,
+                        "scope_target": e.scope_target,
+                        "applied_policies": e.applied_policies,
+                        "resolved_at": e.resolved_at,
+                    })
+                })
+                .collect();
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "resolution": {
+                        "limit": limit,
+                        "effective_layer_filter": effective_layer,
+                        "entries": items,
+                        "total": items.len(),
+                    },
+                },
+            }))
+        }
     }
 }
 
