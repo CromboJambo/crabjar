@@ -1,5 +1,4 @@
-/// Risk configuration — high/medium risk command lists, confidence floor.
-
+//! Risk configuration — high/medium risk command lists, confidence floor.
 use chrono;
 
 use super::command_risk::{HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};

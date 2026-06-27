@@ -1,5 +1,4 @@
-/// Gate context — the data needed for a gate check.
-
+//! Gate context — the data needed for a gate check.
 use crate::trust::TrustScore;
 
 /// Context for gate checks.

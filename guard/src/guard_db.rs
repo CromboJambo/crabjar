@@ -1,11 +1,7 @@
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-
-use crate::action::{ActionRequest, ActionStatus};
-use crate::concierge::{InterruptedLogEntry, PendingQueueEntry};
-use crate::trust::{AnnealConfig, TrustScore};
 
 #[derive(Debug, Error)]
 pub enum GuardDbError {

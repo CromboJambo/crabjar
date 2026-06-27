@@ -45,6 +45,7 @@ pub struct ModelInferenceRequest {
 }
 
 impl ModelInferenceRequest {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: impl Into<String>,
         provenance_id: impl Into<String>,
@@ -146,6 +147,8 @@ impl ModelInferenceOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::ActionStatus;
+    use crate::trust_types::TrustScore;
 
     #[test]
     fn model_inference_kind_display_prompt() {
@@ -195,12 +198,12 @@ mod tests {
             ModelInferenceKind::Prompt,
             "Hello, world!",
             2,
-            super::TrustScore::new(0.7),
+            TrustScore::new(0.7),
         );
         assert_eq!(request.id, "inference-1");
         assert_eq!(request.model_name, "gpt-4");
         assert_eq!(request.trust_layer, 2);
-        assert_eq!(request.status, super::ActionStatus::Pending);
+        assert_eq!(request.status, crate::action::ActionStatus::Pending);
         assert!(request.context.is_empty());
         assert!(request.skill_refs.is_empty());
     }
@@ -215,7 +218,7 @@ mod tests {
             ModelInferenceKind::ContextAugmented,
             "test",
             2,
-            super::TrustScore::new(0.5),
+            TrustScore::new(0.5),
         )
         .with_context(vec!["context1".to_string(), "context2".to_string()]);
         assert_eq!(request.context.len(), 2);
@@ -231,7 +234,7 @@ mod tests {
             ModelInferenceKind::SkillAugmented,
             "test",
             2,
-            super::TrustScore::new(0.5),
+            TrustScore::new(0.5),
         )
         .with_skill_refs(vec!["skill1".to_string()]);
         assert_eq!(request.skill_refs.len(), 1);
@@ -247,10 +250,10 @@ mod tests {
             ModelInferenceKind::Prompt,
             "test",
             2,
-            super::TrustScore::new(0.5),
+            TrustScore::new(0.5),
         )
         .mark_approved();
-        assert_eq!(request.status, super::ActionStatus::TrustApproved);
+        assert_eq!(request.status, crate::action::ActionStatus::TrustApproved);
     }
 
     #[test]
@@ -263,10 +266,10 @@ mod tests {
             ModelInferenceKind::Prompt,
             "test",
             2,
-            super::TrustScore::new(0.5),
+            TrustScore::new(0.5),
         )
         .mark_denied();
-        assert_eq!(request.status, super::ActionStatus::Denied);
+        assert_eq!(request.status, crate::action::ActionStatus::Denied);
     }
 
     #[test]
@@ -279,10 +282,10 @@ mod tests {
             ModelInferenceKind::Prompt,
             "test",
             2,
-            super::TrustScore::new(0.5),
+            TrustScore::new(0.5),
         )
         .mark_resolved();
-        assert_eq!(request.status, super::ActionStatus::Executed);
+        assert_eq!(request.status, crate::action::ActionStatus::Executed);
         assert!(request.resolved_at.is_some());
     }
 

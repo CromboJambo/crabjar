@@ -24,17 +24,23 @@
 pub mod action;
 pub mod command_risk;
 pub mod concierge;
+pub mod concierge_types;
 pub mod fingerprint;
+pub mod fingerprint_types;
 pub mod gate;
 pub mod gate_context;
 pub mod gate_result;
+#[cfg(test)]
+pub mod gate_tests;
 pub mod guard_db;
+pub mod guard_db_impl;
 pub mod inference;
 pub mod memory;
 pub mod memory_types;
 pub mod risk_config;
 pub mod scope;
 pub mod trust;
+pub mod trust_types;
 pub mod trust_resolution;
 
 // Re-export types from split modules for backward compatibility

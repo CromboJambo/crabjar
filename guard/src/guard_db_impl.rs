@@ -1,7 +1,16 @@
+use rusqlite::params;
+
+use crate::action::ActionRequest;
+use crate::action::ActionStatus;
+use crate::concierge_types::{InterruptedLogEntry, PendingQueueEntry};
+use crate::guard_db::{GuardDb, GuardDbError};
+use crate::trust_types::AnnealConfig;
+
+impl GuardDb {
     // -- Anneal config helpers --
 
     pub fn load_anneal_config(&self) -> Result<AnnealConfig, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare("SELECT key, value FROM anneal_config")?;
 
         let rows = stmt.query_map([], |row| {
@@ -37,7 +46,7 @@
     }
 
     pub fn save_anneal_config(&self, config: &AnnealConfig) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "INSERT OR REPLACE INTO anneal_config (key, value) VALUES ('decay_rate', ?1)",
             params![config.decay_rate.to_string()],
@@ -69,7 +78,7 @@
         &self,
         entry: &PendingQueueEntry,
     ) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "INSERT INTO pending_queue (id, gate_result_id, action_type, command, args, trust_layer, confidence, source_event_id, queued_at, reason)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -94,7 +103,7 @@
         &self,
         entry: &InterruptedLogEntry,
     ) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "INSERT INTO interrupted_log (id, gate_result_id, action_type, command, args, trust_layer, source_event_id, reason, logged_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -115,7 +124,7 @@
     }
 
     pub fn read_pending_queue(&self) -> Result<Vec<PendingQueueEntry>, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT id, gate_result_id, action_type, command, args, trust_layer, confidence, source_event_id, queued_at, reason FROM pending_queue ORDER BY queued_at DESC",
         )?;
@@ -143,7 +152,7 @@
     }
 
     pub fn read_interrupted_log(&self) -> Result<Vec<InterruptedLogEntry>, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let mut stmt = conn.prepare(
             "SELECT id, gate_result_id, action_type, command, args, trust_layer, source_event_id, reason, logged_at FROM interrupted_log ORDER BY logged_at DESC",
         )?;
@@ -171,7 +180,7 @@
 
     /// Persist a revoked entry to the revoked_log.
     pub fn persist_revoked_entry(&self, entry: &InterruptedLogEntry) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "INSERT INTO revoked_log (id, gate_result_id, action_type, command, args, trust_layer, source_event_id, reason, logged_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -198,7 +207,7 @@
         trust_layer: u32,
         auto_grant: bool,
     ) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "INSERT OR REPLACE INTO pid_trust (pid, trust_layer, auto_grant, last_use)
              VALUES (?1, ?2, ?3, unixepoch())",
@@ -209,7 +218,7 @@
 
     /// Revoke a PID's trust (drop to layer 0).
     pub fn revoke_pid_trust(&self, pid: i32) -> Result<Option<(u32, i64)>, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let old = conn.query_row(
             "SELECT trust_layer, last_use FROM pid_trust WHERE pid = ?1",
             params![pid],
@@ -233,8 +242,8 @@
     pub fn get_pid_trust(
         &self,
         pid: i32,
-    ) -> Result<Option<crate::trust::PidTrustRecord>, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+    ) -> Result<Option<crate::trust_types::PidTrustRecord>, GuardDbError> {
+        let conn = self.conn();
         let row = conn.query_row(
             "SELECT pid, trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate
              FROM pid_trust WHERE pid = ?1",
@@ -254,7 +263,7 @@
 
         match row {
             Ok((pid, trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate)) => {
-                Ok(Some(crate::trust::PidTrustRecord {
+                Ok(Some(crate::trust_types::PidTrustRecord {
                     pid,
                     trust_layer,
                     use_count,
@@ -271,7 +280,7 @@
 
     /// Increment use count for a PID and optionally bump trust layer.
     pub fn record_pid_use(&self, pid: i32, new_confidence: f64) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         // Increment use count
         conn.execute(
             "UPDATE pid_trust SET use_count = use_count + 1, last_use = unixepoch() WHERE pid = ?1",
@@ -295,7 +304,7 @@
     }
 
     pub fn verify_provenance(&self, source_event_id: &str) -> Result<bool, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         let exists: bool = conn
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM action_requests WHERE source_event_id = ?1)",
@@ -311,7 +320,7 @@
         status: Option<&str>,
         limit: usize,
     ) -> Result<Vec<ActionRequest>, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let query = if let Some(_s) = status {
             "SELECT id, source_event_id, source_node_id, action_type, payload, trust_layer, confidence, status, gate_result, requested_at, resolved_at FROM action_requests WHERE status = ? ORDER BY requested_at DESC LIMIT ?"
@@ -332,7 +341,7 @@
                     action_type: row.get(3)?,
                     payload: row.get(4)?,
                     trust_layer: row.get(5)?,
-                    confidence: crate::trust::TrustScore::new(
+                    confidence: crate::trust_types::TrustScore::new(
                         row.get::<_, String>(6)?
                             .parse::<f64>()
                             .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
@@ -363,7 +372,7 @@
                         action_type: row.get(3)?,
                         payload: row.get(4)?,
                         trust_layer: row.get(5)?,
-                        confidence: crate::trust::TrustScore::new(
+                        confidence: crate::trust_types::TrustScore::new(
                             row.get::<_, String>(6)?
                                 .parse::<f64>()
                                 .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
@@ -392,7 +401,7 @@
         action_id: &str,
         new_status: ActionStatus,
     ) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "UPDATE action_requests SET status = ?, resolved_at = unixepoch() WHERE id = ?",
             params![format!("{}", new_status), action_id],
@@ -400,6 +409,7 @@
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// Persist an action request with scope information.
     pub fn persist_action_request_with_scope(
         &self,
@@ -413,7 +423,7 @@
         scope_actor: Option<&str>,
         scope_target: Option<&str>,
     ) -> Result<(), GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
         conn.execute(
             "INSERT INTO action_requests \
              (id, source_event_id, source_node_id, action_type, payload, trust_layer, \
@@ -435,12 +445,13 @@
     }
 
     /// Read action requests with scope information.
+    #[allow(clippy::type_complexity)]
     pub fn read_action_requests_with_scope(
         &self,
         status: Option<&str>,
         limit: usize,
     ) -> Result<Vec<(ActionRequest, Option<String>, Option<String>)>, GuardDbError> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn();
 
         let query = if let Some(_s) = status {
             "SELECT id, source_event_id, source_node_id, action_type, payload, trust_layer, \
@@ -467,7 +478,7 @@
                             action_type: row.get(3)?,
                             payload: row.get(4)?,
                             trust_layer: row.get(5)?,
-                            confidence: crate::trust::TrustScore::new(
+                            confidence: crate::trust_types::TrustScore::new(
                                 row.get::<_, String>(6)?
                                     .parse::<f64>()
                                     .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
@@ -502,7 +513,7 @@
                                 action_type: row.get(3)?,
                                 payload: row.get(4)?,
                                 trust_layer: row.get(5)?,
-                                confidence: crate::trust::TrustScore::new(
+                                confidence: crate::trust_types::TrustScore::new(
                                     row.get::<_, String>(6)?
                                         .parse::<f64>()
                                         .map_err(|_e| GuardDbError::SchemaError(_e.to_string()))
@@ -551,9 +562,9 @@ mod tests {
 
     #[test]
     fn test_from_mirror_path() {
-        let path = PathBuf::from("/some/dir/mirror.db");
+        let path = std::path::PathBuf::from("/some/dir/mirror.db");
         let guard_path = GuardDb::from_mirror_path(&path);
-        assert_eq!(guard_path, PathBuf::from("/some/dir/guard.db"));
+        assert_eq!(guard_path, std::path::PathBuf::from("/some/dir/guard.db"));
     }
 
     #[test]

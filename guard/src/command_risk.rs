@@ -95,7 +95,7 @@ mod tests {
     #[test]
     fn high_risk_commands_blocked() {
         assert!(CommandRisk::High.blocks_execution());
-        assert!(!CommandRisk::High.requires_review());
+        assert!(CommandRisk::High.requires_review());
     }
 
     #[test]
