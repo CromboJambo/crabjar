@@ -8,11 +8,9 @@
 
 || Metric | Value |
 ||---|---|
-| **Workspace members** | 23 crates |Define core types for the Gate Concierge
-
-This extracts fundamental data structures into `concierge_types.rs`. It introduces models for tracking pending actions (`PendingQueueEntry`) and intercepted logs (`InterruptedLogEntry`), ensuring that provenance boundaries are enforced by the gate. Additionally, it provides a comprehensive `ApprovalStore` wrapper to manage invocation fingerprint leases.
-| **Tests** | ~130 passing, 0 failing |
-| **Clippy** | ✅ Clean (`cargo clippy --workspace -- -D warnings`) |
+|| **Workspace members** | 23 crates |
+|| **Tests** | ~130 passing, 0 failing |
+|| **Clippy** | ✅ Clean (`cargo clippy --workspace -- -D warnings`) |
 | **Architecture crate** | ✅ Built, compiles, has integration test |
 | **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
 | **Per-crate AGENTS.md** | ✅ Complete (all 23 crates documented) |
