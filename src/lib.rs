@@ -315,6 +315,13 @@ pub enum GuardCommand {
         #[arg(long)]
         pid: i32,
     },
+    /// Show trust resolution chain for recent actions
+    Resolution {
+        #[arg(long, default_value = "50")]
+        limit: usize,
+        #[arg(long, help = "Filter by effective trust layer")]
+        effective_layer: Option<u32>,
+    },
 }
 
 /// Doctor subcommands for pre-flight validation
