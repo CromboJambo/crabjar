@@ -42,6 +42,7 @@ pub mod scope;
 pub mod trust;
 pub mod trust_types;
 pub mod trust_resolution;
+pub mod domain_allowlist;
 
 // Re-export types from split modules for backward compatibility
 pub use action::{ActionOutcome, ActionRequest, ActionStatus, OutcomeStatus};
@@ -68,3 +69,4 @@ pub use trust_resolution::{
     TrustResolver,
 };
 pub use inference::{ModelInferenceKind, ModelInferenceOutcome, ModelInferenceRequest};
+pub use domain_allowlist::{DomainAllowlist, DomainCheckError, DomainEntry, DomainTrustLevel};
