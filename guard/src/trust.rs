@@ -1,277 +1,19 @@
-//! Trust-related types and operations for the guard system.
+//! TrustManager — DB-backed trust layer operations.
 //!
-//! Types: `TrustScore`, `TrustLayer`, `ReviewAction`, `ReviewRecord`,
-//! `AnnealConfig`, `AnnealResult`, `RetrievalBand`, `PidTrustRecord`, `RevokedLogEntry`.
-//!
-//! Operations: `TrustManager` — DB-backed trust layer management.
+//! Types are defined in `trust_types`. This module re-exports them and
+//! defines `TrustManager`.
+
+pub use crate::trust_types::{
+    AnnealConfig, AnnealResult, PidTrustRecord, RevokedLogEntry, RetrievalBand, ReviewAction,
+    ReviewRecord, TrustLayer, TrustScore,
+};
 
 use rusqlite::params;
-use serde::{Deserialize, Serialize};
-use std::fmt;
 use tracing::{debug, info, warn};
 
 use crate::guard_db::{GuardDb, GuardDbError};
-use crate::memory_types::NodeKind;
-
-// ============================================================================
-// TrustScore
-// ============================================================================
-
-/// Confidence score for a memory node, 0.0 (unknown) to 1.0 (certain).
-/// Decays over time unless reinforced by successful outcomes.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct TrustScore(f64);
-
-impl TrustScore {
-    pub const fn new(score: f64) -> Self {
-        Self(score.clamp(0.0, 1.0))
-    }
-
-    pub const fn get(&self) -> f64 {
-        self.0
-    }
-
-    pub const fn is_zero(&self) -> bool {
-        self.0 == 0.0
-    }
-
-    pub fn reinforce(&self, delta: f64) -> Self {
-        Self::new(self.0 + delta)
-    }
-
-    pub fn decay(&self, rate: f64) -> Self {
-        Self::new(self.0 - rate)
-    }
-
-    pub fn interpolate(&self, other: &Self, weight: f64) -> Self {
-        let blended = self.0 * (1.0 - weight) + other.0 * weight;
-        Self::new(blended)
-    }
-}
-
-impl Default for TrustScore {
-    fn default() -> Self {
-        Self(0.5)
-    }
-}
-
-impl fmt::Display for TrustScore {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:.3}", self.0)
-    }
-}
-
-// ============================================================================
-// TrustLayer
-// ============================================================================
-
-/// Configurable trust layer band
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TrustLayer {
-    pub id: u32,
-    pub(crate) name: String,
-    pub min_confidence: f64,
-    pub max_confidence: f64,
-    pub auto_execute: bool,
-    pub requires_review: bool,
-    pub(crate) description: Option<String>,
-}
-
-impl TrustLayer {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-
-    pub fn contains_score(&self, score: TrustScore) -> bool {
-        score.get() >= self.min_confidence && score.get() < self.max_confidence
-    }
-}
-
-// ============================================================================
-// Review types
-// ============================================================================
-
-/// Review action taken by human or automated reviewer
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ReviewAction {
-    Approve,
-    Reject,
-    Modify,
-    Escalate,
-}
-
-impl fmt::Display for ReviewAction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ReviewAction::Approve => write!(f, "approve"),
-            ReviewAction::Reject => write!(f, "reject"),
-            ReviewAction::Modify => write!(f, "modify"),
-            ReviewAction::Escalate => write!(f, "escalate"),
-        }
-    }
-}
-
-/// Record of a human or automated review
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReviewRecord {
-    pub id: String,
-    pub node_id: String,
-    pub reviewer: String,
-    pub action: ReviewAction,
-    pub old_confidence: Option<TrustScore>,
-    pub new_confidence: Option<TrustScore>,
-    pub old_trust_layer: Option<u32>,
-    pub new_trust_layer: Option<u32>,
-    pub notes: Option<String>,
-    pub created_at: i64,
-}
-
-// ============================================================================
-// Annealing types
-// ============================================================================
-
-/// Annealing configuration parameters
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnnealConfig {
-    pub decay_rate: f64,
-    pub reinforce_threshold: f64,
-    pub anneal_interval_seconds: u64,
-    pub max_anneal_passes: u32,
-    pub confidence_floor: f64,
-    pub auto_anneal_enabled: bool,
-}
-
-impl Default for AnnealConfig {
-    fn default() -> Self {
-        Self {
-            decay_rate: 0.02,
-            reinforce_threshold: 0.7,
-            anneal_interval_seconds: 3600,
-            max_anneal_passes: 10,
-            confidence_floor: 0.05,
-            auto_anneal_enabled: true,
-        }
-    }
-}
-
-/// Result of an annealing pass
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnnealResult {
-    pub nodes_processed: usize,
-    pub nodes_upgraded: usize,
-    pub nodes_downgraded: usize,
-    pub nodes_decayed: usize,
-    pub edges_pruned: usize,
-    pub pass_number: u32,
-    pub timestamp: i64,
-}
-
-// ============================================================================
-// Retrieval
-// ============================================================================
-
-/// Retrieval band filter for querying memory nodes
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RetrievalBand {
-    pub min_trust_layer: u32,
-    pub max_trust_layer: u32,
-    pub min_confidence: f64,
-    pub kinds: Option<Vec<NodeKind>>,
-    pub max_results: usize,
-}
-
-impl Default for RetrievalBand {
-    fn default() -> Self {
-        Self {
-            min_trust_layer: 0,
-            max_trust_layer: 3,
-            min_confidence: 0.0,
-            kinds: None,
-            max_results: 100,
-        }
-    }
-}
-
-impl RetrievalBand {
-    pub fn working_and_above() -> Self {
-        Self {
-            min_trust_layer: 2,
-            max_trust_layer: 3,
-            min_confidence: 0.5,
-            kinds: None,
-            max_results: 50,
-        }
-    }
-
-    pub fn annealed_only() -> Self {
-        Self {
-            min_trust_layer: 3,
-            max_trust_layer: 3,
-            min_confidence: 0.8,
-            kinds: None,
-            max_results: 25,
-        }
-    }
-
-    pub fn with_kinds(mut self, kinds: Vec<NodeKind>) -> Self {
-        self.kinds = Some(kinds);
-        self
-    }
-}
-
-// ============================================================================
-// PidTrustRecord & RevokedLogEntry
-// ============================================================================
-
-/// PID trust record for per-process authorization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PidTrustRecord {
-    pub pid: i32,
-    pub trust_layer: u32,
-    pub use_count: u64,
-    pub last_use: i64,
-    pub auto_grant: bool,
-    pub decay_interval: i64,
-    pub decay_rate: f64,
-}
-
-impl Default for PidTrustRecord {
-    fn default() -> Self {
-        Self {
-            pid: 0,
-            trust_layer: 0,
-            use_count: 0,
-            last_use: 0,
-            auto_grant: false,
-            decay_interval: 3600,
-            decay_rate: 0.02,
-        }
-    }
-}
-
-/// Record of a guided revocation exit.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RevokedLogEntry {
-    pub id: i64,
-    pub pid: i32,
-    pub command: String,
-    pub revoked_at: i64,
-    pub reason: String,
-    pub old_layer: u32,
-    pub new_layer: u32,
-}
-
-// ============================================================================
-// TrustManager (DB-backed trust layer operations)
-// ============================================================================
 
 /// Manages trust layers and confidence scoring for memory nodes.
-/// Trust layers define bands of confidence that determine auto-execute and review behavior.
 pub struct TrustManager<'a> {
     db: &'a GuardDb,
 }
@@ -281,7 +23,6 @@ impl<'a> TrustManager<'a> {
         Self { db }
     }
 
-    /// List all configured trust layers.
     pub fn list_layers(&self) -> Result<Vec<TrustLayer>, GuardDbError> {
         let conn = self.db.conn();
         let mut stmt = conn.prepare(
@@ -305,7 +46,6 @@ impl<'a> TrustManager<'a> {
         Ok(layers)
     }
 
-    /// Find the trust layer for a given confidence score.
     pub fn layer_for_score(
         &self,
         score: TrustScore,
@@ -316,7 +56,6 @@ impl<'a> TrustManager<'a> {
                 return Ok(Some(layer.clone()));
             }
         }
-        // If score exceeds all layers, return the highest layer
         layers
             .last()
             .cloned()
@@ -326,7 +65,6 @@ impl<'a> TrustManager<'a> {
             ))
     }
 
-    /// Check if a node at a given trust layer can auto-execute.
     pub fn can_auto_execute(&self, trust_layer_id: u32) -> Result<bool, GuardDbError> {
         let conn = self.db.conn();
         let auto: bool = conn
@@ -339,7 +77,6 @@ impl<'a> TrustManager<'a> {
         Ok(auto)
     }
 
-    /// Check if a node at a given trust layer requires human review.
     pub fn requires_review(&self, trust_layer_id: u32) -> Result<bool, GuardDbError> {
         let conn = self.db.conn();
         let review: bool = conn
@@ -352,14 +89,11 @@ impl<'a> TrustManager<'a> {
         Ok(review)
     }
 
-    /// Update a node's trust layer based on its current confidence score.
-    /// Returns the old and new layer IDs.
     pub fn update_node_trust_layer(
         &self,
         node_id: &str,
         new_confidence: TrustScore,
     ) -> Result<Option<(u32, u32)>, GuardDbError> {
-        // Compute new layer ID outside the lock to avoid deadlock
         let new_layer = self.layer_for_score(new_confidence)?.map(|l| l.id);
 
         let result = {
@@ -381,7 +115,7 @@ impl<'a> TrustManager<'a> {
             )?;
 
             (old_layer, final_layer)
-        }; // lock dropped
+        };
 
         let (old_layer, new_layer) = result;
         if old_layer != new_layer {
@@ -398,7 +132,6 @@ impl<'a> TrustManager<'a> {
         }
     }
 
-    /// Record a human review of a memory node.
     pub fn record_review(&self, record: &ReviewRecord) -> Result<(), GuardDbError> {
         let conn = self.db.conn();
 
@@ -428,7 +161,6 @@ impl<'a> TrustManager<'a> {
         Ok(())
     }
 
-    /// Compute effective confidence for a node, factoring in supporting and contradicting evidence.
     pub fn effective_confidence(&self, node_id: &str) -> Result<TrustScore, GuardDbError> {
         let conn = self.db.conn();
 
@@ -473,7 +205,6 @@ impl<'a> TrustManager<'a> {
         Ok(TrustScore::new(effective))
     }
 
-    /// Reinforce a node's confidence after a successful outcome.
     pub fn reinforce(&self, node_id: &str, delta: f64) -> Result<TrustScore, GuardDbError> {
         let new_score = {
             let conn = self.db.conn();
@@ -487,7 +218,7 @@ impl<'a> TrustManager<'a> {
                 .map_err(|_| GuardDbError::SchemaError("Node not found".into()))?;
 
             TrustScore::new(current + delta)
-        }; // lock dropped
+        };
 
         debug!(
             node = node_id,
@@ -498,12 +229,10 @@ impl<'a> TrustManager<'a> {
         Ok(new_score)
     }
 
-    /// Get the guard DB connection.
     pub fn conn(&self) -> std::sync::MutexGuard<'_, rusqlite::Connection> {
         self.db.conn()
     }
 
-    /// Decay a node's confidence based on time and usage.
     pub fn decay(&self, node_id: &str, rate: f64) -> Result<TrustScore, GuardDbError> {
         let config = self.db.load_anneal_config()?;
         let new_score = {
@@ -518,7 +247,7 @@ impl<'a> TrustManager<'a> {
                 .map_err(|_| GuardDbError::SchemaError("Node not found".into()))?;
 
             TrustScore::new((current - rate).max(config.confidence_floor))
-        }; // lock dropped
+        };
 
         warn!(node = node_id, new = new_score.get(), "Confidence decayed");
         let _ = self.update_node_trust_layer(node_id, new_score);
@@ -528,7 +257,8 @@ impl<'a> TrustManager<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::trust_types::{AnnealConfig, RetrievalBand, ReviewAction, TrustLayer, TrustScore};
+    use crate::memory_types::NodeKind;
 
     #[test]
     fn trust_score_new_clamps_to_one() {
