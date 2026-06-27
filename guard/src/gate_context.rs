@@ -19,6 +19,11 @@ pub struct GateContext<'a> {
     pub scope: Option<crate::scope::Scope>,
     /// Scope of the target resource being accessed
     pub target_scope: Option<crate::scope::Scope>,
+    /// Known domains/URLs associated with this action.
+    /// Populated by callers (orchestrator, exec handler) who know the actual
+    /// network destinations. The gate checks these against the domain allowlist.
+    /// If empty, the gate skips domain checking (caller must have verified).
+    pub domains: Vec<String>,
 }
 
 impl<'a> GateContext<'a> {
@@ -41,6 +46,7 @@ impl<'a> GateContext<'a> {
             pid: None,
             scope: None,
             target_scope: None,
+            domains: Vec::new(),
         }
     }
 
