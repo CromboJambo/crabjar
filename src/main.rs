@@ -445,6 +445,14 @@ async fn handle_exec(
 
     let gate = crabjar_guard::ExecutionGate::new(&guard_db, dry_run, &project_root);
 
+    // Build scope from project root for scope isolation
+    let project_scope = crabjar_guard::Scope::project(
+        project_root
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "default".to_string()),
+    );
+
     let gate_result = gate.check(crabjar_guard::GateContext {
         action_type: "exec",
         command,
@@ -454,8 +462,9 @@ async fn handle_exec(
         source_event_id: Some(reason),
         can_interrupt: true,
         pid: None,
-        scope: None,
-        target_scope: None,
+        scope: Some(project_scope.clone()),
+        target_scope: Some(project_scope),
+        domains: vec![], // exec: no known domains at CLI level
     })?;
 
     // Concierge layer: persist gate result to GuardDb
@@ -509,6 +518,35 @@ async fn handle_exec(
                 "exec-session",
             );
             flight_recorder.init()?;
+
+            // Tool registry: discover and validate tools before execution
+            let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
+            let tool_registry_conn: Option<rusqlite::Connection> =
+                rusqlite::Connection::open(&tool_registry_path).ok().or_else(|| {
+                    eprintln!("Warning: Failed to open tool_registry DB, using in-memory");
+                    rusqlite::Connection::open(":memory:").ok()
+                });
+            let discovered_tools = if let Some(ref conn) = tool_registry_conn {
+                let registry = crabjar_tool_registry::ToolRegistry::new(conn);
+                registry.init().ok();
+                registry
+                    .discover_tools("cli", &project_root)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                vec![]
+            };
+
+            // Validate tool availability
+            let _validation = if !discovered_tools.is_empty() {
+                Some(
+                    crabjar_tool_registry::ToolRegistry::new(&tool_registry_conn.unwrap())
+                        .validate_tools(&discovered_tools)
+                        .unwrap_or_default(),
+                )
+            } else {
+                None
+            };
 
             let cmd_id = flight_recorder
                 .execute_command(command, args, &effective_cwd, reason)
