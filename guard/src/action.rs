@@ -191,6 +191,7 @@ impl ActionOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::trust_types::TrustScore;
 
     #[test]
     fn action_status_display_pending() {
@@ -264,7 +265,7 @@ mod tests {
             "execute",
             "echo hello",
             2,
-            super::TrustScore::new(0.7),
+            TrustScore::new(0.7),
         );
         assert_eq!(request.id, "test-1");
         assert_eq!(request.action_type, "execute");
@@ -276,35 +277,35 @@ mod tests {
 
     #[test]
     fn action_request_with_source() {
-        let request = ActionRequest::new("test-2", "execute", "echo", 2, super::TrustScore::new(0.5))
+        let request = ActionRequest::new("test-2", "execute", "echo", 2, TrustScore::new(0.5))
             .with_source("event-123");
         assert_eq!(request.source_event_id, Some("event-123".to_string()));
     }
 
     #[test]
     fn action_request_with_node() {
-        let request = ActionRequest::new("test-3", "execute", "echo", 2, super::TrustScore::new(0.5))
+        let request = ActionRequest::new("test-3", "execute", "echo", 2, TrustScore::new(0.5))
             .with_node("node-456");
         assert_eq!(request.source_node_id, Some("node-456".to_string()));
     }
 
     #[test]
     fn action_request_mark_approved() {
-        let request = ActionRequest::new("test-4", "execute", "echo", 2, super::TrustScore::new(0.5))
+        let request = ActionRequest::new("test-4", "execute", "echo", 2, TrustScore::new(0.5))
             .mark_approved();
         assert_eq!(request.status, ActionStatus::TrustApproved);
     }
 
     #[test]
     fn action_request_mark_denied() {
-        let request = ActionRequest::new("test-5", "execute", "echo", 2, super::TrustScore::new(0.5))
+        let request = ActionRequest::new("test-5", "execute", "echo", 2, TrustScore::new(0.5))
             .mark_denied();
         assert_eq!(request.status, ActionStatus::Denied);
     }
 
     #[test]
     fn action_request_mark_executed() {
-        let request = ActionRequest::new("test-6", "execute", "echo", 2, super::TrustScore::new(0.5))
+        let request = ActionRequest::new("test-6", "execute", "echo", 2, TrustScore::new(0.5))
             .mark_executed();
         assert_eq!(request.status, ActionStatus::Executed);
         assert!(request.resolved_at.is_some());
@@ -312,7 +313,7 @@ mod tests {
 
     #[test]
     fn action_request_mark_interrupted() {
-        let request = ActionRequest::new("test-7", "execute", "echo", 2, super::TrustScore::new(0.5))
+        let request = ActionRequest::new("test-7", "execute", "echo", 2, TrustScore::new(0.5))
             .mark_interrupted();
         assert_eq!(request.status, ActionStatus::Interrupted);
         assert!(request.resolved_at.is_some());
