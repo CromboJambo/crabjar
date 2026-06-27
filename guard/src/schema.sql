@@ -81,8 +81,8 @@ CREATE INDEX IF NOT EXISTS idx_reviews_action ON review_records(action);
 CREATE INDEX IF NOT EXISTS idx_reviews_time ON review_records(created_at DESC);
 
 -- ============================================================================
-|-- Action Tracking: requests and outcomes
-|-- ============================================================================
+-- Action Tracking: requests and outcomes
+-- ============================================================================
 CREATE TABLE IF NOT EXISTS action_requests (
     id TEXT PRIMARY KEY,
     source_event_id TEXT,
