@@ -87,6 +87,6 @@ mod tests {
 
         let r3 = GateResult::Interrupted { reason: "a".to_string() };
         let r4 = GateResult::Interrupted { reason: "b".to_string() };
-        assert_eq!(r3, r4); // Interrupted variants are equal regardless of reason
+        assert_ne!(r3, r4); // Interrupted variants differ by reason
     }
 }
