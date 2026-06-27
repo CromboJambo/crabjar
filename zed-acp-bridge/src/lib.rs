@@ -129,6 +129,7 @@ impl AcpBridge {
                 pid: None,
                 scope: None,
                 target_scope: None,
+                domains: vec![], // zed-acp-bridge: no known domains at this layer
             })
             .map_err(|e| AcpBridgeError::GuardError(e.to_string()))?;
         Ok(result)
