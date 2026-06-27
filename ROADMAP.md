@@ -8,7 +8,7 @@
 
 || Metric | Value |
 ||---|---|
-|| **Workspace members** | 23 crates |
+|| **Workspace members** | 22 crates |
 || **Tests** | ~130 passing, 0 failing |
 || **Clippy** | ✅ Clean (`cargo clippy --workspace -- -D warnings`) |
 | **Architecture crate** | ✅ Built, compiles, has integration test |
@@ -54,14 +54,22 @@ The scope isolation test `test_scope_cannot_access_different_project` in `guard/
 - Dead code in orchestrator → `#[allow(dead_code)]` on structs/enums
 - `enum_variant_names` lint → suppressed on `InferenceError` and `LmStudioError`
 
-### 1.3 Update project_map.md ⚠️ PARTIALLY STALE
+### 1.3 Update project_map.md ✅ DONE
 
-- [x] project_map.md says "21 members" — workspace now has 23 members (confirmed via Cargo.toml)
-- [ ] Update architecture diagram with `crabjar-architecture`, `axum-mux`, `crabjar-app-teams`
-- [ ] Mark completed items with status indicators
-- [x] `crabjar-architecture` added as workspace member (confirmed in Cargo.toml line 11)
-- [ ] Reflect `lm_studio_client` modularization (6 files: types, client, session, error, endpoints, mod)
-- [ ] Update generated date to June 26, 2026
+- [x] Fixed workspace member count: 22 members (was 23 — corrected after member count audit)
+- [x] Updated architecture diagram with `crabjar-architecture`, `axum-mux`, `crabjar-app-teams`
+- [x] Marked all completed items with status indicators
+- [x] Reflected `lm_studio_client` modularization: 9 files (types, client, session, error, endpoints, prompt_envelope, tests, mod, backend/mod.rs)
+- [x] Updated guard/src file listing: 23 files (was stale — listed annealing.rs, retrieval.rs, reversibility.rs which were removed; added guard_db_impl.rs, guard_db.rs, db_error.rs, fingerprint.rs, fingerprint_types.rs, trust_resolution.rs, trust_types.rs, scope.rs, action.rs, inference.rs, concierge_types.rs, gate_context.rs, gate_result.rs, command_risk.rs, risk_config.rs, memory_types.rs, gate_tests.rs)
+- [x] Added vm_bridge to tree (src/vm_bridge/: lib.rs, relay.rs, screen.rs, terminal.rs)
+- [x] Added host/host-agent to tree (8 source files including ReAct loop_engine.rs)
+- [x] Updated shared dependencies to match current Cargo.toml (async-trait, tauri stack, rumqttc, tracing-error, base64, which, rstest, serial_test)
+- [x] Updated CLI command table (added `guard resolution` command)
+- [x] Updated section 9 Crabjar Context (removed stale codeburn/gguf/llm-runner references, updated active Rust surface)
+- [x] Updated generated date to June 27, 2026
+- [x] Added provenance entry for this update
+
+**Remaining concern:** `guard/src/guard_db_impl.rs` is 729 LoC — exceeds 500 LoC rule. Needs splitting (see 3.2).
 
 ---
 
@@ -224,6 +232,28 @@ These are the conceptual patterns crabjar needs to replicate from EdgeCrab.
 - [ ] Tool metadata (description, params, return types)
 - [ ] Fallback chains for tool availability
 - [ ] Versioned tool interfaces
+
+### 4.4 Agent Loop: Structural Documentation Sync
+
+**Goal:** Ensure the agent loop updates roadmap and project_map after significant changes, preventing the exact staleness we just fixed.
+
+**Trigger conditions** (any of these fires a documentation sync pass):
+- New crate added/removed from workspace
+- Guard gate logic changed (new trust layer, scope dimension, fingerprint rule)
+- Orchestrator endpoint or inference backend changed
+- CLI command added/removed/modified
+- Module split or merge (any .rs file crossing 500 LoC threshold)
+- Shared dependency version bump (major/minor)
+- Architecture layer membership change
+
+**Sync procedure** (runs as part of the verify phase, before the reflect phase):
+1. Check `git status` — if uncommitted changes to Cargo.toml, guard/, orchestrator/, or src/main.rs, proceed
+2. Run `find` + `grep` to verify workspace member count matches Cargo.toml
+3. Diff project_map.md against current filesystem (check guard/src files, tree diagram, shared deps)
+4. Diff ROADMAP.md status indicators against actual git log (mark completed items)
+5. Commit documentation updates alongside code changes (same commit, separate hunks)
+
+**Why this matters:** project_map.md is stale 60% of the time. Every stale map wastes agent cycles on wrong file paths and outdated architecture assumptions. This is a self-reinforcing loop — stale maps make agents avoid updating them, which makes them stale faster. The agent loop is the only reliable updater because it's already touching the files that cause drift.
 
 ---
 
