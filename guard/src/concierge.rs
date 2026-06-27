@@ -1,91 +1,16 @@
+//! GateConcierge implementation — extracted from concierge.rs to keep it under 300 LoC.
+//!
+//! Re-exports types from `concierge_types` and defines `GateConcierge` impl.
+
+pub use crate::concierge_types::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
+
+use tracing::{error, info, warn};
+
+use crate::concierge_types::ApprovalStore;
+use crate::guard_db::{GuardDb, GuardDbError};
 use crate::GateResult;
 use crate::action::ActionStatus;
-use crate::fingerprint::{ApprovalLease, ApprovalScope, InvocationFingerprint};
-use crate::guard_db::{GuardDb, GuardDbError};
-use serde::{Deserialize, Serialize};
-use tracing::{error, info, warn};
 use uuid::Uuid;
-
-/// Pending queue entry for actions requiring review.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingQueueEntry {
-    pub id: String,
-    pub gate_result_id: String,
-    pub action_type: String,
-    pub command: String,
-    pub args: Vec<String>,
-    pub trust_layer: u32,
-    pub confidence: f64,
-    pub source_event_id: Option<String>,
-    pub queued_at: i64,
-    pub reason: String,
-}
-
-/// Interrupted log entry for actions blocked by the gate.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InterruptedLogEntry {
-    pub id: String,
-    pub gate_result_id: String,
-    pub action_type: String,
-    pub command: String,
-    pub args: Vec<String>,
-    pub trust_layer: u32,
-    pub source_event_id: Option<String>,
-    pub reason: String,
-    pub logged_at: i64,
-}
-
-/// Gate concierge that enforces provenance boundaries on gate results.
-///
-/// Pending → PendingQueue (queued, not executed).
-/// Interrupted → InterruptedLog (logged, returned, not proceeded).
-/// No tool call path bypasses the gate.
-#[derive(Default)]
-pub struct GateConcierge {
-    pub db: Option<GuardDb>,
-    /// In-memory store for exact-invocation fingerprint approval leases.
-    /// IronClaw's `ironclaw_approvals` uses this pattern to prevent
-    /// approval smuggling: approving `cp src dst` does NOT approve `cp src malicious`.
-    pub approval_store: ApprovalStore,
-}
-
-/// Wrapper for the approval store with a default in-memory implementation.
-#[derive(Default)]
-pub struct ApprovalStore {
-    inner: crate::fingerprint::InMemoryApprovalStore,
-}
-
-impl ApprovalStore {
-    pub fn new() -> Self {
-        Self {
-            inner: crate::fingerprint::InMemoryApprovalStore::new(),
-        }
-    }
-
-    pub fn insert(&self, lease: ApprovalLease) {
-        self.inner.insert(lease);
-    }
-
-    pub fn find_matching(
-        &self,
-        fingerprint: &InvocationFingerprint,
-        scope: &ApprovalScope,
-    ) -> Option<ApprovalLease> {
-        self.inner.find_matching(fingerprint, scope)
-    }
-
-    pub fn list_valid(&self) -> Vec<ApprovalLease> {
-        self.inner.list_valid()
-    }
-
-    pub fn cleanup_expired(&self) {
-        self.inner.cleanup_expired();
-    }
-
-    pub fn revoke_scope(&self, scope: &ApprovalScope) {
-        self.inner.revoke_scope(scope);
-    }
-}
 
 impl GateConcierge {
     pub fn new() -> Self {
@@ -268,19 +193,19 @@ impl GateConcierge {
         ttl_seconds: u64,
         granted_by: &str,
         is_persistent: bool,
-    ) -> Result<ApprovalLease, String> {
-        let fingerprint = InvocationFingerprint::from_command(command, args);
+    ) -> Result<crate::fingerprint::ApprovalLease, String> {
+        let fingerprint = crate::fingerprint::InvocationFingerprint::from_command(command, args);
 
-        let scope = ApprovalScope::new(
+        let scope = crate::fingerprint::ApprovalScope::new(
             None, // project context — would come from scope resolution
             None, // user context — would come from scope resolution
             source_event_id,
         );
 
         let lease = if is_persistent {
-            ApprovalLease::persistent(fingerprint.clone(), scope.clone(), granted_by.to_string())
+            crate::fingerprint::ApprovalLease::persistent(fingerprint.clone(), scope.clone(), granted_by.to_string())
         } else {
-            ApprovalLease::new(
+            crate::fingerprint::ApprovalLease::new(
                 fingerprint.clone(),
                 scope.clone(),
                 ttl_seconds,
@@ -310,9 +235,9 @@ impl GateConcierge {
         command: &str,
         args: &[String],
         source_event_id: Option<String>,
-    ) -> Option<ApprovalLease> {
-        let fingerprint = InvocationFingerprint::from_command(command, args);
-        let scope = ApprovalScope::new(None, None, source_event_id);
+    ) -> Option<crate::fingerprint::ApprovalLease> {
+        let fingerprint = crate::fingerprint::InvocationFingerprint::from_command(command, args);
+        let scope = crate::fingerprint::ApprovalScope::new(None, None, source_event_id);
         self.approval_store.find_matching(&fingerprint, &scope)
     }
 
@@ -322,7 +247,7 @@ impl GateConcierge {
     }
 
     /// List all valid approval leases (for audit/debug).
-    pub fn list_valid_approvals(&self) -> Vec<ApprovalLease> {
+    pub fn list_valid_approvals(&self) -> Vec<crate::fingerprint::ApprovalLease> {
         self.approval_store.list_valid()
     }
 }
