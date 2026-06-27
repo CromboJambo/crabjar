@@ -349,6 +349,7 @@ async fn execute_tool_call(
                 pid: None,
                 scope: None,
                 target_scope: None,
+                domains: vec![], // tool calls: no known domains at exec level
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -507,6 +508,7 @@ async fn execute_tool_call(
                 pid: None,
                 scope: None,
                 target_scope: None,
+                domains: vec![],
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -624,6 +626,7 @@ async fn execute_tool_call(
                 pid: None,
                 scope: None,
                 target_scope: None,
+                domains: vec![],
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -734,6 +737,7 @@ async fn execute_tool_call(
                 pid: None,
                 scope: None,
                 target_scope: None,
+                domains: vec![],
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
