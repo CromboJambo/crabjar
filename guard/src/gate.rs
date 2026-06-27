@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use tracing::{debug, info, warn};
 
 pub use crate::command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
+pub use crate::domain_allowlist::{DomainAllowlist, DomainCheckError};
 use crate::gate_context::GateContext;
 use crate::gate_result::GateResult;
 use crate::guard_db::{GuardDb, GuardDbError};
@@ -18,6 +19,7 @@ pub struct ExecutionGate<'a> {
     trust: TrustManager<'a>,
     dry_run: bool,
     risk_config: RiskConfig,
+    domain_allowlist: DomainAllowlist,
 }
 
 impl<'a> ExecutionGate<'a> {
@@ -27,6 +29,7 @@ impl<'a> ExecutionGate<'a> {
             trust: TrustManager::new(db),
             dry_run,
             risk_config: RiskConfig::default(),
+            domain_allowlist: DomainAllowlist::new(),
         }
     }
 
@@ -161,6 +164,35 @@ impl<'a> ExecutionGate<'a> {
                 return Ok(GateResult::Interrupted {
                     reason: "Unauthorized action: detection != authorization".to_string(),
                 });
+            }
+        }
+
+        // 9. Domain allowlist check (if domains are known)
+        if !ctx.domains.is_empty() {
+            for domain in &ctx.domains {
+                match self.domain_allowlist.check_for_trust_layer(domain, ctx.trust_layer) {
+                    Ok(trust_level) => {
+                        debug!(
+                            action = %ctx.action_type,
+                            domain = %domain,
+                            trust_level = %trust_level,
+                            "Domain allowlist: checked"
+                        );
+                    }
+                    Err(e) => {
+                        let reason = format!(
+                            "Domain allowlist: {} for domain '{}' at trust layer {}",
+                            e, domain, ctx.trust_layer
+                        );
+                        warn!(
+                            action = %ctx.action_type,
+                            domain = %domain,
+                            %reason,
+                            "Domain allowlist blocked"
+                        );
+                        return Ok(GateResult::Interrupted { reason });
+                    }
+                }
             }
         }
 
