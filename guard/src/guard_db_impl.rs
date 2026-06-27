@@ -539,6 +539,129 @@ impl GuardDb {
             };
         Ok(entries)
     }
+
+    // -- Trust Resolution persistence --
+
+    /// Persist a trust resolution audit record.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_trust_resolution(
+        &self,
+        action_id: Option<&str>,
+        requested_layer: u32,
+        requested_confidence: f64,
+        requested_source: &str,
+        effective_layer: u32,
+        effective_confidence: f64,
+        effective_by: &str,
+        scope_actor: Option<&str>,
+        scope_target: Option<&str>,
+        applied_policies: Vec<String>,
+    ) -> Result<(), GuardDbError> {
+        let conn = self.conn();
+        conn.execute(
+            "INSERT INTO trust_resolutions \
+             (action_id, requested_layer, requested_confidence, requested_source, \
+              effective_layer, effective_confidence, effective_by, \
+              scope_actor, scope_target, applied_policies, resolved_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, unixepoch())",
+            params![
+                action_id,
+                requested_layer,
+                requested_confidence,
+                requested_source,
+                effective_layer,
+                effective_confidence,
+                effective_by,
+                scope_actor,
+                scope_target,
+                serde_json::to_string(&applied_policies)
+                    .map_err(|e| GuardDbError::SchemaError(e.to_string()))?,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// List trust resolution records, optionally filtered by effective layer.
+    pub fn list_trust_resolutions(
+        &self,
+        effective_layer: Option<u32>,
+        limit: usize,
+    ) -> Result<Vec<TrustResolutionEntry>, GuardDbError> {
+        let conn = self.conn();
+        let query = if effective_layer.is_some() {
+            "SELECT id, action_id, requested_layer, requested_confidence, requested_source, \
+             effective_layer, effective_confidence, effective_by, \
+             scope_actor, scope_target, applied_policies, resolved_at \
+             FROM trust_resolutions WHERE effective_layer = ? \
+             ORDER BY resolved_at DESC LIMIT ?"
+                .to_string()
+        } else {
+            "SELECT id, action_id, requested_layer, requested_confidence, requested_source, \
+             effective_layer, effective_confidence, effective_by, \
+             scope_actor, scope_target, applied_policies, resolved_at \
+             FROM trust_resolutions ORDER BY resolved_at DESC LIMIT ?"
+                .to_string()
+        };
+
+        let mut stmt = conn.prepare(&query)?;
+        let entries: Vec<TrustResolutionEntry> = if let Some(el) = effective_layer {
+            stmt.query_map(params![el, limit as i64], |row| {
+                Ok(TrustResolutionEntry {
+                    id: row.get(0)?,
+                    action_id: row.get(1)?,
+                    requested_layer: row.get(2)?,
+                    requested_confidence: row.get(3)?,
+                    requested_source: row.get(4)?,
+                    effective_layer: row.get(5)?,
+                    effective_confidence: row.get(6)?,
+                    effective_by: row.get(7)?,
+                    scope_actor: row.get(8)?,
+                    scope_target: row.get(9)?,
+                    applied_policies: row.get::<_, String>(10)?,
+                    resolved_at: row.get(11)?,
+                })
+            })?
+            .collect::<Result<_, _>>()?
+        } else {
+            let mut stmt2 = conn.prepare(&query)?;
+            stmt2
+                .query_map(params![limit as i64], |row| {
+                    Ok(TrustResolutionEntry {
+                        id: row.get(0)?,
+                        action_id: row.get(1)?,
+                        requested_layer: row.get(2)?,
+                        requested_confidence: row.get(3)?,
+                        requested_source: row.get(4)?,
+                        effective_layer: row.get(5)?,
+                        effective_confidence: row.get(6)?,
+                        effective_by: row.get(7)?,
+                        scope_actor: row.get(8)?,
+                        scope_target: row.get(9)?,
+                        applied_policies: row.get::<_, String>(10)?,
+                        resolved_at: row.get(11)?,
+                    })
+                })?
+                .collect::<Result<_, _>>()?
+        };
+        Ok(entries)
+    }
+}
+
+/// A persisted trust resolution record.
+#[derive(Debug, Clone)]
+pub struct TrustResolutionEntry {
+    pub id: i64,
+    pub action_id: Option<String>,
+    pub requested_layer: u32,
+    pub requested_confidence: f64,
+    pub requested_source: String,
+    pub effective_layer: u32,
+    pub effective_confidence: f64,
+    pub effective_by: String,
+    pub scope_actor: Option<String>,
+    pub scope_target: Option<String>,
+    pub applied_policies: String, // JSON array of policy strings
+    pub resolved_at: i64,
 }
 
 #[cfg(test)]
@@ -576,5 +699,32 @@ mod tests {
         let config = db.load_anneal_config().unwrap();
         assert_eq!(config.decay_rate, 0.02);
         assert!(config.auto_anneal_enabled);
+    }
+
+    #[test]
+    fn test_persist_and_list_trust_resolutions() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("guard.db");
+        let db = GuardDb::open(&db_path).unwrap();
+
+        db.record_trust_resolution(
+            Some("act-1"),
+            3,
+            0.85,
+            "agent-1",
+            2,
+            0.72,
+            "project-policy:crabjar",
+            Some("user:alice"),
+            Some("project:crabjar"),
+            vec!["user:max_cap:3".to_string()],
+        )
+        .unwrap();
+
+        let entries = db.list_trust_resolutions(None, 10).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].requested_layer, 3);
+        assert_eq!(entries[0].effective_layer, 2);
+        assert_eq!(entries[0].effective_by, "project-policy:crabjar");
     }
 }
