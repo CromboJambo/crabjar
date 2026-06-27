@@ -102,7 +102,7 @@ These patterns prevent the workspace from collapsing into an unmanageable graph.
 **What's next:**
 - [x] Audit: `effective_trust` is logged at every gate point via `audit_log()` (trust_resolution.rs:332)
 - [x] Add audit trail: `audit_log()` records derivation chain (DONE)
-- [ ] Wire into `crabjar guard` CLI — show trust resolution chain in output
+- [x] Wire into `crabjar guard` CLI — show trust resolution chain in output
 
 ### 2.4 Exact-Invocation Fingerprint Approvals ✅ DONE
 
@@ -130,14 +130,15 @@ Implemented in `orchestrator/src/lm_studio_client/prompt_envelope.rs`.
 
 **Why this matters:** Prompt injection is the attack vector the guard gate can't see. The envelope protects the LLM's context before it reaches the gate.
 
-### 2.6 Product Adapter Pattern ❌ NOT STARTED
+### 2.6 Product Adapter Pattern ✅ DONE
 
-No generic adapter layer exists. Channel-specific code only (host-mqtt, host-graph). Every new channel requires core changes.
+Implemented in `host/host-core/src/adapter.rs`.
 
-- [ ] Design: `ProductAdapter` trait — normalize input → `IncomingMessage`, send output ← `OutgoingMessage`
-- [ ] Implement: adapter registry for discovery and lifecycle
-- [ ] Implement: channel-specific adapters (MQTT → Home Assistant, Graph API → Teams)
-- [ ] New channels = new adapter, no core changes
+- [x] Design: `ProductAdapter` trait — normalize input → `IncomingMessage`, send output ← `OutgoingMessage`
+- [x] Implement: adapter registry for discovery and lifecycle (`AdapterRegistry`)
+- [x] Implement: `IncomingMessage` / `OutgoingMessage` canonical types
+- [x] New channels = new adapter, no core changes
+- [x] 7 unit tests covering register/resolve/duplicate/list/send
 
 **Why this matters:** Every new channel (Discord, Feishu, WeChat) currently requires core changes. The adapter pattern contains that blast radius.
 
