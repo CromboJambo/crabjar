@@ -1,8 +1,8 @@
-/// Risk assessment for commands — high/medium/low risk classification.
-///
-/// Contains command risk lists and the `CommandRisk` enum.
+//! Risk assessment for commands — high/medium/low risk classification.
+//!
+//! Contains command risk lists and the `CommandRisk` enum.
 
-/// High-risk commands that are always blocked.
+//! High-risk commands that are always blocked.
 pub const HIGH_RISK_COMMANDS: &[&str] = &[
     "rm",
     "remove",
