@@ -228,3 +228,25 @@ CREATE TABLE IF NOT EXISTS revoked_log (
 
 CREATE INDEX IF NOT EXISTS idx_revoked_log_time ON revoked_log(revoked_at DESC);
 CREATE INDEX IF NOT EXISTS idx_revoked_log_pid ON revoked_log(pid);
+
+-- ============================================================================
+-- Trust Resolution: audit trail for requested vs effective trust
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS trust_resolutions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT,
+    requested_layer INTEGER NOT NULL,
+    requested_confidence REAL NOT NULL,
+    requested_source TEXT NOT NULL,
+    effective_layer INTEGER NOT NULL,
+    effective_confidence REAL NOT NULL,
+    effective_by TEXT NOT NULL,
+    scope_actor TEXT,
+    scope_target TEXT,
+    applied_policies TEXT NOT NULL,
+    resolved_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_trust_resolutions_action ON trust_resolutions(action_id);
+CREATE INDEX IF NOT EXISTS idx_trust_resolutions_time ON trust_resolutions(resolved_at DESC);
+CREATE INDEX IF NOT EXISTS idx_trust_resolutions_effective ON trust_resolutions(effective_layer);
