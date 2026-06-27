@@ -52,6 +52,7 @@ pub use gate::ExecutionGate;
 pub use gate_context::GateContext;
 pub use gate_result::GateResult;
 pub use guard_db::{GuardDb, GuardDbError};
+pub use guard_db_impl::TrustResolutionEntry;
 pub use memory::MemoryGraph;
 pub use memory_types::{EdgeRelation, MemoryEdge, MemoryNode, NodeKind};
 pub use risk_config::RiskConfig;
