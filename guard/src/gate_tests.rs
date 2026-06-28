@@ -42,6 +42,7 @@ fn test_gate_proceeds_for_trusted_action() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -83,6 +84,7 @@ fn test_gate_pending_for_working_layer() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -124,6 +126,7 @@ fn test_gate_pending_for_low_trust() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -147,6 +150,7 @@ fn test_gate_dry_run() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -188,6 +192,7 @@ fn test_high_risk_command_blocked() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -229,6 +234,7 @@ fn test_medium_risk_command_pending() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -252,6 +258,7 @@ fn test_gate_interrupts_below_confidence_floor() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -275,6 +282,7 @@ fn test_gate_denies_missing_provenance() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
@@ -316,6 +324,7 @@ fn test_gate_proceeds_with_valid_provenance() {
         pid: None,
         scope: None,
         target_scope: None,
+        domains: vec![],
     };
 
     let result = gate.check(ctx).unwrap();
