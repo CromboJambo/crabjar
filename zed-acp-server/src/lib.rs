@@ -210,6 +210,7 @@ impl AcpAgentServer {
                             pid: None,
                             scope: None,
                             target_scope: None,
+                            domains: vec![], // zed-acp-server: no known domains at this layer
                             });
 
                                         match gate_result {
