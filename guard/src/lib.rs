@@ -25,6 +25,7 @@ pub mod action;
 pub mod command_risk;
 pub mod concierge;
 pub mod concierge_types;
+pub mod domain_allowlist;
 pub mod fingerprint;
 pub mod fingerprint_types;
 pub mod gate;
@@ -34,26 +35,29 @@ pub mod gate_result;
 pub mod gate_tests;
 pub mod guard_db;
 pub mod guard_db_impl;
+pub mod guard_db_queries;
+pub mod guard_db_types;
 pub mod inference;
 pub mod memory;
 pub mod memory_types;
 pub mod risk_config;
 pub mod scope;
 pub mod trust;
-pub mod trust_types;
 pub mod trust_resolution;
-pub mod domain_allowlist;
+pub mod trust_types;
 
 // Re-export types from split modules for backward compatibility
 pub use action::{ActionOutcome, ActionRequest, ActionStatus, OutcomeStatus};
 pub use command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
+pub use domain_allowlist::{DomainAllowlist, DomainCheckError, DomainEntry, DomainTrustLevel};
 pub use fingerprint::{ApprovalLease, ApprovalScope, InMemoryApprovalStore, InvocationFingerprint};
 pub use gate::ExecutionGate;
 pub use gate_context::GateContext;
 pub use gate_result::GateResult;
 pub use guard_db::{GuardDb, GuardDbError};
-pub use guard_db_impl::TrustResolutionEntry;
+pub use guard_db_types::TrustResolutionEntry;
+pub use inference::{ModelInferenceKind, ModelInferenceOutcome, ModelInferenceRequest};
 pub use memory::MemoryGraph;
 pub use memory_types::{EdgeRelation, MemoryEdge, MemoryNode, NodeKind};
 pub use risk_config::RiskConfig;
@@ -61,12 +65,10 @@ pub use scope::{
     CrossScopeAuth, Identity, ProjectId, Scope, ScopeError, ScopedAccess, TenantId, ThreadId,
 };
 pub use trust::{
-    AnnealConfig, AnnealResult, PidTrustRecord, RevokedLogEntry, RetrievalBand, ReviewAction,
-    ReviewRecord, TrustLayer, TrustManager, TrustScore,
+    AnnealConfig, AnnealResult, PidTrustRecord, RetrievalBand, ReviewAction, ReviewRecord,
+    RevokedLogEntry, TrustLayer, TrustManager, TrustScore,
 };
 pub use trust_resolution::{
     EffectiveTrust, Policy, PolicyChain, PolicySource, RequestedTrust, TrustResolution,
     TrustResolver,
 };
-pub use inference::{ModelInferenceKind, ModelInferenceOutcome, ModelInferenceRequest};
-pub use domain_allowlist::{DomainAllowlist, DomainCheckError, DomainEntry, DomainTrustLevel};
