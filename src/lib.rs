@@ -84,6 +84,12 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: BackendCommand,
     },
+
+    /// Manage tool registry
+    Tool {
+        #[command(subcommand)]
+        command: ToolCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -268,6 +274,26 @@ pub enum BackendCommand {
     },
     /// Get the current inference backend
     Get,
+}
+
+/// Tool registry management subcommands
+#[derive(Debug, Subcommand, Clone)]
+pub enum ToolCommand {
+    /// List registered tools
+    List {
+        /// Filter by tool type (command, mcp, llm, vector_store, embedding, rag, skill)
+        #[arg(short, long)]
+        r#type: Option<String>,
+        /// Maximum number of tools to return
+        #[arg(short, long, default_value = "50")]
+        limit: usize,
+    },
+    /// Discover tools from known sources
+    Discover {
+        /// Source name to use for discovery
+        #[arg(short, long, default_value = "cli")]
+        source: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
