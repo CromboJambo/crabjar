@@ -156,9 +156,17 @@ Implemented in `host/host-core/src/adapter.rs`.
 
 Codex doesn't contribute architecture — it sets the standard. These are non-negotiable quality bars.
 
-### 3.1 Linting as Policy Gates
+### 3.1 Linting as Policy Gates ✅ PARTIALLY DONE
 
-- [ ] Domain allowlist — restrict which external tools/domains are callable (guard integration)
+- [x] Domain allowlist — implemented in `guard/src/domain_allowlist.rs` (deny-by-default allowlist with trust levels)
+  - `DomainAllowlist` struct with default entries (github, crates.io, docker hub, pypi, npm, huggingface, localhost, RFC1918)
+  - Wildcard support (`*.github.com`)
+  - Per-trust-layer enforcement (layer 3 = all, layer 2 = trusted+monitored, layer 1 = trusted-only)
+  - Audit logging for monitored and restricted domains
+  - Wired into `ExecutionGate::check()` as step 9
+  - `GateContext.domains` field for callers to pass known network destinations
+  - Re-exported from guard crate's public API
+  - 10 unit tests covering exact match, wildcard, trust layer, add/remove
 - [x] Action policy — destructive actions require user permission (implemented in concierge.rs)
 - [x] Code quality gates — module size limits + CI gate (see 3.2 below)
 - [ ] Drift governance — detect when state-docs diverge from reality (partially done via `skill-reference-store`)
@@ -191,13 +199,18 @@ Codex doesn't contribute architecture — it sets the standard. These are non-ne
 - `command_risk.rs` — CommandRisk, HIGH/MEDIUM_RISK_COMMANDS (130 LoC)
 - `risk_config.rs` — RiskConfig (56 LoC)
 
-### 3.3 Build Reproducibility ❌ NOT STARTED
+### 3.3 Build Reproducibility ✅ PARTIALLY DONE
 
-No `just reproducible-build` target. No documented build reproducibility guarantees.
+Cargo.lock already pins all dependency versions. Added `just reproducible-build` target:
+- `cargo update --locked` verifies no drift between Cargo.toml and Cargo.lock
+- `CARGO_INCREMENTAL=0` disables incremental compilation for deterministic builds
+- `RUSTFLAGS="-C target-cpu=native"` pins the target CPU feature set
+- `cargo tree --depth 1` reports dependency tree for audit
 
-- [ ] Pin all dependency versions (already done via Cargo.lock)
-- [ ] Add `just reproducible-build` target
-- [ ] Document build reproducibility guarantees
+**Remaining:**
+- [ ] Add `just reproducible-build` to CI (`.github/workflows/rust.yml`)
+- [ ] Document build reproducibility guarantees in AGENTS.md
+- [ ] Consider `cargo audit` for dependency vulnerability scanning
 
 ---
 
@@ -214,24 +227,53 @@ These are the conceptual patterns crabjar needs to replicate from EdgeCrab.
 - [ ] Startup latency budget (~100ms), error recovery, lifecycle management
 - [ ] Language-agnostic plugin execution
 
-### 4.2 Agent Loop (ReAct) ❌ NOT STARTED
+### 4.2 Agent Loop (ReAct) ✅ PARTIALLY DONE
 
-`host/host-agent/` exists with lifecycle docs. The actual ReAct loop (observe → understand → plan → execute → verify → reflect) is not implemented as a reusable crate.
+`host/host-agent/` exists with a complete ReAct loop implementation:
+- `loop_engine.rs`: `AgentLoop` struct with observe → understand → plan → execute → verify → reflect → persist cycle
+- `executor.rs`, `planner.rs`, `verifier.rs`, `reflector.rs`: Stage-specific logic
+- `work_item_store.rs`: SQLite-backed WorkItem persistence with resume support
+- `inference/backend.rs` + `http_backend.rs`: Inference backend abstraction
+- State machine for loop transitions (via `WorkItem.status`)
+- Confidence-based auto-completion (threshold: 0.85)
+- Max iterations guard (default: 100)
+- Context compression: per-stage inference prompts (not yet configurable)
+- Model routing: single `InferenceBackend` trait, not yet phase-specific
+- Decision flow: `tick()` runs all stages; `confidence` drives continue/stop
 
-- [ ] observe → understand → plan → execute → verify → reflect cycle
-- [ ] State machine for loop transitions
-- [ ] Context compression between turns (critical for long conversations)
-- [ ] Model routing (which model for which phase)
-- [ ] Decision flow: when to call tools vs. respond directly
+**What's wired:**
+- [x] observe → understand → plan → execute → verify → reflect cycle
+- [x] State machine for loop transitions (via WorkItem status)
+- [x] Persistence via WorkItemStore (restart recovery)
+- [x] Confidence-based auto-completion
+- [x] Max iterations guard
 
-### 4.3 Tool Registry ⚠️ EXISTS (not wired)
+**What's not wired:**
+- [ ] Context compression between turns (not yet implemented — stage prompts are ad-hoc)
+- [ ] Model routing (which model for which phase) — currently single InferenceBackend
+- [ ] Decision flow: when to call tools vs. respond directly — not yet exposed as a gateable decision
+- [ ] Scope isolation for agent loop actions — scope is wired into ExecutionGate but not yet populated in the agent loop
 
-`tool_registry/` crate exists in workspace members (confirmed in Cargo.toml line 9). MCP tool registry with rig/aur patterns. Not wired into core execution pipeline.
+### 4.3 Tool Registry ✅ PARTIALLY WIRED
 
-- [ ] Dynamic capability discovery
-- [ ] Tool metadata (description, params, return types)
-- [ ] Fallback chains for tool availability
-- [ ] Versioned tool interfaces
+`tool_registry/` crate exists with full MCP tool registry (rig/mistral.rs patterns):
+- `ToolRegistry` struct with SQLite-backed schema (tools, tool_usage, tool_discovery tables)
+- `register_tool()`, `query_tool()`, `list_all()`, `list_by_type()` CRUD
+- `record_usage()`, `query_usage()` — tool metrics tracking
+- `record_discovery()`, `query_discovery()` — discovery history
+- `discover_tools()` — 4-layer discovery: project `.agents/skills/`, user `~/.agents/skills/`, MCP configs (`~/.config/mcp/`), state-docs
+- `validate_tools()` — binary availability check via `which`
+- `auto_register_discovered()` — auto-register discovered tools with defaults
+- 5 unit tests covering init, register/query, list, usage, type filter
+
+**Wiring status:**
+- [x] Added `crabjar-tool-registry` dependency to crabjar binary (Cargo.toml)
+- [x] Wired into `handle_exec()` in `src/main.rs`: discovers tools from project root before execution
+- [ ] Wire into orchestrator SSE handlers (for agent-facing tool discovery)
+- [ ] Wire into `host-agent` ReAct loop (for dynamic tool injection into prompts)
+- [ ] Add `crabjar tool list` and `crabjar tool discover` CLI subcommands
+- [ ] Add fallback chains for tool availability (if binary missing, suggest install)
+- [ ] Add versioned tool interfaces (schema versioning)
 
 ### 4.4 Agent Loop: Structural Documentation Sync
 
@@ -305,13 +347,34 @@ Claw Code is OpenAI + Anthropic patterns smashed together without a coherent phi
 
 ## Priority 11: Testing Infrastructure
 
-### 11.1 E2E Slice Testing
+### 11.1 E2E Slice Testing ✅ DEFINED
 
 IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough on merges.
 
-- [ ] Define smoke slice: core agent loop, tool execution, channel delivery
-- [ ] Define full slice: all channels, all sandboxes, all trust layers
-- [ ] CI runs smoke on every PR; full on merge/nightly
+**Smoke slice** (runs on every PR, ~30s):
+- `crabjar state list` — verifies CLI binary runs and returns JSON
+- `crabjar workspace status` — verifies `.crabjar_config.toml` loading
+- Guard DB init + basic gate check (in-memory)
+- Tool registry init + register/query cycle
+- Knowledge store init + basic query
+- `crabjar doctor check` — verifies environment health
+
+**Full slice** (runs on merge/nightly, ~5min):
+- All smoke tests above
+- Exec pipeline with real guard DB (tempfile-backed)
+- Domain allowlist enforcement (deny + allow paths)
+- Scope isolation checks (cross-scope blocking)
+- Telemetry flight recorder write/read cycle
+- Agent loop tick with persistence (tempfile-backed WorkItemStore)
+- Tool discovery across all 4 layers
+- `crabjar guard` subcommands (queue, approve, reject, resolution)
+
+**Implementation plan:**
+- [ ] Add `tests/e2e/mod.rs` with smoke test module
+- [ ] Add `tests/e2e/full.rs` with full test module
+- [ ] Add `#[cfg(feature = "e2e-full")]` gate on full tests
+- [ ] CI: run smoke on every PR, full on merge/nightly
+- [ ] Add `just test-e2e-smoke` and `just test-e2e-full` targets
 
 ### 11.2 Replay Snapshots
 
