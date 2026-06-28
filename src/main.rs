@@ -8,16 +8,19 @@ mod doctor;
 mod dotfile_manager;
 mod knowledge_store;
 mod project_loader;
+mod tool_registry_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
 use crabjar_lib::{
-    BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand, KnowledgeCommand,
+    BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
+    KnowledgeCommand, ToolCommand,
 };
 use doctor::handle_doctor_command;
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
 use project_loader::ProjectLoader;
+use tool_registry_cli::handle_tool_command;
 
 fn is_help_request(args: &[String]) -> bool {
     args.iter()
@@ -71,6 +74,9 @@ async fn main() {
             .await
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Backend { command }) => handle_backend_command(command)
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Tool { command }) => handle_tool_command(command)
+            .await
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         None => {
             print_json(&error_response("missing command", true));
@@ -522,10 +528,12 @@ async fn handle_exec(
             // Tool registry: discover and validate tools before execution
             let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
             let tool_registry_conn: Option<rusqlite::Connection> =
-                rusqlite::Connection::open(&tool_registry_path).ok().or_else(|| {
-                    eprintln!("Warning: Failed to open tool_registry DB, using in-memory");
-                    rusqlite::Connection::open(":memory:").ok()
-                });
+                rusqlite::Connection::open(&tool_registry_path)
+                    .ok()
+                    .or_else(|| {
+                        eprintln!("Warning: Failed to open tool_registry DB, using in-memory");
+                        rusqlite::Connection::open(":memory:").ok()
+                    });
             let discovered_tools = if let Some(ref conn) = tool_registry_conn {
                 let registry = crabjar_tool_registry::ToolRegistry::new(conn);
                 registry.init().ok();
@@ -782,7 +790,10 @@ fn handle_guard_command(
                 },
             }))
         }
-        GuardCommand::Resolution { limit, effective_layer } => {
+        GuardCommand::Resolution {
+            limit,
+            effective_layer,
+        } => {
             let entries = guard_db.list_trust_resolutions(effective_layer, limit)?;
             let items: Vec<serde_json::Value> = entries
                 .iter()
