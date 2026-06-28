@@ -23,41 +23,21 @@ All command responses are structured JSON on stdout:
 
 Every derived output must include a `doubt` block: `assumptions`, `blind_spots`, `last_validation`, `stale_after`.
 
-## Architecture
+## Architecture Overview
 
-### Core (state-docs & execution)
-- `src/main.rs`: CLI entry point
-- `src/lib.rs`: shared library surface
-- `memory/`: agent-context SQLite storage (knowledge.db)
-- `guard/`: execution gate (guard.db)
-- `telemetry/`: flight recorder
-- `orchestrator/`: Axum SSE server
-- `sandbox/`: execution sandbox
-- `tool_registry/`: tool registry
-- `axum-mux/`: vm-bridge (per-VM websocket relay)
-- `zed-acp-bridge/` + `zed-acp-server/`: Zed Agent Protocol bridge
+Crabjar is a Rust workspace. Discover the current member list from `Cargo.toml` — it's the source of truth.
 
-### Host runtime
-- `host/host-core/`: Event bus, plugin API, WorkItem model, config
-- `host/host-system/`: System tray, notifications, clipboard, secrets
-- `host/host-observe/`: Metrics, tracing, health reporting
-- `host/host-agent/`: Agent loop (observe→understand→plan→execute→verify→reflect)
-- `host/host-webview/`: WebView session management, OAuth2, token cache
-- `host/host-mqtt/`: MQTT client + Home Assistant discovery
-- `host/host-graph/`: Microsoft Graph API client
-- `host/host-screen/`: Screen capture + display protocol integration
+Key subsystems:
+- **`guard/`**: Execution gate, trust layers, scope isolation. The canonical example of the module-splitting convention.
+- **`memory/`**: Agent-context SQLite storage + state-docs querier (`memory/src/state_docs/`).
+- **`host/`**: 8 host crates (core, system, observe, agent, webview, mqtt, graph, screen).
+- **`orchestrator/`**: Axum SSE server + unified inference backend (LM Studio, MistralRs).
+- **`zed-acp-bridge/`** + **`zed-acp-server/`**: Zed Agent Protocol bridge (Wasm + stdio).
+- **`crabjar-architecture/`**: Mechanical dependency boundary enforcement (8-layer model).
+- **`apps/teams/`**: Teams plugin (reference application).
+- **`src/skill-*`**: Skill crates (script-runner, reference-store).
 
-### Host apps
-- `apps/teams/`: Teams plugin (reference application)
-
-### Skill crates
-- `src/skill-script-runner/`: Skill script runner
-- `src/skill-reference-store/`: Skill reference store
-
-### State-docs
-- `state-docs/`: Durable Markdown docs; overlays in `state-docs/overlay/*.overlay.json`
-
-Workspace config from `.crabjar_config.toml`; missing/malformed → `workspace: null`.
+For crate-level details, use `ls` on the crate directory or read its `AGENTS.md`.
 
 ## Execution Pipeline
 
@@ -75,18 +55,6 @@ Execution is opt-in via `.crabjar_config.toml` `tool_execution_enabled`. All act
 
 Parameter names must match column names, not semantic intent. Semantic naming drift causes structural bugs: `provenance_id` parameter querying `source_id` column is a known bug that makes every downstream caller operate on the wrong column. Always verify parameter-to-column alignment before implementing deactivate, filter, or query functions.
 
-## Workspace Members
-
-Declared in Cargo.toml `[workspace.members]`:
-- **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`
-- **Host**: `host/host-core`, `host/host-system`, `host/host-observe`, `host/host-agent`, `host/host-webview`, `host/host-mqtt`, `host/host-graph`, `host/host-screen`
-- **Apps**: `apps/teams`
-- **Binary**: `src/host-binary`
-- **Skills**: `src/skill-script-runner`, `src/skill-reference-store`
-- **Zed ACP**: `zed-acp-bridge`, `zed-acp-server`
-
-Nested crates use `src/<crate>/src/` pattern (not flat `src/<crate>/`).
-
 ## Coding Style
 
 - `cargo fmt` before changes; `cargo clippy -- -D warnings`
@@ -97,9 +65,7 @@ Nested crates use `src/<crate>/src/` pattern (not flat `src/<crate>/`).
 
 **500 LoC rule**: No single `.rs` module may exceed 500 lines. This is a CI gate, not a suggestion.
 
-### Rationale
-
-Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy. When a module grows past 500 LoC, it's a signal to split by concern:
+Codex-core bloat is the anti-pattern Crabjar must avoid. When a module grows past 500 LoC, split by concern:
 
 - **Types** → separate file (e.g., `types.rs` → `action.rs`, `trust.rs`, `memory_types.rs`)
 - **Context structs** → separate file (e.g., `GateContext`)
@@ -107,35 +73,7 @@ Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cog
 - **Config** → separate file (e.g., `RiskConfig`)
 - **Risk lists** → separate file (e.g., `CommandRisk`)
 
-### How to split
-
-1. Identify the concern (types, context, config, risk, etc.)
-2. Create the new file with proper module doc comment
-3. Move the relevant types/impls
-4. Update `lib.rs` to `pub mod` the new module and re-export types
-5. Update all `use crate::` imports in other modules
-6. Run `cargo check --workspace` to verify
-
-### Tooling
-
-- `just module-sizes` — report all modules exceeding threshold (default: 500)
-- `just module-sizes-check` — CI gate (fails if any module exceeds threshold)
-- CI job: `.github/workflows/rust.yml` → `module-sizes` job
-
-### Current guard crate structure (post-split)
-
-| Module | LoC | Concern |
-|--------|-----|---------|
-| `trust.rs` | 406 | TrustScore, TrustLayer, TrustManager, ReviewAction, AnnealConfig, RetrievalBand |
-| `memory_types.rs` | 193 | NodeKind, MemoryNode, EdgeRelation, MemoryEdge |
-| `memory.rs` | 380 | MemoryGraph (DB-backed impl) |
-| `action.rs` | 318 | ActionStatus, OutcomeStatus, ActionRequest, ActionOutcome |
-| `inference.rs` | 298 | ModelInferenceKind, ModelInferenceRequest, ModelInferenceOutcome |
-| `gate.rs` | 480 | ExecutionGate impl |
-| `gate_context.rs` | 108 | GateContext struct |
-| `gate_result.rs` | 88 | GateResult enum |
-| `command_risk.rs` | 130 | CommandRisk, HIGH/MEDIUM_RISK_COMMANDS |
-| `risk_config.rs` | 56 | RiskConfig |
+Tooling: `just module-sizes` (report), `just module-sizes-check` (CI gate).
 
 ## Testing
 
@@ -157,8 +95,25 @@ Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cog
 
 ## Navigation
 
-Use `project_map.md` and `AGENTS.md` as primary navigation tools. Verify paths before assuming they exist.
+- **`project_map.md`**: Structural map. Has its own freshness tracking (last audit date in Section 10). If >7 days old, treat as potentially stale.
+- **`agent_config.md`**: Agent philosophy and behavior guidelines.
+- **`ROADMAP.md`**: Development priorities and completed phases.
+- **`<crate>/AGENTS.md`**: Per-crate documentation.
 
-## LLM Runner Status
+### Document Freshness Protocol
 
-`llm-runner` (in `llm-workspace/`) is experimental: CPU fallback kernels (`CpuGemmKernel`, `CpuAttentionKernel`) are operational for verification. GPU path is stubbed (`GemmBuilder::build` returns `KernelFromPtx` with no-op matmul). Weight loading → inference pipeline bridge, RoPE/RMSNorm/activations/LM head/sampling are unimplemented. K-family quantization dequantization is unimplemented. See `llmrunner.md` for gap analysis.
+These docs decay. Here's how to handle it:
+
+1. **Always verify structure before trusting details**: Run `ls <path>` or `list_directory` before relying on documented file counts, module lists, or LoC numbers. The filesystem is the source of truth.
+
+2. **Treat structural tables as hints, not contracts**: Module tables, workspace member lists, and file inventories are snapshots. They tell you *what existed when written*, not *what exists now*. Use them for patterns and conventions, not exact counts.
+
+3. **When in doubt, discover**: `list_directory` > read a stale file listing. `grep` > rely on documented API surfaces. `cargo check` > trust a documented build command.
+
+4. **Update on divergence**: If you discover the filesystem has diverged from the docs during a task, update the relevant section with a note about what changed. Don't wait for a scheduled audit.
+
+> **Key principle**: The *conventions* in these docs matter more than the *inventory*. A module-splitting rule is useful forever. A specific file count is only useful for the next 7 days.
+
+## LLM Runner
+
+Experimental (in `llm-workspace/`). CPU fallback kernels operational; GPU path stubbed; K-family dequantization unimplemented. See `llmrunner.md` for gap analysis.
