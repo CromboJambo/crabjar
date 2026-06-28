@@ -184,6 +184,7 @@ thiserror.workspace = true
 agent-context = { path = "memory" }
 crabjar-guard = { path = "guard" }
 crabjar-telemetry = { path = "telemetry" }
+crabjar-tool-registry = { path = "tool_registry" }
 
 # Database
 rusqlite.workspace = true
