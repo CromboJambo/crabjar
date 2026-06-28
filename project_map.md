@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: June 27 2026
+> Generated: June 28 2026
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -32,7 +32,7 @@ crabjar/
 ├── REPRO.md               # Reproduction guide
 ├── human_reference.md     # Human reference documentation
 ├── environment_manifest.json  # Environment manifest (CPU/GPU/storage)
-├── llmrunner.md           # LLM runner architecture notes
+
 ├── project_map.md         # This file
 ├── ROADMAP.md             # Development roadmap
 │
@@ -44,20 +44,25 @@ crabjar/
 ├── src/doctor.rs            # doctor check command
 ├── src/bitwarden/           # bitwarden CLI integration
 │   ├── cli.rs
+│   ├── commands.rs
 │   ├── mod.rs
 │   └── store.rs
 ├── src/knowledge_store/     # knowledge-store commands
 │   ├── mod.rs
 │   └── commands.rs
-├── src/crabjar-config/      # workspace config crate
-│   └── src/lib.rs
+├── src/crabjar_config/      # workspace config crate
+│   └── mod.rs
 ├── src/vm_bridge/           # per-VM websocket relay (screen/terminal)
 │   ├── lib.rs
 │   ├── relay.rs
 │   ├── screen.rs
 │   └── terminal.rs
 ├── src/host-binary/         # host binary crate
-│   └── AGENTS.md
+│   ├── AGENTS.md
+│   ├── Cargo.toml
+│   ├── cli.rs
+│   ├── dashboard.rs
+│   └── main.rs
 ├── src/skill-script-runner/ # skill script discovery and execution
 │   └── src/
 ├── src/skill-reference-store/ # skill reference indexing and staleness
@@ -79,12 +84,12 @@ crabjar/
 │   │   │   ├── querier.rs
 │   │   │   ├── renderer.rs
 │   │   │   ├── models.rs
-│   │   │   └── schema.rs
-│   │   └── files/
-│   │       ├── index.md
-│   │       └── manifest.json
+│   │   └── schema.rs
 │   └── tests/
 │       └── state_docs_tests.rs
+├── memory/files/            # memory crate helper files
+│   ├── index.md
+│   └── manifest.json
 ├── guard/                   # Trust layers, annealing, execution gate, scope isolation
 │   ├── Cargo.toml
 │   └── src/
@@ -111,7 +116,7 @@ crabjar/
 │       ├── memory_types.rs  # NodeKind, MemoryNode, EdgeRelation, MemoryEdge
 │       ├── command_risk.rs  # CommandRisk, HIGH/MEDIUM_RISK_COMMANDS
 │       ├── risk_config.rs   # RiskConfig
-│       └── types.rs
+│       └── domain_allowlist.rs  # Domain allowlist for web fetch scope gating
 ├── telemetry/               # Flight recorder, command executor
 │   ├── Cargo.toml
 │   └── src/
@@ -222,16 +227,16 @@ crabjar/
 │  Host apps
 ├── apps/teams/              # Teams plugin (reference application)
 │   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       └── teams_plugin.rs
+│   ├── src/
+│   │   ├── lib.rs
+│   │   └── teams_plugin.rs
+│   └── teams-for-linux/     # additional teams-for-linux subdirectory
 │
 │  Orchestrator (Axum SSE server)
 ├── orchestrator/            # Axum SSE server + unified LM client
 │   ├── Cargo.toml
 │   └── src/
 │       ├── main.rs          # Axum router: /acp/run, /acp/prompt, /acp/chat
-│       ├── lib.rs           # (empty; binary-only crate)
 │       ├── backend/
 │       │   └── mod.rs       # InferenceBackend trait + BackendKind enum
 │       └── lm_studio_client/
@@ -257,29 +262,6 @@ crabjar/
 │       ├── lib.rs
 │       └── main.rs
 │
-│  Documentation
-├── state-docs/              # Durable Markdown state documentation
-│   ├── bustd-state.md
-│   ├── checkpoint-2026-05-15.md
-│   ├── checkpoint-2026-05-16.md
-│   ├── codex5.14.md
-│   ├── crabjar-state.md
-│   ├── cuda-oxide-state.md
-│   ├── DeepSeek-TUI-state.md
-│   ├── failing-tests.md
-│   ├── gitnexus-state.md
-│   ├── graphifyrs-state.md
-│   ├── graphify-state.md
-│   ├── hermes-agent-state.md
-│   ├── iced-state.md
-│   ├── microsandbox-state.md
-│   ├── mistralrs.md
-│   ├── Observability in Agentic Workflows.md
-│   ├── superpowers-state.md
-│   ├── tokenizers-state.md
-│   ├── uk-pitfalls-state.md
-│   └── overlay/
-│       └── cuda-oxide-state.overlay.json
 │
 │  Non-crate artifacts
 ├── tests/                   # CLI integration tests
@@ -288,29 +270,21 @@ crabjar/
 │   └── index.md
 ├── testing/
 │   └── configs/
-├── bin/                     # compiled binaries
-│   ├── index.md
-│   └── manifest.json
 ├── assets/                  # assets
 │   └── crabjar-banner.png
 ├── workspace/               # workspace config
-│   ├── index.md
-│   └── manifest.json
-├── git/                     # git helper scripts
-│   ├── index.md
-│   └── manifest.json
-├── gitignore/               # gitignore management
 │   ├── index.md
 │   └── manifest.json
 ├── ui-state-copy/           # UI state copy
 │   └── daemon/
 │       ├── index.md
 │       └── manifest.json
-├── reference_materials/     # excluded from Git
-├── crabjar-skills/          # reusable crabjar skills
-├── .agents/skills/          # 53+ agent skills (Hermes skill ecosystem)
-├── browser-tools-mcp/       # external tool (has .git/)
-└── .agents/references/      # agent reference files
+├── crabjar-skills/          # reusable crabjar skills (README, install.sh, skill templates)
+├── scripts/                 # build/dev scripts
+│   └── module-sizes.py
+├── archive/                 # empty (was for experiment consolidation)
+├── .agents/skills/          # 32 agent skills (Hermes skill ecosystem)
+└── .agents/references/      # agent reference files (may be empty in some checkouts)
 ```
 
 ### 2.2 Core Components
@@ -318,7 +292,7 @@ crabjar/
 | Component | Role | Layer | Status |
 | :--- | :--- | :--- | :--- |
 | `crabjar` | CLI for state-docs management | Observer (Active) | Core |
-| `crabjar-config` | TOML config crate | Config | Active |
+| `crabjar_config` | TOML config crate | Config | Active |
 | `memory` | Agent-context SQLite storage | Storage | Active |
 | `orchestrator` | Axum SSE server + unified LM client | Orchestrator | Active |
 | `guard` | Trust layers, annealing, execution gate, scope isolation | Authorization | Active |
@@ -451,6 +425,8 @@ debug = true
 ## 6. CLI Binary Surface
 
 ### 6.1 `crabjar` CLI (src/main.rs)
+
+> Note: CLI surface is the source of truth. If a command is missing from the table, run `crabjar --help` or check `src/main.rs` directly.
 
 | Command | Status | Notes |
 |---|---|---|
@@ -614,35 +590,29 @@ crabjar contains:
 - zed-acp-bridge (Wasm extension)
 - zed-acp-server (stdio JSON-RPC server)
 - axum-mux (vm-bridge)
-- .agents/skills/ (53+ agent skills)
-- .agents/references/
+- .agents/skills/ (32 agent skills)
+- .agents/references/ (may be empty)
 - src/vm_bridge/ (per-VM websocket relay)
 - src/bitwarden/ (bitwarden CLI integration)
 - src/knowledge_store/ (knowledge store commands)
-- src/crabjar-config/ (workspace config crate)
+- src/crabjar_config/ (workspace config crate)
 - src/skill-script-runner/ (skill script discovery)
 - src/skill-reference-store/ (skill reference indexing)
 - src/host-binary/ (host binary crate)
 - tests/cli.rs
 - ui-state-copy
-- reference_materials (excluded from Git)
-- bin/ (compiled binaries)
-- git/ (git helper scripts)
-- gitignore/ (gitignore management)
 - workspace/ (workspace config)
-- state-docs/ (local state-docs + overlay)
-- crabjar-skills/ (reusable crabjar skills)
-- human_reference.md (human reference documentation)
-- environment_manifest.json (environment manifest)
-- index.md (root index)
-- REPRO.md (reproduction guide)
-- build.rs (root build script)
-- llmrunner.md (LLM runner architecture notes)
-- ROADMAP.md (development roadmap)
+- `crabjar-skills/` (reusable crabjar skills)
+- `human_reference.md` (human reference documentation)
+- `environment_manifest.json` (environment manifest)
+- `index.md` (root index)
+- `REPRO.md` (reproduction guide)
+- `build.rs` (root build script)
+- `ROADMAP.md` (development roadmap)
 
 ### 9.2 Active Rust Surface
 
-crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-architecture + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux
+crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-architecture + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux
 
 ### Test Count
 
@@ -654,33 +624,36 @@ crabjar (binary) + crabjar-config (library) + agent-context (library) + orchestr
 
 ### Last Audit
 
-2026-06-27 — Fresh filesystem scan. Workspace: 22 members. Guard: 23 files (guard_db_impl.rs is 729 LoC — exceeds 500 LoC rule). Orchestrator: backend/mod.rs + lm_studio_client/ (8 files) + prompts/default_system.md. crabjar-architecture: 3 source files (layer.rs, boundary.rs, lib.rs). vm_bridge: 4 files at src/vm_bridge/. host/host-agent: 8 source files including ReAct loop engine. All workspace members documented with per-crate AGENTS.md. Version 0.12.0.
+2026-06-28 — Fresh filesystem scan. Workspace: 22 members. Guard: 24 files (guard_db_impl.rs is 729 LoC — exceeds 500 LoC rule). Orchestrator: backend/mod.rs + lm_studio_client/ (8 files) + prompts/default_system.md. crabjar-architecture: 3 source files (layer.rs, boundary.rs, lib.rs). vm_bridge: 4 files at src/vm_bridge/. host/host-agent: 7 source files + inference/ subdirectory. All workspace members documented with per-crate AGENTS.md. Version 0.12.0. Skills: 32 agent skills. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
 
 ### Known Items
 
-- `state-docs/` overlays in `state-docs/*/` subdirectories (cuda-oxide-state.overlay.json)
-- `state-docs/` has 19 Markdown state docs (bustd-state.md, checkpoint-2026-05-15.md, checkpoint-2026-05-16.md, codex5.14.md, crabjar-state.md, cuda-oxide-state.md, DeepSeek-TUI-state.md, failing-tests.md, gitnexus-state.md, graphifyrs-state.md, graphify-state.md, hermes-agent-state.md, iced-state.md, microsandbox-state.md, mistralrs.md, Observability in Agentic Workflows.md, superpowers-state.md, tokenizers-state.md, uk-pitfalls-state.md)
-- Single Git repo — `browser-tools-mcp/` is an external submodule with its own `.git/`
-- Single `Cargo.lock` at workspace root
-- `reference_materials/` — excluded from Git (cloned reference repos, not authored code)
 - `guard/src/schema.sql` — GuardDb schema definition
 - `guard/src/concierge.rs` — sole gate enforcement layer
 - `guard/src/scope.rs` — scope isolation model (identity, project, tenant, thread dimensions)
 - `guard/src/trust_resolution.rs` — requested-vs-effective trust resolution
 - `guard/src/fingerprint.rs` — InvocationFingerprint + SHA-256
+- `guard/src/domain_allowlist.rs` — Domain allowlist for web fetch scope gating
 - `guard/src/guard_db_impl.rs` — 729 LoC (exceeds 500 LoC rule — needs splitting)
 - `memory/src/state_docs/querier.rs` — drift_status() added
+- `memory/files/` — helper files (index.md, manifest.json)
 - `orchestrator/src/lm_studio_client/` — unified LM client with SessionStore; `LmStudioEndpoint::MistralRsServe` variant for mistral.rs serve
 - `orchestrator/src/backend/mod.rs` — unified `InferenceBackend` trait + `BackendKind` enum
-- `.agents/skills/` — 53+ agent skills
-- `.agents/references/` — agent reference files
+- `.agents/skills/` — 32 agent skills
+- `.agents/references/` — agent reference files (may be empty)
 - `crabjar-architecture/` — mechanical dependency boundary enforcement (8-layer model, CI gate candidate)
 - `axum-mux/` — vm-bridge (per-VM websocket relay, screen capture, terminal multiplexer)
 - `src/vm_bridge/` — per-VM websocket relay (lib.rs, relay.rs, screen.rs, terminal.rs)
-- `host/host-agent/` — ReAct loop engine (loop_engine.rs, executor.rs, planner.rs, verifier.rs, reflector.rs)
-- Per-crate AGENTS.md — complete (all 22 workspace members documented)
-- `llm-runner` — CPU fallback kernels (CpuGemmKernel, CpuAttentionKernel) operational; GPU path stubbed; K-family dequantization unimplemented; RoPE/RMSNorm/activations/LM head/sampling not yet coded
-- **Cross-project: llm-workspace** — configured via opencode.jsonc instructions + dotfiles symlink graph (`llm-workspace-rules.md` → AGENTS.md + ROADMAP.md + llmrunner.md)
+- `src/crabjar_config/` — workspace config crate (underscore, not hyphen)
+- `src/bitwarden/commands.rs` — additional bitwarden command handler
+- `src/host-binary/` — host binary crate (cli.rs, dashboard.rs, main.rs, Cargo.toml, AGENTS.md)
+- `apps/teams/teams-for-linux/` — additional teams-for-linux subdirectory
+- `crabjar-skills/` — reusable crabjar skills (README, install.sh, skill templates)
+- `scripts/module-sizes.py` — module size reporting script
+- `archive/` — empty (was for experiment consolidation)
+- Per-crate AGENTS.md — complete (all 23 crates + root documented)
+- **Cross-project: llm-workspace** — configured via opencode.jsonc instructions + dotfiles symlink graph
+- **Removed**: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md (no longer exist)
 
 ### Provenance Entries
 

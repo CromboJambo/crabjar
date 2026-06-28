@@ -171,9 +171,9 @@ Codex doesn't contribute architecture — it sets the standard. These are non-ne
 - [x] Code quality gates — module size limits + CI gate (see 3.2 below)
 - [ ] Drift governance — detect when state-docs diverge from reality (partially done via `skill-reference-store`)
 
-### 3.2 Module Size Governance ✅ COMPLETED
+### 3.2 Module Size Governance ⚠️ PARTIALLY DONE
 
-**Status:** All >500 LoC modules in `guard/` have been split.
+**Status:** Most >500 LoC modules in `guard/` have been split. One remaining offender:
 
 |- [x] Add `just module-sizes` target (reports modules exceeding threshold)
 |- [x] Add `just module-sizes-check` CI gate (fails on >500 LoC)
@@ -184,20 +184,9 @@ Codex doesn't contribute architecture — it sets the standard. These are non-ne
 |- [x] Split `fingerprint.rs` (585 LoC) → `fingerprint_types.rs` (259 LoC) + `fingerprint.rs` (8 LoC: re-exports) + `fingerprint.rs` tests extracted
 |- [x] Split `concierge.rs` (541 LoC) → `concierge_types.rs` (91 LoC) + `concierge.rs` (466 LoC: impl + tests)
 |- [x] Document 500 LoC rule in AGENTS.md
+|- [ ] **Remaining:** `guard_db_impl.rs` is 729 LoC — needs splitting
 
 **Why this matters:** Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy.
-
-**Current guard crate modules (post-split):**
-- `trust.rs` — TrustScore, TrustLayer, TrustManager, ReviewAction, AnnealConfig, RetrievalBand (406 LoC)
-- `memory_types.rs` — NodeKind, MemoryNode, EdgeRelation, MemoryEdge (193 LoC)
-- `memory.rs` — MemoryGraph DB-backed impl (380 LoC)
-- `action.rs` — ActionStatus, OutcomeStatus, ActionRequest, ActionOutcome (318 LoC)
-- `inference.rs` — ModelInferenceKind, ModelInferenceRequest, ModelInferenceOutcome (298 LoC)
-- `gate.rs` — ExecutionGate impl (480 LoC)
-- `gate_context.rs` — GateContext struct (108 LoC)
-- `gate_result.rs` — GateResult enum (88 LoC)
-- `command_risk.rs` — CommandRisk, HIGH/MEDIUM_RISK_COMMANDS (130 LoC)
-- `risk_config.rs` — RiskConfig (56 LoC)
 
 ### 3.3 Build Reproducibility ✅ PARTIALLY DONE
 
@@ -325,20 +314,20 @@ Claw Code is OpenAI + Anthropic patterns smashed together without a coherent phi
 - [ ] Worker process management (reuse supervisor logic)
 - [ ] WebSocket relay integration (reuse proxy logic)
 
-### 6.2 crabjar-screen Crate
+### 12.2 crabjar-screen Crate
 
 - [ ] PipeWire integration for screen share sources
 - [ ] XDG-Portal integration for Wayland screen capture
 - [ ] Preview thumbnail generation (320x180)
 - [ ] Audio capture (microphone + system audio)
 
-### 6.3 crabjar-terminal Crate
+### 12.3 crabjar-terminal Crate
 
 - [ ] Terminal multiplexer integration (wezterm/zellij)
 - [ ] Shared terminal protocol over websocket
 - [ ] Terminal state sync across multiple clients
 
-### 6.4 Wire into crabjar-host
+### 12.4 Wire into crabjar-host
 
 - [ ] Teams plugin integration
 - [ ] Display protocol routing
@@ -417,17 +406,15 @@ Derived from parity analysis against OpenAI Codex (2026-06-23). Codex sets the q
 
 **Why this matters:** Crabjar's knowledge store has no token budget. Without bounded context, long conversations will silently degrade model quality. Codex's approach: everything injected must have a bounded size and a hard cap.
 
-### 9.2 Module Size Governance ❌ NOT STARTED
+### 9.2 Module Size Governance ⚠️ IN PROGRESS
 
-No module size enforcement exists. No `cargo-declared` or custom script to report module sizes. No 500-line cap.
+Most guard/ modules split. One remaining offender: `guard_db_impl.rs` at 729 LoC.
 
-- [ ] Add `cargo-declared` or custom script to report module sizes
-- [ ] Identify modules exceeding 500 lines (current offenders: `types.rs` 775, `gate.rs` 697, `fingerprint.rs` 585)
-- [ ] Split largest offenders — target `guard/` and `orchestrator/` first
+- [ ] Split `guard_db_impl.rs` (729 LoC) — target files: schema, queries, types
+- [ ] Verify no other modules exceed 500 LoC
 - [ ] Add to CI gate as a codex-quality constraint
-- [ ] Document module size rule in AGENTS.md
 
-**Why this matters:** Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy.
+**Note:** Priority 3.2 and 9.2 were previously contradictory. Priority 3.2 had the correct status (in progress, not complete).
 
 ### 9.3 Snapshot Testing for TUI ❌ NOT STARTED
 
