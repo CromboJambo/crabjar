@@ -105,9 +105,11 @@ crabjar/
 │       ├── trust_resolution.rs # Requested-vs-effective trust resolution
 │       ├── action.rs        # ActionStatus, OutcomeStatus, ActionRequest, ActionOutcome
 │       ├── inference.rs     # ModelInferenceKind, ModelInferenceRequest, ModelInferenceOutcome
-│       ├── guard_db.rs      # GuardDb (SQLite schema + queries)
-│       ├── guard_db_impl.rs # GuardDb implementation (729 LoC)
-│       ├── db_error.rs      # GuardDb error types
+│       ├── guard_db.rs        # GuardDb (SQLite schema + queries)
+│       ├── guard_db_impl.rs   # GuardDb impl (anneal + concierge + PID trust)
+│       ├── guard_db_queries.rs # Action requests + trust resolution queries
+│       ├── guard_db_types.rs   # TrustResolutionEntry type
+│       ├── db_error.rs        # GuardDb error types
 │       ├── schema.sql       # GuardDb schema definition
 │       ├── scope.rs         # Scope isolation model (identity, project, tenant, thread)
 │       ├── fingerprint.rs   # InvocationFingerprint + SHA-256
@@ -634,7 +636,9 @@ crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestr
 - `guard/src/trust_resolution.rs` — requested-vs-effective trust resolution
 - `guard/src/fingerprint.rs` — InvocationFingerprint + SHA-256
 - `guard/src/domain_allowlist.rs` — Domain allowlist for web fetch scope gating
-- `guard/src/guard_db_impl.rs` — 729 LoC (exceeds 500 LoC rule — needs splitting)
+- `guard/src/guard_db_impl.rs` — 368 LoC (anneal + concierge + PID trust)
+- `guard/src/guard_db_queries.rs` — 352 LoC (action requests + trust resolution)
+- `guard/src/guard_db_types.rs` — 16 LoC (TrustResolutionEntry)
 - `memory/src/state_docs/querier.rs` — drift_status() added
 - `memory/files/` — helper files (index.md, manifest.json)
 - `orchestrator/src/lm_studio_client/` — unified LM client with SessionStore; `LmStudioEndpoint::MistralRsServe` variant for mistral.rs serve
