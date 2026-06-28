@@ -343,6 +343,38 @@ pub struct DiscoveryRow {
     pub discovery_at: i64,
 }
 
+/// Current schema version for the tool registry.
+pub const TOOL_REGISTRY_SCHEMA_VERSION: i32 = 1;
+
+/// Minimum compatible schema version.
+pub const MIN_COMPATIBLE_SCHEMA_VERSION: i32 = 1;
+
+/// Get the current schema version from the database.
+pub fn get_schema_version(conn: &Connection) -> Result<i32, ToolRegistrySchemaError> {
+    let version: i32 = conn.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_versions",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(version)
+}
+
+/// Check if the database schema is compatible with this version.
+pub fn check_schema_compatibility(conn: &Connection) -> Result<(), ToolRegistrySchemaError> {
+    let current = get_schema_version(conn)?;
+    if current < MIN_COMPATIBLE_SCHEMA_VERSION {
+        return Err(ToolRegistrySchemaError::SchemaError(format!(
+            "incompatible schema version {current}: minimum {MIN_COMPATIBLE_SCHEMA_VERSION} required",
+        )));
+    }
+    Ok(())
+}
+
+/// Get the current schema version as a human-readable string.
+pub fn schema_version_display() -> String {
+    format!("v{TOOL_REGISTRY_SCHEMA_VERSION}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
