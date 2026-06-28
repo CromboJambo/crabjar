@@ -406,15 +406,15 @@ Derived from parity analysis against OpenAI Codex (2026-06-23). Codex sets the q
 
 **Why this matters:** Crabjar's knowledge store has no token budget. Without bounded context, long conversations will silently degrade model quality. Codex's approach: everything injected must have a bounded size and a hard cap.
 
-### 9.2 Module Size Governance ⚠️ IN PROGRESS
+### 9.2 Module Size Governance ✅ DONE
 
-Most guard/ modules split. One remaining offender: `guard_db_impl.rs` at 729 LoC.
+All guard/ modules now under 500 LoC. `guard_db_impl.rs` split into 3 files:
 
-- [ ] Split `guard_db_impl.rs` (729 LoC) — target files: schema, queries, types
-- [ ] Verify no other modules exceed 500 LoC
-- [ ] Add to CI gate as a codex-quality constraint
+- [x] Split `guard_db_impl.rs` (729 LoC) → `guard_db_impl.rs` (368 LoC: anneal + concierge + PID trust) + `guard_db_queries.rs` (352 LoC: action requests + trust resolution) + `guard_db_types.rs` (16 LoC: TrustResolutionEntry)
+- [x] Verified no other modules exceed 500 LoC
+- [x] CI gate (`just module-sizes-check`) already in place
 
-**Note:** Priority 3.2 and 9.2 were previously contradictory. Priority 3.2 had the correct status (in progress, not complete).
+**Note:** Priority 3.2 and 9.2 were previously contradictory. Priority 3.2 had the correct status (in progress, not complete). Both are now complete.
 
 ### 9.3 Snapshot Testing for TUI ❌ NOT STARTED
 
