@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use tracing::{debug, info, warn};
 
 pub use crate::command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
+pub use crate::context_budget::ContextBudget;
 pub use crate::domain_allowlist::{DomainAllowlist, DomainCheckError};
 use crate::gate_context::GateContext;
 use crate::gate_result::GateResult;
@@ -192,6 +193,34 @@ impl<'a> ExecutionGate<'a> {
                         );
                         return Ok(GateResult::Interrupted { reason });
                     }
+                }
+            }
+        }
+
+        // 10. Context budget check (Q12: wire in but leave pretty open)
+        if let (Some(budget), fragment_tokens) = (
+            &ctx.context_budget,
+            ctx.context_fragment_tokens,
+        ) {
+            // Warn at 80% utilization (loose bounds per Q12)
+            if let Some(remaining) = budget.warn_if_approaching() {
+                warn!(
+                    action = %ctx.action_type,
+                    used = budget.used(),
+                    remaining = remaining,
+                    budget = budget.budget(),
+                    "Context budget approaching limit"
+                );
+            }
+
+            // Reserve tokens for this action's context
+            if let Some(tokens) = fragment_tokens {
+                if !budget.can_fit(tokens) {
+                    return Ok(GateResult::ContextExhausted {
+                        used: budget.used(),
+                        budget: budget.budget(),
+                        remaining: budget.remaining(),
+                    });
                 }
             }
         }
