@@ -14,7 +14,7 @@
 mod backend;
 mod http_backend;
 
-pub use backend::{HeuristicBackend, InferenceBackend, InferenceConfig};
+pub use backend::{HeuristicBackend, InferenceBackend, InferenceConfig, InferenceError};
 pub use http_backend::HttpBackend;
 
 /// Create the appropriate backend based on the INFERENCE_BACKEND env var.
