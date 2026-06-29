@@ -471,6 +471,8 @@ async fn handle_exec(
         scope: Some(project_scope.clone()),
         target_scope: Some(project_scope),
         domains: vec![], // exec: no known domains at CLI level
+        context_budget: None,
+        context_fragment_tokens: None,
     })?;
 
     // Concierge layer: persist gate result to GuardDb

@@ -454,6 +454,11 @@ impl KnowledgeBridge {
             crabjar_guard::GateResult::Revoked { reason } => Err(agent_context::Error::Internal(
                 format!("Knowledge write revoked: {}", reason),
             )),
+            crabjar_guard::GateResult::ContextExhausted { used, budget, remaining } => Err(
+                agent_context::Error::Internal(format!(
+                    "Knowledge write blocked: context budget exhausted ({used} / {budget} tokens, {remaining} remaining)"
+                )),
+            ),
         }
     }
 
