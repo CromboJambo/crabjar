@@ -1,7 +1,7 @@
 use crate::error::ToolRegistryError;
 use crate::schema::{
-    init_db, list_all_tools, list_tools_by_type, query_discovery,
-    query_tool, query_tool_usage, record_tool_discovery, record_tool_usage, register_tool,
+    init_db, list_all_tools, list_tools_by_type, query_discovery, query_tool, query_tool_usage,
+    record_tool_discovery, record_tool_usage, register_tool,
 };
 use rusqlite::Connection;
 use tracing::debug;
@@ -138,40 +138,28 @@ impl<'a> ToolRegistry<'a> {
     /// Sync variant of `discover_tools` — does all file I/O synchronously.
     /// Use this when you need to avoid holding a `&Connection` across an `.await`
     /// (Connection is not Send).
-    pub fn discover_tools_sync(
-        &self,
-        source: &str,
-        project_root: &std::path::Path,
-    ) -> Vec<String> {
+    pub fn discover_tools_sync(&self, source: &str, project_root: &std::path::Path) -> Vec<String> {
         let mut discovered = Vec::new();
 
         // Layer 1: Scan project-level skill directories for tool definitions
         for ancestor in project_root.ancestors() {
             let candidate = ancestor.join(".agents/skills");
-            if candidate.is_dir() {
-                if let Ok(entries) = std::fs::read_dir(&candidate) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.is_dir() {
-                            let manifest = path.join("manifest.json");
-                            if manifest.exists() {
-                                if let Ok(content) = std::fs::read_to_string(&manifest) {
-                                    if let Ok(parsed) =
-                                        serde_json::from_str::<serde_json::Value>(&content)
-                                    {
-                                        if let Some(tools) = parsed["tools"].as_array() {
-                                            for tool in tools {
-                                                if let Some(name) =
-                                                    tool["name"].as_str()
-                                                    && !discovered.contains(&name.to_string())
-                                                {
-                                                    discovered.push(name.to_string());
-                                                    let _ = self.record_discovery(source, name);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+            if candidate.is_dir()
+                && let Ok(entries) = std::fs::read_dir(&candidate)
+            {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir()
+                        && let Ok(content) = std::fs::read_to_string(path.join("manifest.json"))
+                        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
+                        && let Some(tools) = parsed["tools"].as_array()
+                    {
+                        for tool in tools {
+                            if let Some(name) = tool["name"].as_str()
+                                && !discovered.contains(&name.to_string())
+                            {
+                                discovered.push(name.to_string());
+                                let _ = self.record_discovery(source, name);
                             }
                         }
                     }
@@ -183,27 +171,23 @@ impl<'a> ToolRegistry<'a> {
         let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
         for scope in [".corust-agent/skills", ".agents/skills"] {
             let candidate = std::path::Path::new(&home_dir).join(scope);
-            if candidate.is_dir() {
-                if let Ok(entries) = std::fs::read_dir(&candidate) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.is_dir() && path.join("manifest.json").exists() {
-                            if let Ok(content) = std::fs::read_to_string(path.join("manifest.json"))
+            if candidate.is_dir()
+                && let Ok(entries) = std::fs::read_dir(&candidate)
+            {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_dir()
+                        && path.join("manifest.json").exists()
+                        && let Ok(content) = std::fs::read_to_string(path.join("manifest.json"))
+                        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
+                        && let Some(tools) = parsed["tools"].as_array()
+                    {
+                        for tool in tools {
+                            if let Some(name) = tool["name"].as_str()
+                                && !discovered.contains(&name.to_string())
                             {
-                                if let Ok(parsed) =
-                                    serde_json::from_str::<serde_json::Value>(&content)
-                                {
-                                    if let Some(tools) = parsed["tools"].as_array() {
-                                        for tool in tools {
-                                            if let Some(name) = tool["name"].as_str()
-                                                && !discovered.contains(&name.to_string())
-                                            {
-                                                discovered.push(name.to_string());
-                                                let _ = self.record_discovery(source, name);
-                                            }
-                                        }
-                                    }
-                                }
+                                discovered.push(name.to_string());
+                                let _ = self.record_discovery(source, name);
                             }
                         }
                     }
@@ -216,40 +200,38 @@ impl<'a> ToolRegistry<'a> {
             std::path::Path::new(&home_dir).join(".config/mcp"),
             std::path::Path::new(&home_dir).join(".config/crabjar/mcp"),
         ] {
-            if mcp_dir.is_dir() {
-                if let Ok(entries) = std::fs::read_dir(&mcp_dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
-                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                if let Ok(parsed) =
-                                    serde_json::from_str::<serde_json::Value>(&content)
+            if mcp_dir.is_dir()
+                && let Ok(entries) = std::fs::read_dir(&mcp_dir)
+            {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file()
+                        && path.extension().is_some_and(|ext| ext == "json")
+                        && let Ok(content) = std::fs::read_to_string(&path)
+                        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
+                    {
+                        // MCP config may have a "tools" array or "command"/"args" fields
+                        if let Some(tools) = parsed["tools"].as_array() {
+                            for tool in tools {
+                                if let Some(name) = tool["name"].as_str()
+                                    && !discovered.contains(&name.to_string())
                                 {
-                                    // MCP config may have a "tools" array or "command"/"args" fields
-                                    if let Some(tools) = parsed["tools"].as_array() {
-                                        for tool in tools {
-                                            if let Some(name) = tool["name"].as_str()
-                                                && !discovered.contains(&name.to_string())
-                                            {
-                                                discovered.push(name.to_string());
-                                                let _ = self.record_discovery(source, name);
-                                            }
-                                        }
-                                    } else if let Some(cmd) = parsed["command"].as_str()
-                                        && let Some(args) = parsed["args"].as_array()
-                                    {
-                                        let tool_name = format!(
-                                            "{}-{}",
-                                            cmd.rsplit('/').next().unwrap_or("mcp"),
-                                            args.first().and_then(|a| a.as_str()).unwrap_or("server")
-                                        );
-                                        if !discovered.contains(&tool_name) {
-                                            let name_clone = tool_name.clone();
-                                            discovered.push(tool_name);
-                                            let _ = self.record_discovery(source, &name_clone);
-                                        }
-                                    }
+                                    discovered.push(name.to_string());
+                                    let _ = self.record_discovery(source, name);
                                 }
+                            }
+                        } else if let Some(cmd) = parsed["command"].as_str()
+                            && let Some(args) = parsed["args"].as_array()
+                        {
+                            let tool_name = format!(
+                                "{}-{}",
+                                cmd.rsplit('/').next().unwrap_or("mcp"),
+                                args.first().and_then(|a| a.as_str()).unwrap_or("server")
+                            );
+                            if !discovered.contains(&tool_name) {
+                                let name_clone = tool_name.clone();
+                                discovered.push(tool_name);
+                                let _ = self.record_discovery(source, &name_clone);
                             }
                         }
                     }
@@ -259,28 +241,25 @@ impl<'a> ToolRegistry<'a> {
 
         // Layer 4: Discover tools from state-docs annotations
         let state_docs_dir = project_root.join("state-docs");
-        if state_docs_dir.is_dir() {
-            if let Ok(entries) = std::fs::read_dir(&state_docs_dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file()
-                        && path.extension().is_some_and(|ext| ext == "md")
-                        && path
-                            .file_name()
-                            .is_some_and(|n| n.to_string_lossy().starts_with("tool_"))
-                    {
-                        if let Some(name) = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .map(|s| s.trim_start_matches("tool_").to_string())
-                            .filter(|n| !n.is_empty())
-                        {
-                            if !discovered.contains(&name) {
-                                discovered.push(name.clone());
-                                let _ = self.record_discovery(source, &name);
-                            }
-                        }
-                    }
+        if state_docs_dir.is_dir()
+            && let Ok(entries) = std::fs::read_dir(&state_docs_dir)
+        {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file()
+                    && path.extension().is_some_and(|ext| ext == "md")
+                    && path
+                        .file_name()
+                        .is_some_and(|n| n.to_string_lossy().starts_with("tool_"))
+                    && let Some(name) = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.trim_start_matches("tool_").to_string())
+                        .filter(|n| !n.is_empty())
+                    && !discovered.contains(&name)
+                {
+                    discovered.push(name.clone());
+                    let _ = self.record_discovery(source, &name);
                 }
             }
         }
