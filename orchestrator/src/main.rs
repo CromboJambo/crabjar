@@ -312,13 +312,14 @@ async fn execute_with_guard(
     _args: &[String],
     binary_path: &str,
     project_root: &std::path::Path,
-    store: &std::sync::Mutex<Store>,
+    _store: &std::sync::Mutex<Store>,
 ) -> Result<String, String> {
     let guard_root = std::env::var("MIRROR_GUARD_ROOT")
         .unwrap_or_else(|_| project_root.to_string_lossy().to_string());
 
     let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(format!(
-        "{}/guard.db", guard_root,
+        "{}/guard.db",
+        guard_root,
     )))
     .unwrap_or_else(|_| {
         warn!("Failed to open guard DB for tool registry execution, using in-memory fallback");
@@ -343,7 +344,7 @@ async fn execute_with_guard(
         domains: vec![],
         context_budget: None,
         context_fragment_tokens: None,
-        }) {
+    }) {
         Ok(result) => {
             let (status, pending_entry, interrupted_entry) = concierge.enforce(
                 result,
@@ -362,23 +363,37 @@ async fn execute_with_guard(
                 ActionStatus::Pending => {
                     return Err(format!(
                         "Pending: queued for review (pending_id: {})",
-                        pending_entry.as_ref().map(|e| e.id.clone()).unwrap_or_default()
+                        pending_entry
+                            .as_ref()
+                            .map(|e| e.id.clone())
+                            .unwrap_or_default()
                     ));
                 }
                 ActionStatus::Denied => {
                     return Err(format!(
                         "Interrupted: {} (interrupted_id: {})",
-                        interrupted_entry.as_ref().map(|e| e.reason.clone()).unwrap_or_default(),
-                        interrupted_entry.as_ref().map(|e| e.id.clone()).unwrap_or_default()
+                        interrupted_entry
+                            .as_ref()
+                            .map(|e| e.reason.clone())
+                            .unwrap_or_default(),
+                        interrupted_entry
+                            .as_ref()
+                            .map(|e| e.id.clone())
+                            .unwrap_or_default()
                     ));
                 }
                 ActionStatus::Executed | ActionStatus::Interrupted => {
-                    return Err("Status not handled by concierge for tool registry execution".to_string());
+                    return Err(
+                        "Status not handled by concierge for tool registry execution".to_string(),
+                    );
                 }
             }
         }
         Err(e) => {
-            error!("Security gate error for registry tool '{}': {}", tool_name, e);
+            error!(
+                "Security gate error for registry tool '{}': {}",
+                tool_name, e
+            );
             return Err(format!("Security gate error: {}", e));
         }
     }
@@ -456,30 +471,41 @@ async fn execute_tool_call(
     store: Arc<std::sync::Mutex<Store>>,
 ) -> Result<String, String> {
     // --- Attempt tool registry resolution first ---
-    let project_root = std::env::current_dir().ok().unwrap_or_else(|| {
-        std::path::PathBuf::from("/home/crombo/crabjar")
-    });
+    let project_root = std::env::current_dir()
+        .ok()
+        .unwrap_or_else(|| std::path::PathBuf::from("/home/crombo/crabjar"));
     let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
 
     // All sync work before any await (Connection is not Send)
-    let mut discovered_tools: Vec<String> = Vec::new();
+    let discovered_tools = if tool_registry_path.exists()
+        && let Ok(conn) = rusqlite::Connection::open(&tool_registry_path)
+    {
+        let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
+        if registry.init().is_ok() {
+            registry.discover_tools_sync("orchestrator", &project_root)
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
     let mut validation: Option<Vec<(String, bool, Option<String>)>> = None;
 
-    if tool_registry_path.exists() {
-        if let Ok(conn) = rusqlite::Connection::open(&tool_registry_path) {
-            let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
-            if registry.init().is_ok() {
-                discovered_tools = registry.discover_tools_sync("orchestrator", &project_root);
-                if !discovered_tools.is_empty() {
-                    validation = Some(registry.validate_tools(&discovered_tools).unwrap_or_default());
-                }
-            }
-        }
+    if !discovered_tools.is_empty() {
+        validation = Some(
+            crabjar_tool_registry::ToolRegistry::new(
+                &rusqlite::Connection::open(&tool_registry_path)
+                    .unwrap_or_else(|_| rusqlite::Connection::open(":memory:").unwrap()),
+            )
+            .validate_tools(&discovered_tools)
+            .unwrap_or_default(),
+        );
     }
 
     // Check if the requested tool is registered and available
     let tool_available = if let Some(ref v) = validation {
-        v.iter().any(|(name, avail, _)| name == function_name && *avail)
+        v.iter()
+            .any(|(name, avail, _)| name == function_name && *avail)
     } else {
         false
     };
@@ -494,9 +520,8 @@ async fn execute_tool_call(
 
         if let Some(ref path) = binary_path {
             // Execute via the guard gate (same path as built-in tools)
-            return execute_with_guard(
-                function_name, args, path, &project_root, store.as_ref(),
-            ).await;
+            return execute_with_guard(function_name, args, path, &project_root, store.as_ref())
+                .await;
         } else {
             // Tool registered but binary missing — return a helpful error
             return Err(format!(
