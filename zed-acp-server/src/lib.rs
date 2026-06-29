@@ -277,6 +277,17 @@ impl AcpAgentServer {
                                     "status": "denied",
                                 }),
                             }),
+                            Ok(GateResult::OversizedFragment { actual, max }) => Ok(AcpResponse::Result {
+                                value: json!({
+                                    "session_id": session_id,
+                                    "tool": function_name,
+                                    "arguments": arguments,
+                                    "gate_result": "oversized_fragment",
+                                    "actual": actual,
+                                    "max": max,
+                                    "status": "denied",
+                                }),
+                            }),
                             Err(e) => Ok(AcpResponse::Error {
                                 message: format!("gate error: {}", e),
                             }),
