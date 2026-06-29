@@ -471,3 +471,89 @@ fn test_context_budget_skipped_when_none() {
     let result = gate.check(ctx).unwrap();
     assert!(result.is_proceed());
 }
+
+#[test]
+fn test_context_budget_rejects_oversized_fragment() {
+    let dir = tempdir().unwrap();
+    let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+    let conn = db.conn();
+    conn.execute(
+        "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![
+            "test-action-oversized",
+            "evt-oversized",
+            "echo",
+            "hello",
+            4,
+            0.95,
+            "trust-approved",
+        ],
+    )
+    .unwrap();
+    drop(conn);
+
+    let gate = ExecutionGate::new(&db, false, dir.path());
+    let budget = crate::context_budget::ContextBudget::new(128_000);
+
+    // Fragment of 15K exceeds the 10K hard cap
+    let ctx = GateContext::new(
+        "echo",
+        "echo",
+        vec!["hello".to_string()],
+        4,
+        TrustScore::new(0.95),
+    )
+    .with_source_event("evt-oversized")
+    .with_context_budget(budget, 15_000);
+
+    let result = gate.check(ctx).unwrap();
+    assert!(matches!(result, GateResult::OversizedFragment { .. }));
+    if let GateResult::OversizedFragment { actual, max } = result {
+        assert_eq!(actual, 15_000);
+        assert_eq!(max, 10_000);
+    } else {
+        panic!("expected OversizedFragment");
+    }
+}
+
+#[test]
+fn test_context_budget_allows_at_hard_cap() {
+    let dir = tempdir().unwrap();
+    let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+    let conn = db.conn();
+    conn.execute(
+        "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![
+            "test-action-at-cap",
+            "evt-at-cap",
+            "echo",
+            "hello",
+            4,
+            0.95,
+            "trust-approved",
+        ],
+    )
+    .unwrap();
+    drop(conn);
+
+    let gate = ExecutionGate::new(&db, false, dir.path());
+    let budget = crate::context_budget::ContextBudget::new(128_000);
+
+    // Exactly at the 10K cap — should proceed
+    let ctx = GateContext::new(
+        "echo",
+        "echo",
+        vec!["hello".to_string()],
+        4,
+        TrustScore::new(0.95),
+    )
+    .with_source_event("evt-at-cap")
+    .with_context_budget(budget, 10_000);
+
+    let result = gate.check(ctx).unwrap();
+    assert!(result.is_proceed());
+}
