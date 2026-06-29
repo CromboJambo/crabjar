@@ -7,18 +7,20 @@ mod crabjar_config;
 mod doctor;
 mod dotfile_manager;
 mod knowledge_store;
+mod metrics;
 mod project_loader;
 mod tool_registry_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
 use crabjar_lib::{
     BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
-    KnowledgeCommand, ToolCommand,
+    KnowledgeCommand, MetricsCommand, ToolCommand,
 };
 use doctor::handle_doctor_command;
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
+use metrics::{run_module_sizes, run_test_count};
 use project_loader::ProjectLoader;
 use tool_registry_cli::handle_tool_command;
 
@@ -77,6 +79,8 @@ async fn main() {
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Tool { command }) => handle_tool_command(command)
             .await
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Metrics { command }) => handle_metrics_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         None => {
             print_json(&error_response("missing command", true));
@@ -909,5 +913,29 @@ fn handle_backend_command(command: BackendCommand) -> Result<serde_json::Value, 
                 "current_backend": current_backend,
             }))
         }
+    }
+}
+
+/// Handle metrics commands
+fn handle_metrics_command(command: MetricsCommand) -> Result<serde_json::Value, String> {
+    match command {
+        MetricsCommand::All => {
+            let tests = run_test_count();
+            let modules = run_module_sizes();
+            Ok(json!({
+                "success": true,
+                "metrics": {
+                    "tests": tests,
+                    "modules": modules,
+                },
+                "usage": [
+                    "crabjar metrics all",
+                    "crabjar metrics tests",
+                    "crabjar metrics modules",
+                ],
+            }))
+        }
+        MetricsCommand::Tests => Ok(run_test_count()),
+        MetricsCommand::Modules => Ok(run_module_sizes()),
     }
 }
