@@ -171,7 +171,10 @@ impl<'a> ExecutionGate<'a> {
         // 9. Domain allowlist check (if domains are known)
         if !ctx.domains.is_empty() {
             for domain in &ctx.domains {
-                match self.domain_allowlist.check_for_trust_layer(domain, ctx.trust_layer) {
+                match self
+                    .domain_allowlist
+                    .check_for_trust_layer(domain, ctx.trust_layer)
+                {
                     Ok(trust_level) => {
                         debug!(
                             action = %ctx.action_type,
@@ -198,10 +201,8 @@ impl<'a> ExecutionGate<'a> {
         }
 
         // 10. Context budget check (Q12: wire in but leave pretty open)
-        if let (Some(budget), fragment_tokens) = (
-            &ctx.context_budget,
-            ctx.context_fragment_tokens,
-        ) {
+        if let (Some(budget), fragment_tokens) = (&ctx.context_budget, ctx.context_fragment_tokens)
+        {
             // Warn at 80% utilization (loose bounds per Q12)
             if let Some(remaining) = budget.warn_if_approaching() {
                 warn!(
@@ -214,14 +215,14 @@ impl<'a> ExecutionGate<'a> {
             }
 
             // Reserve tokens for this action's context
-            if let Some(tokens) = fragment_tokens {
-                if !budget.can_fit(tokens) {
-                    return Ok(GateResult::ContextExhausted {
-                        used: budget.used(),
-                        budget: budget.budget(),
-                        remaining: budget.remaining(),
-                    });
-                }
+            if let Some(tokens) = fragment_tokens
+                && !budget.can_fit(tokens)
+            {
+                return Ok(GateResult::ContextExhausted {
+                    used: budget.used(),
+                    budget: budget.budget(),
+                    remaining: budget.remaining(),
+                });
             }
         }
 
@@ -274,11 +275,7 @@ impl<'a> ExecutionGate<'a> {
 
     /// Check PID trust layer (Option B).
     /// Returns Revoked if trust has decayed below the action's trust layer.
-    fn check_pid_trust(
-        &self,
-        pid: i32,
-        command: &str,
-    ) -> Result<Option<GateResult>, GuardDbError> {
+    fn check_pid_trust(&self, pid: i32, command: &str) -> Result<Option<GateResult>, GuardDbError> {
         let conn = self.trust.conn();
 
         let row = conn.query_row(
