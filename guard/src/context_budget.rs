@@ -8,6 +8,10 @@
 /// Default cumulative context budget (tokens). 128K covers most models.
 pub const DEFAULT_CONTEXT_BUDGET: usize = 128_000;
 
+/// Maximum tokens per fragment. Codex hard cap: 10K tokens.
+/// Fragments exceeding this are rejected at the gate before construction.
+pub const MAX_TOKENS_PER_FRAGMENT: usize = 10_000;
+
 /// Warning threshold: 80% of budget. At this level, log a warning but
 /// allow the action to proceed (per Q12: "leave pretty open").
 pub const CONTEXT_BUDGET_WARN_PCT: f64 = 0.8;
