@@ -459,6 +459,11 @@ impl KnowledgeBridge {
                     "Knowledge write blocked: context budget exhausted ({used} / {budget} tokens, {remaining} remaining)"
                 )),
             ),
+            crabjar_guard::GateResult::OversizedFragment { actual, max } => Err(
+                agent_context::Error::Internal(format!(
+                    "Knowledge write blocked: context fragment too large ({actual} tokens exceeds max of {max})"
+                )),
+            ),
         }
     }
 
