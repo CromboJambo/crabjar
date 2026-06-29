@@ -306,12 +306,207 @@ async fn handle_chat(
     }
 }
 
-/// Execute a tool call based on the function name and arguments.
+/// Execute a binary with guard gate enforcement, capturing stdout/stderr.
+async fn execute_with_guard(
+    tool_name: &str,
+    _args: &[String],
+    binary_path: &str,
+    project_root: &std::path::Path,
+    store: &std::sync::Mutex<Store>,
+) -> Result<String, String> {
+    let guard_root = std::env::var("MIRROR_GUARD_ROOT")
+        .unwrap_or_else(|_| project_root.to_string_lossy().to_string());
+
+    let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(format!(
+        "{}/guard.db", guard_root,
+    )))
+    .unwrap_or_else(|_| {
+        warn!("Failed to open guard DB for tool registry execution, using in-memory fallback");
+        crabjar_guard::GuardDb::open(":memory:").unwrap()
+    });
+
+    let gate = ExecutionGate::new(&guard_db, false, &guard_root);
+
+    let mut concierge = GateConcierge::new().with_db(guard_db.clone());
+
+    match gate.check(GateContext {
+        action_type: "tool_call",
+        command: tool_name,
+        args: _args.to_vec(),
+        trust_layer: 2,
+        confidence: crabjar_guard::TrustScore::new(0.5),
+        source_event_id: Some(&format!("orchestrator-tr-{}", tool_name)),
+        can_interrupt: true,
+        pid: None,
+        scope: None,
+        target_scope: None,
+        domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
+        }) {
+        Ok(result) => {
+            let (status, pending_entry, interrupted_entry) = concierge.enforce(
+                result,
+                "tool_call",
+                tool_name,
+                _args,
+                2,
+                0.5,
+                Some(format!("orchestrator-tr-{}", tool_name)),
+            );
+
+            match status {
+                ActionStatus::TrustApproved => {
+                    info!("Gate concierge: Proceed — {} via tool registry", tool_name);
+                }
+                ActionStatus::Pending => {
+                    return Err(format!(
+                        "Pending: queued for review (pending_id: {})",
+                        pending_entry.as_ref().map(|e| e.id.clone()).unwrap_or_default()
+                    ));
+                }
+                ActionStatus::Denied => {
+                    return Err(format!(
+                        "Interrupted: {} (interrupted_id: {})",
+                        interrupted_entry.as_ref().map(|e| e.reason.clone()).unwrap_or_default(),
+                        interrupted_entry.as_ref().map(|e| e.id.clone()).unwrap_or_default()
+                    ));
+                }
+                ActionStatus::Executed | ActionStatus::Interrupted => {
+                    return Err("Status not handled by concierge for tool registry execution".to_string());
+                }
+            }
+        }
+        Err(e) => {
+            error!("Security gate error for registry tool '{}': {}", tool_name, e);
+            return Err(format!("Security gate error: {}", e));
+        }
+    }
+
+    // Execute the binary
+    let mut child = match tokio::process::Command::new(binary_path)
+        .args(_args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(e) => {
+            return Err(format!("Error spawning '{}': {}", tool_name, e));
+        }
+    };
+
+    let stdout = child.stdout.take().expect("Failed to take stdout");
+    let stderr = child.stderr.take().expect("Failed to take stderr");
+
+    let mut stdout_reader = tokio::io::BufReader::new(stdout).lines();
+    let mut stderr_reader = tokio::io::BufReader::new(stderr).lines();
+
+    let mut output = String::new();
+
+    loop {
+        tokio::select! {
+            line = stdout_reader.next_line() => {
+                match line {
+                    Ok(Some(l)) => {
+                        output.push_str(&l);
+                        output.push('\n');
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        output.push_str(&format!("Error reading stdout: {}", e));
+                        break;
+                    }
+                }
+            }
+            line = stderr_reader.next_line() => {
+                match line {
+                    Ok(Some(l)) => {
+                        output.push_str(&format!("stderr: {}\n", l));
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        output.push_str(&format!("Error reading stderr: {}", e));
+                        break;
+                    }
+                }
+            }
+            status = child.wait() => {
+                match status {
+                    Ok(exit_status) => {
+                        output.push_str(&format!("\nExit code: {}", exit_status));
+                    }
+                    Err(e) => {
+                        output.push_str(&format!("\nError waiting for process: {}", e));
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    Ok(output)
+}
+
+/// Resolve and execute a tool call via the tool registry, falling back to
+/// the built-in tool dispatch for backward compatibility.
 async fn execute_tool_call(
     function_name: &str,
     args: &[String],
     store: Arc<std::sync::Mutex<Store>>,
 ) -> Result<String, String> {
+    // --- Attempt tool registry resolution first ---
+    let project_root = std::env::current_dir().ok().unwrap_or_else(|| {
+        std::path::PathBuf::from("/home/crombo/crabjar")
+    });
+    let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
+
+    // All sync work before any await (Connection is not Send)
+    let mut discovered_tools: Vec<String> = Vec::new();
+    let mut validation: Option<Vec<(String, bool, Option<String>)>> = None;
+
+    if tool_registry_path.exists() {
+        if let Ok(conn) = rusqlite::Connection::open(&tool_registry_path) {
+            let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
+            if registry.init().is_ok() {
+                discovered_tools = registry.discover_tools_sync("orchestrator", &project_root);
+                if !discovered_tools.is_empty() {
+                    validation = Some(registry.validate_tools(&discovered_tools).unwrap_or_default());
+                }
+            }
+        }
+    }
+
+    // Check if the requested tool is registered and available
+    let tool_available = if let Some(ref v) = validation {
+        v.iter().any(|(name, avail, _)| name == function_name && *avail)
+    } else {
+        false
+    };
+
+    // If a registered tool exists and is available, use it; otherwise fall through to built-in dispatch
+    if tool_available {
+        // Validate: check if binary is actually present
+        let binary_path = validation
+            .as_ref()
+            .and_then(|v| v.iter().find(|(n, _, _)| n == function_name))
+            .and_then(|(_, _, p)| p.clone());
+
+        if let Some(ref path) = binary_path {
+            // Execute via the guard gate (same path as built-in tools)
+            return execute_with_guard(
+                function_name, args, path, &project_root, store.as_ref(),
+            ).await;
+        } else {
+            // Tool registered but binary missing — return a helpful error
+            return Err(format!(
+                "Tool '{}' is registered but binary not found in PATH. Install it or run 'crabjar tool discover' to update the registry.",
+                function_name
+            ));
+        }
+    }
+
+    // --- Fallback: built-in tool dispatch (backward compatibility) ---
     match function_name {
         "run_command" => {
             if args.len() < 2 {
@@ -350,6 +545,8 @@ async fn execute_tool_call(
                 scope: None,
                 target_scope: None,
                 domains: vec![], // tool calls: no known domains at exec level
+                context_budget: None,
+                context_fragment_tokens: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -509,6 +706,8 @@ async fn execute_tool_call(
                 scope: None,
                 target_scope: None,
                 domains: vec![],
+                context_budget: None,
+                context_fragment_tokens: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -627,6 +826,8 @@ async fn execute_tool_call(
                 scope: None,
                 target_scope: None,
                 domains: vec![],
+                context_budget: None,
+                context_fragment_tokens: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(
@@ -738,6 +939,8 @@ async fn execute_tool_call(
                 scope: None,
                 target_scope: None,
                 domains: vec![],
+                context_budget: None,
+                context_fragment_tokens: None,
             }) {
                 Ok(result) => {
                     let (status, pending_entry, interrupted_entry) = concierge.enforce(

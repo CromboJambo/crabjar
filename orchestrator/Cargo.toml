@@ -46,6 +46,9 @@ crabjar-telemetry = { path = "../telemetry" }
 # Knowledge store
 agent-context = { path = "../memory" }
 
+# Tool registry
+crabjar-tool-registry = { path = "../tool_registry" }
+
 # Local LLM inference (placeholder — llm-runner moved to PESTI portable execution substrate)
 # The native runner was removed; inference now delegates to external LLM servers.
 futures.workspace = true
