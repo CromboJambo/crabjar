@@ -9,7 +9,7 @@
 || Metric | Value |
 ||---|---|
 || **Workspace members** | 22 crates |
-|| **Tests** | ~130 passing, 0 failing |
+|| **Tests** | 576 passing, 0 failing |
 || **Clippy** | ✅ Clean (`cargo clippy --workspace -- -D warnings`) |
 | **Architecture crate** | ✅ Built, compiles, has integration test |
 | **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
@@ -184,7 +184,7 @@ Codex doesn't contribute architecture — it sets the standard. These are non-ne
 |- [x] Split `fingerprint.rs` (585 LoC) → `fingerprint_types.rs` (259 LoC) + `fingerprint.rs` (8 LoC: re-exports) + `fingerprint.rs` tests extracted
 |- [x] Split `concierge.rs` (541 LoC) → `concierge_types.rs` (91 LoC) + `concierge.rs` (466 LoC: impl + tests)
 |- [x] Document 500 LoC rule in AGENTS.md
-|- [ ] **Remaining:** `guard_db_impl.rs` is 729 LoC — needs splitting
+- [x] `guard_db_impl.rs` is 368 LoC — under 500 LoC rule (no longer an issue)
 
 **Why this matters:** Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy.
 
