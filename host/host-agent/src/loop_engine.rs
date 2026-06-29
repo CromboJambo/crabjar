@@ -1,17 +1,20 @@
 /// Agent loop engine — the core iteration through observe → understand → plan → execute → verify → reflect → persist.
 ///
 /// Every loop operates on exactly one WorkItem at a time.
-/// Supports persistence via WorkItemStore and model-assisted inference via InferenceBackend.
+/// Supports persistence via WorkItemStore and phase-aware model routing.
 use crabjar_host_core::{Status, WorkItem, event_bus::EventBus};
 use crabjar_host_observe::MetricsCollector;
 use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::inference::{InferenceBackend, InferenceConfig};
+use crate::model_routing::{LoopPhase, ModelRouter};
 use crate::work_item_store::WorkItemStore;
+use crate::context_compression::{CompressionConfig, ContextCompressor};
+use crabjar_guard::Scope;
+use crabjar_host_core::work_item::Observation;
 
-/// The agent loop engine.
+/// The agent loop engine with phase-aware model routing and context compression.
 pub struct AgentLoop {
     event_bus: Arc<EventBus>,
     metrics: MetricsCollector,
@@ -21,8 +24,12 @@ pub struct AgentLoop {
     iteration: u32,
     /// Optional persistent store for WorkItem (enables restart recovery).
     store: Option<Arc<WorkItemStore>>,
-    /// Optional inference backend for model-assisted stages.
-    inference: Option<Box<dyn InferenceBackend>>,
+    /// Phase-aware model router for stage-specific inference.
+    router: Option<ModelRouter>,
+    /// Context compressor for observation condensation between stages.
+    context_compressor: ContextCompressor,
+    /// Scope for the agent loop — used for guard gate isolation.
+    scope: Option<Scope>,
 }
 
 impl AgentLoop {
@@ -35,7 +42,29 @@ impl AgentLoop {
             current_work_item: None,
             iteration: 0,
             store: None,
-            inference: None,
+            router: None,
+            context_compressor: ContextCompressor::default_compressor(),
+            scope: None,
+        }
+    }
+
+    /// Create a loop with compression config.
+    pub fn new_with_compression(
+        event_bus: Arc<EventBus>,
+        metrics: MetricsCollector,
+        compression: CompressionConfig,
+    ) -> Self {
+        Self {
+            event_bus,
+            metrics,
+            max_iterations: 100,
+            confidence_threshold: 0.85,
+            current_work_item: None,
+            iteration: 0,
+            store: None,
+            router: None,
+            context_compressor: ContextCompressor::new(compression),
+            scope: None,
         }
     }
 
@@ -44,14 +73,10 @@ impl AgentLoop {
         event_bus: Arc<EventBus>,
         metrics: MetricsCollector,
         db_path: PathBuf,
-        inference_config: Option<InferenceConfig>,
+        router: Option<ModelRouter>,
     ) -> Result<Self, rusqlite::Error> {
         #[allow(clippy::arc_with_non_send_sync)]
         let store = Arc::new(WorkItemStore::open(db_path)?);
-        let inference = inference_config.map(|cfg| {
-            let backend: Box<dyn InferenceBackend> = crate::inference::create_backend(&cfg);
-            backend
-        });
         Ok(Self {
             event_bus,
             metrics,
@@ -60,8 +85,16 @@ impl AgentLoop {
             current_work_item: None,
             iteration: 0,
             store: Some(store),
-            inference,
+            router,
+            context_compressor: ContextCompressor::default_compressor(),
+            scope: None,
         })
+    }
+
+    /// Set the scope for this agent loop.
+    pub fn with_scope(mut self, scope: Scope) -> Self {
+        self.scope = Some(scope);
+        self
     }
 
     /// Start a new WorkItem.
@@ -213,17 +246,27 @@ impl AgentLoop {
 
     async fn observe(&self, work_item: &mut WorkItem) -> Result<(), LoopError> {
         work_item.observe("observe", "state", "Gathering current workspace state");
-        if let Some(ref inference) = self.inference {
+        if let Some(ref router) = self.router {
             let prompt = format!(
                 "Observe phase for work item '{}'. Current status: {:?}. Plan: {:?}. What should be observed next?",
                 work_item.objective, work_item.status, work_item.plan
             );
-            match inference.infer(&prompt).await {
+            let context = if self.needs_compression(work_item.observations.len()) {
+                self.compress_context(&work_item.observations)
+            } else {
+                String::new()
+            };
+            let prompt = if context.is_empty() {
+                prompt
+            } else {
+                format!("## Context from earlier observations:\n{context}\n\n{prompt}")
+            };
+            match crate::model_routing::phase_infer(router, LoopPhase::Observe, &prompt).await {
                 Ok(response) => {
                     work_item.observe("observe", "inference", response);
                 }
                 Err(e) => {
-                    tracing::warn!(error = ?e, "inference failed during observe");
+                    tracing::warn!(error = ?e, "phase_infer failed during observe");
                 }
             }
         }
@@ -232,17 +275,27 @@ impl AgentLoop {
 
     async fn understand(&self, work_item: &mut WorkItem) -> Result<(), LoopError> {
         work_item.observe("understand", "analysis", "Analyzing gathered state");
-        if let Some(ref inference) = self.inference {
+        if let Some(ref router) = self.router {
+            let context = if self.needs_compression(work_item.observations.len()) {
+                self.compress_context(&work_item.observations)
+            } else {
+                String::new()
+            };
+            let observations_display = if context.is_empty() {
+                format!("{:?}", work_item.observations)
+            } else {
+                context
+            };
             let prompt = format!(
-                "Understand phase for work item '{}'. Observations so far: {:?}. Analyze the problem and suggest key insights.",
-                work_item.objective, work_item.observations
+                "Understand phase for work item '{}'. Observations so far: {observations_display}. Analyze the problem and suggest key insights.",
+                work_item.objective
             );
-            match inference.infer(&prompt).await {
+            match crate::model_routing::phase_infer(router, LoopPhase::Understand, &prompt).await {
                 Ok(response) => {
                     work_item.observe("understand", "inference", response);
                 }
                 Err(e) => {
-                    tracing::warn!(error = ?e, "inference failed during understand");
+                    tracing::warn!(error = ?e, "phase_infer failed during understand");
                 }
             }
         }
@@ -251,17 +304,27 @@ impl AgentLoop {
 
     async fn plan(&self, work_item: &mut WorkItem) -> Result<(), LoopError> {
         work_item.observe("plan", "planning", "Generating execution plan");
-        if let Some(ref inference) = self.inference {
+        if let Some(ref router) = self.router {
+            let context = if self.needs_compression(work_item.observations.len()) {
+                self.compress_context(&work_item.observations)
+            } else {
+                String::new()
+            };
+            let observations_display = if context.is_empty() {
+                format!("{:?}", work_item.observations)
+            } else {
+                context
+            };
             let prompt = format!(
-                "Plan phase for work item '{}'. Objective: '{}'. Current observations: {:?}. Generate a concrete task plan.",
-                work_item.objective, work_item.objective, work_item.observations
+                "Plan phase for work item '{}'. Objective: '{}'. Current observations: {observations_display}. Generate a concrete task plan.",
+                work_item.objective, work_item.objective
             );
-            match inference.infer(&prompt).await {
+            match crate::model_routing::phase_infer(router, LoopPhase::Plan, &prompt).await {
                 Ok(response) => {
                     work_item.observe("plan", "inference", response);
                 }
                 Err(e) => {
-                    tracing::warn!(error = ?e, "inference failed during plan");
+                    tracing::warn!(error = ?e, "phase_infer failed during plan");
                 }
             }
         }
@@ -270,17 +333,27 @@ impl AgentLoop {
 
     async fn execute(&self, work_item: &mut WorkItem) -> Result<(), LoopError> {
         work_item.observe("execute", "execution", "Executing planned tasks");
-        if let Some(ref inference) = self.inference {
+        if let Some(ref router) = self.router {
+            let context = if self.needs_compression(work_item.observations.len()) {
+                self.compress_context(&work_item.observations)
+            } else {
+                String::new()
+            };
+            let observations_display = if context.is_empty() {
+                format!("{:?}", work_item.observations)
+            } else {
+                context
+            };
             let prompt = format!(
-                "Execute phase for work item '{}'. Plan: {:?}. Current confidence: {:.2}. Which task should be prioritized?",
+                "Execute phase for work item '{}'. Plan: {:?}. Current confidence: {:.2}. Which task should be prioritized? Context: {observations_display}",
                 work_item.objective, work_item.plan, work_item.confidence
             );
-            match inference.infer(&prompt).await {
+            match crate::model_routing::phase_infer(router, LoopPhase::Execute, &prompt).await {
                 Ok(response) => {
                     work_item.observe("execute", "inference", response);
                 }
                 Err(e) => {
-                    tracing::warn!(error = ?e, "inference failed during execute");
+                    tracing::warn!(error = ?e, "phase_infer failed during execute");
                 }
             }
         }
@@ -289,9 +362,19 @@ impl AgentLoop {
 
     async fn verify(&self, work_item: &mut WorkItem) -> Result<(), LoopError> {
         work_item.observe("verify", "verification", "Verifying execution results");
-        if let Some(ref inference) = self.inference {
+        if let Some(ref router) = self.router {
+            let context = if self.needs_compression(work_item.observations.len()) {
+                self.compress_context(&work_item.observations)
+            } else {
+                String::new()
+            };
+            let observations_display = if context.is_empty() {
+                format!("{:?}", work_item.observations)
+            } else {
+                context
+            };
             let prompt = format!(
-                "Verify phase for work item '{}'. Task results: {:?}. Are the results satisfactory?",
+                "Verify phase for work item '{}'. Task results: {:?}. Are the results satisfactory? Context: {observations_display}",
                 work_item.objective,
                 work_item
                     .plan
@@ -299,12 +382,12 @@ impl AgentLoop {
                     .map(|t| (t.id, t.result.clone()))
                     .collect::<Vec<_>>()
             );
-            match inference.infer(&prompt).await {
+            match crate::model_routing::phase_infer(router, LoopPhase::Verify, &prompt).await {
                 Ok(response) => {
                     work_item.observe("verify", "inference", response);
                 }
                 Err(e) => {
-                    tracing::warn!(error = ?e, "inference failed during verify");
+                    tracing::warn!(error = ?e, "phase_infer failed during verify");
                 }
             }
         }
@@ -317,17 +400,27 @@ impl AgentLoop {
             "reflection",
             "Evaluating results and updating confidence",
         );
-        if let Some(ref inference) = self.inference {
+        if let Some(ref router) = self.router {
+            let context = if self.needs_compression(work_item.observations.len()) {
+                self.compress_context(&work_item.observations)
+            } else {
+                String::new()
+            };
+            let observations_display = if context.is_empty() {
+                format!("{:?}", work_item.observations)
+            } else {
+                context
+            };
             let prompt = format!(
-                "Reflect phase for work item '{}'. Confidence: {:.2}. Plan progress: {:?}. Should we continue, retry, or conclude?",
+                "Reflect phase for work item '{}'. Confidence: {:.2}. Plan progress: {:?}. Should we continue, retry, or conclude? Context: {observations_display}",
                 work_item.objective, work_item.confidence, work_item.plan
             );
-            match inference.infer(&prompt).await {
+            match crate::model_routing::phase_infer(router, LoopPhase::Reflect, &prompt).await {
                 Ok(response) => {
                     work_item.observe("reflect", "inference", response);
                 }
                 Err(e) => {
-                    tracing::warn!(error = ?e, "inference failed during reflect");
+                    tracing::warn!(error = ?e, "phase_infer failed during reflect");
                 }
             }
         }
@@ -380,6 +473,18 @@ impl AgentLoop {
     /// Set the confidence threshold for auto-completion.
     pub fn set_confidence_threshold(&mut self, threshold: f32) {
         self.confidence_threshold = threshold;
+    }
+
+    /// Compress observations for a specific phase, returning a context string.
+    /// If compression is disabled or observations are few, returns all observations.
+    fn compress_context(&self, observations: &[Observation]) -> String {
+        self.context_compressor.compress(observations)
+    }
+
+    /// Check if compression is active for the given observation count.
+    fn needs_compression(&self, observation_count: usize) -> bool {
+        observation_count > self.context_compressor.config().recent_count
+            && self.context_compressor.config().enabled
     }
 }
 
@@ -488,9 +593,10 @@ mod tests {
 
         let bus = Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();
-        let config = InferenceConfig::default();
+        // Use a default router (all heuristic) — same behavior as before
+        let router = ModelRouter::default();
         let mut loop_engine =
-            AgentLoop::new_with_persistence(bus, metrics, db_path, Some(config)).unwrap();
+            AgentLoop::new_with_persistence(bus, metrics, db_path, Some(router)).unwrap();
 
         loop_engine.start("Heuristic inference test");
         let result = loop_engine.tick().await.unwrap();
@@ -500,5 +606,33 @@ mod tests {
         let wi = loop_engine.current_work_item().unwrap();
         let has_inference = wi.observations.iter().any(|o| o.kind == "inference");
         assert!(has_inference, "expected heuristic inference observation");
+    }
+
+    #[tokio::test]
+    async fn test_router_with_phase_config() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.into_path().join("work_items.db");
+
+        let bus = Arc::new(EventBus::new(16));
+        let metrics = MetricsCollector::new();
+
+        // Build a router with HTTP for plan/reflect, heuristic for others
+        let router = ModelRouter::default_for_loop(
+            "http://localhost:1234".into(),
+            "gpt-4o-mini".into(),
+            Some("test-key".into()),
+        );
+
+        let mut loop_engine =
+            AgentLoop::new_with_persistence(bus, metrics, db_path, Some(router)).unwrap();
+
+        loop_engine.start("Phase routing test");
+        let result = loop_engine.tick().await.unwrap();
+        assert!(matches!(result, LoopResult::IterationComplete { .. }));
+
+        // The loop should complete — plan/reflect will try HTTP but fall back to heuristic
+        // when the endpoint doesn't respond, and observe/understand/execute/verify use heuristic
+        let wi = loop_engine.current_work_item().unwrap();
+        assert!(wi.observations.iter().any(|o| o.kind == "inference"));
     }
 }
