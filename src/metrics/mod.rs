@@ -3,7 +3,6 @@
 /// Provides dynamic queries for test counts, module sizes, LoC totals,
 /// and clippy status — replacing stale snapshot values in project_map.md
 /// and ROADMAP.md.
-
 mod test_count;
 mod module_sizes;
 
