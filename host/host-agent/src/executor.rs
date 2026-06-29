@@ -2,12 +2,26 @@
 ///
 /// Each task is independently executable. Results are captured and stored.
 use crabjar_host_core::{WorkItem, work_item::TaskStatus};
+use crabjar_guard::Scope;
 
-pub struct TaskExecutor;
+pub struct TaskExecutor {
+    /// Default scope for gate context (can be overridden per-call).
+    scope: Option<Scope>,
+}
 
 impl TaskExecutor {
     pub fn new() -> Self {
-        Self
+        Self { scope: None }
+    }
+
+    /// Create a TaskExecutor with a default scope.
+    pub fn with_scope(scope: Scope) -> Self {
+        Self { scope: Some(scope) }
+    }
+
+    /// Get the default scope (if any).
+    pub fn scope(&self) -> Option<&Scope> {
+        self.scope.as_ref()
     }
 
     /// Execute a single task by index.
@@ -102,6 +116,8 @@ impl TaskExecutor {
                         .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").unwrap());
 
                     let gate = crabjar_guard::ExecutionGate::new(&guard_db, false, &guard_root);
+                    
+                    // Use the executor's scope if available, otherwise None
                     let gate_result = match gate.check(crabjar_guard::GateContext {
                         action_type: "tool_call",
                         command: tool_name,
@@ -111,7 +127,7 @@ impl TaskExecutor {
                         source_event_id: Some("host-agent-exec"),
                         can_interrupt: true,
                         pid: None,
-                        scope: None,
+                        scope: self.scope.clone(),
                         target_scope: None,
                         domains: vec![],
                         context_budget: None,
@@ -179,6 +195,11 @@ impl TaskExecutor {
                         } => {
                             return format!(
                                 "Task '{tool_name}' context budget exhausted: {used} / {budget} tokens, {remaining} remaining"
+                            );
+                        }
+                        crabjar_guard::GateResult::OversizedFragment { actual, max } => {
+                            return format!(
+                                "Task '{tool_name}' context fragment too large: {actual} tokens exceeds max of {max}"
                             );
                         }
                     };
