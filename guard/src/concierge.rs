@@ -154,6 +154,39 @@ impl GateConcierge {
                 );
                 (ActionStatus::Denied, None, Some(entry))
             }
+            GateResult::ContextExhausted { used, budget, remaining } => {
+                let reason = format!(
+                    "Context budget exhausted: {used} / {budget} tokens used, {remaining} remaining"
+                );
+                let entry = InterruptedLogEntry {
+                    id: Uuid::new_v4().to_string(),
+                    gate_result_id: gate_result_id.clone(),
+                    action_type: action_type.to_string(),
+                    command: command.to_string(),
+                    args: args.to_vec(),
+                    trust_layer,
+                    source_event_id: source_event_id.clone(),
+                    reason: reason.clone(),
+                    logged_at: chrono::Utc::now().timestamp(),
+                };
+                if let Some(db) = &self.db
+                    && let Err(e) = db.persist_revoked_entry(&entry)
+                {
+                    error!(
+                        gate_result_id = %gate_result_id,
+                        "Failed to persist context exhausted entry: {}", e
+                    );
+                }
+                warn!(
+                    gate_result_id = %gate_result_id,
+                    action_type = %action_type,
+                    used = used,
+                    budget = budget,
+                    remaining = remaining,
+                    "Gate concierge: ContextExhausted — budget depleted"
+                );
+                (ActionStatus::Denied, None, Some(entry))
+            }
         }
     }
 
