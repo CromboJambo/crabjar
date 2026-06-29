@@ -22,6 +22,12 @@ pub enum GateResult {
         budget: usize,
         remaining: usize,
     },
+    /// Fragment exceeds the per-fragment hard cap (10K tokens per Codex spec).
+    /// The fragment must be truncated or split before being injected.
+    OversizedFragment {
+        actual: usize,
+        max: usize,
+    },
 }
 
 impl GateResult {
