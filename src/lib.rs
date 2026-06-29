@@ -90,6 +90,12 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: ToolCommand,
     },
+
+    /// Workspace metrics (tests, modules, LoC, clippy)
+    Metrics {
+        #[command(subcommand)]
+        command: MetricsCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -357,10 +363,22 @@ pub enum DoctorCommand {
     Check,
 }
 
+/// Workspace metrics subcommands
+#[derive(Debug, Subcommand, Clone)]
+pub enum MetricsCommand {
+    /// Run all workspace metrics (tests, modules, LoC, clippy)
+    All,
+    /// Run just the test count
+    Tests,
+    /// Run just the module size check (500 LoC rule)
+    Modules,
+}
+
 pub mod bitwarden;
 pub mod crabjar_config;
 pub mod doctor;
 pub mod knowledge_store;
+pub mod metrics;
 pub mod project_loader;
 
 pub use crabjar_config::ProjectConfig;
