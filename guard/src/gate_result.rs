@@ -15,6 +15,13 @@ pub enum GateResult {
     Revoked {
         reason: String,
     },
+    /// Context budget exhausted — no more fragments can be injected.
+    /// The agent should continue with reduced context and try again later.
+    ContextExhausted {
+        used: usize,
+        budget: usize,
+        remaining: usize,
+    },
 }
 
 impl GateResult {
@@ -41,6 +48,11 @@ impl GateResult {
     /// Returns `true` if the process was revoked.
     pub fn is_revoked(&self) -> bool {
         matches!(self, GateResult::Revoked { .. })
+    }
+
+    /// Returns `true` if the context budget was exhausted.
+    pub fn is_context_exhausted(&self) -> bool {
+        matches!(self, GateResult::ContextExhausted { .. })
     }
 }
 
