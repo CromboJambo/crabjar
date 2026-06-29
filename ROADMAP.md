@@ -243,7 +243,7 @@ These are the conceptual patterns crabjar needs to replicate from EdgeCrab.
 - [ ] Decision flow: when to call tools vs. respond directly — not yet exposed as a gateable decision
 - [ ] Scope isolation for agent loop actions — scope is wired into ExecutionGate but not yet populated in the agent loop
 
-### 4.3 Tool Registry ✅ PARTIALLY WIRED
+### 4.3 Tool Registry ✅ WIRED INTO CORE
 
 `tool_registry/` crate exists with full MCP tool registry (rig/mistral.rs patterns):
 - `ToolRegistry` struct with SQLite-backed schema (tools, tool_usage, tool_discovery tables)
@@ -253,16 +253,18 @@ These are the conceptual patterns crabjar needs to replicate from EdgeCrab.
 - `discover_tools()` — 4-layer discovery: project `.agents/skills/`, user `~/.agents/skills/`, MCP configs (`~/.config/mcp/`), state-docs
 - `validate_tools()` — binary availability check via `which`
 - `auto_register_discovered()` — auto-register discovered tools with defaults
+- `discover_tools_sync()` — sync variant to avoid holding `&Connection` across `.await` (Connection is not Send)
+- Schema versioning: `schema_versions` table, `get_schema_version()`, `check_schema_compatibility()`
 - 5 unit tests covering init, register/query, list, usage, type filter
 
 **Wiring status:**
 - [x] Added `crabjar-tool-registry` dependency to crabjar binary (Cargo.toml)
 - [x] Wired into `handle_exec()` in `src/main.rs`: discovers tools from project root before execution
-- [ ] Wire into orchestrator SSE handlers (for agent-facing tool discovery)
-- [ ] Wire into `host-agent` ReAct loop (for dynamic tool injection into prompts)
-- [ ] Add `crabjar tool list` and `crabjar tool discover` CLI subcommands
-- [ ] Add fallback chains for tool availability (if binary missing, suggest install)
-- [ ] Add versioned tool interfaces (schema versioning)
+- [x] Wired into orchestrator `execute_tool_call()`: tool registry resolution with guard gate enforcement, falls back to built-in dispatch for backward compatibility
+- [x] Wired into host-agent `TaskExecutor::execute_via_registry()`: resolves task descriptions as tool calls, executes via guard gate
+- [x] Added `crabjar tool list` and `crabjar tool discover` CLI subcommands
+- [x] Added fallback chains for tool availability (binary missing → suggest install, run `crabjar tool discover`)
+- [x] Added schema versioning (v1) with `schema_versions` table and compatibility checks
 
 ### 4.4 Agent Loop: Structural Documentation Sync
 
@@ -477,11 +479,11 @@ Multi-level configuration (defaults → user config → project config → CLI f
 5. **Context compression strategy:** Summarization vs. selective retention vs. relevance scoring?
 6. **Scope isolation granularity:** Which scope dimensions are needed at launch? (identity, project, tenant, thread) — DONE: all four implemented
 7. **Boundary enforcement trigger:** CI-only gate or also pre-commit hook?
-8. **Prompt envelope scope:** Protect all LLM prompts or only user-facing ones?
-9. **VM bridge priority:** Is VM-based agent isolation worth the complexity, or should we start with Unix user sandboxing (already in `crabjar-sandbox`)?
-10. **Dual-backend persistence:** Do we actually need PostgreSQL, or is SQLite sufficient for the foreseeable future?
-11. **tool_registry wiring:** `tool_registry/` crate exists in workspace but is not wired into core execution pipeline — when to integrate?
-12. **ContextFragment guard wiring:** Bounded context management is done in `memory/` but not yet wired into guard rejection logic — when to gate?
+8. **Prompt envelope scope:** ✅ **Decided (June 28):** Protect **both** user-facing and non-user-facing prompts. Only deprioritize if cost becomes a constraint. No cost pressure yet.
+9. **VM bridge priority:** ✅ **Decided (June 28):** Scope to **Unix user sandbox** (already in `crabjar-sandbox`). Reassess VM bridge if a concrete benefit case emerges later.
+10. **Dual-backend persistence:** ✅ **Decided (June 28):** **Stick with SQLite** until a real PostgreSQL need appears. No abstraction layer needed now.
+11. **tool_registry wiring:** ✅ **Decided (June 28):** No friction from the user side — it's agent-facing and results work. "Done" is undefined; leave as-is unless a concrete gap appears.
+12. **ContextFragment guard wiring:** ✅ **Decided (June 28):** **Wire in but leave pretty open** — gate on bounded context but with loose bounds. Tighten later if needed.
 
 ---
 
