@@ -43,6 +43,8 @@ fn test_gate_proceeds_for_trusted_action() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -85,6 +87,8 @@ fn test_gate_pending_for_working_layer() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -127,6 +131,8 @@ fn test_gate_pending_for_low_trust() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -151,6 +157,8 @@ fn test_gate_dry_run() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -193,6 +201,8 @@ fn test_high_risk_command_blocked() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -235,6 +245,8 @@ fn test_medium_risk_command_pending() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -259,6 +271,8 @@ fn test_gate_interrupts_below_confidence_floor() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -283,6 +297,8 @@ fn test_gate_denies_missing_provenance() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
@@ -325,8 +341,133 @@ fn test_gate_proceeds_with_valid_provenance() {
         scope: None,
         target_scope: None,
         domains: vec![],
+        context_budget: None,
+        context_fragment_tokens: None,
     };
 
     let result = gate.check(ctx).unwrap();
     assert_eq!(result, GateResult::Proceed);
+}
+
+#[test]
+fn test_context_budget_proceeds_when_fits() {
+    let dir = tempdir().unwrap();
+    let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+    let conn = db.conn();
+    conn.execute(
+        "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![
+            "test-action-budget-1",
+            "evt-budget-1",
+            "echo",
+            "hello",
+            4,
+            0.95,
+            "trust-approved",
+        ],
+    )
+    .unwrap();
+    drop(conn);
+
+    let gate = ExecutionGate::new(&db, false, dir.path());
+    let budget = crate::context_budget::ContextBudget::new(1000);
+
+    let ctx = GateContext::new(
+        "echo",
+        "echo",
+        vec!["hello".to_string()],
+        4,
+        TrustScore::new(0.95),
+    )
+    .with_source_event("evt-budget-1")
+    .with_context_budget(budget, 500);
+
+    let result = gate.check(ctx).unwrap();
+    assert!(result.is_proceed());
+}
+
+#[test]
+fn test_context_budget_rejects_when_exhausted() {
+    let dir = tempdir().unwrap();
+    let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+    let conn = db.conn();
+    conn.execute(
+        "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![
+            "test-action-budget-2",
+            "evt-budget-2",
+            "echo",
+            "hello",
+            4,
+            0.95,
+            "trust-approved",
+        ],
+    )
+    .unwrap();
+    drop(conn);
+
+    let gate = ExecutionGate::new(&db, false, dir.path());
+    let budget = crate::context_budget::ContextBudget::new(1000);
+
+    let ctx = GateContext::new(
+        "echo",
+        "echo",
+        vec!["hello".to_string()],
+        4,
+        TrustScore::new(0.95),
+    )
+    .with_source_event("evt-budget-2")
+    .with_context_budget(budget, 2000);
+
+    let result = gate.check(ctx).unwrap();
+    assert!(result.is_context_exhausted());
+    if let GateResult::ContextExhausted { used, budget: b, remaining } = &result {
+        assert_eq!(*used, 0);
+        assert_eq!(*b, 1000);
+        assert_eq!(*remaining, 1000);
+    } else {
+        panic!("expected ContextExhausted");
+    }
+}
+
+#[test]
+fn test_context_budget_skipped_when_none() {
+    let dir = tempdir().unwrap();
+    let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
+
+    let conn = db.conn();
+    conn.execute(
+        "INSERT INTO action_requests (id, source_event_id, action_type, payload, trust_layer, confidence, status)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![
+            "test-action-budget-3",
+            "evt-budget-3",
+            "echo",
+            "hello",
+            4,
+            0.95,
+            "trust-approved",
+        ],
+    )
+    .unwrap();
+    drop(conn);
+
+    let gate = ExecutionGate::new(&db, false, dir.path());
+
+    // No context_budget set — should proceed regardless of fragment size
+    let ctx = GateContext::new(
+        "echo",
+        "echo",
+        vec!["hello".to_string()],
+        4,
+        TrustScore::new(0.95),
+    )
+    .with_source_event("evt-budget-3");
+
+    let result = gate.check(ctx).unwrap();
+    assert!(result.is_proceed());
 }
