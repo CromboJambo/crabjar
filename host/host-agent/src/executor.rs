@@ -60,9 +60,9 @@ impl TaskExecutor {
         let tool_args = if parts.len() > 1 { &parts[1..] } else { &[] };
 
         // Check tool registry for the tool
-        let project_root = std::env::current_dir().ok().unwrap_or_else(|| {
-            std::path::PathBuf::from("/home/crombo/crabjar")
-        });
+        let project_root = std::env::current_dir()
+            .ok()
+            .unwrap_or_else(|| std::path::PathBuf::from("/home/crombo/crabjar"));
         let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
 
         if !tool_registry_path.exists() {
@@ -72,7 +72,9 @@ impl TaskExecutor {
         let conn = match rusqlite::Connection::open(&tool_registry_path) {
             Ok(c) => c,
             Err(e) => {
-                return format!("Task '{task_desc}' executed successfully (stub — registry error: {e})");
+                return format!(
+                    "Task '{task_desc}' executed successfully (stub — registry error: {e})"
+                );
             }
         };
 
@@ -85,88 +87,103 @@ impl TaskExecutor {
         if registry.query_tool(tool_name).ok().flatten().is_some() {
             // Tool registered — validate binary availability
             let all_tools = vec![tool_name.to_string()];
-            if let Ok(validation) = registry.validate_tools(&all_tools) {
-                if let Some((_, available, binary_path)) = validation.first() {
-                    if *available {
-                        // Execute via guard gate
-                        let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                            .unwrap_or_else(|_| project_root.to_string_lossy().to_string());
+            if let Ok(validation) = registry.validate_tools(&all_tools)
+                && let Some((_, available, binary_path)) = validation.first()
+            {
+                if *available {
+                    // Execute via guard gate
+                    let guard_root = std::env::var("MIRROR_GUARD_ROOT")
+                        .unwrap_or_else(|_| project_root.to_string_lossy().to_string());
 
-                        let guard_db = crabjar_guard::GuardDb::open(
-                            crabjar_guard::GuardDb::from_mirror_path(format!("{}/guard.db", guard_root)),
-                        ).unwrap_or_else(|_| {
-                            crabjar_guard::GuardDb::open(":memory:").unwrap()
-                        });
+                    let guard_db =
+                        crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
+                            format!("{}/guard.db", guard_root),
+                        ))
+                        .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").unwrap());
 
-                        let gate = crabjar_guard::ExecutionGate::new(&guard_db, false, &guard_root);
-                        let gate_result = match gate.check(crabjar_guard::GateContext {
-                            action_type: "tool_call",
-                            command: tool_name,
-                            args: tool_args.iter().map(|s| s.to_string()).collect(),
-                            trust_layer: 2,
-                            confidence: crabjar_guard::TrustScore::new(0.5),
-                            source_event_id: Some("host-agent-exec"),
-                            can_interrupt: true,
-                            pid: None,
-                            scope: None,
-                            target_scope: None,
-                            domains: vec![],
-                            context_budget: None,
-                            context_fragment_tokens: None,
-                        }) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                return format!("Task '{task_desc}' failed: security gate error: {e}");
-                            }
-                        };
+                    let gate = crabjar_guard::ExecutionGate::new(&guard_db, false, &guard_root);
+                    let gate_result = match gate.check(crabjar_guard::GateContext {
+                        action_type: "tool_call",
+                        command: tool_name,
+                        args: tool_args.iter().map(|s| s.to_string()).collect(),
+                        trust_layer: 2,
+                        confidence: crabjar_guard::TrustScore::new(0.5),
+                        source_event_id: Some("host-agent-exec"),
+                        can_interrupt: true,
+                        pid: None,
+                        scope: None,
+                        target_scope: None,
+                        domains: vec![],
+                        context_budget: None,
+                        context_fragment_tokens: None,
+                    }) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return format!("Task '{task_desc}' failed: security gate error: {e}");
+                        }
+                    };
 
-                        match gate_result {
-                            crabjar_guard::GateResult::Proceed => {
-                                // Execute the binary
-                                if let Some(path) = binary_path {
-                                    match std::process::Command::new(path)
-                                        .args(tool_args)
-                                        .output()
-                                    {
-                                        Ok(output) => {
-                                            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                                            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                                            if !output.status.success() {
-                                                return format!("Task '{tool_name}' failed with exit code {}: {stderr}", output.status.code().unwrap_or(-1));
-                                            }
-                                            return if stdout.is_empty() {
-                                                format!("Task '{tool_name}' executed successfully (exit code: {})", output.status.code().unwrap_or(0))
-                                            } else {
-                                                format!("Task '{tool_name}' output:\n{stdout}")
-                                            };
+                    match gate_result {
+                        crabjar_guard::GateResult::Proceed => {
+                            // Execute the binary
+                            if let Some(path) = binary_path {
+                                match std::process::Command::new(path).args(tool_args).output() {
+                                    Ok(output) => {
+                                        let stdout =
+                                            String::from_utf8_lossy(&output.stdout).to_string();
+                                        let stderr =
+                                            String::from_utf8_lossy(&output.stderr).to_string();
+                                        if !output.status.success() {
+                                            return format!(
+                                                "Task '{tool_name}' failed with exit code {}: {stderr}",
+                                                output.status.code().unwrap_or(-1)
+                                            );
                                         }
-                                        Err(e) => {
-                                            return format!("Task '{tool_name}' failed to execute: {e}");
-                                        }
+                                        return if stdout.is_empty() {
+                                            format!(
+                                                "Task '{tool_name}' executed successfully (exit code: {})",
+                                                output.status.code().unwrap_or(0)
+                                            )
+                                        } else {
+                                            format!("Task '{tool_name}' output:\n{stdout}")
+                                        };
                                     }
-                                } else {
-                                    return format!("Task '{tool_name}' registered but binary not found");
+                                    Err(e) => {
+                                        return format!(
+                                            "Task '{tool_name}' failed to execute: {e}"
+                                        );
+                                    }
                                 }
+                            } else {
+                                return format!(
+                                    "Task '{tool_name}' registered but binary not found"
+                                );
                             }
-                            crabjar_guard::GateResult::Pending => {
-                                return format!("Task '{tool_name}' pending — requires approval");
-                            }
-                            crabjar_guard::GateResult::Interrupted { .. } => {
-                                return format!("Task '{tool_name}' interrupted");
-                            }
-                            crabjar_guard::GateResult::DryRun => {
-                                return format!("Task '{tool_name}' dry-run (no-op)");
-                            }
-                            crabjar_guard::GateResult::Revoked { .. } => {
-                                return format!("Task '{tool_name}' permissions revoked");
-                            }
-                            crabjar_guard::GateResult::ContextExhausted { used, budget, remaining } => {
-                                return format!("Task '{tool_name}' context budget exhausted: {used} / {budget} tokens, {remaining} remaining");
-                            }
-                        };
-                    } else {
-                        return format!("Task '{tool_name}' registered but binary not found in PATH");
-                    }
+                        }
+                        crabjar_guard::GateResult::Pending => {
+                            return format!("Task '{tool_name}' pending — requires approval");
+                        }
+                        crabjar_guard::GateResult::Interrupted { .. } => {
+                            return format!("Task '{tool_name}' interrupted");
+                        }
+                        crabjar_guard::GateResult::DryRun => {
+                            return format!("Task '{tool_name}' dry-run (no-op)");
+                        }
+                        crabjar_guard::GateResult::Revoked { .. } => {
+                            return format!("Task '{tool_name}' permissions revoked");
+                        }
+                        crabjar_guard::GateResult::ContextExhausted {
+                            used,
+                            budget,
+                            remaining,
+                        } => {
+                            return format!(
+                                "Task '{tool_name}' context budget exhausted: {used} / {budget} tokens, {remaining} remaining"
+                            );
+                        }
+                    };
+                } else {
+                    return format!("Task '{tool_name}' registered but binary not found in PATH");
                 }
             }
         }
