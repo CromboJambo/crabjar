@@ -216,19 +216,20 @@ These are the conceptual patterns crabjar needs to replicate from EdgeCrab.
 - [ ] Startup latency budget (~100ms), error recovery, lifecycle management
 - [ ] Language-agnostic plugin execution
 
-### 4.2 Agent Loop (ReAct) ✅ PARTIALLY DONE
+### 4.2 Agent Loop (ReAct) ✅ DONE
 
-`host/host-agent/` exists with a complete ReAct loop implementation:
+`host/host-agent/` implements a complete ReAct loop with phase-aware model routing, context compression, decision gating, and scope isolation:
+
 - `loop_engine.rs`: `AgentLoop` struct with observe → understand → plan → execute → verify → reflect → persist cycle
-- `executor.rs`, `planner.rs`, `verifier.rs`, `reflector.rs`: Stage-specific logic
+- `model_routing.rs`: `ModelRouter` with `LoopPhase` enum (6 phases), `PhaseConfig` per-phase, `PhaseBuilder` for common patterns. Default routing sends plan/reflect to HTTP backend, others to heuristic.
+- `context_compression.rs`: `ContextCompressor` with configurable `CompressionConfig` — keeps recent N observations raw, groups older by stage/kind into summaries, enforces token budget. Three presets: `for_short_conversation()`, `for_long_conversation()`, `disabled()`.
+- `decision_gate.rs`: `DecisionGate` with `Decision` enum (ToolCall / RespondDirectly / Defer), `DecisionConfig` for auto-decide threshold and max tool calls per turn. Heuristic fallback when no model configured.
+- `executor.rs`: `TaskExecutor` with `scope: Option<Scope>` — wires scope from `AgentLoop` into `GateContext` for guard gate enforcement.
 - `work_item_store.rs`: SQLite-backed WorkItem persistence with resume support
 - `inference/backend.rs` + `http_backend.rs`: Inference backend abstraction
 - State machine for loop transitions (via `WorkItem.status`)
 - Confidence-based auto-completion (threshold: 0.85)
 - Max iterations guard (default: 100)
-- Context compression: per-stage inference prompts (not yet configurable)
-- Model routing: single `InferenceBackend` trait, not yet phase-specific
-- Decision flow: `tick()` runs all stages; `confidence` drives continue/stop
 
 **What's wired:**
 - [x] observe → understand → plan → execute → verify → reflect cycle
@@ -236,12 +237,22 @@ These are the conceptual patterns crabjar needs to replicate from EdgeCrab.
 - [x] Persistence via WorkItemStore (restart recovery)
 - [x] Confidence-based auto-completion
 - [x] Max iterations guard
+- [x] Context compression between turns — `ContextCompressor` groups older observations by stage/kind, enforces token budget
+- [x] Model routing — phase-specific backends via `ModelRouter`; plan/reflect use HTTP backend by default, others use heuristic
+- [x] Decision flow: `DecisionGate` evaluates WorkItem state to decide tool call vs direct response vs defer
+- [x] Scope isolation — `AgentLoop.with_scope()` → `TaskExecutor` → `GateContext.scope` for guard enforcement
 
-**What's not wired:**
-- [ ] Context compression between turns (not yet implemented — stage prompts are ad-hoc)
-- [ ] Model routing (which model for which phase) — currently single InferenceBackend
-- [ ] Decision flow: when to call tools vs. respond directly — not yet exposed as a gateable decision
-- [ ] Scope isolation for agent loop actions — scope is wired into ExecutionGate but not yet populated in the agent loop
+**New files added:**
+- `host/host-agent/src/model_routing.rs` (435 LoC) — `LoopPhase`, `PhaseBackendKind`, `PhaseConfig`, `ModelRouter`, `PhaseBuilder`, `phase_infer()`
+- `host/host-agent/src/context_compression.rs` (388 LoC) — `CompressionConfig`, `ContextCompressor`
+- `host/host-agent/src/decision_gate.rs` (365 LoC) — `Decision`, `DecisionConfig`, `DecisionGate`
+
+**Changes to existing files:**
+- `host/host-agent/src/loop_engine.rs` — replaced single `InferenceBackend` with `Option<ModelRouter>`, added `ContextCompressor`, added `scope: Option<Scope>`, wired compression into all stage methods
+- `host/host-agent/src/executor.rs` — `TaskExecutor` now holds `Option<Scope>`, passes it through to `GateContext`
+- `host/host-agent/src/inference/mod.rs` — re-exports `InferenceError` for model_routing
+
+43 new tests covering model routing, context compression, decision gate, and loop integration.
 
 ### 4.3 Tool Registry ✅ WIRED INTO CORE
 
@@ -404,7 +415,12 @@ Derived from parity analysis against OpenAI Codex (2026-06-23). Codex sets the q
 - [x] Implement: bounded injection API in knowledge store (`memory/`)
 - [x] Add: per-fragment token accounting (not byte counting)
 - [x] Add: P0 alert for fragments exceeding 1k tokens
-- [ ] Wire into guard: reject actions that would produce unbounded context fragments
+- [x] Wire into guard: gate rejects oversized fragments (>10K) and checks cumulative budget
+  - `guard/src/context_budget.rs`: `ContextBudget` + `MAX_TOKENS_PER_FRAGMENT` constant
+  - `guard/src/gate.rs` step 10: per-fragment hard cap check → `GateResult::OversizedFragment`
+  - `guard/src/gate.rs` step 10: cumulative budget check → `GateResult::ContextExhausted`
+  - Loose bounds per Q12: warning at 80%, hard rejection only at 100%
+  - 2 new tests: `test_context_budget_rejects_oversized_fragment`, `test_context_budget_allows_at_hard_cap`
 
 **Why this matters:** Crabjar's knowledge store has no token budget. Without bounded context, long conversations will silently degrade model quality. Codex's approach: everything injected must have a bounded size and a hard cap.
 
