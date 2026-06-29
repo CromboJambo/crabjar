@@ -130,6 +130,8 @@ impl AcpBridge {
                 scope: None,
                 target_scope: None,
                 domains: vec![], // zed-acp-bridge: no known domains at this layer
+                context_budget: None,
+                context_fragment_tokens: None,
             })
             .map_err(|e| AcpBridgeError::GuardError(e.to_string()))?;
         Ok(result)

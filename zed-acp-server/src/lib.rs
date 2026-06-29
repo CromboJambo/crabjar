@@ -211,6 +211,8 @@ impl AcpAgentServer {
                             scope: None,
                             target_scope: None,
                             domains: vec![], // zed-acp-server: no known domains at this layer
+                            context_budget: None,
+                            context_fragment_tokens: None,
                             });
 
                                         match gate_result {
@@ -261,6 +263,18 @@ impl AcpAgentServer {
                                     "reason": reason,
                                     "status": "revoked",
                                     "guided_exit": true,
+                                }),
+                            }),
+                            Ok(GateResult::ContextExhausted { used, budget, remaining }) => Ok(AcpResponse::Result {
+                                value: json!({
+                                    "session_id": session_id,
+                                    "tool": function_name,
+                                    "arguments": arguments,
+                                    "gate_result": "context_exhausted",
+                                    "used": used,
+                                    "budget": budget,
+                                    "remaining": remaining,
+                                    "status": "denied",
                                 }),
                             }),
                             Err(e) => Ok(AcpResponse::Error {
