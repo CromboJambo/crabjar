@@ -203,6 +203,16 @@ impl<'a> ExecutionGate<'a> {
         // 10. Context budget check (Q12: wire in but leave pretty open)
         if let (Some(budget), fragment_tokens) = (&ctx.context_budget, ctx.context_fragment_tokens)
         {
+            // Per-fragment hard cap (Codex spec: 10K tokens)
+            if let Some(tokens) = fragment_tokens
+                && tokens > crate::context_budget::MAX_TOKENS_PER_FRAGMENT
+            {
+                return Ok(GateResult::OversizedFragment {
+                    actual: tokens,
+                    max: crate::context_budget::MAX_TOKENS_PER_FRAGMENT,
+                });
+            }
+
             // Warn at 80% utilization (loose bounds per Q12)
             if let Some(remaining) = budget.warn_if_approaching() {
                 warn!(
