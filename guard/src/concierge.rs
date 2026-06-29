@@ -187,6 +187,38 @@ impl GateConcierge {
                 );
                 (ActionStatus::Denied, None, Some(entry))
             }
+            GateResult::OversizedFragment { actual, max } => {
+                let reason = format!(
+                    "Context fragment too large: {actual} tokens exceeds max of {max}"
+                );
+                let entry = InterruptedLogEntry {
+                    id: Uuid::new_v4().to_string(),
+                    gate_result_id: gate_result_id.clone(),
+                    action_type: action_type.to_string(),
+                    command: command.to_string(),
+                    args: args.to_vec(),
+                    trust_layer,
+                    source_event_id: source_event_id.clone(),
+                    reason: reason.clone(),
+                    logged_at: chrono::Utc::now().timestamp(),
+                };
+                if let Some(db) = &self.db
+                    && let Err(e) = db.persist_revoked_entry(&entry)
+                {
+                    error!(
+                        gate_result_id = %gate_result_id,
+                        "Failed to persist oversized fragment entry: {}", e
+                    );
+                }
+                warn!(
+                    gate_result_id = %gate_result_id,
+                    action_type = %action_type,
+                    max = max,
+                    actual = actual,
+                    "Gate concierge: OversizedFragment — fragment rejected"
+                );
+                (ActionStatus::Denied, None, Some(entry))
+            }
         }
     }
 
