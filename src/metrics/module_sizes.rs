@@ -2,7 +2,6 @@
 ///
 /// Scans all .rs files in the workspace (excluding target/) and reports
 /// per-file and per-crate LoC totals, plus any violations.
-
 use serde_json::json;
 
 /// Run module size metrics.
@@ -48,37 +47,37 @@ pub fn run_module_sizes() -> serde_json::Value {
             .output()
         {
             let wc_stdout = String::from_utf8_lossy(&wc_output.stdout);
-            if let Some(first_word) = wc_stdout.split_whitespace().next() {
-                if let Ok(locl) = first_word.parse::<usize>() {
-                    total_lines += locl;
-                    if locl > max_lines {
-                        max_lines = locl;
-                        max_file = line.to_string();
-                    }
-                    if locl > 500 {
-                        violations.push(format!("{}: {} LoC", line, locl));
-                    }
+            if let Some(first_word) = wc_stdout.split_whitespace().next()
+                && let Ok(locl) = first_word.parse::<usize>()
+            {
+                total_lines += locl;
+                if locl > max_lines {
+                    max_lines = locl;
+                    max_file = line.to_string();
+                }
+                if locl > 500 {
+                    violations.push(format!("{}: {} LoC", line, locl));
+                }
 
-                    // Extract crate name from path
-                    let crate_name = if let Some(pos) = line.find("/src/") {
-                        line[..pos].to_string()
-                    } else {
-                        "root".to_string()
-                    };
+                // Extract crate name from path
+                let crate_name = if let Some(pos) = line.find("/src/") {
+                    line[..pos].to_string()
+                } else {
+                    "root".to_string()
+                };
 
-                    if let Some(obj) = crate_sizes.get_mut(&crate_name) {
-                        if let Some(total) = obj.get("total_lines").and_then(|v| v.as_u64()) {
-                            obj["total_lines"] = json!((total as usize + locl) as u64);
-                        }
-                        if let Some(count) = obj.get("file_count").and_then(|v| v.as_u64()) {
-                            obj["file_count"] = json!((count as usize + 1) as u64);
-                        }
-                    } else {
-                        let mut m = serde_json::Map::new();
-                        m.insert("total_lines".to_string(), json!(locl as u64));
-                        m.insert("file_count".to_string(), json!(1u64));
-                        crate_sizes.insert(crate_name, serde_json::Value::Object(m));
+                if let Some(obj) = crate_sizes.get_mut(&crate_name) {
+                    if let Some(total) = obj.get("total_lines").and_then(|v| v.as_u64()) {
+                        obj["total_lines"] = json!((total as usize + locl) as u64);
                     }
+                    if let Some(count) = obj.get("file_count").and_then(|v| v.as_u64()) {
+                        obj["file_count"] = json!((count as usize + 1) as u64);
+                    }
+                } else {
+                    let mut m = serde_json::Map::new();
+                    m.insert("total_lines".to_string(), json!(locl as u64));
+                    m.insert("file_count".to_string(), json!(1u64));
+                    crate_sizes.insert(crate_name, serde_json::Value::Object(m));
                 }
             }
         }
