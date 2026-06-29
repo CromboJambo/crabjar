@@ -2,7 +2,6 @@
 ///
 /// Runs `cargo test --workspace` and parses the output to count total tests.
 /// Returns structured JSON with per-crate and aggregate counts.
-
 use serde_json::json;
 
 /// Run test count metrics.
@@ -47,16 +46,16 @@ pub fn run_test_count() -> serde_json::Value {
             if let Some(pos) = first.find(" passed") {
                 let num_str = &first[..pos]; // everything before " passed"
                 // num_str is like "test result: ok. 73" — extract last number
-                if let Some(last_word) = num_str.split_whitespace().last() {
-                    if let Ok(val) = last_word.parse::<usize>() {
-                        total_passed += val;
-                        crate_results.push(json!({
-                            "passed": val,
-                            "failed": 0,
-                            "ignored": 0,
-                        }));
-                    }
-                }
+            if let Some(last_word) = num_str.split_whitespace().last()
+                && let Ok(val) = last_word.parse::<usize>()
+            {
+                total_passed += val;
+                crate_results.push(json!({
+                    "passed": val,
+                    "failed": 0,
+                    "ignored": 0,
+                }));
+            }
             }
 
             // Parse remaining segments: "0 failed", "0 ignored"
@@ -66,13 +65,13 @@ pub fn run_test_count() -> serde_json::Value {
                     continue;
                 }
                 // Split into number + word: "0 failed" -> ("0", "failed")
-                if let Some((num_str, word)) = seg.rsplit_once(' ') {
-                    if let Ok(val) = num_str.parse::<usize>() {
-                        match word {
-                            "failed" => total_failed += val,
-                            "ignored" => total_ignored += val,
-                            _ => {}
-                        }
+                if let Some((num_str, word)) = seg.rsplit_once(' ')
+                    && let Ok(val) = num_str.parse::<usize>()
+                {
+                    match word {
+                        "failed" => total_failed += val,
+                        "ignored" => total_ignored += val,
+                        _ => {}
                     }
                 }
             }
@@ -84,10 +83,10 @@ pub fn run_test_count() -> serde_json::Value {
         let mut running_total: usize = 0;
         for line in combined.lines() {
             let words: Vec<&str> = line.split_whitespace().collect();
-            if words.len() >= 3 && words[1] == "running" && words[2] == "tests" {
-                if let Ok(val) = words[0].parse::<usize>() {
-                    running_total += val;
-                }
+            if words.len() >= 3 && words[1] == "running" && words[2] == "tests"
+                && let Ok(val) = words[0].parse::<usize>()
+            {
+                running_total += val;
             }
         }
         if running_total > 0 {
