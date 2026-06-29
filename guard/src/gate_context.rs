@@ -1,4 +1,5 @@
 //! Gate context — the data needed for a gate check.
+use crate::context_budget::ContextBudget;
 use crate::trust::TrustScore;
 
 /// Context for gate checks.
@@ -24,6 +25,12 @@ pub struct GateContext<'a> {
     /// network destinations. The gate checks these against the domain allowlist.
     /// If empty, the gate skips domain checking (caller must have verified).
     pub domains: Vec<String>,
+    /// Cumulative context budget for this action's scope.
+    /// If None, context budget is not checked (permissive mode).
+    pub context_budget: Option<ContextBudget>,
+    /// Token count of the context that would be injected by this action.
+    /// Only relevant when context_budget is Some.
+    pub context_fragment_tokens: Option<usize>,
 }
 
 impl<'a> GateContext<'a> {
@@ -47,6 +54,8 @@ impl<'a> GateContext<'a> {
             scope: None,
             target_scope: None,
             domains: Vec::new(),
+            context_budget: None,
+            context_fragment_tokens: None,
         }
     }
 
@@ -77,6 +86,18 @@ impl<'a> GateContext<'a> {
     /// Set the target scope of the action.
     pub fn with_target_scope(mut self, scope: crate::scope::Scope) -> Self {
         self.target_scope = Some(scope);
+        self
+    }
+
+    /// Set the context budget for this action.
+    ///
+    /// When Some, the gate will check that the action's context fragments
+    /// fit within the budget. Per Q12: bounds are loose — a warning is
+    /// logged at 80% utilization, but the action is allowed through.
+    /// Hard rejection only happens at 100%.
+    pub fn with_context_budget(mut self, budget: ContextBudget, fragment_tokens: usize) -> Self {
+        self.context_budget = Some(budget);
+        self.context_fragment_tokens = Some(fragment_tokens);
         self
     }
 }
