@@ -477,14 +477,20 @@ async fn execute_tool_call(
     let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
 
     // All sync work before any await (Connection is not Send)
-    let discovered_tools = if tool_registry_path.exists()
-        && let Ok(conn) = rusqlite::Connection::open(&tool_registry_path)
-    {
-        let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
-        if registry.init().is_ok() {
-            registry.discover_tools_sync("orchestrator", &project_root)
-        } else {
-            Vec::new()
+    let discovered_tools = if tool_registry_path.exists() {
+        match rusqlite::Connection::open(&tool_registry_path) {
+            Ok(conn) => {
+                let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
+                if registry.init().is_ok() {
+                    match registry.discover_tools("orchestrator", &project_root) {
+                        Ok(tools) => tools,
+                        Err(_) => Vec::new(),
+                    }
+                } else {
+                    Vec::new()
+                }
+            }
+            Err(_) => Vec::new(),
         }
     } else {
         Vec::new()

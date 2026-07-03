@@ -28,7 +28,8 @@
 mod client;
 mod endpoints;
 mod error;
-mod prompt_envelope;
+mod prompt_types;
+mod prompt_validator;
 mod session;
 mod types;
 
@@ -38,9 +39,9 @@ pub use client::LmStudioClient;
 #[allow(unused_imports)]
 pub use error::ToolCallInfo;
 #[allow(unused_imports)]
-pub use prompt_envelope::{
-    PromptEnvelope, PromptError, PromptValidator, SourceLabel,
-};
+pub use prompt_types::{compute_provenance, LabeledContent, PromptEnvelope, PromptMetadata, SourceLabel};
+#[allow(unused_imports)]
+pub use prompt_validator::PromptValidator;
 #[allow(unused_imports)]
 pub use session::SessionError;
 #[allow(unused_imports)]

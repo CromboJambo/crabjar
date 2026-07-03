@@ -5,9 +5,8 @@
 
 use super::endpoints::{anthropic, native, openai};
 use super::error::{LmStudioError, ToolCallInfo};
-use super::prompt_envelope::{
-    PromptEnvelope, PromptValidator, SourceLabel,
-};
+use super::prompt_types::{PromptEnvelope, SourceLabel};
+use super::prompt_validator::PromptValidator;
 use super::session::{SessionError, SessionState, SessionStore};
 use super::types::*;
 use tracing::{info, warn};
