@@ -4,13 +4,13 @@
 
 ---
 
-## Status (June 26, 2026)
+## Status (July 3, 2026)
 
-|| Metric | Value |
-||---|---|
-|| **Workspace members** | 22 crates |
-|| **Tests** | 576 passing, 0 failing |
-|| **Clippy** | ✅ Clean (`cargo clippy --workspace -- -D warnings`) |
+| Metric | Value |
+|---|---|
+| **Workspace members** | 22 crates |
+| **Tests** | 612 passing, 0 failing |
+| **Clippy** | ✅ Clean (`cargo clippy --workspace -- -D warnings`) |
 | **Architecture crate** | ✅ Built, compiles, has integration test |
 | **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
 | **Per-crate AGENTS.md** | ✅ Complete (all 23 crates documented) |
@@ -20,6 +20,13 @@
 | **ContextFragment** | ✅ Implemented in memory/ with P0 alert threshold |
 | **Audit trail** | ✅ TrustResolution.audit_log() records derivation chain |
 | **Guard module size** | ✅ Split 5 modules (trust, gate, fingerprint, concierge, trust_resolution) — all under 500 LoC |
+| **Context budgeting** | ✅ Enforced in ExecutionGate step 10: per-fragment hard cap + cumulative budget check |
+| **Oversized fragment handling** | ✅ Gate rejects fragments >10K tokens; Zed ACP server handles oversized responses |
+| **Metrics reporting** | ✅ `crabjar metrics` CLI subcommand with test count, LoC, workspace stats |
+| **Domain allowlisting** | ✅ Implemented in guard/ with trust-layer enforcement + network domain tracking |
+| **Reproducible builds** | ✅ `just reproducible-build` target with locked deps and deterministic flags |
+| **Agent loop (ReAct)** | ✅ Full ReAct loop engine with model routing, context compression, decision gating |
+| **Tool registry wiring** | ✅ Fully wired into crabjar binary, orchestrator, host-agent, and CLI |
 
 ---
 
@@ -69,7 +76,7 @@ The scope isolation test `test_scope_cannot_access_different_project` in `guard/
 - [x] Updated generated date to June 27, 2026
 - [x] Added provenance entry for this update
 
-**Remaining concern:** `guard/src/guard_db_impl.rs` is 729 LoC — exceeds 500 LoC rule. Needs splitting (see 3.2).
+**Remaining concern:** Resolved — `guard_db_impl.rs` split into 3 files, all under 500 LoC (see 3.2).
 
 ---
 
@@ -171,22 +178,38 @@ Codex doesn't contribute architecture — it sets the standard. These are non-ne
 - [x] Code quality gates — module size limits + CI gate (see 3.2 below)
 - [ ] Drift governance — detect when state-docs diverge from reality (partially done via `skill-reference-store`)
 
-### 3.2 Module Size Governance ⚠️ PARTIALLY DONE
+### 3.2 Module Size Governance ⚠️ PARTIALLY DONE (guard/ ✅, other crates ❌)
 
-**Status:** Most >500 LoC modules in `guard/` have been split. One remaining offender:
+**Status:** All `guard/` modules are under 500 LoC. However, several non-guard modules have drifted past the threshold:
 
-|- [x] Add `just module-sizes` target (reports modules exceeding threshold)
-|- [x] Add `just module-sizes-check` CI gate (fails on >500 LoC)
-|- [x] Add CI job to `.github/workflows/rust.yml`
-|- [x] Split `trust.rs` (697 LoC) → `trust_types.rs` (252 LoC) + `trust.rs` (429 LoC: impl + tests)
-|- [x] Split `gate.rs` (614 LoC) → `gate.rs` (292 LoC: impl) + `gate_tests.rs` (323 LoC: tests)
-|- [x] Split `trust_resolution.rs` (641 LoC) → `trust_resolution.rs` (431 LoC: impl only)
-|- [x] Split `fingerprint.rs` (585 LoC) → `fingerprint_types.rs` (259 LoC) + `fingerprint.rs` (8 LoC: re-exports) + `fingerprint.rs` tests extracted
-|- [x] Split `concierge.rs` (541 LoC) → `concierge_types.rs` (91 LoC) + `concierge.rs` (466 LoC: impl + tests)
-|- [x] Document 500 LoC rule in AGENTS.md
-- [x] `guard_db_impl.rs` is 368 LoC — under 500 LoC rule (no longer an issue)
+| File | Lines | Status |
+|---|---|---|
+| `orchestrator/src/lm_studio_client/prompt_envelope.rs` | 940 | ⚠️ Over limit |
+| `src/knowledge_store/mod.rs` | 832 | ⚠️ Over limit |
+| `memory/src/context.rs` | 751 | ⚠️ Over limit |
+| `memory/src/state_docs/indexer.rs` | 705 | ⚠️ Over limit |
+| `tool_registry/src/tool_registry.rs` | 695 | ⚠️ Over limit |
 
-**Why this matters:** Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy.
+**Completed (guard/):**
+- [x] Add `just module-sizes` target (reports modules exceeding threshold)
+- [x] Add `just module-sizes-check` CI gate (fails on >500 LoC)
+- [x] Add CI job to `.github/workflows/rust.yml`
+- [x] Split `trust.rs` (697 LoC) → `trust_types.rs` (252 LoC) + `trust.rs` (429 LoC: impl + tests)
+- [x] Split `gate.rs` (614 LoC) → `gate.rs` (292 LoC: impl) + `gate_tests.rs` (323 LoC: tests)
+- [x] Split `trust_resolution.rs` (641 LoC) → `trust_resolution.rs` (431 LoC: impl only)
+- [x] Split `fingerprint.rs` (585 LoC) → `fingerprint_types.rs` (259 LoC) + `fingerprint.rs` (8 LoC: re-exports) + tests extracted
+- [x] Split `concierge.rs` (541 LoC) → `concierge_types.rs` (91 LoC) + `concierge.rs` (466 LoC: impl + tests)
+- [x] Document 500 LoC rule in AGENTS.md
+- [x] `guard_db_impl.rs` split into 3 files, all under 500 LoC
+
+**Remaining:**
+- [ ] Split `prompt_envelope.rs` (940 LoC) — consider extracting injection detection patterns
+- [ ] Split `knowledge_store/mod.rs` (832 LoC) — separate query/write/CRUD concerns
+- [ ] Split `memory/src/context.rs` (751 LoC) — extract ContextFragmentBuilder
+- [ ] Split `indexer.rs` (705 LoC) — separate indexing logic from state-doc rendering
+- [ ] Split `tool_registry.rs` (695 LoC) — extract discovery/usage/schema concerns
+
+**Why this matters:** Codex-core bloat is the anti-pattern Crabjar must avoid. The 500 LoC rule is cognitive load management, not bureaucracy. Guard/ proved it's doable; now we need to extend enforcement to all crates.
 
 ### 3.3 Build Reproducibility ✅ PARTIALLY DONE
 
@@ -486,21 +509,23 @@ Multi-level configuration (defaults → user config → project config → CLI f
 
 ---
 
-## Open Questions
+## Open Questions & Decisions
 
-1. **WASM timeline:** When to invest in WASM plugin support vs. keeping it as a reserved slot?
-2. **Model routing:** How to decide which model handles which phase of the ReAct loop?
-3. **State-doc staleness:** What threshold triggers staleness warnings? (7 days? content changes?)
-4. **Plugin language support:** Which languages for ToolServer plugins? (Rust, Python, Go?)
-5. **Context compression strategy:** Summarization vs. selective retention vs. relevance scoring?
-6. **Scope isolation granularity:** Which scope dimensions are needed at launch? (identity, project, tenant, thread) — DONE: all four implemented
-7. **Boundary enforcement trigger:** CI-only gate or also pre-commit hook?
+1. **WASM timeline:** When to invest in WASM plugin support vs. keeping it as a reserved slot? — *Open*
+2. **Model routing:** How to decide which model handles which phase of the ReAct loop? — *Decided: plan/reflect → HTTP backend, others → heuristic (implemented in `host-agent/model_routing.rs`)*
+3. **State-doc staleness:** What threshold triggers staleness warnings? (7 days? content changes?) — *Open*
+4. **Plugin language support:** Which languages for ToolServer plugins? (Rust, Python, Go?) — *Open*
+5. **Context compression strategy:** Summarization vs. selective retention vs. relevance scoring? — *Decided: grouping older observations by stage/kind into summaries with token budget enforcement (implemented in `host-agent/context_compression.rs`)*
+6. **Scope isolation granularity:** Which scope dimensions are needed at launch? (identity, project, tenant, thread) — ✅ DONE: all four implemented
+7. **Boundary enforcement trigger:** CI-only gate or also pre-commit hook? — *Open*
 8. **Prompt envelope scope:** ✅ **Decided (June 28):** Protect **both** user-facing and non-user-facing prompts. Only deprioritize if cost becomes a constraint. No cost pressure yet.
 9. **VM bridge priority:** ✅ **Decided (June 28):** Scope to **Unix user sandbox** (already in `crabjar-sandbox`). Reassess VM bridge if a concrete benefit case emerges later.
 10. **Dual-backend persistence:** ✅ **Decided (June 28):** **Stick with SQLite** until a real PostgreSQL need appears. No abstraction layer needed now.
 11. **tool_registry wiring:** ✅ **Decided (June 28):** No friction from the user side — it's agent-facing and results work. "Done" is undefined; leave as-is unless a concrete gap appears.
 12. **ContextFragment guard wiring:** ✅ **Decided (June 28):** **Wire in but leave pretty open** — gate on bounded context but with loose bounds. Tighten later if needed.
+13. **Module size governance scope:** Should the 500 LoC rule apply to all crates or just guard/? — *Decision: Apply to all crates (guard/ proved it's doable; now extending enforcement to orchestrator/, memory/, tool_registry/*)
+14. **Metrics reporting scope:** What workspace metrics should `crabjar metrics` report? — *Decided: test count, LoC per crate, total modules, workspace member count*
 
 ---
 
-*Last updated: June 26, 2026*
+*Last updated: July 3, 2026*
