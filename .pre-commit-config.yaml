@@ -1,0 +1,44 @@
+# Pre-commit hooks for crabjar workspace
+# Run: pip install pre-commit && pre-commit install
+# Manual run: pre-commit run --all-files
+
+default_language_version:
+  python: python3
+
+repos:
+  # ─── Rust workspace checks ──────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: cargo-check
+        name: cargo check (workspace)
+        entry: ~/.cargo/bin/cargo check --workspace
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+      - id: cargo-clippy
+        name: cargo clippy (--workspace, deny warnings)
+        entry: ~/.cargo/bin/cargo clippy --workspace -- -D warnings
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+  # ─── Module size governance (500 LoC rule) ──────────────────────
+  - repo: local
+    hooks:
+      - id: module-sizes-check
+        name: module sizes (< 500 LoC per .rs file)
+        entry: ~/.cargo/bin/just module-sizes-check
+        language: system
+        pass_filenames: false
+        stages: [commit]
+
+  # ─── Architecture boundary enforcement (8-layer model) ──────────
+  - repo: local
+    hooks:
+      - id: architecture-boundaries
+        name: crabjar-architecture (layer dependency check)
+        entry: ~/.cargo/bin/cargo test -p crabjar-architecture --lib -- test_workspace_boundaries_are_valid --nocapture
+        language: system
+        pass_filenames: false
+        stages: [commit]
