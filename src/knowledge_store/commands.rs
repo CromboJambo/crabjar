@@ -1,4 +1,4 @@
-use crate::knowledge_store::{KnowledgeBridge, knowledge_response};
+use super::{KnowledgeBridge, knowledge_response};
 use agent_context::KnowledgeKind;
 use serde_json::json;
 
