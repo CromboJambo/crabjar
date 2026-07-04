@@ -1,10 +1,10 @@
+use crate::discovery;
 use crate::error::ToolRegistryError;
 use crate::schema::{
     init_db, list_all_tools, list_tools_by_type, query_discovery, query_tool, query_tool_usage,
     record_tool_discovery, record_tool_usage, register_tool,
 };
 use rusqlite::Connection;
-use tracing::debug;
 
 /// MCP tool registry with rig/mistral.rs patterns for tool discovery, registration, and execution policy.
 ///
@@ -120,162 +120,16 @@ impl<'a> ToolRegistry<'a> {
     }
 
     /// Discover tools from a source by scanning skill directories, MCP manifests, and state-docs.
-    ///
-    /// Scans four layers:
-    /// 1. Project-level skill directories (`.agents/skills/*/manifest.json`)
-    /// 2. User-level skill directories (`~/.corust-agent/skills`, `~/.agents/skills`)
-    /// 3. MCP server configurations (`~/.config/mcp/`, `~/.config/crabjar/mcp/`)
-    /// 4. State-docs registered tools
-    pub async fn discover_tools(
+    pub fn discover_tools(
         &self,
         source: &str,
         project_root: &std::path::Path,
     ) -> Result<Vec<String>, ToolRegistryError> {
-        let discovered = self.discover_tools_sync(source, project_root);
+        let discovered = discovery::discover_tools(source, project_root)?;
         Ok(discovered)
     }
 
-    /// Sync variant of `discover_tools` — does all file I/O synchronously.
-    /// Use this when you need to avoid holding a `&Connection` across an `.await`
-    /// (Connection is not Send).
-    pub fn discover_tools_sync(&self, source: &str, project_root: &std::path::Path) -> Vec<String> {
-        let mut discovered = Vec::new();
-
-        // Layer 1: Scan project-level skill directories for tool definitions
-        for ancestor in project_root.ancestors() {
-            let candidate = ancestor.join(".agents/skills");
-            if candidate.is_dir()
-                && let Ok(entries) = std::fs::read_dir(&candidate)
-            {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir()
-                        && let Ok(content) = std::fs::read_to_string(path.join("manifest.json"))
-                        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
-                        && let Some(tools) = parsed["tools"].as_array()
-                    {
-                        for tool in tools {
-                            if let Some(name) = tool["name"].as_str()
-                                && !discovered.contains(&name.to_string())
-                            {
-                                discovered.push(name.to_string());
-                                let _ = self.record_discovery(source, name);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Layer 2: Scan user-level skill directories
-        let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
-        for scope in [".corust-agent/skills", ".agents/skills"] {
-            let candidate = std::path::Path::new(&home_dir).join(scope);
-            if candidate.is_dir()
-                && let Ok(entries) = std::fs::read_dir(&candidate)
-            {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir()
-                        && path.join("manifest.json").exists()
-                        && let Ok(content) = std::fs::read_to_string(path.join("manifest.json"))
-                        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
-                        && let Some(tools) = parsed["tools"].as_array()
-                    {
-                        for tool in tools {
-                            if let Some(name) = tool["name"].as_str()
-                                && !discovered.contains(&name.to_string())
-                            {
-                                discovered.push(name.to_string());
-                                let _ = self.record_discovery(source, name);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Layer 3: Scan MCP server configurations
-        for mcp_dir in [
-            std::path::Path::new(&home_dir).join(".config/mcp"),
-            std::path::Path::new(&home_dir).join(".config/crabjar/mcp"),
-        ] {
-            if mcp_dir.is_dir()
-                && let Ok(entries) = std::fs::read_dir(&mcp_dir)
-            {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file()
-                        && path.extension().is_some_and(|ext| ext == "json")
-                        && let Ok(content) = std::fs::read_to_string(&path)
-                        && let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content)
-                    {
-                        // MCP config may have a "tools" array or "command"/"args" fields
-                        if let Some(tools) = parsed["tools"].as_array() {
-                            for tool in tools {
-                                if let Some(name) = tool["name"].as_str()
-                                    && !discovered.contains(&name.to_string())
-                                {
-                                    discovered.push(name.to_string());
-                                    let _ = self.record_discovery(source, name);
-                                }
-                            }
-                        } else if let Some(cmd) = parsed["command"].as_str()
-                            && let Some(args) = parsed["args"].as_array()
-                        {
-                            let tool_name = format!(
-                                "{}-{}",
-                                cmd.rsplit('/').next().unwrap_or("mcp"),
-                                args.first().and_then(|a| a.as_str()).unwrap_or("server")
-                            );
-                            if !discovered.contains(&tool_name) {
-                                let name_clone = tool_name.clone();
-                                discovered.push(tool_name);
-                                let _ = self.record_discovery(source, &name_clone);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Layer 4: Discover tools from state-docs annotations
-        let state_docs_dir = project_root.join("state-docs");
-        if state_docs_dir.is_dir()
-            && let Ok(entries) = std::fs::read_dir(&state_docs_dir)
-        {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file()
-                    && path.extension().is_some_and(|ext| ext == "md")
-                    && path
-                        .file_name()
-                        .is_some_and(|n| n.to_string_lossy().starts_with("tool_"))
-                    && let Some(name) = path
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .map(|s| s.trim_start_matches("tool_").to_string())
-                        .filter(|n| !n.is_empty())
-                    && !discovered.contains(&name)
-                {
-                    discovered.push(name.clone());
-                    let _ = self.record_discovery(source, &name);
-                }
-            }
-        }
-
-        debug!(
-            source = %source,
-            tool_count = discovered.len(),
-            "Tool registry: tools discovered"
-        );
-
-        discovered
-    }
-
     /// Validate that discovered tools have their required binaries available.
-    ///
-    /// Returns a map of tool names to their validation status.
     pub fn validate_tools(
         &self,
         tool_names: &[String],
@@ -310,9 +164,6 @@ impl<'a> ToolRegistry<'a> {
     }
 
     /// Auto-register discovered tools into the registry.
-    ///
-    /// For each discovered tool, if it doesn't already exist in the registry,
-    /// register it with a default low-risk execution policy.
     pub fn auto_register_discovered(
         &self,
         tool_names: &[String],
@@ -533,18 +384,18 @@ mod tests {
         assert_eq!(rows.len(), 1);
     }
 
-    #[tokio::test]
-    async fn test_discover_tools_no_skills_dir() {
+    #[test]
+    fn test_discover_tools_no_skills_dir() {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
-        let result = registry.discover_tools("test", dir.path()).await;
+        let result = registry.discover_tools("test", dir.path());
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_discover_tools_with_manifest() {
+    #[test]
+    fn test_discover_tools_with_manifest() {
         let dir = tempdir().unwrap();
         let skills_dir = dir.path().join(".agents/skills/test-skill");
         std::fs::create_dir_all(&skills_dir).unwrap();
@@ -556,13 +407,13 @@ mod tests {
         let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
-        let tools = registry.discover_tools("test", dir.path()).await.unwrap();
+        let tools = registry.discover_tools("test", dir.path()).unwrap();
         assert!(tools.contains(&"cargo_check".to_string()));
         assert!(tools.contains(&"lint".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_discover_tools_skips_duplicate() {
+    #[test]
+    fn test_discover_tools_skips_duplicate() {
         let dir = tempdir().unwrap();
         let skills1 = dir.path().join(".agents/skills/skill-a");
         let skills2 = dir.path().join(".agents/skills/skill-b");
@@ -581,13 +432,13 @@ mod tests {
         let conn = rusqlite::Connection::open(dir.path().join("tool_registry.db")).unwrap();
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
-        let tools = registry.discover_tools("test", dir.path()).await.unwrap();
+        let tools = registry.discover_tools("test", dir.path()).unwrap();
         assert_eq!(tools.iter().filter(|t| *t == "cargo_check").count(), 1);
         assert!(tools.contains(&"lint".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_discover_tools_invalid_manifest() {
+    #[test]
+    fn test_discover_tools_invalid_manifest() {
         let dir = tempdir().unwrap();
         let skills_dir = dir.path().join(".agents/skills/bad-skill");
         std::fs::create_dir_all(&skills_dir).unwrap();
@@ -596,7 +447,7 @@ mod tests {
         let registry = ToolRegistry::new(&conn);
         registry.init().unwrap();
         // Invalid JSON manifests are silently skipped (graceful degradation).
-        let result = registry.discover_tools("test", dir.path()).await;
+        let result = registry.discover_tools("test", dir.path());
         assert!(result.is_ok());
     }
 
