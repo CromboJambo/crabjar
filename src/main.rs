@@ -543,10 +543,7 @@ async fn handle_exec(
             let discovered_tools = if let Some(ref conn) = tool_registry_conn {
                 let registry = crabjar_tool_registry::ToolRegistry::new(conn);
                 registry.init().ok();
-                registry
-                    .discover_tools("cli", &project_root)
-                    .await
-                    .unwrap_or_default()
+                registry.discover_tools("cli", &project_root).unwrap_or_default()
             } else {
                 vec![]
             };

@@ -118,7 +118,7 @@ async fn handle_tool_discover(
     let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
 
     // Discover tools
-    let discovered = registry.discover_tools(&source, &project_root).await?;
+    let discovered = registry.discover_tools(&source, &project_root)?;
 
     // Validate tool availability
     let validation = registry.validate_tools(&discovered)?;
