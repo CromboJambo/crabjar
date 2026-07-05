@@ -553,29 +553,26 @@ fn full_guard_db_pending_queue() {
 
     let guard_db = crabjar_guard::GuardDb::open(&db_path).expect("GuardDb open failed");
 
-    // Create a pending queue entry
+    // Create a pending queue entry (matching actual struct fields)
     let entry = crabjar_guard::PendingQueueEntry {
         id: "e2e-test-entry".to_string(),
+        gate_result_id: "gr-e2e-1".to_string(),
         action_type: "exec".to_string(),
         command: "echo test".to_string(),
         args: vec!["hello".to_string()],
-        cwd: "/tmp".to_string(),
-        reason: "e2e-test".to_string(),
         trust_layer: 3,
         confidence: 0.9,
         source_event_id: Some("e2e-source-123".to_string()),
-        status: "pending".to_string(),
-        created_at: chrono::Utc::now().timestamp_millis(),
+        queued_at: chrono::Utc::now().timestamp_millis(),
+        reason: "e2e-test".to_string(),
     };
 
     guard_db
         .persist_pending_queue_entry(&entry)
         .expect("persist pending entry failed");
 
-    // Retrieve it back
-    let entries = guard_db
-        .query_pending_queue(Some("pending"), 10)
-        .expect("query pending queue failed");
+    // Retrieve it back using read_pending_queue (no filter param)
+    let entries = guard_db.read_pending_queue().expect("read pending queue failed");
 
     assert!(entries.len() >= 1);
     assert_eq!(entries[0].id, "e2e-test-entry");
