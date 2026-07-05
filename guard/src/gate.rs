@@ -126,19 +126,34 @@ impl<'a> ExecutionGate<'a> {
         #[allow(clippy::collapsible_if)]
         if let (Some(actor_scope), Some(target_scope)) = (&ctx.scope, &ctx.target_scope) {
             if !actor_scope.can_access(target_scope) {
-                let reason = format!(
-                    "Scope isolation: {} cannot access {}",
-                    actor_scope.to_scope_string(),
-                    target_scope.to_scope_string()
-                );
-                warn!(
+                // Check for valid CrossScopeAuth bypass
+                let cross_scope_allowed = ctx.cross_scope_auth.as_ref().map_or(false, |auth| {
+                    auth.is_valid(3600) && auth.actor_scope == *actor_scope && auth.target_scope == *target_scope
+                });
+
+                if !cross_scope_allowed {
+                    let reason = format!(
+                        "Scope isolation: {} cannot access {}",
+                        actor_scope.to_scope_string(),
+                        target_scope.to_scope_string()
+                    );
+                    warn!(
+                        action = %ctx.action_type,
+                        actor = %actor_scope,
+                        target = %target_scope,
+                        %reason,
+                        "Scope isolation blocked"
+                    );
+                    return Ok(GateResult::Interrupted { reason });
+                }
+
+                debug!(
                     action = %ctx.action_type,
                     actor = %actor_scope,
                     target = %target_scope,
-                    %reason,
-                    "Scope isolation blocked"
+                    reason = ctx.cross_scope_auth.as_ref().map(|a| a.reason.as_str()).unwrap_or(""),
+                    "Cross-scope operation authorized via CrossScopeAuth"
                 );
-                return Ok(GateResult::Interrupted { reason });
             }
         }
 
