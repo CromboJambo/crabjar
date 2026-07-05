@@ -463,6 +463,12 @@ async fn handle_exec(
             .unwrap_or_else(|| "default".to_string()),
     );
 
+    // Auto-construct CrossScopeAuth if scopes differ (same-scope → None, no-op)
+    let cross_scope_auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(
+        &project_scope,
+        &project_scope,
+    );
+
     let gate_result = gate.check(crabjar_guard::GateContext {
         action_type: "exec",
         command,
@@ -474,7 +480,7 @@ async fn handle_exec(
         pid: None,
         scope: Some(project_scope.clone()),
         target_scope: Some(project_scope),
-        cross_scope_auth: None,
+        cross_scope_auth,
         domains: vec![], // exec: no known domains at CLI level
         context_budget: None,
         context_fragment_tokens: None,

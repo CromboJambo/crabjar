@@ -127,7 +127,7 @@ impl<'a> ExecutionGate<'a> {
         if let (Some(actor_scope), Some(target_scope)) = (&ctx.scope, &ctx.target_scope) {
             if !actor_scope.can_access(target_scope) {
                 // Check for valid CrossScopeAuth bypass
-                let cross_scope_allowed = ctx.cross_scope_auth.as_ref().map_or(false, |auth| {
+                let cross_scope_allowed = ctx.cross_scope_auth.as_ref().is_some_and(|auth| {
                     auth.is_valid(3600) && auth.actor_scope == *actor_scope && auth.target_scope == *target_scope
                 });
 

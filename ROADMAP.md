@@ -113,7 +113,7 @@ These patterns prevent the workspace from collapsing into an unmanageable graph.
 - [x] Wire CrossScopeAuth enforcement into the gate — DONE (gate.rs:129-156 validates auth.is_valid(3600) + actor/target scope match before allowing cross-scope bypass; GateContext.cross_scope_auth field added with builder method)
 
 **What's next:**
-- [ ] Wire CrossScopeAuth creation into callers (orchestrator, exec handler) — currently the gate accepts it but no caller creates valid instances yet
+- [x] Wire CrossScopeAuth creation into callers (orchestrator, exec handler) — DONE (src/main.rs:467 auto-constructs via `CrossScopeAuth::auto_for_scopes()`; orchestrator/host-agent still pass None because they lack scope injection — future work)
 
 ### 2.3 Requested-vs-Effective Trust Resolution ✅ DONE (with audit trail)
 
