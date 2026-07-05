@@ -400,11 +400,19 @@ IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough 
 - `crabjar guard` subcommands (queue, approve, reject, resolution)
 
 **Implementation plan:**
-- [ ] Add `tests/e2e/mod.rs` with smoke test module
+- [x] Add `tests/e2e/mod.rs` with smoke test module (6 tests)
 - [ ] Add `tests/e2e/full.rs` with full test module
 - [ ] Add `#[cfg(feature = "e2e-full")]` gate on full tests
 - [ ] CI: run smoke on every PR, full on merge/nightly
-- [ ] Add `just test-e2e-smoke` and `just test-e2e-full` targets
+- [x] Add `just test-e2e-smoke` and `just test-e2e-full` targets (smoke target added; full target pending full.rs)
+
+**Smoke slice results:** 6/6 passing (~0.3s total):
+- `crabjar state list` ✅ — verifies CLI binary runs and returns JSON with docs array
+- `crabjar workspace status` ✅ — verifies `.crabjar_config.toml` loading (null config + valid config paths)
+- Guard DB init + basic gate check ✅ (`guard queue --status=pending`) — verifies guard commands return structured JSON
+- Tool registry init + register/query cycle ✅ (`tool list`) — verifies tool commands work even with empty registry
+- Knowledge store init + basic query ✅ (`knowledge insert` → `knowledge query`) — verifies knowledge CRUD pipeline
+- `crabjar doctor check` ✅ — verifies environment health checks with doubt block per CLI output contract
 
 ### 11.2 Replay Snapshots
 

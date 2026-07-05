@@ -164,6 +164,14 @@ documentation.workspace = true
 name = "crabjar"
 path = "src/main.rs"
 
+[[test]]
+name = "cli"
+harness = true
+
+[[test]]
+name = "e2e"
+path = "tests/e2e/mod.rs"
+
 [lib]
 name = "crabjar_lib"
 path = "src/lib.rs"

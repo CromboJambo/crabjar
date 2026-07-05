@@ -15,6 +15,11 @@ run +args='state list':
 test:
     cargo test --workspace
 
+# E2E smoke tests — fast regression gate (~30s)
+# Covers: state list, workspace status, guard queue, tool list, knowledge query, doctor check
+test-e2e-smoke:
+    cargo test -p crabjar --test e2e
+
 clean:
     cargo clean
 
