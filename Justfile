@@ -20,6 +20,11 @@ test:
 test-e2e-smoke:
     cargo test -p crabjar --test e2e
 
+# Full E2E integration tests — deep regression gate (~5min)
+# Covers: exec pipeline, domain allowlist, scope isolation, telemetry, agent loop persistence, tool discovery, guard subcommands, knowledge lifecycle
+test-e2e-full:
+    cargo test -p crabjar --test e2e_full
+
 clean:
     cargo clean
 
