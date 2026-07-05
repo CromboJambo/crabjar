@@ -218,6 +218,8 @@ clap_mangen = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true
+crabjar-host-core = { path = "host/host-core" }
+crabjar-host-agent = { path = "host/host-agent" }
 
 # vm-bridge: Per-VM websocket relay for display protocols (for screen sharing)
 vm-bridge = { path = "axum-mux" }
