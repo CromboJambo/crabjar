@@ -175,7 +175,6 @@ path = "tests/e2e/mod.rs"
 [[test]]
 name = "e2e_full"
 path = "tests/e2e/full.rs"
-harness = false
 
 [lib]
 name = "crabjar_lib"

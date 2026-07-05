@@ -4,7 +4,6 @@
 //! Gate behind `#[cfg(feature = "e2e-full")]` so they only run on merge/nightly.
 
 use serde_json::Value;
-use std::fs;
 use std::process::Command;
 
 fn binary() -> &'static str {
@@ -32,7 +31,7 @@ fn json_stdout(output: &std::process::Output) -> Value {
 fn full_exec_pipeline_dry_run() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-exec"
 tool_execution_enabled = true
@@ -57,7 +56,7 @@ tool_execution_enabled = true
 fn full_exec_pipeline_denied() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-exec-denied"
 tool_execution_enabled = false
@@ -81,7 +80,7 @@ tool_execution_enabled = false
 fn full_exec_pipeline_proceeds() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-exec-proceed"
 tool_execution_enabled = true
@@ -320,7 +319,7 @@ async fn full_agent_loop_persistence() {
 fn full_tool_discovery() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-tool-discover"
 "#,
@@ -339,7 +338,7 @@ fn full_tool_discovery() {
 fn full_tool_list_with_filter() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-tool-list"
 "#,
@@ -362,7 +361,7 @@ fn full_tool_list_with_filter() {
 fn full_guard_queue_subcommand() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-guard-queue"
 tool_execution_enabled = true
@@ -383,7 +382,7 @@ tool_execution_enabled = true
 fn full_guard_provenance_subcommand() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-guard-prov"
 tool_execution_enabled = true
@@ -407,7 +406,7 @@ tool_execution_enabled = true
 fn full_guard_resolution_subcommand() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-guard-res"
 tool_execution_enabled = true
@@ -427,7 +426,7 @@ tool_execution_enabled = true
 fn full_guard_grant_subcommand() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-guard-grant"
 tool_execution_enabled = true
@@ -448,7 +447,7 @@ tool_execution_enabled = true
 fn full_guard_revoke_subcommand() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-guard-rev"
 tool_execution_enabled = true
@@ -469,7 +468,7 @@ tool_execution_enabled = true
 fn full_guard_approve_subcommand() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-guard-approve"
 tool_execution_enabled = true
@@ -497,7 +496,7 @@ tool_execution_enabled = true
 fn full_guard_reject_subcommand() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         r#"name = "full-guard-reject"
 tool_execution_enabled = true
@@ -662,7 +661,7 @@ fn full_knowledge_lifecycle() {
 fn full_workspace_malformed_config() {
     let temp = tempfile::tempdir().unwrap();
 
-    fs::write(
+    std::fs::write(
         temp.path().join(".crabjar_config.toml"),
         "this is not valid toml {{{",
     )
@@ -688,3 +687,5 @@ fn full_workspace_missing_config() {
     assert_eq!(body["success"], true);
     assert_eq!(body["workspace"], Value::Null);
 }
+
+fn main() {}
