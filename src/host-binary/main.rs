@@ -1,5 +1,6 @@
 mod cli;
 mod dashboard;
+mod tui;
 
 use clap::{Parser, Subcommand};
 use crabjar_host_agent::AgentLoop;
@@ -38,6 +39,15 @@ enum Commands {
     Status,
     /// Run the Ratatui Mission Control dashboard
     Dashboard,
+    /// Conversational agent TUI
+    Tui {
+        /// Objective for the agent (optional)
+        #[arg(short, long)]
+        objective: Option<String>,
+        /// Session ID to resume
+        #[arg(long)]
+        session: Option<String>,
+    },
     /// List registered plugins
     PluginList,
     /// Show WorkItem state
@@ -129,6 +139,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Dashboard => {
             dashboard::run(event_bus, metrics, plugin_registry).await?;
+        }
+        Commands::Tui { objective, session } => {
+            let obj = objective.as_deref();
+            let sid = session.as_deref();
+            tui::run(obj, sid).await?;
         }
         Commands::PluginList => {
             let plugins = plugin_registry.list().await;
