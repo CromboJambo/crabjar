@@ -474,6 +474,7 @@ async fn handle_exec(
         pid: None,
         scope: Some(project_scope.clone()),
         target_scope: Some(project_scope),
+        cross_scope_auth: None,
         domains: vec![], // exec: no known domains at CLI level
         context_budget: None,
         context_fragment_tokens: None,

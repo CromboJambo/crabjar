@@ -210,6 +210,7 @@ impl AcpAgentServer {
                             pid: None,
                             scope: None,
                             target_scope: None,
+        cross_scope_auth: None,
                             domains: vec![], // zed-acp-server: no known domains at this layer
                             context_budget: None,
                             context_fragment_tokens: None,

@@ -110,9 +110,10 @@ These patterns prevent the workspace from collapsing into an unmanageable graph.
 - [x] Add `CrossScopeAuth` approval flow — DONE (implemented in scope.rs:132-213 with expiry)
 - [x] Wire scope into `ExecutionGate::check()` — DONE (step 7 at gate.rs:125-143 enforces actor_scope.can_access(target_scope))
 - [x] Add scope to `GuardDb` schema — DONE (`scope_actor`, `scope_target` columns in action_requests and trust_resolutions tables)
+- [x] Wire CrossScopeAuth enforcement into the gate — DONE (gate.rs:129-156 validates auth.is_valid(3600) + actor/target scope match before allowing cross-scope bypass; GateContext.cross_scope_auth field added with builder method)
 
 **What's next:**
-- [ ] Wire CrossScopeAuth enforcement into the gate (currently only basic can_access check exists; no explicit CrossScopeAuth validation for cross-scope operations that need to bypass scope isolation)
+- [ ] Wire CrossScopeAuth creation into callers (orchestrator, exec handler) — currently the gate accepts it but no caller creates valid instances yet
 
 ### 2.3 Requested-vs-Effective Trust Resolution ✅ DONE (with audit trail)
 

@@ -129,6 +129,7 @@ impl TaskExecutor {
                         pid: None,
                         scope: self.scope.clone(),
                         target_scope: None,
+        cross_scope_auth: None,
                         domains: vec![],
                         context_budget: None,
                         context_fragment_tokens: None,
