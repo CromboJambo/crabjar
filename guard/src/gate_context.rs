@@ -20,6 +20,10 @@ pub struct GateContext<'a> {
     pub scope: Option<crate::scope::Scope>,
     /// Scope of the target resource being accessed
     pub target_scope: Option<crate::scope::Scope>,
+    /// Authorization for cross-scope operations (optional bypass).
+    /// When set and valid, allows an action to proceed even when
+    /// actor_scope cannot directly access target_scope.
+    pub cross_scope_auth: Option<crate::scope::CrossScopeAuth>,
     /// Known domains/URLs associated with this action.
     /// Populated by callers (orchestrator, exec handler) who know the actual
     /// network destinations. The gate checks these against the domain allowlist.
@@ -53,6 +57,7 @@ impl<'a> GateContext<'a> {
             pid: None,
             scope: None,
             target_scope: None,
+            cross_scope_auth: None,
             domains: Vec::new(),
             context_budget: None,
             context_fragment_tokens: None,
@@ -86,6 +91,12 @@ impl<'a> GateContext<'a> {
     /// Set the target scope of the action.
     pub fn with_target_scope(mut self, scope: crate::scope::Scope) -> Self {
         self.target_scope = Some(scope);
+        self
+    }
+
+    /// Set cross-scope authorization for bypassing scope isolation.
+    pub fn with_cross_scope_auth(mut self, auth: crate::scope::CrossScopeAuth) -> Self {
+        self.cross_scope_auth = Some(auth);
         self
     }
 
@@ -144,5 +155,22 @@ mod tests {
         let ctx = GateContext::new("test", "echo", vec![], 0, TrustScore::new(0.5))
             .with_pid(1234);
         assert_eq!(ctx.pid, Some(1234));
+    }
+
+    #[test]
+    fn gate_context_with_cross_scope_auth() {
+        let actor = crate::scope::Scope::project("project-a");
+        let target = crate::scope::Scope::project("project-b");
+        let auth = crate::scope::CrossScopeAuth::new(
+            target.clone(),
+            actor.clone(),
+            "migration",
+            "admin-policy",
+        );
+        let ctx = GateContext::new("test", "echo", vec![], 0, TrustScore::new(0.5))
+            .with_scope(actor)
+            .with_target_scope(target)
+            .with_cross_scope_auth(auth);
+        assert!(ctx.cross_scope_auth.is_some());
     }
 }
