@@ -271,9 +271,8 @@ async fn full_telemetry_flight_recorder_cycle() {
 /// Direct library test: WorkItemStore create → save → load → update → list_ids.
 #[tokio::test]
 async fn full_agent_loop_persistence() {
-    use crabjar_host_core::{Status, TaskStatus};
-    use crabjar_host_agent::work_item_store::{WorkItem, WorkItemStore};
-    use uuid::Uuid;
+    use crabjar_host_core::{Status, TaskStatus, WorkItem};
+    use crabjar_host_agent::WorkItemStore;
 
     let temp = tempfile::tempdir().unwrap();
     let db_path = temp.path().join("work_items.db");
@@ -318,6 +317,9 @@ async fn full_agent_loop_persistence() {
 #[test]
 fn full_tool_discovery() {
     let temp = tempfile::tempdir().unwrap();
+
+    // Create required subdirectories for DB access
+    std::fs::create_dir_all(temp.path().join("tool_registry")).unwrap();
 
     std::fs::write(
         temp.path().join(".crabjar_config.toml"),
@@ -609,7 +611,7 @@ fn full_knowledge_lifecycle() {
     assert!(verify_output.status.success());
     let verify_body = json_stdout(&verify_output);
     assert_eq!(verify_body["success"], true);
-    assert_eq!(verify_body["bad_ids"], Value::Array(vec![]));
+    assert_eq!(verify_body["data"]["bad_ids"], Value::Array(vec![]));
 
     // List events
     let events_output = run_in(
@@ -619,7 +621,7 @@ fn full_knowledge_lifecycle() {
     assert!(events_output.status.success());
     let events_body = json_stdout(&events_output);
     assert_eq!(events_body["success"], true);
-    assert!(!events_body["events"].as_array().unwrap().is_empty());
+    assert!(!events_body["data"]["events"].as_array().unwrap().is_empty());
 
     // Deactivate the entry
     let deactivate_output = run_in(
@@ -635,7 +637,7 @@ fn full_knowledge_lifecycle() {
 
     let deactivate_body = json_stdout(&deactivate_output);
     assert_eq!(deactivate_body["success"], true);
-    assert_eq!(deactivate_body["id"], id);
+    assert_eq!(deactivate_body["data"]["id"], id);
 
     // Query should return no results for the deactivated entry's tags
     let query_output = run_in(

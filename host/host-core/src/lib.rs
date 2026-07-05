@@ -8,4 +8,4 @@ pub use adapter::{AdapterRegistry, IncomingMessage, OutgoingMessage, ProductAdap
 pub use config::HostConfig;
 pub use event_bus::{Event, EventBus, EventType};
 pub use plugin::{Plugin, PluginContext, PluginRegistry};
-pub use work_item::{Status, WorkItem};
+pub use work_item::{Status, TaskStatus, WorkItem};
