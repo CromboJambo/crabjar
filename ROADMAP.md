@@ -401,10 +401,9 @@ IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough 
 
 **Implementation plan:**
 - [x] Add `tests/e2e/mod.rs` with smoke test module (6 tests)
-- [ ] Add `tests/e2e/full.rs` with full test module
-- [ ] Add `#[cfg(feature = "e2e-full")]` gate on full tests
+- [x] Add `tests/e2e/full.rs` with full test module (26 tests covering exec pipeline, domain allowlist, scope isolation, telemetry flight recorder, agent loop persistence via WorkItemStore, tool discovery across 4 layers, guard subcommands, knowledge lifecycle, workspace config edge cases)
 - [ ] CI: run smoke on every PR, full on merge/nightly
-- [x] Add `just test-e2e-smoke` and `just test-e2e-full` targets (smoke target added; full target pending full.rs)
+- [x] Add `just test-e2e-smoke` and `just test-e2e-full` targets
 
 **Smoke slice results:** 6/6 passing (~0.3s total):
 - `crabjar state list` ✅ — verifies CLI binary runs and returns JSON with docs array
@@ -413,6 +412,19 @@ IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough 
 - Tool registry init + register/query cycle ✅ (`tool list`) — verifies tool commands work even with empty registry
 - Knowledge store init + basic query ✅ (`knowledge insert` → `knowledge query`) — verifies knowledge CRUD pipeline
 - `crabjar doctor check` ✅ — verifies environment health checks with doubt block per CLI output contract
+
+**Full slice results:** 26/26 passing (~0.02s total):
+- Exec pipeline dry-run/denied/proceeds (3 tests) — config → gate check → concierge enforcement
+- Domain allowlist blocks unknown / trust layers / wildcards (3 tests) — deny-by-default with layer enforcement
+- Scope isolation different users / same user diff projects / same scope (3 tests) — mutual inaccessibility invariant
+- CrossScopeAuth auto-construction (1 test) — `auto_for_scopes()` returns Some for cross-project, None for same-scope
+- Telemetry flight recorder init → execute_command → query_records (1 test) — async write/read cycle
+- Agent loop WorkItemStore create → save → load → update → list_ids (1 test) — persistence round-trip with status transitions
+- Tool discovery + tool list with filter (2 tests) — CLI integration for registry commands
+- Guard queue / provenance / resolution / grant / revoke / approve / reject (7 tests) — all guard subcommands return structured JSON
+- GuardDb schema verification + pending queue persist/retrieve (2 tests) — SQLite-backed DB operations
+- Knowledge insert → verify → events → deactivate → query confirms removal (1 test) — full lifecycle with integrity checks
+- Workspace malformed TOML / missing config (2 tests) — soft-fail returns null workspace
 
 ### 11.2 Replay Snapshots
 
