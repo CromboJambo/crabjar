@@ -72,8 +72,9 @@
 
 ### CrossScopeAuth Wiring ✅ DONE
 
-- `src/main.rs:467` — auto-constructs via `CrossScopeAuth::auto_for_scopes()`
-- Orchestrator/host-agent still pass None (lack scope injection — future work)
+- `src/main.rs:483` — auto-constructs via `CrossScopeAuth::auto_for_scopes()`
+- `orchestrator/src/main.rs` — constructs `actor_scope` + `target_scope` in `AppState`, wires into all 3 gate check sites (`execute_with_guard`, "run_command", "search_logs") with `CrossScopeAuth::auto_for_scopes()`
+- `host/host-agent/executor.rs` — constructs `CrossScopeAuth` from `self.scope` when scope is set, falls back to `None` otherwise
 
 ---
 
@@ -479,13 +480,13 @@ All guard/ modules now under 500 LoC. `guard_db_impl.rs` split into 3 files:
 
 ### 9.3 Snapshot Testing for TUI ✅ DONE
 
-**Status:** Implemented in `tests/snapshot_tests.rs` with 6 tests covering CLI JSON output format and TUI message serialization. Baselines committed to `tests/snapshots/`.
+**Status:** Implemented in `tests/snapshot_tests.rs` with 6 tests covering CLI JSON output format and TUI message serialization. Baselines committed to `tests/snapshots/`. CI gate (`snapshot-review`) runs on every PR/commit via `cargo insta test --review`.
 
 - [x] Add `insta` to workspace dependencies (v1.43, json feature)
 - [x] Add snapshot tests for CLI JSON output: `state list`, `workspace status`, `doctor check`, `tool list`, `guard queue`
 - [x] Add snapshot test for TUI message serialization (`Message` enum variants)
-- [ ] Document snapshot testing workflow in AGENTS.md (how to update baselines with `INSTA_UPDATE=always`)
-- [ ] CI gate: fail on pending snapshots (requires `cargo insta` binary — not yet installed as dev tool)
+- [x] Document snapshot testing workflow in AGENTS.md (how to update baselines with `INSTA_UPDATE=always`)
+- [x] CI gate: `snapshot-review` job installs `cargo-insta` and runs `cargo insta test --review`, fails on pending snapshots
 
 **Why this matters:** Crabjar has no regression testing for structured output. Snapshot tests catch format drift before it reaches users. Codex's pattern: UI/text changes must update snapshots as part of the PR.
 

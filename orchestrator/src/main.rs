@@ -312,7 +312,7 @@ async fn execute_with_guard(
     _args: &[String],
     binary_path: &str,
     project_root: &std::path::Path,
-    _store: &std::sync::Mutex<Store>,
+    store: &std::sync::Mutex<Store>,
 ) -> Result<String, String> {
     let guard_root = std::env::var("MIRROR_GUARD_ROOT")
         .unwrap_or_else(|_| project_root.to_string_lossy().to_string());
@@ -328,6 +328,11 @@ async fn execute_with_guard(
 
     let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
+    // Construct scope for this orchestrator instance
+    let actor_scope = crabjar_guard::Scope::project("orchestrator");
+    let target_scope = actor_scope.clone();
+    let cross_scope_auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+
     let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
     match gate.check(GateContext {
@@ -339,9 +344,9 @@ async fn execute_with_guard(
         source_event_id: Some(&format!("orchestrator-tr-{}", tool_name)),
         can_interrupt: true,
         pid: None,
-        scope: None,
-        target_scope: None,
-        cross_scope_auth: None,
+        scope: Some(actor_scope.clone()),
+        target_scope: Some(target_scope.clone()),
+        cross_scope_auth,
         domains: vec![],
         context_budget: None,
         context_fragment_tokens: None,
@@ -563,6 +568,11 @@ async fn execute_tool_call(
 
             let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
+            // Construct scope for this orchestrator instance
+            let actor_scope = crabjar_guard::Scope::project("orchestrator");
+            let target_scope = actor_scope.clone();
+            let cross_scope_auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
             match gate.check(GateContext {
@@ -574,9 +584,9 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-tc"),
                 can_interrupt: true,
                 pid: None,
-                scope: None,
-                target_scope: None,
-        cross_scope_auth: None,
+                scope: Some(actor_scope.clone()),
+                target_scope: Some(target_scope.clone()),
+                cross_scope_auth,
                 domains: vec![], // tool calls: no known domains at exec level
                 context_budget: None,
                 context_fragment_tokens: None,
@@ -1076,6 +1086,9 @@ struct AppState {
     events_db_path: String,
     guard_root: String,
     backend: Arc<Mutex<Box<dyn InferenceBackend>>>,
+    /// Scope for this orchestrator instance (used for gate context).
+    actor_scope: crabjar_guard::Scope,
+    target_scope: crabjar_guard::Scope,
 }
 
 /// Handler for recent_events — queries the knowledge store.
@@ -1217,12 +1230,18 @@ async fn main() -> anyhow::Result<()> {
     // Native/PESTI inference was moved to the PESTI portable execution substrate.
     let backend: Box<dyn InferenceBackend> = Box::new(LmStudioClient::from_env());
 
+    // Shared state across request handlers — construct scope for gate context
+    let actor_scope = crabjar_guard::Scope::project("orchestrator");
+    let target_scope = actor_scope.clone();
+
     // Shared state across request handlers
     let state = AppState {
         store: Arc::new(std::sync::Mutex::new(store)),
         events_db_path,
         guard_root,
         backend: Arc::new(Mutex::new(backend)),
+        actor_scope,
+        target_scope,
     };
 
     // Define the Axum router with SSE and JSON endpoints.

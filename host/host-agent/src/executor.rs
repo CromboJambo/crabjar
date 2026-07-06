@@ -116,7 +116,15 @@ impl TaskExecutor {
                         .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").unwrap());
 
                     let gate = crabjar_guard::ExecutionGate::new(&guard_db, false, &guard_root);
-                    
+
+                    // Construct CrossScopeAuth from the executor's scope (if set)
+                    let cross_scope_auth = if let Some(ref actor_scope) = self.scope {
+                        let target_scope = actor_scope.clone();
+                        crabjar_guard::CrossScopeAuth::auto_for_scopes(actor_scope, &target_scope)
+                    } else {
+                        None
+                    };
+
                     // Use the executor's scope if available, otherwise None
                     let gate_result = match gate.check(crabjar_guard::GateContext {
                         action_type: "tool_call",
@@ -128,8 +136,8 @@ impl TaskExecutor {
                         can_interrupt: true,
                         pid: None,
                         scope: self.scope.clone(),
-                        target_scope: None,
-        cross_scope_auth: None,
+                        target_scope: self.scope.clone(),
+                        cross_scope_auth,
                         domains: vec![],
                         context_budget: None,
                         context_fragment_tokens: None,

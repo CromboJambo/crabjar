@@ -92,6 +92,28 @@ Tooling: `just module-sizes` (report), `just module-sizes-check` (CI gate).
 - Filesystem fixtures: `tempfile::tempdir()`; never write into repository
 - Test names: descriptive snake_case stating behaviour, e.g. `state_list_returns_json`
 
+### Snapshot Testing (insta)
+
+Crabjar uses [`insta`](https://docs.rs/insta/) for snapshot testing of structured output (CLI JSON responses, TUI message serialization). Snapshots live in `tests/snapshots/*.snap`.
+
+**Updating baselines:** When you intentionally change CLI output or a data structure's serialized form:
+
+```bash
+INSTA_UPDATE=always cargo test --test snapshot_tests
+git add tests/snapshots/
+```
+
+This regenerates the `.snap` files to match current output. **Review the diff before committing** — snapshots are regression guards, not auto-accepted.
+
+**CI gate:** The `snapshot-review` job runs on every PR/commit and fails if any test produces a pending snapshot (i.e., output changed but baselines weren't updated). Never bypass this in CI.
+
+```bash
+# Local dry-run: see what would fail without updating
+cargo insta test --review --test snapshot_tests
+```
+
+If you get `insta` not found, install it: `cargo install cargo-insta`.
+
 ## Drift Governance
 
 `project_map.md` stale after >7 days without modification. Divergence between documented structure and actual filesystem is a structural integrity concern.

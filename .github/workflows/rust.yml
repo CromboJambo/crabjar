@@ -51,3 +51,12 @@ jobs:
     - uses: actions/checkout@v4
     - name: Check module sizes
       run: python scripts/module-sizes.py --threshold 500
+
+  snapshot-review:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install cargo-insta
+      run: cargo install cargo-insta
+    - name: Review snapshots (fail on pending)
+      run: cargo insta test --review --test snapshot_tests
