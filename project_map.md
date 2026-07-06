@@ -18,7 +18,7 @@ CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes stat
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 22 members, shared deps
+├── Cargo.toml               # Workspace root — 23 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── build.rs                 # Root build script
 ├── AGENTS.md               # Repository guidelines
@@ -153,7 +153,15 @@ crabjar/
 │       ├── lib.rs
 │       ├── layer.rs         # 8-layer model (0-7)
 │       └── boundary.rs      # boundary::check_workspace_boundaries()
-│
+├── crates/terminal/         # Terminal multiplexer integration (wezterm/zellij + asciinema v2)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs           # TerminalSession, TerminalManager, Snapshot types
+│       ├── backend.rs       # TerminalBackend trait + detection utilities
+│       ├── wezterm.rs       # Wezterm mux backend (spawn/send-text/get-text)
+│       ├── zellij.rs        # Zellij action protocol backend
+│       └── recording.rs     # Asciinema v2 session recorder
+
 │  Host runtime
 ├── host/host-core/          # Event bus, plugin API, WorkItem model, config
 │   ├── Cargo.toml
@@ -303,6 +311,7 @@ crabjar/
 | `tool_registry` | MCP tool registry | Registry | Active |
 | `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement (8-layer model) | Governance | Active |
+| `crates/terminal` | Terminal multiplexer integration (wezterm/zellij + asciinema v2 recording) | Integration | Active |
 | `host/host-core` | Event bus, plugin API, WorkItem model, adapter pattern | Core | Active |
 | `host/host-system` | Notifications, clipboard, secrets, tray | System | Active |
 | `host/host-observe` | Metrics, tracing, health reporting | Observation | Active |
@@ -322,6 +331,7 @@ crabjar/
 
 Declared in Cargo.toml `[workspace.members]`:
 - **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
+- **Terminal**: `crates/terminal` (wezterm/zellij backends + asciinema v2 recording)
 - **Host**: `host/host-core`, `host/host-system`, `host/host-observe`, `host/host-agent`, `host/host-webview`, `host/host-mqtt`, `host/host-graph`, `host/host-screen`
 - **Apps**: `apps/teams`
 - **Binary**: `src/host-binary`
