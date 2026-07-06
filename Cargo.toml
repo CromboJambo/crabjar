@@ -30,6 +30,8 @@ members = [
     # Zed ACP
     "zed-acp-bridge",
     "zed-acp-server",
+    # Plugin system
+    "crabjar-plugin",
 ]
 
 resolver = "2"

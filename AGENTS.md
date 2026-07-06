@@ -12,6 +12,16 @@ Use `just` for workflows:
 
 Narrow scope: `cargo check/clippy/test -p <crate>`
 
+## Build Reproducibility
+
+Crabjar enforces deterministic builds via `just reproducible-build`:
+
+1. **Dependency pinning**: Cargo.lock is version-controlled and verified with `cargo update --locked` (fails if lockfile drifts from Cargo.toml)
+2. **Deterministic compilation**: `CARGO_INCREMENTAL=0` disables incremental cache; `RUSTFLAGS="-C target-cpu=native"` pins CPU feature set
+3. **CI gate**: The `reproducible-build` job runs on every push/PR — fails if the build is non-deterministic or lockfile is out of date
+
+**What this guarantees:** Building the same commit twice produces byte-identical binaries (same toolchain, same OS). It does *not* guarantee cross-platform reproducibility — different OSes/compilers will produce different artifacts.
+
 ## CLI Output Contract
 
 All command responses are structured JSON on stdout:

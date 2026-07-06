@@ -6,7 +6,6 @@ pub mod commands;
 mod confidence;
 
 pub use bridge::KnowledgeBridge;
-pub use commands::KnowledgeCommandExt;
 
 /// Build a structured knowledge response for CLI output.
 pub fn knowledge_response(message: impl Into<String>, data: serde_json::Value) -> serde_json::Value {

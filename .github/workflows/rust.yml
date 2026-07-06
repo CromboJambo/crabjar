@@ -38,6 +38,13 @@ jobs:
     - name: Run tests
       run: cargo test --workspace --all-targets --all-features --verbose
 
+  reproducible-build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Reproducible build check
+      run: just reproducible-build
+
   module-sizes:
     runs-on: ubuntu-latest
     steps:

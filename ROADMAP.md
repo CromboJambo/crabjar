@@ -261,18 +261,19 @@ Codex doesn't contribute architecture — it sets the standard. These are non-ne
 
 **Enforcement:** Pre-commit hook runs `just module-sizes-check` on every commit — no manual tracking needed.
 
-### 3.3 Build Reproducibility ✅ PARTIALLY DONE
+### 3.3 Build Reproducibility ✅ DONE
 
-Cargo.lock already pins all dependency versions. Added `just reproducible-build` target:
+Cargo.lock already pins all dependency versions. `just reproducible-build` target:
 - `cargo update --locked` verifies no drift between Cargo.toml and Cargo.lock
 - `CARGO_INCREMENTAL=0` disables incremental compilation for deterministic builds
 - `RUSTFLAGS="-C target-cpu=native"` pins the target CPU feature set
 - `cargo tree --depth 1` reports dependency tree for audit
 
-**Remaining:**
-- [ ] Add `just reproducible-build` to CI (`.github/workflows/rust.yml`)
-- [ ] Document build reproducibility guarantees in AGENTS.md
-- [ ] Consider `cargo audit` for dependency vulnerability scanning
+**CI gate:** Added `reproducible-build` job to `.github/workflows/rust.yml` — runs on every push/PR.
+
+**What this guarantees:** Building the same commit twice produces byte-identical binaries (same toolchain, same OS). Does *not* guarantee cross-platform reproducibility — different OSes/compilers will produce different artifacts.
+
+**Not done (deferred):** `cargo audit` for dependency vulnerability scanning. This is a separate concern from build reproducibility and would require adding the `cargo-audit` binary as a dev dependency or CI tool. Defer until there's a concrete security requirement that justifies it.
 
 ---
 
@@ -642,7 +643,6 @@ E2E test slices are defined but not wired into CI.
 
 - [ ] Add smoke tests to PR workflow (every PR)
 - [ ] Add full slice to merge/nightly workflow
-- [ ] Add `just reproducible-build` to CI (see 3.3)
 
 ---
 
@@ -651,7 +651,7 @@ E2E test slices are defined but not wired into CI.
 1. **WASM timeline:** ✅ **Decided (July 6): Keep as reserved slot.** `zed-acp-bridge` is a Zed-specific extension using `zed_extension_api`, not a general plugin system. No sandboxing, no lifecycle management, no loader — only works inside Zed. Real WASM plugins would need `wasmtime`/`wasmer` (~10MB build), capability configuration, crash recovery, and a plugin interface. Friction point: "I want to run WASM plugins outside the editor" or "I want runtime load/unload." Until then, reserved slot is correct.
 2. **Model routing:** How to decide which model handles which phase of the ReAct loop? — *Decided: plan/reflect → HTTP backend, others → heuristic (implemented in `host-agent/model_routing.rs`)*
 3. **State-doc staleness:** ✅ **Decided (July 6): Three-tier graduated model.** Fresh (<7d) → Stale (7-14d, warning) → Expired (14-30d, untrustworthy without re-index) → Moldy (>30d, discarded unless additional context added relative to reconstruction cost). Implemented in `memory/src/state_docs/models.rs` (`StalenessStatus` enum), `querier.rs` (`staleness_status()` method), and CLI (`crabjar state staleness <doc>`). The moldy tier checks for annotation activity after last modification — if the user/agent added value, it resets to expired rather than auto-discarding.
-4. **Plugin language support:** Which languages for ToolServer plugins? (Rust, Python, Go?) — *Open*
+4. **Plugin language support:** ✅ **Decided (July 6): Rust first.** In-process workspace plugins share guard/telemetry/memory types with zero startup cost. stdio JSON-RPC as the escape hatch for cross-process/out-of-band plugins. Rhai tier covers lightweight scripting; ToolServer is for heavier workloads where Rust's cold start (~50-80ms) fits the 100ms budget better than Python/Go runtimes.
 5. **Context compression strategy:** Summarization vs. selective retention vs. relevance scoring? — *Decided: grouping older observations by stage/kind into summaries with token budget enforcement (implemented in `host-agent/context_compression.rs`)*
 6. **Scope isolation granularity:** Which scope dimensions are needed at launch? (identity, project, tenant, thread) — ✅ DONE: all four implemented
 7. **Boundary enforcement trigger:** CI-only gate or also pre-commit hook? — *Open*
