@@ -32,6 +32,8 @@ members = [
     "zed-acp-server",
     # Plugin system
     "crabjar-plugin",
+    # File search engine
+    "file_search",
 ]
 
 resolver = "2"
