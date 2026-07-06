@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 mod manifest;
 mod proxy;
+mod terminal_relay;
 
 use manifest::Manifest;
 
@@ -16,6 +17,15 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let args: Vec<String> = env::args().collect();
+
+    // Terminal relay mode: run only the terminal relay server.
+    if let Some(pos) = args.iter().position(|a| a == "--terminal-relay") {
+        let port = args
+            .get(pos + 1)
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(8082);
+        return terminal_relay::serve("0.0.0.0".to_string(), port).await;
+    }
 
     // Re-exec mode: this same binary, invoked as a per-VM worker.
     // `--worker <name>` runs just that one VM's bridge, nothing else.
