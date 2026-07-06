@@ -32,13 +32,15 @@
 //!
 //! ```rust,no_run
 //! use crabjar_terminal::{TerminalManager, TerminalBackend};
+//! use std::path::PathBuf;
 //!
 //! #[tokio::main]
 //! async fn main() -> anyhow::Result<()> {
 //!     let mut manager = TerminalManager::new();
 //!     
 //!     // Create a session with auto-detection (wezterm > zellij)
-//!     let mut session = manager.create_session("agent-work", "/home/user/project")?;
+//!     let working_dir = PathBuf::from("/home/user/project");
+//!     let mut session = manager.create_session("agent-work", working_dir)?;
 //!     session.spawn().await?;
 //!     
 //!     // Send commands and read output
@@ -50,7 +52,8 @@
 //!     println!("Terminal has {} lines", snap.lines.len());
 //!     
 //!     // Record session as asciicast v2
-//!     let record_path = session.record("/tmp/session.cast").await?;
+//!     let record_path = std::path::PathBuf::from("/tmp/session.cast");
+//!     let _recorded = session.record(&record_path).await?;
 //!     
 //!     session.stop().await?;
 //!     Ok(())

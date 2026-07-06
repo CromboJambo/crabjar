@@ -54,7 +54,15 @@ pub fn index_doc(
     overlay_entries: &[Annotation],
 ) -> Result<(), crate::Error> {
     let content = fs::read_to_string(doc_path)?;
-    let metadata = extract_metadata(&content);
+    let mut metadata = extract_metadata(&content);
+
+    // Fall back to filename (without .md) if no frontmatter name provided
+    if metadata.doc_name.is_empty() {
+        if let Some(name) = doc_path.file_stem().and_then(|s| s.to_str()) {
+            metadata.doc_name = name.trim_end_matches(".md").to_string();
+        }
+    }
+
     let sections = extract_sections(&content);
     let tables = extract_tables(&content);
     let code_blocks = extract_code_blocks(&content);

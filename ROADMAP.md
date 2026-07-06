@@ -9,7 +9,7 @@
 | Metric | Value |
 |---|---|
 | **Workspace members** | 23 crates (added `crates/terminal`) |
-| **Tests** | ~135 passing, 8 failing (pre-existing cli.rs failures — knowledge/state operations) |
+| **Tests** | ~149+ passing, 0 failing (all pre-existing cli.rs failures resolved) |
 | **Clippy** | ⚠️ Warnings only (unused imports/variables), no blocking errors |
 | **Architecture crate** | ✅ Built, compiles, has integration test |
 | **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
@@ -597,18 +597,24 @@ IronClaw's `scripts/replay-snap.sh` enables deterministic testing by replaying r
 
 These are the highest-value items that would move crabjar closer to a usable agent harness.
 
-### 13.1 Fix Pre-existing Test Failures ⚠️ BLOCKER
+### 13.1 Fix Pre-existing Test Failures ✅ DONE
 
-8 tests failing in `tests/cli.rs` — knowledge/state operations. These are pre-existing failures unrelated to TUI work but block CI trust.
+All 8 pre-existing cli.rs test failures resolved (July 6, 2026):
 
-- [ ] Debug and fix: `knowledge_deactivate_updates_query_results`
-- [ ] Debug and fix: `knowledge_events_and_verify_return_json`
-- [ ] Debug and fix: `knowledge_sync_and_query_return_json`
-- [ ] Debug and fix: `knowledge_sync_is_idempotent`
-- [ ] Debug and fix: `query_one_tag_does_not_return_unrelated_rows`
-- [ ] Debug and fix: `resolve_annotation_deactivates_derived_knowledge`
-- [ ] Debug and fix: `resolve_one_annotation_does_not_deactivate_other`
-- [ ] Debug and fix: `state_show_returns_doc_contents`
+- [x] `knowledge_deactivate_updates_query_results` — fixed: tests read from top-level keys but CLI wraps in `"data"`
+- [x] `knowledge_events_and_verify_return_json` — fixed: same `"data"` nesting issue on verify/events fields
+- [x] `knowledge_sync_and_query_return_json` — fixed: sync/query assertions updated to `body["data"]["..."]`
+- [x] `knowledge_sync_is_idempotent` — fixed: same pattern
+- [x] `query_one_tag_does_not_return_unrelated_rows` — fixed: query result path updated
+- [x] `resolve_annotation_deactivates_derived_knowledge` — fixed: sync/query/resolve paths updated
+- [x] `resolve_one_annotation_does_not_deactivate_other` — fixed: same pattern across 2-doc test
+- [x] `state_show_returns_doc_contents` — fixed: two bugs — (1) indexer now falls back to filename stem when frontmatter lacks `name:`, (2) `state show` strips `.md` extension before lookup
+
+**Root causes:**
+1. CLI wraps all responses in `{"success": true, "message": "...", "data": {...}}` but tests read from top level — 7 tests affected
+2. State-doc indexer stored empty `doc_name` when frontmatter had no `name:` field — caused `state show` to fail on docs without explicit name
+
+**Files changed:** `tests/cli.rs`, `memory/src/state_docs/indexer.rs`, `src/main.rs`, `crates/terminal/src/lib.rs` (doctest fix)
 
 ### 13.2 TUI Snapshot Testing ✅ DONE (merged into 9.3)
 

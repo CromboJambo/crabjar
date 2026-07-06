@@ -134,8 +134,10 @@ fn handle_state_command(
         StateCommand::Show { doc_name, zoom } => {
             let conn = rusqlite::Connection::open("state-docs.db")?;
             agent_context::state_docs::migrate(&conn)?;
+            // Strip .md extension to match how the indexer stores doc names (from frontmatter `name:`)
+            let lookup_name = doc_name.strip_suffix(".md").unwrap_or(&doc_name);
             let renderer = agent_context::state_docs::Renderer::new(&conn);
-            let (markdown, metadata) = renderer.render_doc(&doc_name, zoom)?;
+            let (markdown, metadata) = renderer.render_doc(lookup_name, zoom)?;
             Ok(json!({
                 "success": true,
                 "message": format!("rendered {} at zoom level {}", doc_name, zoom),
