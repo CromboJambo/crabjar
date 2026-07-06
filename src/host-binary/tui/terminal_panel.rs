@@ -2,7 +2,7 @@
 //!
 //! Wraps `crabjar-terminal` to provide a live terminal view within the ratatui UI.
 
-use crabjar_terminal::{TerminalManager, TerminalSession};
+use crabjar_terminal::{TerminalBackend, TerminalManager, TerminalSession};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
@@ -41,18 +41,35 @@ pub struct TerminalPanel {
 
 impl TerminalPanel {
     /// Create a new terminal panel with the given configuration.
-    pub async fn new(config: TerminalPanelConfig) -> Result<Self, Box<dyn std::error::Error>> {
+    /// Returns `None` if no terminal backend is available (wezterm/zellij not installed).
+    pub async fn try_new(config: TerminalPanelConfig) -> Result<Option<Self>, Box<dyn std::error::Error>> {
         let mut manager = TerminalManager::new();
-        
-        // Create and spawn a session using the correct crabjar-terminal API
-        let mut session = manager.create_session(&config.session_name, PathBuf::from("/tmp"))?;
-        session.spawn().await?;
 
-        Ok(Self {
-            config,
-            session: Some(Arc::new(Mutex::new(session))),
-            output_buffer: Vec::new(),
-        })
+        // Try to create and spawn a session; fail gracefully if no backend available
+        match manager.create_session(&config.session_name, PathBuf::from("/tmp")) {
+            Ok(mut session) => {
+                if session.spawn().await.is_ok() {
+                    Ok(Some(Self {
+                        config,
+                        session: Some(Arc::new(Mutex::new(session))),
+                        output_buffer: Vec::new(),
+                    }))
+                } else {
+                    tracing::warn!("Failed to spawn terminal session");
+                    Ok(None)
+                }
+            }
+            Err(e) => {
+                tracing::info!("No terminal backend available (wezterm/zellij not installed): {}", e);
+                Ok(None)
+            }
+        }
+    }
+
+    /// Create a new terminal panel (convenience wrapper — panics if unavailable).
+    #[deprecated(since = "0.1.0", note = "Use `try_new` instead for graceful degradation")]
+    pub async fn new(config: TerminalPanelConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::try_new(config).await?.ok_or_else(|| "No terminal backend available".into())
     }
 
     /// Send text input to the terminal session.
