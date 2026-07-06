@@ -3,10 +3,13 @@
 //! Manages conversation history, agent loop lifecycle, and guard interaction.
 
 use super::input;
-use crate::session::{Session, SessionStore};
+use super::session::SessionStore;
+use super::terminal_panel::TerminalPanel;
 use crabjar_host_agent::{AgentLoop, LoopResult};
-use crabjar_host_core::{EventBus, MetricsCollector};
+use crabjar_host_core::EventBus;
+use crabjar_host_observe::MetricsCollector;
 use ratatui::Frame;
+use std::borrow::Cow;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
@@ -24,7 +27,7 @@ pub enum AppState {
 }
 
 /// Message types in the conversation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Message {
     User { text: String },
     Agent { text: String },
@@ -46,6 +49,8 @@ pub struct App {
     pub session_store: Option<SessionStore>,
     /// Current session ID
     pub current_session_id: Option<String>,
+    /// Terminal panel for displaying agent terminal sessions
+    pub terminal_panel: Option<TerminalPanel>,
 }
 
 impl App {
@@ -61,6 +66,7 @@ impl App {
             scroll_offset: 0,
             session_store: None,
             current_session_id: None,
+            terminal_panel: None,
         };
 
         // Initialize session store if data directory exists
@@ -162,7 +168,29 @@ impl App {
         use ratatui::text::{Line, Span};
         use ratatui::widgets::{Block, Borders, Paragraph};
 
+        // Split into left (terminal) and right (chat) panels
         let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .margin(1)
+            .constraints([
+                Constraint::Percentage(40),  // Terminal panel
+                Constraint::Percentage(60),  // Chat panel
+            ])
+            .split(frame.area());
+
+        // Render terminal panel on the left
+        if let Some(ref panel) = self.terminal_panel {
+            panel.render(frame, chunks[0]);
+        } else {
+            // Fallback: show a placeholder when no terminal is available
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title(" Terminal [unavailable] ");
+            frame.render_widget(block, chunks[0]);
+        }
+
+        // Split the right side into chat components
+        let chat_chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([
@@ -171,17 +199,17 @@ impl App {
                 Constraint::Length(3),  // Status bar
                 Constraint::Length(1),  // Input line
             ])
-            .split(frame.area());
+            .split(chunks[1]);
 
         // Title bar
         let title = match &self.state {
-            AppState::Idle => "CrabJar Agent — Ready",
-            AppState::Running => "CrabJar Agent — Running...",
-            AppState::AwaitingApproval(_) => "CrabJar Agent — Awaiting Approval",
-            AppState::Error(ref e) => format!("CrabJar Agent — Error: {}", e).as_str(),
+            AppState::Idle => Cow::Borrowed("CrabJar Agent — Ready"),
+            AppState::Running => Cow::Borrowed("CrabJar Agent — Running..."),
+            AppState::AwaitingApproval(_) => Cow::Borrowed("CrabJar Agent — Awaiting Approval"),
+            AppState::Error(e) => Cow::Owned(format!("CrabJar Agent — Error: {}", e)),
         };
 
-        let title_widget = Paragraph::new(title)
+        let title_widget = Paragraph::new(title.as_ref())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
@@ -189,7 +217,7 @@ impl App {
             )
             .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
 
-        frame.render_widget(title_widget, chunks[0]);
+        frame.render_widget(title_widget, chat_chunks[0]);
 
         // Message area with scrollback
         let visible_messages: Vec<&Message> = self.messages.iter().rev().take(20).collect();
@@ -246,26 +274,28 @@ impl App {
         let message_widget = Paragraph::new(lines)
             .block(Block::default().borders(Borders::ALL).title(" Conversation "));
 
-        frame.render_widget(message_widget, chunks[1]);
+        frame.render_widget(message_widget, chat_chunks[1]);
 
         // Status bar
-        let status_text = match &self.state {
-            AppState::Idle => " Enter your request below ",
-            AppState::Running => " Agent is working... ",
-            AppState::AwaitingApproval(ref action) => format!(" Guard pending: {} [approve/reject] ", action).as_str(),
-            AppState::Error(_) => " Error occurred ",
+        let status_text: Cow<'_, str> = match &self.state {
+            AppState::Idle => Cow::Borrowed(" Enter your request below "),
+            AppState::Running => Cow::Borrowed(" Agent is working... "),
+            AppState::AwaitingApproval(action) => {
+                Cow::Owned(format!(" Guard pending: {} [approve/reject] ", action))
+            }
+            AppState::Error(_) => Cow::Borrowed(" Error occurred "),
         };
 
-        let status_widget = Paragraph::new(status_text)
+        let status_widget = Paragraph::new(status_text.as_ref())
             .style(Style::default().fg(Color::Yellow));
 
-        frame.render_widget(status_widget, chunks[2]);
+        frame.render_widget(status_widget, chat_chunks[2]);
 
         // Input line
         let input_widget = Paragraph::new(self.input_buffer.clone())
             .block(Block::default().borders(Borders::ALL).title(" Input "));
 
-        frame.render_widget(input_widget, chunks[3]);
+        frame.render_widget(input_widget, chat_chunks[3]);
     }
 
     /// Set the current app state.
@@ -304,7 +334,7 @@ impl App {
 
             match loop_engine.tick().await {
                 Ok(result) => match result {
-                    LoopResult::IterationComplete { confidence, tasks_completed } => {
+                    LoopResult::IterationComplete { work_item_id: _, confidence, tasks_completed } => {
                         self.messages.push(Message::Agent {
                             text: format!(
                                 "Iteration {}: confidence={:.0}%, tasks={}",
@@ -319,7 +349,7 @@ impl App {
                             break;
                         }
                     }
-                    LoopResult::Completed { .. } => {
+                    LoopResult::Completed { work_item_id: _ } => {
                         self.messages.push(Message::Agent { text: "Task completed successfully.".to_string() });
                         tx.send(AppState::Idle).await?;
                         break;

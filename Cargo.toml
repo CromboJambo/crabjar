@@ -18,6 +18,8 @@ members = [
     "host/host-mqtt",
     "host/host-graph",
     "host/host-screen",
+    # Terminal multiplexer integration
+    "crates/terminal",
     # Host apps
     "apps/teams",
     # Host binary
@@ -220,6 +222,7 @@ clap_mangen = { workspace = true }
 tempfile.workspace = true
 crabjar-host-core = { path = "host/host-core" }
 crabjar-host-agent = { path = "host/host-agent" }
+insta = { version = "1.43", features = ["json"] }
 
 # vm-bridge: Per-VM websocket relay for display protocols (for screen sharing)
 vm-bridge = { path = "axum-mux" }

@@ -7,8 +7,9 @@
 pub mod app;
 pub mod input;
 mod session;
+pub mod terminal_panel;
 
-use crate::app::{App, AppState};
+use app::{App, AppState};
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::DefaultTerminal;
@@ -45,7 +46,7 @@ async fn run_app(
     initial_objective: Option<&str>,
     session_id: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (tx, rx) = mpsc::channel(64);
+    let (tx, mut rx) = mpsc::channel(64);
 
     // Build the app state
     let mut app = App::new(initial_objective, session_id)?;
@@ -60,11 +61,12 @@ async fn run_app(
                 match action {
                     input::Action::Submit(text) => {
                         tx.send(AppState::Running).await?;
-                        let _ = tokio::spawn(async move {
-                            if let Err(e) = app.run_agent_loop(&text, &tx).await {
-                                let _ = tx.send(AppState::Error(format!("Agent error: {}", e))).await;
-                            }
-                        });
+                        // Run agent loop inline — AgentLoop contains rusqlite (RefCell) which isn't Send,
+                        // so it can't be moved into tokio::spawn. The TUI already blocks on run_app,
+                        // and the UI is in "Running" state during execution anyway.
+                        if let Err(e) = app.run_agent_loop(&text, &tx).await {
+                            let _ = tx.send(AppState::Error(format!("Agent error: {}", e))).await;
+                        }
                     }
                     input::Action::Quit => break,
                 }
