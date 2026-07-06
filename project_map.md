@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, Zed ACP bridge, and agent skills. LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
+CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, file search engine (BM25/Tantivy 0.22), plugin system (WASM runtime), Zed ACP bridge, and agent skills. LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
 
 ---
 
@@ -18,7 +18,7 @@ CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes stat
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 23 members, shared deps
+├── Cargo.toml               # Workspace root — 24 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── build.rs                 # Root build script
 ├── AGENTS.md               # Repository guidelines
@@ -153,6 +153,10 @@ crabjar/
 │       ├── lib.rs
 │       ├── layer.rs         # 8-layer model (0-7)
 │       └── boundary.rs      # boundary::check_workspace_boundaries()
+├── crabjar-plugin/          # Plugin system (WASM runtime, lifecycle management)
+│   ├── Cargo.toml
+│   └── src/
+│       └── lib.rs
 ├── crates/terminal/         # Terminal multiplexer integration (wezterm/zellij + asciinema v2)
 │   ├── Cargo.toml
 │   └── src/
@@ -161,6 +165,14 @@ crabjar/
 │       ├── wezterm.rs       # Wezterm mux backend (spawn/send-text/get-text)
 │       ├── zellij.rs        # Zellij action protocol backend
 │       └── recording.rs     # Asciinema v2 session recorder
+
+│  File search engine
+├── file_search/             # BM25-based file indexing and search (Tantivy 0.22)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs           # Public API surface
+│       ├── indexer.rs       # BM25 document indexing with LowerCaser tokenizer
+│       └── storage.rs       # SearchStorage (index CRUD, search, reload)
 
 │  Host runtime
 ├── host/host-core/          # Event bus, plugin API, WorkItem model, config
@@ -311,6 +323,8 @@ crabjar/
 | `tool_registry` | MCP tool registry | Registry | Active |
 | `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement (8-layer model) | Governance | Active |
+| `file_search` | BM25-based file indexing and search (Tantivy 0.22) | Search | Active |
+| `crabjar-plugin` | Plugin system (WASM runtime, lifecycle management) | Plugin | Active |
 | `crates/terminal` | Terminal multiplexer integration (wezterm/zellij + asciinema v2 recording) | Integration | Active |
 | `host/host-core` | Event bus, plugin API, WorkItem model, adapter pattern | Core | Active |
 | `host/host-system` | Notifications, clipboard, secrets, tray | System | Active |
@@ -331,6 +345,8 @@ crabjar/
 
 Declared in Cargo.toml `[workspace.members]`:
 - **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
+- **Plugin system**: `crabjar-plugin` (WASM runtime, lifecycle management)
+- **File search**: `file_search` (BM25 indexing with Tantivy 0.22)
 - **Terminal**: `crates/terminal` (wezterm/zellij backends + asciinema v2 recording)
 - **Host**: `host/host-core`, `host/host-system`, `host/host-observe`, `host/host-agent`, `host/host-webview`, `host/host-mqtt`, `host/host-graph`, `host/host-screen`
 - **Apps**: `apps/teams`
@@ -597,6 +613,8 @@ crabjar contains:
 - sandbox (agent isolation)
 - tool_registry (MCP tool registry)
 - crabjar-architecture (mechanical dependency boundary enforcement)
+- file_search (BM25-based file indexing with Tantivy 0.22)
+- crabjar-plugin (WASM runtime, lifecycle management)
 - host/ (8 host crates: core, system, observe, agent, webview, mqtt, graph, screen)
 - apps/teams (Teams plugin)
 - zed-acp-bridge (Wasm extension)
@@ -624,11 +642,11 @@ crabjar contains:
 
 ### 9.2 Active Rust Surface
 
-crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-architecture + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux
+crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-architecture + file_search + crabjar-plugin + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux
 
 ### Test Count
 
-103+ passing in guard crate (scope isolation + trust); full workspace test count TBD on clippy verification. Clippy: clean (`cargo clippy --workspace -- -D warnings`).
+103+ passing in guard crate (scope isolation + trust); 6 passing in file_search crate; full workspace test count TBD on clippy verification. Clippy: clean (`cargo clippy --workspace -- -D warnings`).
 
 ---
 
@@ -636,7 +654,7 @@ crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestr
 
 ### Last Audit
 
-2026-06-28 — Fresh filesystem scan. Workspace: 22 members. Guard: 24 files (guard_db_impl.rs is 729 LoC — exceeds 500 LoC rule). Orchestrator: backend/mod.rs + lm_studio_client/ (8 files) + prompts/default_system.md. crabjar-architecture: 3 source files (layer.rs, boundary.rs, lib.rs). vm_bridge: 4 files at src/vm_bridge/. host/host-agent: 7 source files + inference/ subdirectory. All workspace members documented with per-crate AGENTS.md. Version 0.12.0. Skills: 32 agent skills. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
+2026-07-06 — Fresh filesystem scan. Workspace: 24 members (added `file_search`, `crabjar-plugin`). Guard: 24 files. Orchestrator: backend/mod.rs + lm_studio_client/ (8 files) + prompts/default_system.md. crabjar-architecture: 3 source files (layer.rs, boundary.rs, lib.rs). file_search: 3 source files (lib.rs, indexer.rs, storage.rs) — BM25 indexing with Tantivy 0.22, all tests passing. crabjar-plugin: WASM runtime + lifecycle management. vm_bridge: 4 files at src/vm_bridge/. host/host-agent: 7 source files + inference/ subdirectory. All workspace members documented with per-crate AGENTS.md. Version 0.12.0. Skills: 32 agent skills. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
 
 ### Known Items
 
@@ -656,6 +674,8 @@ crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestr
 - `.agents/skills/` — 32 agent skills
 - `.agents/references/` — agent reference files (may be empty)
 - `crabjar-architecture/` — mechanical dependency boundary enforcement (8-layer model, CI gate candidate)
+- `file_search/` — BM25-based file indexing and search with Tantivy 0.22 (lib.rs, indexer.rs, storage.rs)
+- `crabjar-plugin/` — WASM runtime + lifecycle management
 - `axum-mux/` — vm-bridge (per-VM websocket relay, screen capture, terminal multiplexer)
 - `src/vm_bridge/` — per-VM websocket relay (lib.rs, relay.rs, screen.rs, terminal.rs)
 - `src/crabjar_config/` — workspace config crate (underscore, not hyphen)
@@ -665,7 +685,7 @@ crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestr
 - `crabjar-skills/` — reusable crabjar skills (README, install.sh, skill templates)
 - `scripts/module-sizes.py` — module size reporting script
 - `archive/` — empty (was for experiment consolidation)
-- Per-crate AGENTS.md — complete (all 23 crates + root documented)
+- Per-crate AGENTS.md — complete (all 24 crates + root documented)
 - **Cross-project: llm-workspace** — configured via opencode.jsonc instructions + dotfiles symlink graph
 - **Removed**: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md (no longer exist)
 
@@ -688,6 +708,7 @@ crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestr
 | `prov-zeroclaw-credit` | README + project_map credit: ZeroClaw docs for security model, tool receipts, microkernel, SOP, config schema | 2026-06-06 | Attribution for design influence | crabjar/README.md, crabjar/project_map.md |
 | `prov-codex-parity` | ROADMAP.md Priority 9: 5 Codex pattern imports (bounded context, module size governance, snapshot testing, file search, Starlark exec policy) | 2026-06-23 | Feature parity analysis — Codex vs CrabJar | crabjar/README.md, crabjar/project_map.md, codex/AGENTS.md, codex/codex-rs/Cargo.toml |
 | `prov-map-drift-2026-06-27` | project_map.md regenerated — 22 members, guard/src fully updated (23 files), crabjar-architecture added to tree, vm_bridge added, host/host-agent added, orchestrator backend/mod.rs documented, shared deps refreshed (async-trait, tauri, rumqttc, tracing-error, etc.), CLI commands updated with guard resolution, section 9 cleaned up (removed stale codeburn/gguf/llm-runner references) | 2026-06-27 | Roadmap 1.3 update | crabjar/project_map.md |
+| `prov-map-drift-2026-07-06` | project_map.md regenerated — 24 members (added file_search + crabjar-plugin), tree diagram updated, Core Components table populated, workspace members section refreshed, Section 9 Crabjar Context updated with new crates, Drift Report Last Audit and Known Items updated | 2026-07-06 | Structural alignment refresh | crabjar/project_map.md |
 
 ---
 
