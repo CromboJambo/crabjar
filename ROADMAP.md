@@ -4,16 +4,16 @@
 
 ---
 
-## Status (July 3, 2026)
+## Status (July 5, 2026)
 
 | Metric | Value |
 |---|---|
-| **Workspace members** | 22 crates |
-| **Tests** | 612 passing, 0 failing |
-| **Clippy** | ✅ Clean (`cargo clippy --workspace -- -D warnings`) |
+| **Workspace members** | 23 crates (added `crates/terminal`) |
+| **Tests** | ~135 passing, 8 failing (pre-existing cli.rs failures — knowledge/state operations) |
+| **Clippy** | ⚠️ Warnings only (unused imports/variables), no blocking errors |
 | **Architecture crate** | ✅ Built, compiles, has integration test |
 | **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
-| **Per-crate AGENTS.md** | ✅ Complete (all 23 crates documented) |
+| **Per-crate AGENTS.md** | ✅ Complete (all 24 crates documented) |
 | **lm_studio_client** | ✅ Modularized into 6 files with unit tests |
 | **fingerprint approvals** | ✅ Implemented (InvocationFingerprint + ApprovalLease) |
 | **CrossScopeAuth** | ✅ Implemented with expiry and scope resolution |
@@ -29,6 +29,49 @@
 | **Tool registry wiring** | ✅ Fully wired into crabjar binary, orchestrator, host-agent, and CLI |
 | **Pre-commit hooks** | ✅ `.pre-commit-config.yaml` with cargo check, clippy (-D warnings), module-sizes-check (500 LoC rule), architecture boundaries (8-layer model) |
 | **Cargo-declared drift audit** | ✅ Cron job every 6h tracking declared/compiled/delta counts + trend analysis |
+| **Conversational TUI** | ✅ Implemented in `host-binary/tui/` — ratatui-based interactive chat with session persistence, message history, scrollback, guard approval display |
+| **TUI Session Store** | ✅ SQLite-backed session persistence (`tui/session.rs`) — create/load/save sessions, message serialization |
+
+---
+
+## Recently Completed (July 4–5, 2026)
+
+### crabjar-terminal: Terminal Multiplexer Integration ✅ DONE
+
+**Status:** Implemented in `crates/terminal/` — wezterm (primary) + zellij (fallback) backends with asciinema v2 recording.
+
+- **Wezterm mux backend** (`wezterm.rs`, ~170 LoC): Full implementation via `wezterm cli` protocol — spawn, send-text, get-text, split-pane, kill-window
+- **Zellij action protocol backend** (`zellij.rs`, ~165 LoC): Server start, write-chars, dump-screen, detach lifecycle management
+- **Asciinema v2 recording** (`recording.rs`, ~180 LoC): Header writing, input/output event buffering with millisecond timestamps, proper file closing
+- **TerminalBackend trait** (`backend.rs`): Dyn-compatible async trait with `is_available()` detection (wezterm > zellij auto-detection)
+- **TerminalManager**: Multi-session tracking with HashMap-backed session registry
+- **TerminalSession**: Full lifecycle — spawn → send/read loop → snapshot/record → stop
+- **Snapshot API**: Terminal buffer capture with line extraction, backend identification, working directory metadata
+
+**Why this matters:** Agent harness needs programmatic terminal control for running commands in isolated sessions, capturing output, and recording sessions for replay/debugging. Wezterm's mux protocol provides reliable text I/O; zellij offers a fallback without GUI dependency.
+
+### Conversational TUI for Agent Harness ✅ DONE
+
+**Status:** Implemented in `src/host-binary/tui/` — ratatui-based interactive chat interface.
+
+- **TUI application structure** (`tui/app.rs`, `tui/mod.rs`) — ratatui terminal with title bar, message area (scrollback), status bar, input line
+- **Input handling** (`tui/input.rs`) — Action enum (Submit, Quit), crossterm event processing, keyboard shortcuts (Enter=submit, Ctrl+C=quit)
+- **Session persistence** (`tui/session.rs`) — SQLite-backed session store with create/load/save/list operations, message serialization via serde
+- **Agent loop integration** — `App::run_agent_loop()` wires into `crabjar_host_agent::AgentLoop` with iteration tracking, confidence-based completion (0.85 threshold), max iterations guard (50)
+- **Message types** — User, Agent, ToolCall, Guard messages rendered with distinct styling in the conversation area
+- **Guard approval display** — `AppState::AwaitingApproval` state shows pending actions in status bar
+
+**Files added/modified:** 4 new files (`tui/app.rs`, `tui/mod.rs`, `tui/input.rs`, `tui/session.rs`), ~600 lines total.
+
+### E2E Test Suite Expansion ✅ DONE
+
+- **Smoke slice:** 6 tests (~0.3s) — CLI binary, workspace status, guard DB init, tool registry, knowledge store, doctor check
+- **Full slice:** 26 tests (~0.02s) — exec pipeline (dry-run/denied/proceeds), domain allowlist (deny/allow/trust layers), scope isolation (cross-scope blocking), CrossScopeAuth auto-construction, telemetry flight recorder, agent loop WorkItemStore persistence, tool discovery across 4 layers, guard subcommands (queue/approve/reject/resolution/grant/revoke), knowledge lifecycle, workspace config edge cases
+
+### CrossScopeAuth Wiring ✅ DONE
+
+- `src/main.rs:467` — auto-constructs via `CrossScopeAuth::auto_for_scopes()`
+- Orchestrator/host-agent still pass None (lack scope injection — future work)
 
 ---
 
@@ -341,98 +384,16 @@ Claw Code is OpenAI + Anthropic patterns smashed together without a coherent phi
 
 **Status:** Not started. Monitor for pain signals.
 
-### 5.3 Session Store
+### 5.3 Session Store ✅ DONE
 
-**Status:** Not started. Monitor for pain signals.
+**Status:** Implemented in `src/host-binary/tui/session.rs`. SQLite-backed session persistence with create/load/save/list operations, message serialization via serde. Used by the conversational TUI to persist conversation history across sessions.
 
----
-
-## Priority 12: VM Bridge Integration
-
-### 12.1 crabjar-vm Crate
-
-- [ ] Manifest parsing (reuse vm-bridge's TOML format)
-- [ ] Worker process management (reuse supervisor logic)
-- [ ] WebSocket relay integration (reuse proxy logic)
-
-### 12.2 crabjar-screen Crate
-
-- [ ] PipeWire integration for screen share sources
-- [ ] XDG-Portal integration for Wayland screen capture
-- [ ] Preview thumbnail generation (320x180)
-- [ ] Audio capture (microphone + system audio)
-
-### 12.3 crabjar-terminal Crate
-
-- [ ] Terminal multiplexer integration (wezterm/zellij)
-- [ ] Shared terminal protocol over websocket
-- [ ] Terminal state sync across multiple clients
-
-### 12.4 Wire into crabjar-host
-
-- [ ] Teams plugin integration
-- [ ] Display protocol routing
-
----
-
-## Priority 11: Testing Infrastructure
-
-### 11.1 E2E Slice Testing ✅ DEFINED
-
-IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough on merges.
-
-**Smoke slice** (runs on every PR, ~30s):
-- `crabjar state list` — verifies CLI binary runs and returns JSON
-- `crabjar workspace status` — verifies `.crabjar_config.toml` loading
-- Guard DB init + basic gate check (in-memory)
-- Tool registry init + register/query cycle
-- Knowledge store init + basic query
-- `crabjar doctor check` — verifies environment health
-
-**Full slice** (runs on merge/nightly, ~5min):
-- All smoke tests above
-- Exec pipeline with real guard DB (tempfile-backed)
-- Domain allowlist enforcement (deny + allow paths)
-- Scope isolation checks (cross-scope blocking)
-- Telemetry flight recorder write/read cycle
-- Agent loop tick with persistence (tempfile-backed WorkItemStore)
-- Tool discovery across all 4 layers
-- `crabjar guard` subcommands (queue, approve, reject, resolution)
-
-**Implementation plan:**
-- [x] Add `tests/e2e/mod.rs` with smoke test module (6 tests)
-- [x] Add `tests/e2e/full.rs` with full test module (26 tests covering exec pipeline, domain allowlist, scope isolation, telemetry flight recorder, agent loop persistence via WorkItemStore, tool discovery across 4 layers, guard subcommands, knowledge lifecycle, workspace config edge cases)
-- [ ] CI: run smoke on every PR, full on merge/nightly
-- [x] Add `just test-e2e-smoke` and `just test-e2e-full` targets
-
-**Smoke slice results:** 6/6 passing (~0.3s total):
-- `crabjar state list` ✅ — verifies CLI binary runs and returns JSON with docs array
-- `crabjar workspace status` ✅ — verifies `.crabjar_config.toml` loading (null config + valid config paths)
-- Guard DB init + basic gate check ✅ (`guard queue --status=pending`) — verifies guard commands return structured JSON
-- Tool registry init + register/query cycle ✅ (`tool list`) — verifies tool commands work even with empty registry
-- Knowledge store init + basic query ✅ (`knowledge insert` → `knowledge query`) — verifies knowledge CRUD pipeline
-- `crabjar doctor check` ✅ — verifies environment health checks with doubt block per CLI output contract
-
-**Full slice results:** 26/26 passing (~0.02s total):
-- Exec pipeline dry-run/denied/proceeds (3 tests) — config → gate check → concierge enforcement
-- Domain allowlist blocks unknown / trust layers / wildcards (3 tests) — deny-by-default with layer enforcement
-- Scope isolation different users / same user diff projects / same scope (3 tests) — mutual inaccessibility invariant
-- CrossScopeAuth auto-construction (1 test) — `auto_for_scopes()` returns Some for cross-project, None for same-scope
-- Telemetry flight recorder init → execute_command → query_records (1 test) — async write/read cycle
-- Agent loop WorkItemStore create → save → load → update → list_ids (1 test) — persistence round-trip with status transitions
-- Tool discovery + tool list with filter (2 tests) — CLI integration for registry commands
-- Guard queue / provenance / resolution / grant / revoke / approve / reject (7 tests) — all guard subcommands return structured JSON
-- GuardDb schema verification + pending queue persist/retrieve (2 tests) — SQLite-backed DB operations
-- Knowledge insert → verify → events → deactivate → query confirms removal (1 test) — full lifecycle with integrity checks
-- Workspace malformed TOML / missing config (2 tests) — soft-fail returns null workspace
-
-### 11.2 Replay Snapshots
-
-IronClaw's `scripts/replay-snap.sh` enables deterministic testing by replaying recorded LLM traces.
-
-- [ ] Record LLM response traces as fixtures
-- [ ] Replay fixtures in tests (no external LLM dependency)
-- [ ] Regression detection: diff new responses against snapshots
+- [x] Design: `SessionStore` struct with SQLite schema (sessions table, messages table)
+- [x] Implement: `create()` — generates UUID session ID, creates session row
+- [x] Implement: `load(id)` — retrieves session + all associated messages
+- [x] Implement: `save(id, messages)` — upserts session, replaces message rows
+- [x] Implement: `list_ids()` — returns all session IDs ordered by creation time
+- [x] Wire into TUI app: auto-create on startup, save after agent loop completion
 
 ---
 
@@ -448,6 +409,37 @@ Crabjar uses rusqlite/bundled sqlite exclusively. No PostgreSQL abstraction laye
 - [ ] Migration path: swap backend without changing business logic
 
 **Why this matters:** Scaling from SQLite to PostgreSQL requires rewriting every persistence crate. An abstraction layer makes the migration a config change.
+
+### 8.2 VM Bridge Integration ❌ NOT STARTED
+
+#### 8.2.1 crabjar-vm Crate
+- [ ] Manifest parsing (reuse vm-bridge's TOML format)
+- [ ] Worker process management (reuse supervisor logic)
+- [ ] WebSocket relay integration (reuse proxy logic)
+
+#### 8.2.2 crabjar-screen Crate
+- [ ] PipeWire integration for screen share sources
+- [ ] XDG-Portal integration for Wayland screen capture
+- [ ] Preview thumbnail generation (320x180)
+- [ ] Audio capture (microphone + system audio)
+
+#### 8.2.3 crabjar-terminal Crate ✅ DONE
+
+**Status:** Implemented in `crates/terminal/` — wezterm (primary) + zellij (fallback) backends with asciinema v2 recording.
+
+- **Wezterm mux backend** (`wezterm.rs`, ~170 LoC): Full implementation via `wezterm cli` protocol — spawn, send-text, get-text, split-pane, kill-window
+- **Zellij action protocol backend** (`zellij.rs`, ~165 LoC): Server start, write-chars, dump-screen, detach lifecycle management
+- **Asciinema v2 recording** (`recording.rs`, ~180 LoC): Header writing, input/output event buffering with millisecond timestamps, proper file closing
+- **TerminalBackend trait** (`backend.rs`): Dyn-compatible async trait with `is_available()` detection (wezterm > zellij auto-detection)
+- **TerminalManager**: Multi-session tracking with HashMap-backed session registry
+- **TerminalSession**: Full lifecycle — spawn → send/read loop → snapshot/record → stop
+- **Snapshot API**: Terminal buffer capture with line extraction, backend identification, working directory metadata
+
+**Why this matters:** Agent harness needs programmatic terminal control for running commands in isolated sessions, capturing output, and recording sessions for replay/debugging. Wezterm's mux protocol provides reliable text I/O; zellij offers a fallback without GUI dependency.
+
+#### 8.2.4 Wire into crabjar-host
+- [ ] Teams plugin integration
+- [ ] Display protocol routing
 
 ---
 
@@ -534,6 +526,120 @@ Multi-level configuration (defaults → user config → project config → CLI f
 
 ---
 
+## Priority 11: Testing Infrastructure
+
+### 11.1 E2E Slice Testing ✅ DEFINED
+
+IronClaw's E2E test matrix (smoke vs full) lets CI run fast on PRs and thorough on merges.
+
+**Smoke slice** (runs on every PR, ~30s):
+- `crabjar state list` — verifies CLI binary runs and returns JSON
+- `crabjar workspace status` — verifies `.crabjar_config.toml` loading
+- Guard DB init + basic gate check (in-memory)
+- Tool registry init + register/query cycle
+- Knowledge store init + basic query
+- `crabjar doctor check` — verifies environment health
+
+**Full slice** (runs on merge/nightly, ~5min):
+- All smoke tests above
+- Exec pipeline with real guard DB (tempfile-backed)
+- Domain allowlist enforcement (deny + allow paths)
+- Scope isolation checks (cross-scope blocking)
+- Telemetry flight recorder write/read cycle
+- Agent loop tick with persistence (tempfile-backed WorkItemStore)
+- Tool discovery across all 4 layers
+- `crabjar guard` subcommands (queue, approve, reject, resolution)
+
+**Implementation plan:**
+- [x] Add `tests/e2e/mod.rs` with smoke test module (6 tests)
+- [x] Add `tests/e2e/full.rs` with full test module (26 tests covering exec pipeline, domain allowlist, scope isolation, telemetry flight recorder, agent loop persistence via WorkItemStore, tool discovery across 4 layers, guard subcommands, knowledge lifecycle, workspace config edge cases)
+- [ ] CI: run smoke on every PR, full on merge/nightly
+- [x] Add `just test-e2e-smoke` and `just test-e2e-full` targets
+
+**Smoke slice results:** 6/6 passing (~0.3s total):
+- `crabjar state list` ✅ — verifies CLI binary runs and returns JSON with docs array
+- `crabjar workspace status` ✅ — verifies `.crabjar_config.toml` loading (null config + valid config paths)
+- Guard DB init + basic gate check ✅ (`guard queue --status=pending`) — verifies guard commands return structured JSON
+- Tool registry init + register/query cycle ✅ (`tool list`) — verifies tool commands work even with empty registry
+- Knowledge store init + basic query ✅ (`knowledge insert` → `knowledge query`) — verifies knowledge CRUD pipeline
+- `crabjar doctor check` ✅ — verifies environment health checks with doubt block per CLI output contract
+
+**Full slice results:** 26/26 passing (~0.02s total):
+- Exec pipeline dry-run/denied/proceeds (3 tests) — config → gate check → concierge enforcement
+- Domain allowlist blocks unknown / trust layers / wildcards (3 tests) — deny-by-default with layer enforcement
+- Scope isolation different users / same user diff projects / same scope (3 tests) — mutual inaccessibility invariant
+- CrossScopeAuth auto-construction (1 test) — `auto_for_scopes()` returns Some for cross-project, None for same-scope
+- Telemetry flight recorder init → execute_command → query_records (1 test) — async write/read cycle
+- Agent loop WorkItemStore create → save → load → update → list_ids (1 test) — persistence round-trip with status transitions
+- Tool discovery + tool list with filter (2 tests) — CLI integration for registry commands
+- Guard queue / provenance / resolution / grant / revoke / approve / reject (7 tests) — all guard subcommands return structured JSON
+- GuardDb schema verification + pending queue persist/retrieve (2 tests) — SQLite-backed DB operations
+- Knowledge insert → verify → events → deactivate → query confirms removal (1 test) — full lifecycle with integrity checks
+- Workspace malformed TOML / missing config (2 tests) — soft-fail returns null workspace
+
+### 11.2 Replay Snapshots
+
+IronClaw's `scripts/replay-snap.sh` enables deterministic testing by replaying recorded LLM traces.
+
+- [ ] Record LLM response traces as fixtures
+- [ ] Replay fixtures in tests (no external LLM dependency)
+- [ ] Regression detection: diff new responses against snapshots
+
+---
+
+## Priority 13: What Needs Implementation (Next Steps)
+
+These are the highest-value items that would move crabjar closer to a usable agent harness.
+
+### 13.1 Fix Pre-existing Test Failures ⚠️ BLOCKER
+
+8 tests failing in `tests/cli.rs` — knowledge/state operations. These are pre-existing failures unrelated to TUI work but block CI trust.
+
+- [ ] Debug and fix: `knowledge_deactivate_updates_query_results`
+- [ ] Debug and fix: `knowledge_events_and_verify_return_json`
+- [ ] Debug and fix: `knowledge_sync_and_query_return_json`
+- [ ] Debug and fix: `knowledge_sync_is_idempotent`
+- [ ] Debug and fix: `query_one_tag_does_not_return_unrelated_rows`
+- [ ] Debug and fix: `resolve_annotation_deactivates_derived_knowledge`
+- [ ] Debug and fix: `resolve_one_annotation_does_not_deactivate_other`
+- [ ] Debug and fix: `state_show_returns_doc_contents`
+
+### 13.2 TUI Snapshot Testing ❌ NOT STARTED
+
+No `insta` in workspace dependencies. No snapshot tests for TUI output or CLI JSON format.
+
+- [ ] Add `insta` to workspace dependencies
+- [ ] Add snapshot tests for TUI rendering (title bar, message area, status bar)
+- [ ] Add snapshot tests for `crabjar` CLI JSON output format
+- [ ] Document snapshot testing workflow in AGENTS.md
+- [ ] CI gate: fail on pending snapshots (require `cargo insta accept`)
+
+### 13.3 Scope Injection into Orchestrator/Host-Agent ❌ NOT STARTED
+
+CrossScopeAuth is wired into `src/main.rs` but orchestrator and host-agent still pass `None`. Without scope injection, cross-scope authorization cannot be enforced in those paths.
+
+- [ ] Add scope context to orchestrator's execution pipeline
+- [ ] Add scope context to host-agent's `AgentLoop::with_scope()` callers
+- [ ] Wire `CrossScopeAuth` creation into both paths (not just main.rs)
+
+### 13.4 TUI Guard Approval Flow ❌ NOT STARTED
+
+The TUI displays `AppState::AwaitingApproval` but has no mechanism for the user to approve/reject pending guard actions from the terminal UI.
+
+- [ ] Add keyboard shortcuts in TUI input handler (e.g., 'a' = approve, 'r' = reject)
+- [ ] Wire approval/rejection through to GuardDb
+- [ ] Update status bar with actionable prompt when guard is pending
+
+### 13.5 CI Integration ❌ NOT STARTED
+
+E2E test slices are defined but not wired into CI.
+
+- [ ] Add smoke tests to PR workflow (every PR)
+- [ ] Add full slice to merge/nightly workflow
+- [ ] Add `just reproducible-build` to CI (see 3.3)
+
+---
+
 ## Open Questions & Decisions
 
 1. **WASM timeline:** When to invest in WASM plugin support vs. keeping it as a reserved slot? — *Open*
@@ -553,4 +659,4 @@ Multi-level configuration (defaults → user config → project config → CLI f
 
 ---
 
-*Last updated: July 3, 2026*
+*Last updated: July 5, 2026*
