@@ -1,0 +1,14 @@
+---
+source: tests/snapshot_tests.rs
+expression: "serde_json::json!({\n    \"success\":\n    parsed.get(\"success\").and_then(|v| v.as_bool()).unwrap_or(false),\n    \"workspace\": workspace_val,\n})"
+---
+{
+  "success": true,
+  "workspace": {
+    "declared_tools": 2,
+    "description": "CrabJar agent workspace with cuda-oxide integration",
+    "name": "crabjar-workspace",
+    "tool_execution_enabled": true,
+    "user_dinit_socket": null
+  }
+}

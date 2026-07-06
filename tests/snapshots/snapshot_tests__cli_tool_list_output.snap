@@ -1,0 +1,8 @@
+---
+source: tests/snapshot_tests.rs
+expression: "serde_json::json!({\n    \"success\":\n    parsed.get(\"success\").and_then(|v| v.as_bool()).unwrap_or(false),\n    \"tools_count\":\n    parsed.get(\"tools\").and_then(|v|\n    v.as_array()).map(|a| a.len()).unwrap_or(0),\n})"
+---
+{
+  "success": true,
+  "tools_count": 0
+}

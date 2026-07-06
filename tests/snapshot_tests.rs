@@ -47,10 +47,10 @@ fn test_cli_state_list_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Output is not valid JSON");
     
-    insta::assert_json_snapshot!("cli_state_list_output", {
+    insta::assert_json_snapshot!("cli_state_list_output", serde_json::json!({
         "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
         "docs_count": parsed.get("docs").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-    });
+    }));
 }
 
 /// Test that CLI `workspace status` returns valid JSON structure.
@@ -66,10 +66,12 @@ fn test_cli_workspace_status_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Output is not valid JSON");
     
-    insta::assert_json_snapshot!("cli_workspace_status_output", {
+    let workspace_val = parsed.get("workspace").cloned().unwrap_or(serde_json::json!(null));
+    
+    insta::assert_json_snapshot!("cli_workspace_status_output", serde_json::json!({
         "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
-        "workspace": if parsed.get("workspace").is_null() { serde_json::json!(null) } else { &parsed["workspace"] },
-    });
+        "workspace": workspace_val,
+    }));
 }
 
 /// Test that CLI `doctor check` returns valid JSON structure.
@@ -85,10 +87,10 @@ fn test_cli_doctor_check_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Output is not valid JSON");
     
-    insta::assert_json_snapshot!("cli_doctor_check_output", {
+    insta::assert_json_snapshot!("cli_doctor_check_output", serde_json::json!({
         "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
         "checks_count": parsed.get("checks").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-    });
+    }));
 }
 
 /// Test that CLI `tool list` returns valid JSON structure.
@@ -104,10 +106,10 @@ fn test_cli_tool_list_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Output is not valid JSON");
     
-    insta::assert_json_snapshot!("cli_tool_list_output", {
+    insta::assert_json_snapshot!("cli_tool_list_output", serde_json::json!({
         "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
         "tools_count": parsed.get("tools").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-    });
+    }));
 }
 
 /// Test that CLI `guard queue` returns valid JSON structure.
@@ -123,8 +125,8 @@ fn test_cli_guard_queue_output() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("Output is not valid JSON");
     
-    insta::assert_json_snapshot!("cli_guard_queue_output", {
+    insta::assert_json_snapshot!("cli_guard_queue_output", serde_json::json!({
         "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
         "pending_count": parsed.get("pending").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-    });
+    }));
 }
