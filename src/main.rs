@@ -328,6 +328,20 @@ fn handle_state_command(
                 }
             }))
         }
+        StateCommand::Staleness { doc_name, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let querier = agent_context::state_docs::StateDocQuerier::new(
+                conn,
+                std::path::PathBuf::from(&db_path),
+            );
+            let result = querier.staleness_status(&doc_name);
+            Ok(json!({
+                "success": true,
+                "message": format!("staleness check for {}", doc_name),
+                "payload": result,
+            }))
+        }
     }
 }
 

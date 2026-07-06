@@ -2,6 +2,7 @@
 // Query interface for agents to search state-docs via SQLite
 
 use crate::state_docs::models::Section;
+use chrono::Utc;
 use rusqlite::Connection;
 use serde_json::json;
 use std::fs;
@@ -151,6 +152,58 @@ impl StateDocQuerier {
             "state_doc_path": doc_path.to_string_lossy(),
             "exists": doc_path.exists(),
         })
+    }
+
+    /// Compute staleness status for a state-doc using three-tier thresholds:
+    /// - Fresh (< 7 days): trusted content
+    /// - Stale (7-14 days): warning, may have drifted
+    /// - Expired (14-30 days): untrustworthy without re-index
+    /// - Moldy (> 30 days): discarded unless additional context added since last modification
+    pub fn staleness_status(&self, doc_name: &str) -> serde_json::Value {
+        use crate::state_docs::models::StalenessStatus;
+
+        let metadata = self.get_metadata(doc_name);
+        let last_modified_str = metadata.as_ref().and_then(|m| m["last_modified"].as_str());
+
+        // Parse the last modified timestamp
+        let last_modified = last_modified_str.and_then(|s| {
+            chrono::DateTime::parse_from_rfc3339(s)
+                .ok()
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+        });
+
+        // Check for any annotations added after the doc was last modified.
+        // This determines if there's "recent context" that justifies keeping a moldy doc.
+        let latest_annotation_at = self.get_latest_annotation_time(doc_name);
+
+        let status = match (last_modified, &latest_annotation_at) {
+            (Some(lm), Some(ann)) => StalenessStatus::compute_with_context(&lm, Some(*ann)),
+            (Some(lm), None) => StalenessStatus::compute_with_context(&lm, None),
+            _ => StalenessStatus::Fresh, // no metadata = assume fresh
+        };
+
+        json!({
+            "doc": doc_name,
+            "status": status.label(),
+            "days_old": status.age_days(),
+            "is_trustworthy": status.is_trustworthy(),
+            "warning": status.warning(),
+            "last_modified": last_modified_str.unwrap_or(""),
+        })
+    }
+
+    /// Get the latest annotation timestamp for a doc (used by staleness_status).
+    fn get_latest_annotation_time(&self, doc_name: &str) -> Option<chrono::DateTime<Utc>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT created_at FROM annotations WHERE doc_id = ?1 ORDER BY created_at DESC LIMIT 1",
+        ).ok()?;
+
+        // Query the raw string first, then parse outside the closure to avoid
+        // rusqlite::Error type mismatch with chrono::ParseError.
+        let s: String = stmt.query_row(rusqlite::params![doc_name], |row| row.get(0)).ok()?;
+        chrono::DateTime::parse_from_rfc3339(&s)
+            .ok()
+            .map(|dt| dt.with_timezone(&chrono::Utc))
     }
 
     // --- Internal query methods ---

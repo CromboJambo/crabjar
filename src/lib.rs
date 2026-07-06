@@ -169,6 +169,14 @@ pub enum StateCommand {
         #[arg(long, default_value = "state-docs.db")]
         db_path: String,
     },
+    /// Check staleness status of a state-doc (three-tier: stale/expired/moldy)
+    Staleness {
+        /// State-doc name
+        doc_name: String,
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]

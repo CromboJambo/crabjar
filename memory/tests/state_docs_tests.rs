@@ -986,3 +986,118 @@ fn different_content_produces_different_checksum() {
         "different content should produce different checksums"
     );
 }
+
+// ─── staleness tests ──────────────────────────────────────────────
+
+use agent_context::state_docs::models::StalenessStatus;
+
+#[test]
+fn staleness_fresh_within_7_days() {
+    let now = chrono::Utc::now();
+    let last_modified = now - chrono::Duration::days(3);
+    let status = StalenessStatus::compute(&last_modified);
+    assert!(matches!(status, StalenessStatus::Fresh));
+    assert!(status.is_fresh());
+    assert!(status.is_trustworthy());
+}
+
+#[test]
+fn staleness_stale_7_to_14_days() {
+    let now = chrono::Utc::now();
+    let last_modified = now - chrono::Duration::days(10);
+    let status = StalenessStatus::compute(&last_modified);
+    assert!(matches!(&status, StalenessStatus::Stale { days } if *days == 10));
+    assert!(!status.is_fresh());
+    assert!(status.is_trustworthy());
+}
+
+#[test]
+fn staleness_expired_14_to_30_days() {
+    let now = chrono::Utc::now();
+    let last_modified = now - chrono::Duration::days(20);
+    let status = StalenessStatus::compute(&last_modified);
+    assert!(matches!(&status, StalenessStatus::Expired { days } if *days == 20));
+    assert!(!status.is_fresh());
+    assert!(!status.is_trustworthy());
+}
+
+#[test]
+fn staleness_moldy_over_30_days() {
+    let now = chrono::Utc::now();
+    let last_modified = now - chrono::Duration::days(45);
+    let status = StalenessStatus::compute(&last_modified);
+    assert!(matches!(&status, StalenessStatus::Moldy { days, .. } if *days == 45));
+    assert!(!status.is_fresh());
+    assert!(!status.is_trustworthy());
+}
+
+#[test]
+fn staleness_compute_with_context_resets_moldy_to_expired() {
+    let now = chrono::Utc::now();
+    let last_modified = now - chrono::Duration::days(45);
+    // Annotation added 10 days ago (after doc modification, within 30d window)
+    let annotation_time = now - chrono::Duration::days(10);
+    let status = StalenessStatus::compute_with_context(&last_modified, Some(annotation_time));
+    assert!(matches!(&status, StalenessStatus::Expired { days } if *days == 45));
+}
+
+#[test]
+fn staleness_compute_with_context_stays_moldy_without_context() {
+    let now = chrono::Utc::now();
+    let last_modified = now - chrono::Duration::days(45);
+    // No annotation activity
+    let status = StalenessStatus::compute_with_context(&last_modified, None);
+    assert!(matches!(&status, StalenessStatus::Moldy { days, .. } if *days == 45));
+}
+
+#[test]
+fn staleness_label_returns_correct_string() {
+    let fresh = StalenessStatus::Fresh;
+    let stale = StalenessStatus::Stale { days: 10 };
+    let expired = StalenessStatus::Expired { days: 20 };
+    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+
+    assert_eq!(fresh.label(), "fresh");
+    assert_eq!(stale.label(), "stale");
+    assert_eq!(expired.label(), "expired");
+    assert_eq!(moldy.label(), "moldy");
+}
+
+#[test]
+fn staleness_warning_only_for_non_fresh() {
+    let fresh = StalenessStatus::Fresh;
+    let stale = StalenessStatus::Stale { days: 10 };
+    let expired = StalenessStatus::Expired { days: 20 };
+    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+
+    assert!(fresh.warning().is_none());
+    assert!(stale.warning().is_some());
+    assert!(expired.warning().is_some());
+    assert!(moldy.warning().is_some());
+}
+
+#[test]
+fn staleness_age_days_returns_correct_value() {
+    let fresh = StalenessStatus::Fresh;
+    let stale = StalenessStatus::Stale { days: 10 };
+    let expired = StalenessStatus::Expired { days: 20 };
+    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+
+    assert_eq!(fresh.age_days(), 0);
+    assert_eq!(stale.age_days(), 10);
+    assert_eq!(expired.age_days(), 20);
+    assert_eq!(moldy.age_days(), 45);
+}
+
+#[test]
+fn staleness_is_trustworthy_only_fresh_or_stale() {
+    let fresh = StalenessStatus::Fresh;
+    let stale = StalenessStatus::Stale { days: 10 };
+    let expired = StalenessStatus::Expired { days: 20 };
+    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+
+    assert!(fresh.is_trustworthy());
+    assert!(stale.is_trustworthy());
+    assert!(!expired.is_trustworthy());
+    assert!(!moldy.is_trustworthy());
+}

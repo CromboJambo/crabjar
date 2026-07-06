@@ -86,6 +86,21 @@ Tooling: `just module-sizes` (report), `just module-sizes-check` (CI gate).
 
 `project_map.md` stale after >7 days without modification. Divergence between documented structure and actual filesystem is a structural integrity concern.
 
+### State-Doc Staleness (Three-Tier Thresholds)
+
+State-docs use a graduated staleness model with three tiers:
+
+| Tier | Age | Behavior |
+|------|-----|----------|
+| **Fresh** | < 7 days | Trusted content, no warnings |
+| **Stale** | 7–14 days | Warning — content may have drifted from indexed state; `is_trustworthy` still true |
+| **Expired** | 14–30 days | Untrustworthy without re-index; flag for regeneration |
+| **Moldy** | > 30 days | Corroded beyond useful provenance; discarded unless additional context (annotations) added since last modification relative to reconstruction cost |
+
+The `StalenessStatus` enum is defined in `memory/src/state_docs/models.rs`. Use `StateDocQuerier::staleness_status()` to compute it — this checks both age and whether annotations were added after the doc was last modified.
+
+CLI: `crabjar state staleness <doc_name>` returns structured JSON with status, days_old, is_trustworthy, and warning fields.
+
 ## Zed Agent Protocol
 
 - Zed agent servers require stdin/stdout JSON-RPC

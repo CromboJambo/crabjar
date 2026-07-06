@@ -648,9 +648,9 @@ E2E test slices are defined but not wired into CI.
 
 ## Open Questions & Decisions
 
-1. **WASM timeline:** When to invest in WASM plugin support vs. keeping it as a reserved slot? — *Open*
+1. **WASM timeline:** ✅ **Decided (July 6): Keep as reserved slot.** `zed-acp-bridge` is a Zed-specific extension using `zed_extension_api`, not a general plugin system. No sandboxing, no lifecycle management, no loader — only works inside Zed. Real WASM plugins would need `wasmtime`/`wasmer` (~10MB build), capability configuration, crash recovery, and a plugin interface. Friction point: "I want to run WASM plugins outside the editor" or "I want runtime load/unload." Until then, reserved slot is correct.
 2. **Model routing:** How to decide which model handles which phase of the ReAct loop? — *Decided: plan/reflect → HTTP backend, others → heuristic (implemented in `host-agent/model_routing.rs`)*
-3. **State-doc staleness:** What threshold triggers staleness warnings? (7 days? content changes?) — *Open*
+3. **State-doc staleness:** ✅ **Decided (July 6): Three-tier graduated model.** Fresh (<7d) → Stale (7-14d, warning) → Expired (14-30d, untrustworthy without re-index) → Moldy (>30d, discarded unless additional context added relative to reconstruction cost). Implemented in `memory/src/state_docs/models.rs` (`StalenessStatus` enum), `querier.rs` (`staleness_status()` method), and CLI (`crabjar state staleness <doc>`). The moldy tier checks for annotation activity after last modification — if the user/agent added value, it resets to expired rather than auto-discarding.
 4. **Plugin language support:** Which languages for ToolServer plugins? (Rust, Python, Go?) — *Open*
 5. **Context compression strategy:** Summarization vs. selective retention vs. relevance scoring? — *Decided: grouping older observations by stage/kind into summaries with token budget enforcement (implemented in `host-agent/context_compression.rs`)*
 6. **Scope isolation granularity:** Which scope dimensions are needed at launch? (identity, project, tenant, thread) — ✅ DONE: all four implemented
