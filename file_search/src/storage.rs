@@ -13,7 +13,7 @@ use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tantivy::schema::*;
 use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, Term};
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use crate::indexer::{IndexedFile, FileIndexer};
 
@@ -230,10 +230,9 @@ impl SearchStorage {
         // Get field handle for path
         let path_field = self.schema.get_field("path").map_err(|e| format!("Missing 'path' field: {}", e))?;
 
-        // Delete from tantivy
+        // Delete from tantivy (returns number of deleted documents)
         self.index_writer
-            .delete_term(Term::from_field_text(path_field, &path_str))
-            .map_err(|e| format!("Failed to delete from index: {}", e))?;
+            .delete_term(Term::from_field_text(path_field, &path_str));
 
         // Delete from SQLite
         self.db_conn.execute("DELETE FROM files WHERE path = ?1", params![&path_str])
@@ -338,21 +337,9 @@ impl SearchStorage {
 
     /// Clear all indexed data.
     pub fn clear(&mut self) -> Result<(), String> {
-        // Delete from tantivy by iterating over all documents and deleting them
-        let searcher = self.index_reader.searcher();
-        let num_segments = searcher.segment_readers().len();
-        
-        for segment_reader in searcher.segment_readers() {
-            let inv = segment_reader.inverted_index(self.schema.get_field("path").ok())
-                .map_err(|e| format!("Failed to get inverted index: {}", e))?;
-            
-            if let Some(mut inv) = inv {
-                while let Some(term) = inv.next() {
-                    if term.field() == self.schema.get_field("path").unwrap_or_else(|_| self.schema.get_field("content").unwrap()) {
-                        let _ = self.index_writer.delete_term(term);
-                    }
-                }
-            }
+        // Delete all documents from tantivy index
+        if let Err(e) = self.index_writer.delete_all_documents() {
+            return Err(format!("Failed to delete all documents: {}", e));
         }
 
         // Clear SQLite
@@ -367,29 +354,35 @@ impl SearchStorage {
         &self.index_path
     }
 
+    /// Reload the index reader to see newly committed documents.
+    pub fn reload(&mut self) -> Result<(), String> {
+        self.index_reader.reload().map_err(|e| format!("Failed to reload index: {}", e))?;
+        Ok(())
+    }
+
     /// Helper to extract a text field from a document.
-    fn get_text_field(doc: &TantivyDocument, schema: &Schema, field: Field) -> Result<String, String> {
+    fn get_text_field(doc: &TantivyDocument, _schema: &Schema, field: Field) -> Result<String, String> {
         let values = doc.get_first(field).ok_or_else(|| "Missing field".to_string())?;
         match values {
-            Value::Str(s) => Ok(s.to_string()),
+            OwnedValue::Str(s) => Ok(s.clone()),
             _ => Err(format!("Expected text field, got {:?}", values)),
         }
     }
 
     /// Helper to extract an i64 field from a document.
-    fn get_i64_field(doc: &TantivyDocument, schema: &Schema, field: Field) -> Option<i64> {
+    fn get_i64_field(doc: &TantivyDocument, _schema: &Schema, field: Field) -> Option<i64> {
         let values = doc.get_first(field)?;
         match values {
-            Value::I64(v) => Some(*v),
+            OwnedValue::I64(v) => Some(*v),
             _ => None,
         }
     }
 
     /// Helper to extract a u64 field from a document.
-    fn get_u64_field(doc: &TantivyDocument, schema: &Schema, field: Field) -> Option<u64> {
+    fn get_u64_field(doc: &TantivyDocument, _schema: &Schema, field: Field) -> Option<u64> {
         let values = doc.get_first(field)?;
         match values {
-            Value::U64(v) => Some(*v),
+            OwnedValue::U64(v) => Some(*v),
             _ => None,
         }
     }
@@ -441,6 +434,7 @@ mod tests {
         // Index the file
         storage.index_file(&test_file, "fn main() { println!(\"hello world\"); }").unwrap();
         storage.commit().unwrap();
+        storage.reload().unwrap();
 
         // Verify it's indexed
         assert_eq!(storage.index_count().unwrap(), 1);

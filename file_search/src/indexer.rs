@@ -4,10 +4,10 @@
 //! for efficient full-text indexing of file contents.
 
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 use ignore::WalkBuilder;
-use tantivy::tokenizer::{SimpleTokenizer, TextAnalyzer};
+use tantivy::tokenizer::{LowerCaser, SimpleTokenizer, TextAnalyzer};
 use tracing::{debug, info, warn};
 
 use crate::DEFAULT_EXTENSIONS;
@@ -169,6 +169,7 @@ impl FileIndexer {
     /// Tokenize file content for BM25 indexing.
     pub fn tokenize(content: &str) -> Vec<String> {
         let mut tokenizer = TextAnalyzer::builder(SimpleTokenizer::default())
+            .filter(LowerCaser)
             .build();
 
         // tantivy 0.22 API: token_stream().process() takes a closure receiving &Token
