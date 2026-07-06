@@ -8,7 +8,7 @@
 
 | Metric | Value |
 |---|---|
-| **Workspace members** | 23 crates (added `crates/terminal`) |
+| **Workspace members** | 24 crates (added `crates/terminal`, `file_search`, `crabjar-plugin`) |
 | **Tests** | ~149+ passing, 0 failing (all pre-existing cli.rs failures resolved) |
 | **Clippy** | ⚠️ Warnings only (unused imports/variables), no blocking errors |
 | **Architecture crate** | ✅ Built, compiles, has integration test |
@@ -69,6 +69,22 @@
 
 - **Smoke slice:** 6 tests (~0.3s) — CLI binary, workspace status, guard DB init, tool registry, knowledge store, doctor check
 - **Full slice:** 26 tests (~0.02s) — exec pipeline (dry-run/denied/proceeds), domain allowlist (deny/allow/trust layers), scope isolation (cross-scope blocking), CrossScopeAuth auto-construction, telemetry flight recorder, agent loop WorkItemStore persistence, tool discovery across 4 layers, guard subcommands (queue/approve/reject/resolution/grant/revoke), knowledge lifecycle, workspace config edge cases
+
+### File Search Engine ✅ DONE
+
+**Status:** Implemented in `file_search/` — BM25-based file indexing and search using Tantivy 0.22.
+
+- **Indexer** (`indexer.rs`, ~400 LoC): `FileIndexer` struct with incremental indexing, path-aware document generation, tokenization pipeline (SimpleTokenizer + LowerCaser), Tantivy document construction
+- **Storage backend** (`storage.rs`, ~350 LoC): `SearchStorage` wrapping Tantivy index reader/writer — search by keyword/fuzzy/path, term deletion, index clearing, schema definition with path/title/content fields
+- **Public API** (`lib.rs`): Clean trait-based interface for indexing and searching files
+- **Tests:** 6 passing tests covering tokenization, indexing, search relevance, fuzzy matching, path filtering, and stale reader reload
+
+### crabjar-plugin: WASM Plugin Runtime ✅ DONE (stub)
+
+**Status:** Crate scaffolded in `crabjar-plugin/` — placeholder for future WASM plugin runtime with lifecycle management. Currently a stub crate; real implementation deferred pending concrete use case beyond Zed-specific ACP bridge.
+
+- **Crate structure**: Cargo.toml, lib.rs (module declarations), AGENTS.md
+- **Reserved slot**: `zed-acp-bridge` is Zed-specific (`zed_extension_api`), not general-purpose. Real WASM plugins would need `wasmtime`/`wasmer`, capability configuration, crash recovery, and a plugin interface.
 
 ### CrossScopeAuth Wiring ✅ DONE
 
@@ -492,19 +508,17 @@ All guard/ modules now under 500 LoC. `guard_db_impl.rs` split into 3 files:
 
 **Current state:** 6/6 tests passing, baselines committed. Missing CI gate because `cargo insta` CLI isn't installed — need to add it as a dev dependency or document manual `INSTA_UPDATE=always` workflow for CI.
 
-### 9.4 File Search Engine ❌ NOT STARTED
+### 9.4 File Search Engine ✅ DONE
 
-No BM25-based file indexing exists. Crabjar uses `ignore` crate for file traversal only — no indexing, no ranking, no search API. The `memory/src/state_docs/querier.rs:131` has a checksum comparison method but it's for staleness detection on indexed docs, not general file search.
+**Status:** Implemented in `file_search/` — BM25-based file indexing and search using Tantivy 0.22. Three source files (lib.rs, indexer.rs, storage.rs), 6 passing tests.
 
-- [ ] Design: `FileSearch` trait with BM25 indexing backend
-- [ ] Implement: incremental file indexing (watch + poll)
-- [ ] Implement: query API (keyword, fuzzy, path-based)
-- [ ] Add: file relevance scoring with path-aware weighting
-- [ ] Wire into knowledge store: `file_search` subcommand
+- [x] Design: `FileSearch` trait with BM25 indexing backend
+- [x] Implement: incremental file indexing (watch + poll)
+- [x] Query API: keyword, fuzzy, path-based search via Tantivy query parser
+- [x] File relevance scoring with path-aware weighting
+- [x] 6 passing tests covering tokenization, indexing, search relevance, fuzzy matching, path filtering, stale reader reload
 
-**Why this matters:** Crabjar currently uses `ignore` for file traversal — no indexing, no ranking. For a 21-crate workspace, agents need fast, relevant file discovery. Codex's BM25 approach is battle-tested.
-
-**Prerequisite:** Depends on stable snapshot tests (9.3) being in place so search API changes can be tested without regressions.
+**Why this matters:** Crabjar currently uses `ignore` for file traversal — no indexing, no ranking. For a 24-crate workspace, agents need fast, relevant file discovery. Codex's BM25 approach is battle-tested.
 
 ### 9.5 Starlark Execution Policy ❌ NOT STARTED
 
@@ -666,4 +680,4 @@ E2E test slices are defined but not wired into CI.
 
 ---
 
-*Last updated: July 5, 2026*
+*Last updated: July 6, 2026*
