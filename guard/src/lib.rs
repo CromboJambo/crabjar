@@ -47,6 +47,10 @@ pub mod trust;
 pub mod trust_resolution;
 pub mod trust_types;
 
+// Policy engine — declarative policy abstraction (Option C: Hybrid)
+pub mod policy;
+pub mod policy_types;
+
 // Re-export types from split modules for backward compatibility
 pub use action::{ActionOutcome, ActionRequest, ActionStatus, OutcomeStatus};
 pub use command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};

@@ -12,6 +12,7 @@ pub use crate::domain_allowlist::{DomainAllowlist, DomainCheckError};
 use crate::gate_context::GateContext;
 use crate::gate_result::GateResult;
 use crate::guard_db::{GuardDb, GuardDbError};
+use crate::policy_types::{PolicyContext, PolicyEngine, PolicyResult};
 use crate::risk_config::RiskConfig;
 use crate::trust::TrustManager;
 
@@ -21,6 +22,10 @@ pub struct ExecutionGate<'a> {
     dry_run: bool,
     risk_config: RiskConfig,
     domain_allowlist: DomainAllowlist,
+    /// Optional policy engine for declarative policy evaluation.
+    /// When set, runs as a pre-check before the existing gate logic.
+    /// If no policy engine is configured, falls back to static gate behavior (backward compatible).
+    policy_engine: Option<Box<dyn PolicyEngine>>,
 }
 
 impl<'a> ExecutionGate<'a> {
@@ -31,9 +36,59 @@ impl<'a> ExecutionGate<'a> {
             dry_run,
             risk_config: RiskConfig::default(),
             domain_allowlist: DomainAllowlist::new(),
+            policy_engine: None,
         }
     }
 
+    /// Set the policy engine for this gate.
+    pub fn with_policy_engine(mut self, engine: Box<dyn PolicyEngine>) -> Self {
+        self.policy_engine = Some(engine);
+        self
+    }
+
+    /// Convert a GateContext into a PolicyContext for evaluation.
+    fn to_policy_context(&self, ctx: &GateContext<'_>) -> PolicyContext {
+        PolicyContext {
+            action_type: ctx.action_type.to_string(),
+            command: ctx.command.to_string(),
+            args: ctx.args.clone(),
+            trust_layer: ctx.trust_layer,
+            confidence: ctx.confidence,
+            source_event_id: ctx.source_event_id.map(|s| s.to_string()),
+            can_interrupt: ctx.can_interrupt,
+            pid: ctx.pid,
+            scope: ctx.scope.as_ref().cloned(),
+            target_scope: ctx.target_scope.as_ref().cloned(),
+            domains: ctx.domains.clone(),
+            context_budget: ctx.context_budget.clone(),
+            context_fragment_tokens: ctx.context_fragment_tokens,
+        }
+    }
+
+    /// Run the policy engine pre-check if configured.
+    /// Returns `Some(GateResult)` if the policy engine blocks or modifies the check,
+    /// or `None` to proceed with normal gate logic.
+    fn run_policy_check(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
+        let policy_engine = self.policy_engine.as_ref()?;
+        let policy_ctx = self.to_policy_context(ctx);
+
+        match policy_engine.evaluate(&policy_ctx) {
+            PolicyResult::Proceed => None, // Policy allows — proceed with normal gate logic
+            PolicyResult::Interrupted { reason } => Some(GateResult::Interrupted { reason }),
+            PolicyResult::Pending => Some(GateResult::Pending),
+            PolicyResult::DryRun => Some(GateResult::DryRun),
+            PolicyResult::Revoked { reason } => Some(GateResult::Revoked { reason }),
+            PolicyResult::ContextExhausted { used, budget, remaining } => {
+                Some(GateResult::ContextExhausted { used, budget, remaining })
+            }
+            PolicyResult::OversizedFragment { actual, max } => {
+                Some(GateResult::OversizedFragment { actual, max })
+            }
+        }
+    }
+}
+
+impl<'a> ExecutionGate<'a> {
     pub fn with_risk_config(mut self, risk_config: RiskConfig) -> Self {
         self.risk_config = risk_config;
         self
@@ -47,6 +102,18 @@ impl<'a> ExecutionGate<'a> {
     /// 3. Interruptibility: allow the gate to return Interrupted instead of executing
     /// 4. Trust layer check: auto-execute only for trusted layers
     pub fn check(&self, ctx: GateContext<'_>) -> Result<GateResult, GuardDbError> {
+        // Policy engine pre-check (if configured).
+        // This runs before the existing gate logic and can short-circuit with a result.
+        if let Some(gate_result) = self.run_policy_check(&ctx) {
+            debug!(
+                action = %ctx.action_type,
+                policy_source = self.policy_engine.as_ref().map(|e| e.source_description()),
+                "Policy engine pre-check returned: {:?}",
+                gate_result
+            );
+            return Ok(gate_result);
+        }
+
         // 1. Dry-run check
         if self.dry_run {
             info!(
