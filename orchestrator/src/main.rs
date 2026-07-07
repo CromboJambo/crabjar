@@ -735,6 +735,12 @@ async fn execute_tool_call(
 
             let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
+            // Construct scope for this orchestrator instance
+            let actor_scope = crabjar_guard::Scope::project("orchestrator");
+            let target_scope = actor_scope.clone();
+            let cross_scope_auth =
+                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
             match gate.check(GateContext {
@@ -746,9 +752,9 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-sl"),
                 can_interrupt: true,
                 pid: None,
-                scope: None,
-                target_scope: None,
-        cross_scope_auth: None,
+                scope: Some(actor_scope.clone()),
+                target_scope: Some(target_scope.clone()),
+                cross_scope_auth,
                 domains: vec![],
                 context_budget: None,
                 context_fragment_tokens: None,
@@ -856,6 +862,12 @@ async fn execute_tool_call(
 
             let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
+            // Construct scope for this orchestrator instance
+            let actor_scope = crabjar_guard::Scope::project("orchestrator");
+            let target_scope = actor_scope.clone();
+            let cross_scope_auth =
+                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
             match gate.check(GateContext {
@@ -867,9 +879,9 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-re"),
                 can_interrupt: true,
                 pid: None,
-                scope: None,
-                target_scope: None,
-        cross_scope_auth: None,
+                scope: Some(actor_scope.clone()),
+                target_scope: Some(target_scope.clone()),
+                cross_scope_auth,
                 domains: vec![],
                 context_budget: None,
                 context_fragment_tokens: None,
@@ -970,6 +982,12 @@ async fn execute_tool_call(
 
             let gate = ExecutionGate::new(&guard_db, false, &guard_root);
 
+            // Construct scope for this orchestrator instance
+            let actor_scope = crabjar_guard::Scope::project("orchestrator");
+            let target_scope = actor_scope.clone();
+            let cross_scope_auth =
+                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
             match gate.check(GateContext {
@@ -981,9 +999,9 @@ async fn execute_tool_call(
                 source_event_id: Some("orchestrator-bs"),
                 can_interrupt: true,
                 pid: None,
-                scope: None,
-                target_scope: None,
-        cross_scope_auth: None,
+                scope: Some(actor_scope.clone()),
+                target_scope: Some(target_scope.clone()),
+                cross_scope_auth,
                 domains: vec![],
                 context_budget: None,
                 context_fragment_tokens: None,

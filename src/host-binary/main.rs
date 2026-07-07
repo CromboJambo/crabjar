@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand};
 use crabjar_host_agent::AgentLoop;
 use crabjar_host_core::{EventBus, HostConfig, PluginRegistry};
 use crabjar_host_observe::MetricsCollector;
+use crabjar_guard::Scope as GuardScope;
 use std::sync::Arc;
 
 #[derive(Parser, Debug)]
@@ -157,13 +158,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Tick => {
-            let mut loop_engine = AgentLoop::new(event_bus, metrics);
+            let mut loop_engine = AgentLoop::new(event_bus, metrics)
+                .with_scope(GuardScope::project("host"));
             loop_engine.start("Auto-tick objective");
             let result = loop_engine.tick().await?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Commands::Run { objective } => {
-            let mut loop_engine = AgentLoop::new(event_bus, metrics);
+            let mut loop_engine = AgentLoop::new(event_bus, metrics)
+                .with_scope(GuardScope::project("host"));
             loop_engine.start(&objective);
             println!("Running agent loop for: {}", objective);
 

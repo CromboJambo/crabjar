@@ -129,7 +129,8 @@ async fn run_tui(
                 KeyCode::Char('q') => running = false,
                 KeyCode::F(1) => {
                     // Start agent loop
-                    let mut loop_engine = AgentLoop::new(event_bus.clone(), metrics.clone());
+                    let mut loop_engine = AgentLoop::new(event_bus.clone(), metrics.clone())
+                        .with_scope(crabjar_guard::Scope::project("host"));
                     loop_engine.start("Mission Control tick");
                     let _ = loop_engine.tick().await;
                 }

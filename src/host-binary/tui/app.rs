@@ -322,7 +322,8 @@ impl App {
         let bus = std::sync::Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();
 
-        let mut loop_engine = AgentLoop::new(bus, metrics);
+        let mut loop_engine = AgentLoop::new(bus, metrics)
+            .with_scope(crabjar_guard::Scope::project("tui"));
         loop_engine.start(objective);
 
         self.messages.push(Message::Agent { text: format!("Starting: {}", objective) });
