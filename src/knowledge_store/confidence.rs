@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ConfidenceDefaults {
     pub note_confidence: f64,
     pub question_confidence: f64,
