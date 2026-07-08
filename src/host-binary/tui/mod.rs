@@ -10,6 +10,7 @@ mod session;
 pub mod terminal_panel;
 
 use app::{App, AppState};
+use crabjar_guard::GuardDb;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::DefaultTerminal;
@@ -20,6 +21,7 @@ use tokio::sync::mpsc;
 pub async fn run(
     objective: Option<&str>,
     session_id: Option<&str>,
+    guard_db: Option<GuardDb>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Setup terminal — use a wrapper to avoid move issues
     let mut stdout = io::stdout();
@@ -30,7 +32,7 @@ pub async fn run(
     let mut terminal = ratatui::Terminal::new(backend)?;
 
     // Run the TUI app (blocks until user quits)
-    let result = run_app(&mut terminal, objective, session_id).await;
+    let result = run_app(&mut terminal, objective, session_id, guard_db).await;
 
     // Restore terminal
     drop(terminal);
@@ -45,11 +47,12 @@ async fn run_app(
     terminal: &mut DefaultTerminal,
     initial_objective: Option<&str>,
     session_id: Option<&str>,
+    guard_db: Option<GuardDb>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (tx, mut rx) = mpsc::channel(64);
 
     // Build the app state
-    let mut app = App::new(initial_objective, session_id)?;
+    let mut app = App::new(initial_objective, session_id, guard_db)?;
 
     loop {
         terminal.draw(|frame| app.render(frame))?;
@@ -69,6 +72,16 @@ async fn run_app(
                         }
                     }
                     input::Action::Quit => break,
+                    input::Action::ApprovePending => {
+                        if let Err(e) = app.resolve_pending(true) {
+                            tracing::error!("Failed to approve pending action: {}", e);
+                        }
+                    }
+                    input::Action::RejectPending => {
+                        if let Err(e) = app.resolve_pending(false) {
+                            tracing::error!("Failed to reject pending action: {}", e);
+                        }
+                    }
                 }
             }
         }

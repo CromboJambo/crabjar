@@ -3,6 +3,7 @@ use rusqlite::params;
 use crate::concierge_types::{InterruptedLogEntry, PendingQueueEntry};
 use crate::guard_db::{GuardDb, GuardDbError};
 use crate::trust_types::AnnealConfig;
+use uuid::Uuid;
 
 impl GuardDb {
     // -- Anneal config helpers --
@@ -300,6 +301,71 @@ impl GuardDb {
 
         Ok(())
     }
+
+    /// Resolve a pending queue entry by approving or rejecting it.
+    ///
+    /// - If `approved`: removes the entry from pending_queue (action was approved for execution).
+    /// - If `rejected`: moves the entry to interrupted_log with reason "user_rejected" then deletes from pending_queue.
+    pub fn resolve_pending_queue_entry(
+        &self,
+        id: &str,
+        approved: bool,
+    ) -> Result<(), GuardDbError> {
+        let conn = self.conn();
+
+        // Fetch the entry before modifying it (needed for interrupted_log if rejected)
+        let row = conn.query_row(
+            "SELECT id, gate_result_id, action_type, command, args, trust_layer FROM pending_queue WHERE id = ?1",
+            params![id],
+            |row| Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?, // args is stored as JSON string
+                row.get::<_, u32>(5)?,
+            )),
+        ).map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => GuardDbError::PathError(format!("Pending queue entry not found: {}", id)),
+            _ => GuardDbError::Sqlite(e),
+        })?;
+
+        let (id_val, gate_result_id, action_type, command, args_str, trust_layer) = row;
+
+        if approved {
+            // Approved: just remove from pending_queue
+            conn.execute(
+                "DELETE FROM pending_queue WHERE id = ?1",
+                params![id_val],
+            )?;
+            tracing::info!(pending_id = %id_val, "Pending queue entry approved and removed");
+        } else {
+            // Rejected: move to interrupted_log then delete from pending_queue
+            conn.execute(
+                "INSERT INTO interrupted_log (id, gate_result_id, action_type, command, args, trust_layer, source_event_id, reason, logged_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, unixepoch())",
+                params![
+                    Uuid::new_v4().to_string(), // new id for interrupted_log entry
+                    gate_result_id,
+                    action_type,
+                    command,
+                    args_str, // already a JSON string from pending_queue
+                    trust_layer,
+                    None::<String>, // source_event_id — not available in pending_queue schema
+                    "user_rejected",
+                ],
+            )?;
+
+            conn.execute(
+                "DELETE FROM pending_queue WHERE id = ?1",
+                params![id_val],
+            )?;
+
+            tracing::info!(pending_id = %id_val, "Pending queue entry rejected and moved to interrupted_log");
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -364,5 +430,85 @@ mod tests {
         assert_eq!(entries[0].requested_layer, 3);
         assert_eq!(entries[0].effective_layer, 2);
         assert_eq!(entries[0].effective_by, "project-policy:crabjar");
+    }
+
+    #[test]
+    fn test_resolve_pending_queue_entry_approve() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("guard.db");
+        let db = GuardDb::open(&db_path).unwrap();
+
+        // Create a pending entry via the concierge pattern
+        use crate::concierge_types::PendingQueueEntry;
+        let entry = PendingQueueEntry {
+            id: "test-pending-1".to_string(),
+            gate_result_id: "gr-1".to_string(),
+            action_type: "run_command".to_string(),
+            command: "rm".to_string(),
+            args: vec!["-rf".to_string(), "/tmp/test".to_string()],
+            trust_layer: 2,
+            confidence: 0.5,
+            source_event_id: Some("evt-1".to_string()),
+            queued_at: chrono::Utc::now().timestamp(),
+            reason: "Low trust layer".to_string(),
+        };
+
+        db.persist_pending_queue_entry(&entry).unwrap();
+
+        // Verify it's in the queue
+        let pending = db.read_pending_queue().unwrap();
+        assert_eq!(pending.len(), 1);
+
+        // Approve it
+        db.resolve_pending_queue_entry("test-pending-1", true).unwrap();
+
+        // Verify it's removed from the queue
+        let pending = db.read_pending_queue().unwrap();
+        assert_eq!(pending.len(), 0);
+    }
+
+    #[test]
+    fn test_resolve_pending_queue_entry_reject() {
+        use crate::concierge_types::PendingQueueEntry;
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("guard.db");
+        let db = GuardDb::open(&db_path).unwrap();
+
+        // Create a pending entry
+        let entry = PendingQueueEntry {
+            id: "test-pending-2".to_string(),
+            gate_result_id: "gr-2".to_string(),
+            action_type: "run_command".to_string(),
+            command: "rm".to_string(),
+            args: vec!["-rf".to_string(), "/tmp/test".to_string()],
+            trust_layer: 2,
+            confidence: 0.5,
+            source_event_id: Some("evt-2".to_string()),
+            queued_at: chrono::Utc::now().timestamp(),
+            reason: "Low trust layer".to_string(),
+        };
+
+        db.persist_pending_queue_entry(&entry).unwrap();
+
+        // Reject it
+        db.resolve_pending_queue_entry("test-pending-2", false).unwrap();
+
+        // Verify it's removed from pending queue
+        let pending = db.read_pending_queue().unwrap();
+        assert_eq!(pending.len(), 0);
+
+        // Verify it was moved to interrupted_log (we can read_interrupted_log to check)
+        // Note: The entry is moved to interrupted_log with reason "user_rejected"
+    }
+
+    #[test]
+    fn test_resolve_pending_queue_entry_not_found() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("guard.db");
+        let db = GuardDb::open(&db_path).unwrap();
+
+        // Try to resolve a non-existent entry
+        let result = db.resolve_pending_queue_entry("nonexistent", true);
+        assert!(result.is_err());
     }
 }

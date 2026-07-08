@@ -144,7 +144,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Tui { objective, session } => {
             let obj = objective.as_deref();
             let sid = session.as_deref();
-            tui::run(obj, sid).await?;
+            // Initialize guard DB co-located with data directory
+            let guard_db_path = format!("{}/guard.db", cli.data_dir);
+            let guard_db = crabjar_guard::GuardDb::open(&guard_db_path).ok();
+            tui::run(obj, sid, guard_db).await?;
         }
         Commands::PluginList => {
             let plugins = plugin_registry.list().await;

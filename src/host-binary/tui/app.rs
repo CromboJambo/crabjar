@@ -5,6 +5,7 @@
 use super::input;
 use super::session::SessionStore;
 use super::terminal_panel::TerminalPanel;
+use crabjar_guard::GuardDb;
 use crabjar_host_agent::{AgentLoop, LoopResult};
 use crabjar_host_core::EventBus;
 use crabjar_host_observe::MetricsCollector;
@@ -20,8 +21,8 @@ pub enum AppState {
     Idle,
     /// Agent loop is running
     Running,
-    /// Waiting for guard approval
-    AwaitingApproval(String),
+    /// Waiting for guard approval — holds pending entry ID and action description
+    AwaitingApproval { id: String, action_desc: String },
     /// Error occurred
     Error(String),
 }
@@ -51,6 +52,8 @@ pub struct App {
     pub current_session_id: Option<String>,
     /// Terminal panel for displaying agent terminal sessions
     pub terminal_panel: Option<TerminalPanel>,
+    /// Guard database for pending queue operations
+    pub guard_db: Option<GuardDb>,
 }
 
 impl App {
@@ -58,6 +61,7 @@ impl App {
     pub fn new(
         initial_objective: Option<&str>,
         session_id: Option<&str>,
+        guard_db: Option<GuardDb>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut app = Self {
             state: AppState::Idle,
@@ -67,6 +71,7 @@ impl App {
             session_store: None,
             current_session_id: None,
             terminal_panel: None,
+            guard_db,
         };
 
         // Initialize session store if data directory exists
@@ -116,6 +121,19 @@ impl App {
         match event {
             crossterm::event::Event::Key(key) => {
                 use crossterm::event::KeyCode;
+
+                // Handle guard approval shortcuts when awaiting approval
+                if let AppState::AwaitingApproval { .. } = self.state {
+                    match key.code {
+                        KeyCode::Char('a') | KeyCode::Char('A') => {
+                            return Ok(Some(input::Action::ApprovePending));
+                        }
+                        KeyCode::Char('r') | KeyCode::Char('R') => {
+                            return Ok(Some(input::Action::RejectPending));
+                        }
+                        _ => {} // fall through to normal input handling below
+                    }
+                }
 
                 match key.code {
                     // Enter: submit input
@@ -205,7 +223,9 @@ impl App {
         let title = match &self.state {
             AppState::Idle => Cow::Borrowed("CrabJar Agent — Ready"),
             AppState::Running => Cow::Borrowed("CrabJar Agent — Running..."),
-            AppState::AwaitingApproval(_) => Cow::Borrowed("CrabJar Agent — Awaiting Approval"),
+            AppState::AwaitingApproval { action_desc, .. } => {
+                Cow::Owned(format!("CrabJar Agent — Awaiting Approval: {}", action_desc))
+            }
             AppState::Error(e) => Cow::Owned(format!("CrabJar Agent — Error: {}", e)),
         };
 
@@ -280,8 +300,11 @@ impl App {
         let status_text: Cow<'_, str> = match &self.state {
             AppState::Idle => Cow::Borrowed(" Enter your request below "),
             AppState::Running => Cow::Borrowed(" Agent is working... "),
-            AppState::AwaitingApproval(action) => {
-                Cow::Owned(format!(" Guard pending: {} [approve/reject] ", action))
+            AppState::AwaitingApproval { id: _, action_desc } => {
+                Cow::Owned(format!(
+                    " Guard pending: {} [a=approve / r=reject] ",
+                    action_desc
+                ))
             }
             AppState::Error(_) => Cow::Borrowed(" Error occurred "),
         };
@@ -310,6 +333,30 @@ impl App {
             _ => {}
         }
         self.state = state;
+    }
+
+    /// Resolve a pending guard action by approving or rejecting it.
+    pub fn resolve_pending(&mut self, approved: bool) -> Result<(), Box<dyn std::error::Error>> {
+        // Extract the pending entry ID from current state
+        let (id, action_desc) = match &self.state {
+            AppState::AwaitingApproval { id, action_desc } => (id.clone(), action_desc.clone()),
+            _ => return Err("Not in AwaitingApproval state".into()),
+        };
+
+        // Resolve via GuardDb if available
+        if let Some(ref db) = self.guard_db {
+            db.resolve_pending_queue_entry(&id, approved)?;
+        }
+
+        // Update state and message
+        let decision = if approved { "approved" } else { "rejected" };
+        self.messages.push(Message::Guard {
+            action: format!("{} (user {})", action_desc, decision),
+            pending: false,
+        });
+        self.state = AppState::Idle;
+
+        Ok(())
     }
 
     /// Run the agent loop with the given objective.
@@ -365,6 +412,40 @@ impl App {
                     self.messages.push(Message::Agent { text: format!("Loop error: {}", e) });
                     tx.send(AppState::Error(e.to_string())).await?;
                     break;
+                }
+            }
+
+            // Check for pending guard actions and surface them to the user
+            if let Some(ref db) = self.guard_db {
+                if let Ok(pending_entries) = db.read_pending_queue() {
+                    if !pending_entries.is_empty() {
+                        // Surface the first pending entry as a guard message
+                        let entry = &pending_entries[0];
+                        let action_desc = format!(
+                            "{} {} {}",
+                            entry.command,
+                            entry.args.join(" "),
+                            if entry.reason.len() > 40 {
+                                &entry.reason[..40]
+                            } else {
+                                &entry.reason
+                            }
+                        );
+
+                        self.messages.push(Message::Guard {
+                            action: format!("{} (pending review)", action_desc),
+                            pending: true,
+                        });
+
+                        // Set state to awaiting approval — user must approve/reject before continuing
+                        tx.send(AppState::AwaitingApproval {
+                            id: entry.id.clone(),
+                            action_desc: action_desc.clone(),
+                        }).await?;
+
+                        // Break out of the loop — wait for user input via keyboard shortcuts
+                        break;
+                    }
                 }
             }
 

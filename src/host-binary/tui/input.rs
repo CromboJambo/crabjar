@@ -9,4 +9,8 @@ pub enum Action {
     Submit(String),
     /// Quit the application
     Quit,
+    /// Approve a pending guard action (key: 'a')
+    ApprovePending,
+    /// Reject a pending guard action (key: 'r')
+    RejectPending,
 }

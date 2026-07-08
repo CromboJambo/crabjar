@@ -9,30 +9,31 @@
 | Metric | Value |
 |---|---|
 | **Workspace members** | 24 crates (added `crates/terminal`, `file_search`, `crabjar-plugin`) |
-| **Tests** | ~149+ passing, 0 failing (all pre-existing cli.rs failures resolved) |
-| **Clippy** | ⚠️ Warnings only (unused imports/variables), no blocking errors |
-| **Architecture crate** | ✅ Built, compiles, has integration test |
-| **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
-| **Per-crate AGENTS.md** | ✅ Complete (all 24 crates documented) |
-| **lm_studio_client** | ✅ Modularized into 6 files with unit tests |
-| **fingerprint approvals** | ✅ Implemented (InvocationFingerprint + ApprovalLease) |
-| **CrossScopeAuth** | ✅ Implemented with expiry and scope resolution |
-| **ContextFragment** | ✅ Implemented in memory/ with P0 alert threshold |
-| **Audit trail** | ✅ TrustResolution.audit_log() records derivation chain |
-| **Guard module size** | ✅ Split 5 modules (trust, gate, fingerprint, concierge, trust_resolution) — all under 500 LoC |
-| **Context budgeting** | ✅ Enforced in ExecutionGate step 10: per-fragment hard cap + cumulative budget check |
-| **Oversized fragment handling** | ✅ Gate rejects fragments >10K tokens; Zed ACP server handles oversized responses |
-| **Metrics reporting** | ✅ `crabjar metrics` CLI subcommand with test count, LoC, workspace stats |
-| **Domain allowlisting** | ✅ Implemented in guard/ with trust-layer enforcement + network domain tracking |
-| **Reproducible builds** | ✅ `just reproducible-build` target with locked deps and deterministic flags |
-| **Agent loop (ReAct)** | ✅ Full ReAct loop engine with model routing, context compression, decision gating |
-| **Tool registry wiring** | ✅ Fully wired into crabjar binary, orchestrator, host-agent, and CLI |
-| **Pre-commit hooks** | ✅ `.pre-commit-config.yaml` with cargo check, clippy (-D warnings), module-sizes-check (500 LoC rule), architecture boundaries (8-layer model) |
-| **Cargo-declared drift audit** | ✅ Cron job every 6h tracking declared/compiled/delta counts + trend analysis |
-| **Conversational TUI** | ✅ Implemented in `host-binary/tui/` — ratatui-based interactive chat with session persistence, message history, scrollback, guard approval display |
-| **TUI Terminal Panel** | ✅ Implemented in `tui/terminal_panel.rs` — wraps `crabjar-terminal` for live terminal view within TUI; graceful degradation when wezterm/zellij unavailable via `TerminalPanel::try_new()` returning `Option<Self>` |
-| **Snapshot Testing (insta)** | ✅ Implemented in `tests/snapshot_tests.rs` — 6 tests covering CLI JSON output format (`state list`, `workspace status`, `doctor check`, `tool list`, `guard queue`) and TUI message serialization; baselines committed to `tests/snapshots/` |
-| **TUI Session Store** | ✅ SQLite-backed session persistence (`tui/session.rs`) — create/load/save sessions, message serialization |
+| **Tests** | ~152+ passing, 0 failing (all pre-existing cli.rs failures resolved + 3 new resolve_pending_queue_entry tests) |
+|| **Clippy** | ⚠️ Warnings only (unused imports/variables), no blocking errors |
+|| **Architecture crate** | ✅ Built, compiles, has integration test |
+|| **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
+|| **Per-crate AGENTS.md** | ✅ Complete (all 24 crates documented) |
+|| **lm_studio_client** | ✅ Modularized into 6 files with unit tests |
+|| **fingerprint approvals** | ✅ Implemented (InvocationFingerprint + ApprovalLease) |
+|| **CrossScopeAuth** | ✅ Implemented with expiry and scope resolution |
+|| **ContextFragment** | ✅ Implemented in memory/ with P0 alert threshold |
+|| **Audit trail** | ✅ TrustResolution.audit_log() records derivation chain |
+|| **Guard module size** | ✅ Split 5 modules (trust, gate, fingerprint, concierge, trust_resolution) — all under 500 LoC |
+|| **Context budgeting** | ✅ Enforced in ExecutionGate step 10: per-fragment hard cap + cumulative budget check |
+|| **Oversized fragment handling** | ✅ Gate rejects fragments >10K tokens; Zed ACP server handles oversized responses |
+|| **Metrics reporting** | ✅ `crabjar metrics` CLI subcommand with test count, LoC, workspace stats |
+|| **Domain allowlisting** | ✅ Implemented in guard/ with trust-layer enforcement + network domain tracking |
+|| **Reproducible builds** | ✅ `just reproducible-build` target with locked deps and deterministic flags |
+|| **Agent loop (ReAct)** | ✅ Full ReAct loop engine with model routing, context compression, decision gating |
+|| **Tool registry wiring** | ✅ Fully wired into crabjar binary, orchestrator, host-agent, and CLI |
+|| **Pre-commit hooks** | ✅ `.pre-commit-config.yaml` with cargo check, clippy (-D warnings), module-sizes-check (500 LoC rule), architecture boundaries (8-layer model) |
+|| **Cargo-declared drift audit** | ✅ Cron job every 6h tracking declared/compiled/delta counts + trend analysis |
+|| **Conversational TUI** | ✅ Implemented in `host-binary/tui/` — ratatui-based interactive chat with session persistence, message history, scrollback, guard approval display |
+|| **TUI Terminal Panel** | ✅ Implemented in `tui/terminal_panel.rs` — wraps `crabjar-terminal` for live terminal view within TUI; graceful degradation when wezterm/zellij unavailable via `TerminalPanel::try_new()` returning `Option<Self>` |
+|| **Snapshot Testing (insta)** | ✅ Implemented in `tests/snapshot_tests.rs` — 6 tests covering CLI JSON output format (`state list`, `workspace status`, `doctor check`, `tool list`, `guard queue`) and TUI message serialization; baselines committed to `tests/snapshots/` |
+|| **TUI Session Store** | ✅ SQLite-backed session persistence (`tui/session.rs`) — create/load/save sessions, message serialization |
+|| **TUI Guard Approval Flow** | ✅ Implemented in `host-binary/tui/` — keyboard shortcuts ('a'/'r') for approve/reject pending guard actions, `resolve_pending_queue_entry()` DB method, agent loop surfaces pending queue entries and pauses for user input |
 
 ---
 
@@ -668,13 +669,31 @@ CrossScopeAuth is now wired across all execution paths — CLI, orchestrator, ho
 
 **Why this matters:** Without scope injection, cross-scope authorization cannot be enforced in orchestrator and host-agent paths. All gate checks now carry proper `scope` + `target_scope` + `cross_scope_auth` fields, enabling the guard's scope isolation logic to function correctly across all execution entry points.
 
-### 13.4 TUI Guard Approval Flow ❌ NOT STARTED
+### 13.4 TUI Guard Approval Flow ✅ DONE
 
-The TUI displays `AppState::AwaitingApproval` but has no mechanism for the user to approve/reject pending guard actions from the terminal UI.
+**Status:** Implemented in `host-binary/tui/` — keyboard shortcuts ('a'/'r') for approve/reject pending guard actions, `resolve_pending_queue_entry()` DB method, agent loop surfaces pending queue entries and pauses for user input.
 
-- [ ] Add keyboard shortcuts in TUI input handler (e.g., 'a' = approve, 'r' = reject)
-- [ ] Wire approval/rejection through to GuardDb
-- [ ] Update status bar with actionable prompt when guard is pending
+- [x] Add keyboard shortcuts in TUI input handler (`'a'` = approve, `'r'` = reject)
+  - Modified `handle_input()` to check for 'a'/'r' keys when state is `AwaitingApproval`
+  - Added `ApprovePending` and `RejectPending` variants to `Action` enum in `input.rs`
+- [x] Wire approval/rejection through to GuardDb
+  - Implemented `resolve_pending_queue_entry(id, approved: bool)` in `GuardDb` (guard_db_impl.rs)
+  - Approve: removes entry from pending_queue
+  - Reject: moves entry to interrupted_log with reason "user_rejected", then deletes from pending_queue
+  - Added `uuid::Uuid` import for generating new IDs when moving entries
+- [x] Update status bar with actionable prompt when guard is pending
+  - Changed `AppState::AwaitingApproval(String)` → `AppState::AwaitingApproval { id: String, action_desc: String }` to store entry ID and description
+  - Status bar shows `" Guard pending: {} [a=approve / r=reject] "` with the action description
+  - Title bar updates to show `"CrabJar Agent — Awaiting Approval: <action>"`
+
+**New files modified:**
+- `guard/src/guard_db_impl.rs`: Added `resolve_pending_queue_entry()` method + 3 unit tests
+- `src/host-binary/tui/input.rs`: Added `ApprovePending` and `RejectPending` to Action enum
+- `src/host-binary/tui/app.rs`: Updated AppState variant, added keyboard shortcuts in handle_input(), added resolve_pending() method, wired pending queue check into agent loop
+- `src/host-binary/tui/mod.rs`: Updated run() signature to accept guard_db, wired ApprovePending/RejectPending actions in event loop
+- `src/host-binary/main.rs`: Creates GuardDb and passes it to tui::run()
+
+**Tests:** 3 new unit tests added (approve, reject, not_found) — all passing. Full workspace test suite: ~152+ passing, 0 failing.
 
 ### 13.5 CI Integration ❌ NOT STARTED
 
