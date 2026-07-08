@@ -4,7 +4,7 @@
 
 use super::app::Message;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 /// A single conversation session.
