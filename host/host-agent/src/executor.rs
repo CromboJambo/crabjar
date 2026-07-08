@@ -74,9 +74,10 @@ impl TaskExecutor {
         let tool_args = if parts.len() > 1 { &parts[1..] } else { &[] };
 
         // Check tool registry for the tool
-        let project_root = std::env::current_dir()
-            .ok()
-            .or_else(|_| std::env::var("CRABJAR_ROOT").ok().map(std::path::PathBuf::from));
+        let project_root = std::env::var("CRABJAR_ROOT")
+            .map(std::path::PathBuf::from)
+            .or_else(|_| std::env::current_dir())
+            .unwrap_or_default();
         let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
 
         if !tool_registry_path.exists() {
