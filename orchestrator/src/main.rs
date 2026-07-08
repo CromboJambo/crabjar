@@ -477,9 +477,10 @@ async fn execute_tool_call(
     store: Arc<std::sync::Mutex<Store>>,
 ) -> Result<String, String> {
     // --- Attempt tool registry resolution first ---
-    let project_root = std::env::current_dir()
-        .ok()
-        .unwrap_or_else(|| std::path::PathBuf::from("/home/crombo/crabjar"));
+    let project_root = std::env::var("CRABJAR_ROOT")
+        .map(std::path::PathBuf::from)
+        .or_else(|_| std::env::current_dir())
+        .unwrap_or_default();
     let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
 
     // All sync work before any await (Connection is not Send)
@@ -556,7 +557,9 @@ async fn execute_tool_call(
 
             // Security layer: check command before execution with provenance.
             let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
+                .unwrap_or_else(|_| {
+                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+                });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/mirror.db", guard_root),
@@ -723,7 +726,9 @@ async fn execute_tool_call(
         "search_logs" => {
             // Security layer: check command before execution with provenance.
             let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| "/home/crombo/mirror-lab".to_string());
+                .unwrap_or_else(|_| {
+                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+                });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/mirror.db", guard_root),
@@ -850,7 +855,9 @@ async fn execute_tool_call(
         "recent_events" => {
             // Security layer: check command before execution with provenance.
             let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
+                .unwrap_or_else(|_| {
+                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+                });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/guard.db", guard_root),
@@ -970,7 +977,9 @@ async fn execute_tool_call(
         "by_source" => {
             // Security layer: check command before execution with provenance.
             let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
+                .unwrap_or_else(|_| {
+                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+                });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/guard.db", guard_root),
@@ -1230,12 +1239,17 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     // Database configuration — mirror-lab paths are optional overrides
+    let crabjar_root = std::env::var("CRABJAR_ROOT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
     let knowledge_db_path = std::env::var("KNOWLEDGE_DB_PATH")
-        .unwrap_or_else(|_| "/home/crombo/crabjar/memory/knowledge.db".to_string());
+        .unwrap_or_else(|| format!("{}/memory/knowledge.db", crabjar_root.display()));
     let events_db_path = std::env::var("MIRROR_LOG_DB_PATH")
-        .unwrap_or_else(|_| "/home/crombo/crabjar/memory/events.db".to_string());
-    let guard_root =
-        std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| "/home/crombo/crabjar".to_string());
+        .unwrap_or_else(|| format!("{}/memory/events.db", crabjar_root.display()));
+    let guard_root = std::env::var("MIRROR_GUARD_ROOT")
+        .unwrap_or_else(|_| {
+            std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+        });
 
     // Initialize knowledge store schema
     let kconn = rusqlite::Connection::open(&knowledge_db_path)

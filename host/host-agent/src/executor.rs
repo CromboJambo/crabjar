@@ -76,7 +76,7 @@ impl TaskExecutor {
         // Check tool registry for the tool
         let project_root = std::env::current_dir()
             .ok()
-            .unwrap_or_else(|| std::path::PathBuf::from("/home/crombo/crabjar"));
+            .or_else(|_| std::env::var("CRABJAR_ROOT").ok().map(std::path::PathBuf::from));
         let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
 
         if !tool_registry_path.exists() {

@@ -65,7 +65,7 @@ do_run() {
     # Set clean environment — no persistent state
     env -i \
         HOME="$TEMP_HOME" \
-        PATH="/usr/local/bin:/usr/bin:/bin:/home/crombo/.local/bin" \
+        PATH="/usr/local/bin:/usr/bin:/bin:${HOME:-.}/.local/bin" \
         SHELL="/bin/bash" \
         HISTSIZE=0 \
         HISTFILESIZE=0 \

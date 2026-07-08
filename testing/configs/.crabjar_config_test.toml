@@ -5,7 +5,7 @@ tool_execution_enabled = true
 auto_register = true
 
 [[tools]]
-path = "/home/crombo/.cargo/bin/cargo-oxide"
+path = "${CARGO_OXIDE_PATH:-$HOME/.cargo/bin/cargo-oxide}"
 commands = ["run", "build", "pipeline", "debug", "doctor"]
 
 [[tools]]

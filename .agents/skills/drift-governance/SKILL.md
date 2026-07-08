@@ -128,7 +128,7 @@ Replaces `ReversibilityScore` (single-point worst-case) with bounded set.
 Filesystem vs project_map discrepancy analysis. Run before reading project_map.md.
 
 ```bash
-bash /home/crombo/crabjar/.agents/skills/drift-governance/scripts/fs_audit.sh
+bash "$CRABJAR_ROOT/.agents/skills/drift-governance/scripts/fs_audit.sh"
 ```
 
 ### `scripts/perturbation_compute.sh`
@@ -136,7 +136,7 @@ bash /home/crombo/crabjar/.agents/skills/drift-governance/scripts/fs_audit.sh
 Compute bounded perturbation set for a given action.
 
 ```bash
-bash /home/crombo/crabjar/.agents/skills/drift-governance/scripts/perturbation_compute.sh
+bash "$CRABJAR_ROOT/.agents/skills/drift-governance/scripts/perturbation_compute.sh"
 ```
 
 ---

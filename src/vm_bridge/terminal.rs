@@ -21,7 +21,7 @@ impl TerminalMultiplexer {
             Self::Wezterm => {
                 // Create wezterm session
                 let output = tokio::process::Command::new("wezterm")
-                    .args(&["start", "--", "bash", "-c", f"tmux new-session -d -s {name} && tmux send-keys -t {name} 'cd /home/crombo/projects/crabjar && cargo run' Enter"])
+                    .args(&["start", "--", "bash", "-c", f"tmux new-session -d -s {name} && tmux send-keys -t {name} 'cd "${CRABJAR_ROOT:-.}" && cargo run' Enter"])
                     .output()
                     .await?;
                 
@@ -32,7 +32,7 @@ impl TerminalMultiplexer {
             Self::Zellij => {
                 // Create zellij session
                 let output = tokio::process::Command::new("zellij")
-                    .args(&["new-session", "-s", name, "--", "bash", "-c", f"cd /home/crombo/projects/crabjar && cargo run"])
+                    .args(&["new-session", "-s", name, "--", "bash", "-c", f"cd "${CRABJAR_ROOT:-.}" && cargo run"])
                     .output()
                     .await?;
                 

@@ -33,7 +33,7 @@
   ],
   "windowKeyByProjectPathEntries": [
     {
-      "projectPath": "/home/crombo/.lmstudio",
+      "projectPath": "${LMSTUDIO_CONFIG_DIR:-$HOME/.lmstudio}",
       "windowKey": "window-1"
     }
   ]

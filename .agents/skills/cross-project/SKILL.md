@@ -19,9 +19,9 @@ for version-controlled changes.
 
 | Project | Path | Key Files |
 |---------|------|-----------|
-| LinuxFromCrates | `/home/crombo/LinuxFromCrates/` | `AGENTS.md`, `agent_config.md`, `lfc.toml`, `Justfile` |
-| .dotfiles | `/home/crombo/.dotfiles/` | `AGENTS.md`, `environment_manifest.json`, `state-docs/`, `symlinks/` |
-| llm-workspace | `/home/crombo/projects/llm-workspace/` | `AGENTS.md`, `ROADMAP.md`, `llmrunner.md`, `rust-toolchain.toml` |
+| LinuxFromCrates | `${LFC_ROOT:-$HOME/LinuxFromCrates}/` | `AGENTS.md`, `agent_config.md`, `lfc.toml`, `Justfile` |
+| .dotfiles | `${DOTFILES_ROOT:-$HOME/.dotfiles}/` | `AGENTS.md`, `environment_manifest.json`, `state-docs/`, `symlinks/` |
+| llm-workspace | `${LLM_WORKSPACE_ROOT:-$HOME/projects/llm-workspace}/` | `AGENTS.md`, `ROADMAP.md`, `llmrunner.md`, `rust-toolchain.toml` |
 
 ## Access Control
 
@@ -40,10 +40,10 @@ Edit `opencode.json` and add the external project's rule/config files:
 ```json
 {
   "instruction_paths": [
-    "/home/crombo/LinuxFromCrates/AGENTS.md",
-    "/home/crombo/LinuxFromCrates/agent_config.md",
-    "/home/crombo/.dotfiles/AGENTS.md",
-    "/home/crombo/.dotfiles/environment_manifest.json"
+    "${LFC_ROOT:-$HOME/LinuxFromCrates}/AGENTS.md",
+    "${LFC_ROOT:-$HOME/LinuxFromCrates}/agent_config.md",
+    "${DOTFILES_ROOT:-$HOME/.dotfiles}/AGENTS.md",
+    "${DOTFILES_ROOT:-$HOME/.dotfiles}/environment_manifest.json"
   ]
 }
 ```
@@ -57,8 +57,8 @@ Add an entry to `~/.dotfiles/manifest/graph.toml` and run `symlink-apply.sh`:
 ```toml
 [[entries]]
 name = "lfc-rules"
-source = "/home/crombo/LinuxFromCrates/AGENTS.md"
-dest = "/home/crombo/.config/opencode/lfc-rules.md"
+source = "${LFC_ROOT:-$HOME/LinuxFromCrates}/AGENTS.md"
+dest = "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/lfc-rules.md"
 type = "immutable"
 notes = "LinuxFromCrates agent rules"
 ```
@@ -75,7 +75,7 @@ For rules that should apply to all sessions across all projects:
 
 ```json
 {
-  "global_rules_path": "/home/crombo/.config/opencode/cross-project-rules.md"
+  "global_rules_path": "${XDG_CONFIG_HOME:-$HOME/.config}/opencode/cross-project-rules.md"
 }
 ```
 
@@ -106,7 +106,7 @@ External projects can be modified through a gated workflow:
 {
   "sandbox_mode": "workspace-write",
   "approval_required": true,
-  "apply_to": ["/home/crombo/LinuxFromCrates/", "/home/crombo/.dotfiles/"]
+  "apply_to": ["${LFC_ROOT:-$HOME/LinuxFromCrates}/", "${DOTFILES_ROOT:-$HOME/.dotfiles}/"]
 }
 ```
 
