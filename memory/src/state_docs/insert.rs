@@ -11,7 +11,7 @@ pub fn insert_doc_metadata(
     doc_path: &Path,
     metadata: &DocMetadata,
 ) -> Result<(), crate::Error> {
-    let path = doc_path.to_string_lossy().to_string();
+    let _path = doc_path.to_string_lossy().to_string();
     conn.execute(
         "INSERT OR REPLACE INTO doc_metadata (doc_name, description, last_modified, line_count, checksum) VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
