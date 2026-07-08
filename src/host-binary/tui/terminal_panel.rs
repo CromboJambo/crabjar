@@ -2,7 +2,7 @@
 //!
 //! Wraps `crabjar-terminal` to provide a live terminal view within the ratatui UI.
 
-use crabjar_terminal::{TerminalBackend, TerminalManager, TerminalSession};
+use crabjar_terminal::{TerminalManager, TerminalSession};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
@@ -30,6 +30,7 @@ impl Default for TerminalPanelConfig {
 }
 
 /// A terminal panel that displays a crabjar-terminal session.
+#[allow(dead_code)]
 pub struct TerminalPanel {
     /// Configuration for this panel
     config: TerminalPanelConfig,
@@ -39,6 +40,7 @@ pub struct TerminalPanel {
     output_buffer: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl TerminalPanel {
     /// Create a new terminal panel with the given configuration.
     /// Returns `None` if no terminal backend is available (wezterm/zellij not installed).
