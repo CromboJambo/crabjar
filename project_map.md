@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: June 28 2026
+> Generated: July 8 2026
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -118,7 +118,10 @@ crabjar/
 │       ├── memory_types.rs  # NodeKind, MemoryNode, EdgeRelation, MemoryEdge
 │       ├── command_risk.rs  # CommandRisk, HIGH/MEDIUM_RISK_COMMANDS
 │       ├── risk_config.rs   # RiskConfig
-│       └── domain_allowlist.rs  # Domain allowlist for web fetch scope gating
+│       ├── domain_allowlist.rs  # Domain allowlist for web fetch scope gating
+│       ├── policy.rs        # StaticPolicyEngine (TOML-based declarative policies)
+│       ├── policy_types.rs  # PolicyRule, PolicyCheck types
+│       └── context_budget.rs # ContextBudget + MAX_TOKENS_PER_FRAGMENT
 ├── telemetry/               # Flight recorder, command executor
 │   ├── Cargo.toml
 │   └── src/
@@ -209,6 +212,9 @@ crabjar/
 │       ├── verifier.rs
 │       ├── reflector.rs
 │       ├── work_item_store.rs
+│       ├── model_routing.rs  # ModelRouter with LoopPhase enum, phase-specific backends
+│       ├── context_compression.rs # ContextCompressor with token budget enforcement
+│       ├── decision_gate.rs  # DecisionGate (ToolCall/RespondDirectly/Defer)
 │       └── inference/
 │           ├── mod.rs
 │           ├── backend.rs
@@ -343,7 +349,7 @@ crabjar/
 
 ### 2.3 Workspace Members
 
-Declared in Cargo.toml `[workspace.members]`:
+Declared in Cargo.toml `[workspace.members]`: 24 crates total.
 - **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
 - **Plugin system**: `crabjar-plugin` (WASM runtime, lifecycle management)
 - **File search**: `file_search` (BM25 indexing with Tantivy 0.22)
@@ -353,60 +359,34 @@ Declared in Cargo.toml `[workspace.members]`:
 - **Binary**: `src/host-binary`
 - **Skills**: `src/skill-script-runner`, `src/skill-reference-store`
 - **Zed ACP**: `zed-acp-bridge`, `zed-acp-server`
+- **ADR process**: `specs/` (Architecture Decision Records, Nygard-style templates)
 
 ### 2.4 Shared Dependencies
 
 Declared in Cargo.toml `[workspace.dependencies]`:
-- async-trait (0.1)
-- futures (0.3)
-- tokio (1.51.1, full)
-- tokio-stream (0.1, time)
-- serde (1.0, derive)
-- serde_json (1.0)
-- toml (0.8)
-- thiserror (2.0)
-- anyhow (1.0)
+- async-trait (0.1), futures (0.3), tokio (1.51.1, full), tokio-stream (0.1, time)
+- serde (1.0, derive), serde_json (1.0), toml (0.8)
+- thiserror (2.0), anyhow (1.0)
 - rusqlite (0.37, bundled)
-- clap (4.5, derive, env)
-- clap_mangen (0.2)
-- crossterm (0.28)
-- ratatui (0.30)
-- tauri (2), tauri-plugin-notification (2), tauri-plugin-shell (2), tauri-plugin-tray (2)
-- libnotify (1.0)
-- arboard (3)
-- keyring (3)
+- clap (4.5, derive, env), clap_mangen (0.2)
+- crossterm (0.28), ratatui (0.30)
+- tauri (2) + plugins: notification, shell, tray
+- libnotify (1.0), arboard (3), keyring (3)
 - rumqttc (0.24)
-- uuid (1.23.0, v4, serde)
-- chrono (0.4.38, serde, now)
-- tempfile (3.24.0)
-- reqwest (0.13.2, json, stream)
-- axum (0.8, http1, tokio)
-- tower-http (0.5, cors)
-- futures-util (0.3)
-- tracing (0.1)
-- tracing-subscriber (0.3, env-filter)
-- tracing-appender (0.2)
-- tracing-error (0.2)
+- uuid (1.23.0, v4, serde), chrono (0.4.38, serde, now), tempfile (3.24.0)
+- reqwest (0.13.2, json, stream), axum (0.8, http1, tokio), tower-http (0.5, cors)
+- tracing (0.1) + subscriber (env-filter), appender (0.2), error (0.2)
 - cargo-declared (0.1.3)
-- ignore (0.4)
-- path-absolutize (3.1)
-- sha2 (0.10)
-- hex (0.4)
-- which (7)
-- dirs (6.0)
-- base64 (0.22)
-- zed_extension_api (0.2)
-- tiktoken-rs (0.11.0)
-- rstest (0.26.1)
-- serial_test (3.2.0)
+- ignore (0.4), path-absolutize (3.1), sha2 (0.10), hex (0.4)
+- which (7), dirs (6.0), base64 (0.22)
+- zed_extension_api (0.2), tiktoken-rs (0.11.0)
+- rstest (0.26.1), serial_test (3.2.0)
 
-### 2.5 Release Profile
+### 2.5 Profiles
 
-inherits = "release", debug = 2, opt-level = 3, lto = true, strip = true
-
-### 2.6 Dev Profile
-
-debug = true
+**Release**: inherits release, opt-level=3, lto=true, strip=true
+**Profiling**: inherits release, debug=2
+**Dev**: debug=true
 
 ---
 
@@ -417,11 +397,17 @@ debug = true
 | `just check` | cargo check --workspace |
 | `just build` | cargo build -p crabjar |
 | `just run state list` | runs binary with replaceable arguments |
-| `just test` | cargo test --workspace |
+| `just test` | cargo test --workspace (691 tests passing) |
 | `just clean` | removes build artifacts |
 | `cargo clippy --workspace -- -D warnings` | lint; warnings treated as errors |
 | `cargo fmt --all` | auto-format every crate |
 | `cargo fmt --all -- --check` | CI formatting gate |
+| `just module-sizes` | report modules exceeding 500 LoC threshold |
+| `just module-sizes-check` | CI gate — fails on >500 LoC |
+| `just reproducible-build` | locked deps + deterministic flags |
+
+**Version:** 0.12.0 (Rust 2024 edition)
+**Total tests:** 691 passing across workspace, 0 failing
 
 ---
 
@@ -485,6 +471,7 @@ debug = true
 | `crabjar exec --command <cmd> --reason <id>` | **end-to-end** | request → guard → concierge → telemetry → outcome → trust update |
 | `crabjar bitwarden status/list/get/search/generate` | wired | CLI-available gate |
 | `crabjar doctor check` | wired | Checks guard.db/flight.db/knowledge.db schema |
+| `crabjar metrics` | wired | Test count, LoC per crate, total modules, workspace member count |
 
 ### 6.2 `crabjar exec` Pipeline
 
@@ -603,33 +590,36 @@ Every derived output must include a `doubt` block with:
 crabjar contains:
 - agent_config.md
 - AGENTS.md
-- Cargo.toml (workspace root + crabjar binary manifest)
+- Cargo.toml (workspace root + crabjar binary manifest, version 0.12.0)
 - Justfile
 - Containerfile, Dockerfile
-- orchestrator (Axum SSE server + unified LM client)
-- guard (ExecutionGate + GateConcierge + TrustManager + annealing + scope isolation + fingerprint approvals + trust resolution)
-- memory (agent-context crate with state_docs querier)
+- orchestrator (Axum SSE server + unified LM client with prompt envelope defense)
+- guard (ExecutionGate + GateConcierge + TrustManager + annealing + scope isolation + fingerprint approvals + trust resolution + static policy engine + context budgeting + domain allowlist)
+- memory (agent-context crate with state_docs querier, context fragments with token budget)
 - telemetry (flight recorder + command executor)
 - sandbox (agent isolation)
-- tool_registry (MCP tool registry)
-- crabjar-architecture (mechanical dependency boundary enforcement)
+- tool_registry (MCP tool registry with 4-layer discovery)
+- crabjar-architecture (mechanical dependency boundary enforcement, 8-layer model)
 - file_search (BM25-based file indexing with Tantivy 0.22)
-- crabjar-plugin (WASM runtime, lifecycle management)
+- crabjar-plugin (WASM runtime, lifecycle management — stub)
 - host/ (8 host crates: core, system, observe, agent, webview, mqtt, graph, screen)
 - apps/teams (Teams plugin)
 - zed-acp-bridge (Wasm extension)
 - zed-acp-server (stdio JSON-RPC server)
 - axum-mux (vm-bridge)
+- crates/terminal (wezterm/zellij backends + asciinema v2 recording)
 - .agents/skills/ (32 agent skills)
 - .agents/references/ (may be empty)
 - src/vm_bridge/ (per-VM websocket relay)
 - src/bitwarden/ (bitwarden CLI integration)
-- src/knowledge_store/ (knowledge store commands)
+- src/knowledge_store/ (knowledge store commands with bridge + confidence)
 - src/crabjar_config/ (workspace config crate)
 - src/skill-script-runner/ (skill script discovery)
 - src/skill-reference-store/ (skill reference indexing)
-- src/host-binary/ (host binary crate)
+- src/host-binary/ (host binary crate with TUI, guard approval flow)
 - tests/cli.rs
+- tests/e2e/ (smoke + full E2E test slices)
+- tests/snapshots/ (insta snapshot baselines)
 - ui-state-copy
 - workspace/ (workspace config)
 - `crabjar-skills/` (reusable crabjar skills)
@@ -639,15 +629,16 @@ crabjar contains:
 - `REPRO.md` (reproduction guide)
 - `build.rs` (root build script)
 - `ROADMAP.md` (development roadmap)
-- `specs/` (Architecture Decision Records — see specs/README.md)
+- `specs/` (Architecture Decision Records — Nygard-style templates, see specs/README.md)
 
 ### 9.2 Active Rust Surface
 
-crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-architecture + file_search + crabjar-plugin + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux
+crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-architecture + file_search + crabjar-plugin + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux + crates/terminal
 
 ### Test Count
 
-103+ passing in guard crate (scope isolation + trust); 6 passing in file_search crate; full workspace test count TBD on clippy verification. Clippy: clean (`cargo clippy --workspace -- -D warnings`).
+**691 passing across workspace, 0 failing.**
+Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine, domain allowlist, context budgeting). Host-agent: ~35+ tests (model routing, context compression, decision gate, loop integration). File search: 6 passing. E2E: 32 total (6 smoke + 26 full). Snapshot: 6 tests.
 
 ---
 
@@ -655,39 +646,46 @@ crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestr
 
 ### Last Audit
 
-2026-07-06 — Fresh filesystem scan. Workspace: 24 members (added `file_search`, `crabjar-plugin`). Guard: 24 files. Orchestrator: backend/mod.rs + lm_studio_client/ (8 files) + prompts/default_system.md. crabjar-architecture: 3 source files (layer.rs, boundary.rs, lib.rs). file_search: 3 source files (lib.rs, indexer.rs, storage.rs) — BM25 indexing with Tantivy 0.22, all tests passing. crabjar-plugin: WASM runtime + lifecycle management. vm_bridge: 4 files at src/vm_bridge/. host/host-agent: 7 source files + inference/ subdirectory. All workspace members documented with per-crate AGENTS.md. Version 0.12.0. Skills: 32 agent skills. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
+2026-07-08 — Fresh filesystem scan. Workspace: 24 members + `specs/` (ADR process). Guard: 24 source files (added policy.rs, policy_types.rs, context_budget.rs, command_risk.rs, risk_config.rs, db_error.rs; split guard_db_impl into impl/queries/types). Memory/state_docs: 9 files (split indexer into extract.rs + insert.rs). Telemetry: 5 files (added command_executor.rs). Host/host-agent: 8 source files + inference/ subdir (added model_routing.rs, context_compression.rs, decision_gate.rs — ReAct loop with phase-aware routing, token budget compression, and decision gating). File search: 3 source files. crabjar-plugin: stub crate. crabjar-architecture: 3 source files. crates/terminal: 4 source files (wezterm/zellij backends + recording). Skills: 32 agent skills. Version: 0.12.0, Rust 2024 edition. Total tests: 691 passing, 0 failing. ADR process established in specs/. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
 
 ### Known Items
 
 - `guard/src/schema.sql` — GuardDb schema definition
-- `guard/src/concierge.rs` — sole gate enforcement layer
-- `guard/src/scope.rs` — scope isolation model (identity, project, tenant, thread dimensions)
-- `guard/src/trust_resolution.rs` — requested-vs-effective trust resolution
+- `guard/src/concierge.rs` — sole gate enforcement layer (~466 LoC)
+- `guard/src/scope.rs` — scope isolation model (identity, project, tenant, thread dimensions) + 16 tests
+- `guard/src/trust_resolution.rs` — requested-vs-effective trust resolution (~431 LoC)
 - `guard/src/fingerprint.rs` — InvocationFingerprint + SHA-256
-- `guard/src/domain_allowlist.rs` — Domain allowlist for web fetch scope gating
-- `guard/src/guard_db_impl.rs` — 368 LoC (anneal + concierge + PID trust)
-- `guard/src/guard_db_queries.rs` — 352 LoC (action requests + trust resolution)
-- `guard/src/guard_db_types.rs` — 16 LoC (TrustResolutionEntry)
-- `memory/src/state_docs/querier.rs` — drift_status() added
-- `memory/files/` — helper files (index.md, manifest.json)
+- `guard/src/domain_allowlist.rs` — Domain allowlist for web fetch scope gating (10 tests)
+- `guard/src/policy.rs` — StaticPolicyEngine with TOML-based declarative policies (17 tests)
+- `guard/src/context_budget.rs` — ContextBudget + MAX_TOKENS_PER_FRAGMENT (6 tests)
+- `guard/src/command_risk.rs` — CommandRisk, HIGH/MEDIUM_RISK_COMMANDS (6 tests)
+- `guard/src/guard_db_impl.rs` — 368 LoC (anneal + concierge + PID trust) — split from monolithic impl
+- `guard/src/guard_db_queries.rs` — 352 LoC (action requests + trust resolution) — split from monolithic impl
+- `guard/src/guard_db_types.rs` — 16 LoC (TrustResolutionEntry) — split from monolithic impl
+- `memory/src/state_docs/extract.rs` — markdown parsing (~400 LoC)
+- `memory/src/state_docs/insert.rs` — SQLite writes (~144 LoC)
+- `memory/src/context/mod.rs` — ContextFragmentBuilder with token budget (24 tests)
 - `orchestrator/src/lm_studio_client/` — unified LM client with SessionStore; `LmStudioEndpoint::MistralRsServe` variant for mistral.rs serve
 - `orchestrator/src/backend/mod.rs` — unified `InferenceBackend` trait + `BackendKind` enum
-- `.agents/skills/` — 32 agent skills
+- `orchestrator/prompts/default_system.md` — default system prompt template
+- `.agents/skills/` — 32 agent skills (added: format-version-drift, session-handoff)
 - `.agents/references/` — agent reference files (may be empty)
 - `crabjar-architecture/` — mechanical dependency boundary enforcement (8-layer model, CI gate candidate)
-- `file_search/` — BM25-based file indexing and search with Tantivy 0.22 (lib.rs, indexer.rs, storage.rs)
-- `crabjar-plugin/` — WASM runtime + lifecycle management
+- `file_search/` — BM25-based file indexing and search with Tantivy 0.22 (lib.rs, indexer.rs, storage.rs) — 6 tests
+- `crabjar-plugin/` — WASM runtime + lifecycle management (stub crate)
 - `axum-mux/` — vm-bridge (per-VM websocket relay, screen capture, terminal multiplexer)
 - `src/vm_bridge/` — per-VM websocket relay (lib.rs, relay.rs, screen.rs, terminal.rs)
 - `src/crabjar_config/` — workspace config crate (underscore, not hyphen)
 - `src/bitwarden/commands.rs` — additional bitwarden command handler
-- `src/host-binary/` — host binary crate (cli.rs, dashboard.rs, main.rs, Cargo.toml, AGENTS.md)
+- `src/host-binary/` — host binary crate with TUI (cli.rs, dashboard.rs, main.rs, Cargo.toml, AGENTS.md)
+- `src/metrics/` — metrics reporting subcommand
 - `apps/teams/teams-for-linux/` — additional teams-for-linux subdirectory
 - `crabjar-skills/` — reusable crabjar skills (README, install.sh, skill templates)
 - `scripts/module-sizes.py` — module size reporting script
 - `archive/` — empty (was for experiment consolidation)
 - Per-crate AGENTS.md — complete (all 24 crates + root documented)
 - **Cross-project: llm-workspace** — configured via opencode.jsonc instructions + dotfiles symlink graph
+- **ADR process**: `specs/` directory with Nygard-style ADR template, README index, and ADR-001 establishing the decision process
 - **Removed**: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md (no longer exist)
 
 ### Provenance Entries
@@ -709,7 +707,9 @@ crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestr
 | `prov-zeroclaw-credit` | README + project_map credit: ZeroClaw docs for security model, tool receipts, microkernel, SOP, config schema | 2026-06-06 | Attribution for design influence | crabjar/README.md, crabjar/project_map.md |
 | `prov-codex-parity` | ROADMAP.md Priority 9: 5 Codex pattern imports (bounded context, module size governance, snapshot testing, file search, Starlark exec policy) | 2026-06-23 | Feature parity analysis — Codex vs CrabJar | crabjar/README.md, crabjar/project_map.md, codex/AGENTS.md, codex/codex-rs/Cargo.toml |
 | `prov-map-drift-2026-06-27` | project_map.md regenerated — 22 members, guard/src fully updated (23 files), crabjar-architecture added to tree, vm_bridge added, host/host-agent added, orchestrator backend/mod.rs documented, shared deps refreshed (async-trait, tauri, rumqttc, tracing-error, etc.), CLI commands updated with guard resolution, section 9 cleaned up (removed stale codeburn/gguf/llm-runner references) | 2026-06-27 | Roadmap 1.3 update | crabjar/project_map.md |
-| `prov-map-drift-2026-07-06` | project_map.md regenerated — 24 members (added file_search + crabjar-plugin), tree diagram updated, Core Components table populated, workspace members section refreshed, Section 9 Crabjar Context updated with new crates, Drift Report Last Audit and Known Items updated | 2026-07-06 | Structural alignment refresh | crabjar/project_map.md |
+| `prov-map-drift-2026-07-06` | project_map.md regenerated — 24 members (added file_search + crabjar-plugin), tree diagram updated, Core Components table populated, workspace members section refreshed, Section 9 Crabjar Context updated with new crates, Drift Report Last Audit and Known Items updated | 2026-07-06 | Structural alignment refresh | crabjar/project_map.md
+| `prov-map-drift-2026-07-08` | project_map.md regenerated — generated date updated, Section 3 Build & Test expanded (module-sizes targets, reproducible-build, test count), Section 2.3 workspace members includes specs/ ADR process, Section 2.4 shared deps consolidated to single-line format, Section 2.5 profiles renamed and simplified, guard/src file listing expanded with policy/context_budget/command_risk/risk_config/db_error files, host/host-agent updated with model_routing/context_compression/decision_gate, Section 9 structure updated (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Drift Report Last Audit and Known Items refreshed with current state | 2026-07-08 | Structural alignment refresh + ADR process addition | crabjar/project_map.md
+| `prov-map-drift-2026-07-08b` | project_map.md regenerated — Section 9.1 structure list expanded (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Section 9.2 test count updated to 691 passing with breakdown by crate, Drift Report Known Items expanded with policy/context_budget/command_risk/risk_config/db_error files and ADR process entry | 2026-07-08 | Structural alignment refresh — second pass on Section 9 + Known Items | crabjar/project_map.md
 
 ---
 
