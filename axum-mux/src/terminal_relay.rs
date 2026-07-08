@@ -75,6 +75,7 @@ pub enum ControlMessage {
 /// Terminal I/O message sent over WebSocket binary frames.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 pub enum IoMessage {
     /// Terminal output bytes (server → client).
     Output { data: Vec<u8> },
