@@ -312,7 +312,7 @@ async fn execute_with_guard(
     _args: &[String],
     binary_path: &str,
     project_root: &std::path::Path,
-    store: &std::sync::Mutex<Store>,
+    _store: &std::sync::Mutex<Store>,
 ) -> Result<String, String> {
     let guard_root = std::env::var("MIRROR_GUARD_ROOT")
         .unwrap_or_else(|_| project_root.to_string_lossy().to_string());
@@ -1243,9 +1243,9 @@ async fn main() -> anyhow::Result<()> {
         .map(std::path::PathBuf::from)
         .unwrap_or_default();
     let knowledge_db_path = std::env::var("KNOWLEDGE_DB_PATH")
-        .unwrap_or_else(|| format!("{}/memory/knowledge.db", crabjar_root.display()));
+        .unwrap_or_else(|_| format!("{}/memory/knowledge.db", crabjar_root.display()));
     let events_db_path = std::env::var("MIRROR_LOG_DB_PATH")
-        .unwrap_or_else(|| format!("{}/memory/events.db", crabjar_root.display()));
+        .unwrap_or_else(|_| format!("{}/memory/events.db", crabjar_root.display()));
     let guard_root = std::env::var("MIRROR_GUARD_ROOT")
         .unwrap_or_else(|_| {
             std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
