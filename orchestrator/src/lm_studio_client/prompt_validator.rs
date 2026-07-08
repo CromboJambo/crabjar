@@ -9,7 +9,6 @@
 //! - Markdown code block command injection
 
 use super::prompt_types::{PromptEnvelope, PromptMetadata, PromptError, SourceLabel};
-use crate::lm_studio_client::types::LmStudioEndpoint;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Validation rules for prompt content.
@@ -194,8 +193,7 @@ impl PromptValidator {
 mod tests {
     use super::*;
     use crate::lm_studio_client::prompt_types::{compute_provenance, LabeledContent, PromptEnvelope};
-    use crate::lm_studio_client::types::LmStudioEndpoint;
-
+    
     // ---- SourceLabel tests ----
 
     #[test]
