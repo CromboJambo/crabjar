@@ -4,12 +4,12 @@
 
 ---
 
-## Status (July 5, 2026)
+## Status (July 8, 2026)
 
 | Metric | Value |
 |---|---|
-| **Workspace members** | 24 crates (added `crates/terminal`, `file_search`, `crabjar-plugin`) |
-| **Tests** | ~152+ passing, 0 failing (all pre-existing cli.rs failures resolved + 3 new resolve_pending_queue_entry tests) |
+| **Workspace members** | 24 crates + `specs/` (ADR process) |
+| **Tests** | 691 passing, 0 failing |
 || **Clippy** | ⚠️ Warnings only (unused imports/variables), no blocking errors |
 || **Architecture crate** | ✅ Built, compiles, has integration test |
 || **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
@@ -34,6 +34,53 @@
 || **Snapshot Testing (insta)** | ✅ Implemented in `tests/snapshot_tests.rs` — 6 tests covering CLI JSON output format (`state list`, `workspace status`, `doctor check`, `tool list`, `guard queue`) and TUI message serialization; baselines committed to `tests/snapshots/` |
 || **TUI Session Store** | ✅ SQLite-backed session persistence (`tui/session.rs`) — create/load/save sessions, message serialization |
 || **TUI Guard Approval Flow** | ✅ Implemented in `host-binary/tui/` — keyboard shortcuts ('a'/'r') for approve/reject pending guard actions, `resolve_pending_queue_entry()` DB method, agent loop surfaces pending queue entries and pauses for user input |
+|| **ADR Process** | ✅ Nygard-style Architecture Decision Records in `specs/` with template, README index, ADR-001 establishing the process |
+|| **Static Policy Engine** | ✅ TOML-based declarative policies in guard/ (17 tests) |
+|| **Context budget enforcement** | ✅ ContextBudget + MAX_TOKENS_PER_FRAGMENT in guard/ (6 tests) |
+|| **Command risk catalog** | ✅ HIGH/MEDIUM_RISK_COMMANDS in guard/ (6 tests) |
+
+---
+
+## Recently Completed (July 8, 2026)
+
+### ADR Process ✅ DONE
+
+**Status:** Implemented in `specs/` — Nygard-style Architecture Decision Records.
+
+- **Template**: `ADR_TEMPLATE.md` with status/context/decision/options considered/consequences sections. References Michael Nygard's "Documenting Architecture Decisions" (2011).
+- **Registry**: `README.md` with index table, cross-referencing convention (`[[ADR-NNN]]` inline links matching git-reflector pattern), when-to-write guidance.
+- **First ADR**: `ADR-001_specify_decision_process.md` — self-referential decision establishing the process itself. Documents why ADRs are needed (repeated debates, lost rationale, onboarding friction) and compares 4 options (inline comments, wiki tools, in-repo Markdown, git commit messages).
+- **Cross-references**: Uses `[[ADR-NNN]]` inline link pattern consistent with `.agents/skills/git-reflector/` reference style.
+- **Status lifecycle**: Proposed → Accepted → Superseded/Deprecated
+- Updated `project_map.md` to include specs/ in structure listing and drift report.
+
+### Guard Crate Expansion ✅ DONE
+
+**Status:** Added 6 new source files to guard/, bringing total to 24:
+
+- `policy.rs` (17 tests) — StaticPolicyEngine with TOML-based declarative policies. Configurable checks: dangerous commands, confidence floors, trust layer minimums, scope isolation toggles, domain allowlist modes, context budgets.
+- `policy_types.rs` — PolicyRule, PolicyCheck types
+- `context_budget.rs` (6 tests) — ContextBudget + MAX_TOKENS_PER_FRAGMENT constant. Enforced in ExecutionGate step 10: per-fragment hard cap → GateResult::OversizedFragment; cumulative budget check → GateResult::ContextExhausted.
+- `command_risk.rs` (6 tests) — CommandRisk enum, HIGH/MEDIUM_RISK_COMMANDS list
+- `risk_config.rs` — RiskConfig struct for policy configuration
+- `db_error.rs` — GuardDb error types
+
+### Memory/State-Docs Split ✅ DONE
+
+**Status:** Split `indexer.rs` (705 LoC) into:
+- `extract.rs` (~400 LoC: markdown parsing)
+- `insert.rs` (~144 LoC: SQLite writes)
+
+Fixed pre-existing schema/insert column mismatches (`doc_metadata` vs `documents`, `doc_id` vs `doc_path`).
+
+### Host-Agent ReAct Loop Expansion ✅ DONE
+
+**Status:** Added 3 new source files to host-agent:
+- `model_routing.rs` (435 LoC) — ModelRouter with LoopPhase enum, PhaseBackendKind, PhaseConfig, PhaseBuilder. Default routing sends plan/reflect to HTTP backend, others to heuristic.
+- `context_compression.rs` (388 LoC) — ContextCompressor with CompressionConfig. Keeps recent N observations raw, groups older by stage/kind into summaries, enforces token budget. Three presets: for_short_conversation(), for_long_conversation(), disabled().
+- `decision_gate.rs` (365 LoC) — DecisionGate with Decision enum (ToolCall/RespondDirectly/Defer), DecisionConfig for auto-decide threshold and max tool calls per turn.
+
+43 new tests covering model routing, context compression, decision gate, and loop integration.
 
 ---
 
@@ -540,13 +587,16 @@ All guard/ modules now under 500 LoC. `guard_db_impl.rs` split into 3 files:
 
 ## Priority 10: Developer Experience
 
-### 10.1 ADR Process ❌ NOT STARTED
+### 10.1 ADR Process ✅ DONE
 
-No `specs/` directory or ADR template exists.
+**Status:** Implemented in `specs/` — Nygard-style Architecture Decision Records.
 
-- [ ] `specs/ADR-NNN_<title>.md` template
-- [ ] Decision context, options, rationale
-- [ ] Cross-references between related ADRs
+- [x] `specs/ADR_TEMPLATE.md` — reusable template with status, context, decision, options considered, consequences (references Michael Nygard's "Documenting Architecture Decisions" 2011)
+- [x] `specs/README.md` — registry/index table, cross-referencing convention (`[[ADR-NNN]]` inline links matching git-reflector pattern), when-to-write guidance
+- [x] `specs/ADR-001_specify_decision_process.md` — first ADR establishing the decision process itself (self-referential)
+- [x] Cross-references between related ADRs via `[[ADR-NNN]]` inline links
+- [x] Status lifecycle: Proposed → Accepted → Superseded/Deprecated
+- [x] Updated `project_map.md` to include specs/ in structure listing and drift report
 
 ### 10.2 Config Layering ⚠️ PARTIALLY DONE
 
@@ -723,4 +773,4 @@ E2E test slices are defined but not wired into CI.
 
 ---
 
-*Last updated: July 6, 2026*
+*Last updated: July 8, 2026*
