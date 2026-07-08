@@ -639,6 +639,7 @@ crabjar contains:
 - `REPRO.md` (reproduction guide)
 - `build.rs` (root build script)
 - `ROADMAP.md` (development roadmap)
+- `specs/` (Architecture Decision Records — see specs/README.md)
 
 ### 9.2 Active Rust Surface
 
