@@ -14,7 +14,9 @@ use super::confidence::{annotation_confidence, ConfidenceDefaults, now_unix_ms};
 /// Result of a gated knowledge insert.
 #[derive(Debug, Clone)]
 pub enum GatedInsertResult {
+    #[allow(dead_code)]
     Inserted { id: i64 },
+    #[allow(dead_code)]
     Quarantined { id: i64 },
     DryRun,
 }
