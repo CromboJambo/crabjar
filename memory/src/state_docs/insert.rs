@@ -125,7 +125,7 @@ pub fn insert_annotation(
     doc_path: &Path,
     annotation: &Annotation,
 ) -> Result<(), crate::Error> {
-    let _path = doc_path.to_string_lossy().to_string();
+    let path = doc_path.to_string_lossy().to_string();
     let doc_id_hash: u64 = path.bytes().fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
     conn.execute(
         "INSERT INTO annotations (doc_id, section_id, line_number, kind, message, author, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
