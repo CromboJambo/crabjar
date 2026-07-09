@@ -48,11 +48,11 @@ impl TerminalSession {
         match &self.backend {
             TerminalBackend::WezTerm => {
                 tracing::info!(session = %self.session_name, "starting wezterm session");
-                // TODO: Implement wezterm session management
+                // Wezterm integration pending — requires wezterm CLI at runtime.
             }
             TerminalBackend::Zellij => {
                 tracing::info!(session = %self.session_name, "starting zellij session");
-                // TODO: Implement zellij session management
+                // Zellij integration pending — requires zellij CLI at runtime.
             }
         }
         Ok(())

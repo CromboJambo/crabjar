@@ -22,7 +22,7 @@ struct ProxyState {
 /// each incoming connection, dials the VM's display socket and relays
 /// raw bytes in both directions. The browser-side SPICE/VNC client
 /// (spice-html5 / noVNC) does all the actual protocol decoding — this
-/// is deliberately a dumb pipe.
+/// proxy is byte-transparent and performs no interpretation of the payload.
 pub async fn serve(vm: Vm, bind_addr: String) -> Result<()> {
     let listen_port = vm.listen_port;
     let name = vm.name.clone();

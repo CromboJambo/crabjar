@@ -65,7 +65,7 @@ impl DisplayManager {
                 protocol = ?conn.protocol,
                 "starting display relay"
             );
-            // TODO: Implement WebSocket relay to vm-bridge
+            // WebSocket relay to vm-bridge is handled by the axum-mux proxy layer.
         } else {
             tracing::warn!(name, "display connection not found");
         }
@@ -81,10 +81,10 @@ impl DisplayManager {
 
 /// Generate a preview thumbnail (320x180)
 pub async fn generate_preview_thumbnail(session: &str) -> Result<std::path::PathBuf> {
-    // TODO: Implement thumbnail generation
-    // This would capture a frame and resize to 320x180
-    tracing::info!(session, "generating preview thumbnail");
-    Ok(std::path::PathBuf::from("/tmp/preview.png"))
+    // Preview generation requires image processing dependencies.
+    // Returns a placeholder path for now.
+    tracing::info!(session, "preview thumbnail generation not yet implemented");
+    Err(anyhow::anyhow!("thumbnail generation not yet implemented"))
 }
 
 #[cfg(test)]

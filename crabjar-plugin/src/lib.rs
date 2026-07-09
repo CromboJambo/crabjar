@@ -349,20 +349,17 @@ impl ProcessPool {
         _args: serde_json::Value,
         _timeout: Duration,
     ) -> Result<ToolResult, PluginError> {
-        // TODO: Implement actual JSON-RPC communication over stdin/stdout.
-        // This is a stub — the real implementation would:
-        // 1. Write a JSON-RPC request to child.stdin
-        // 2. Read response from child.stdout with timeout
-        // 3. Parse and return ToolResult
-        Err(PluginError::NotImplemented("execute_with_timeout not yet implemented".into()))
+        // JSON-RPC communication over stdin/stdout is pending.
+        Err(PluginError::NotImplemented("execute_with_timeout not yet implemented".to_string()))
     }
 
     /// Check health of all running plugins.
     pub async fn check_health(&self) -> Vec<(String, HealthStatus)> {
         let instances = self.instances.read().await;
+        // Active processes are assumed healthy until a real health probe is implemented.
         instances
             .iter()
-            .map(|h| (h.name.clone(), HealthStatus::Healthy)) // TODO: actual health check
+            .map(|h| (h.name.clone(), HealthStatus::Healthy))
             .collect()
     }
 
@@ -371,7 +368,7 @@ impl ProcessPool {
         let mut instances = self.instances.write().await;
         for handle in instances.iter() {
             if let Some(pid) = handle.pid {
-                // TODO: Send SIGTERM via tokio::process::Command::new("kill") or similar.
+                // Process cleanup via SIGTERM is pending — currently just clears the registry.
                 debug!("stopping plugin '{}' (pid={})", handle.name, pid);
             }
         }

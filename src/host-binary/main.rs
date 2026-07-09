@@ -155,9 +155,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::WorkItem { id } => {
             // Placeholder — WorkItem persistence will be added in Phase 2
-            println!("WorkItem query (placeholder — coming in Phase 2)");
+            tracing::info!(?id, "WorkItem query (placeholder — coming in Phase 2)");
             if let Some(id) = id {
-                println!("  ID: {}", id);
+                println!("WorkItem ID: {}", id);
+            } else {
+                println!("No WorkItem ID specified. Use --id <uuid> to query a specific item.");
             }
         }
         Commands::Tick => {
@@ -168,10 +170,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Commands::Run { objective } => {
+            tracing::info!(objective = %objective, "Starting agent loop");
             let mut loop_engine = AgentLoop::new(event_bus, metrics)
                 .with_scope(GuardScope::project("host"));
             loop_engine.start(&objective);
-            println!("Running agent loop for: {}", objective);
 
             let mut iterations = 0;
             loop {
@@ -183,25 +185,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         tasks_completed,
                         ..
                     } => {
-                        println!(
-                            "  Iteration {}: confidence={:.0}%, tasks={}/{}",
-                            iterations,
-                            confidence * 100.0,
-                            tasks_completed,
-                            tasks_completed
+                        tracing::info!(
+                            iteration = iterations,
+                            confidence = %confidence,
+                            tasks = *tasks_completed,
+                            "Agent loop iteration complete"
                         );
                     }
                     crabjar_host_agent::LoopResult::Completed { .. } => {
-                        println!("  Completed after {} iterations", iterations);
+                        tracing::info!(iterations = iterations, "Agent loop completed");
+                        println!("Completed after {} iterations", iterations);
                         break;
                     }
                     crabjar_host_agent::LoopResult::Failed { reason, .. } => {
-                        println!("  Failed: {}", reason);
+                        tracing::warn!(reason = %reason, "Agent loop failed");
+                        println!("Failed: {}", reason);
                         break;
                     }
                 }
                 if iterations > 200 {
-                    println!("  Max iterations reached");
+                    tracing::warn!("Max iterations (200) reached without completion");
+                    println!("Max iterations reached");
                     break;
                 }
             }

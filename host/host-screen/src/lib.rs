@@ -155,11 +155,11 @@ impl ScreenCapture {
 
     /// Start screen capture session
     pub async fn start_session(&self) -> Result<Option<ScreenShareSession>> {
-        // TODO: Implement PipeWire/XDG-Portal integration
-        // For now, return None to indicate unimplemented
+        // Screen capture requires PipeWire or XDG-Portal runtime dependencies.
+        // Returns None to indicate the feature is not yet available on this system.
         tracing::info!(
             source = ?self.source,
-            "starting screen capture session"
+            "screen capture session (PipeWire/XDG-Portal integration pending)"
         );
         Ok(None)
     }
@@ -189,10 +189,9 @@ impl ScreenShareSession {
 
     /// Generate preview thumbnail (320x180)
     pub async fn generate_preview(&mut self) -> Result<PathBuf> {
-        // TODO: Implement thumbnail generation
-        // This would capture a frame and resize to 320x180
-        tracing::info!("generating preview thumbnail");
-        Ok(PathBuf::from("/tmp/preview.png"))
+        // Preview generation requires image processing dependencies.
+        tracing::warn!("preview thumbnail generation not yet implemented");
+        Err(anyhow::anyhow!("thumbnail generation not yet implemented"))
     }
 }
 

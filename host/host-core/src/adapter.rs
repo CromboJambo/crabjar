@@ -45,7 +45,7 @@ use tokio::sync::RwLock;
 /// channel-specific data into this representation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct OutgoingMessage {
-    /// Target destination (e.g., "alice@company.com", "team-channel-123")
+    /// Target destination (e.g., "user-id", "team-channel-123")
     pub to: String,
     /// Message content (plain text or markdown)
     pub content: String,
