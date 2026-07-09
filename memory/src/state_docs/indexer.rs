@@ -57,10 +57,9 @@ pub fn index_doc(
     let mut metadata = extract_metadata(&content);
 
     // Fall back to filename (without .md) if no frontmatter name provided
-    if metadata.doc_name.is_empty() {
-        if let Some(name) = doc_path.file_stem().and_then(|s| s.to_str()) {
-            metadata.doc_name = name.trim_end_matches(".md").to_string();
-        }
+    if metadata.doc_name.is_empty()
+        && let Some(name) = doc_path.file_stem().and_then(|s| s.to_str()) {
+        metadata.doc_name = name.trim_end_matches(".md").to_string();
     }
 
     let sections = extract_sections(&content);
