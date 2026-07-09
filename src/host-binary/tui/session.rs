@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 /// A single conversation session.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Session {
     pub id: String,
     pub messages: Vec<Message>,
