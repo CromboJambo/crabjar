@@ -121,7 +121,7 @@ impl FileIndexer {
         for entry_result in walker {
             match entry_result {
                 Ok(entry) => {
-                    if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+                    if !entry.file_type().is_some_and(|ft| ft.is_file()) {
                         continue;
                     }
 
@@ -139,16 +139,15 @@ impl FileIndexer {
                     }
 
                     // Check file size
-                    if let Ok(metadata) = entry.metadata() {
-                        if metadata.len() > self.config.max_file_size {
-                            debug!(
-                                path = ?entry.path(),
-                                size = metadata.len(),
-                                max = self.config.max_file_size,
-                                "Skipping oversized file"
-                            );
-                            continue;
-                        }
+                    if let Ok(metadata) = entry.metadata()
+                        && metadata.len() > self.config.max_file_size {
+                        debug!(
+                            path = ?entry.path(),
+                            size = metadata.len(),
+                            max = self.config.max_file_size,
+                            "Skipping oversized file"
+                        );
+                        continue;
                     }
 
                     // Create IndexedFile
