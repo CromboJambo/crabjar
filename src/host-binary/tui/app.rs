@@ -86,23 +86,20 @@ impl App {
         }
 
         // Load or create session
-        if let Some(sid) = session_id {
-            if let Some(ref store) = app.session_store {
-                if let Ok(session) = store.load(sid) {
-                    app.current_session_id = Some(sid.to_string());
-                    for msg in &session.messages {
-                        app.messages.push(msg.clone());
-                    }
-                }
+        if let Some(sid) = session_id
+            && let Some(ref store) = app.session_store
+            && let Ok(session) = store.load(sid) {
+            app.current_session_id = Some(sid.to_string());
+            for msg in &session.messages {
+                app.messages.push(msg.clone());
             }
         }
 
         // If no session loaded, create a new one
-        if app.current_session_id.is_none() {
-            if let Some(ref store) = app.session_store {
-                let sid = store.create()?;
-                app.current_session_id = Some(sid);
-            }
+        if app.current_session_id.is_none()
+            && let Some(ref store) = app.session_store {
+            let sid = store.create()?;
+            app.current_session_id = Some(sid);
         }
 
         // Add initial objective if provided
@@ -416,37 +413,35 @@ impl App {
             }
 
             // Check for pending guard actions and surface them to the user
-            if let Some(ref db) = self.guard_db {
-                if let Ok(pending_entries) = db.read_pending_queue() {
-                    if !pending_entries.is_empty() {
-                        // Surface the first pending entry as a guard message
-                        let entry = &pending_entries[0];
-                        let action_desc = format!(
-                            "{} {} {}",
-                            entry.command,
-                            entry.args.join(" "),
-                            if entry.reason.len() > 40 {
-                                &entry.reason[..40]
-                            } else {
-                                &entry.reason
-                            }
-                        );
-
-                        self.messages.push(Message::Guard {
-                            action: format!("{} (pending review)", action_desc),
-                            pending: true,
-                        });
-
-                        // Set state to awaiting approval — user must approve/reject before continuing
-                        tx.send(AppState::AwaitingApproval {
-                            id: entry.id.clone(),
-                            action_desc: action_desc.clone(),
-                        }).await?;
-
-                        // Break out of the loop — wait for user input via keyboard shortcuts
-                        break;
+            if let Some(ref db) = self.guard_db
+                && let Ok(pending_entries) = db.read_pending_queue()
+                && !pending_entries.is_empty() {
+                // Surface the first pending entry as a guard message
+                let entry = &pending_entries[0];
+                let action_desc = format!(
+                    "{} {} {}",
+                    entry.command,
+                    entry.args.join(" "),
+                    if entry.reason.len() > 40 {
+                        &entry.reason[..40]
+                    } else {
+                        &entry.reason
                     }
-                }
+                );
+
+                self.messages.push(Message::Guard {
+                    action: format!("{} (pending review)", action_desc),
+                    pending: true,
+                });
+
+                // Set state to awaiting approval — user must approve/reject before continuing
+                tx.send(AppState::AwaitingApproval {
+                    id: entry.id.clone(),
+                    action_desc: action_desc.clone(),
+                }).await?;
+
+                // Break out of the loop — wait for user input via keyboard shortcuts
+                break;
             }
 
             // Small delay between iterations for readability
@@ -454,10 +449,9 @@ impl App {
         }
 
         // Save to session if we have a store
-        if let Some(ref store) = self.session_store {
-            if let Some(ref sid) = self.current_session_id {
-                store.save(sid, &self.messages)?;
-            }
+        if let Some(ref store) = self.session_store
+            && let Some(ref sid) = self.current_session_id {
+            store.save(sid, &self.messages)?;
         }
 
         Ok(())
