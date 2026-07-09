@@ -489,10 +489,7 @@ async fn execute_tool_call(
             Ok(conn) => {
                 let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
                 if registry.init().is_ok() {
-                    match registry.discover_tools("orchestrator", &project_root) {
-                        Ok(tools) => tools,
-                        Err(_) => Vec::new(),
-                    }
+registry.discover_tools("orchestrator", &project_root).unwrap_or_default()
                 } else {
                     Vec::new()
                 }

@@ -72,6 +72,7 @@ impl SessionStore {
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// List all session IDs.
     pub fn list_ids(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
         let mut ids = Vec::new();
@@ -82,10 +83,9 @@ impl SessionStore {
         for entry in fs::read_dir(&self.data_dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "json") {
-                if let Some(stem) = path.file_stem() {
-                    ids.push(stem.to_string_lossy().to_string());
-                }
+            if path.extension().is_some_and(|ext| ext == "json")
+                && let Some(stem) = path.file_stem() {
+                ids.push(stem.to_string_lossy().to_string());
             }
         }
 

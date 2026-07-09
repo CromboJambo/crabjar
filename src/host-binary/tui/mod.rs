@@ -39,7 +39,7 @@ pub async fn run(
     terminal::disable_raw_mode()?;
     crossterm::execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
 
-    result.map_err(Into::into)
+    result
 }
 
 /// Core event loop: render → poll input → process → repeat.

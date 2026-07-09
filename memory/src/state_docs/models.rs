@@ -54,7 +54,7 @@ impl StalenessStatus {
         let days = duration.num_days().max(0);
 
         // Check if there's been any annotation activity after the doc was last modified.
-        let has_recent_context = latest_annotation_at.map_or(false, |ann_time| {
+        let has_recent_context = latest_annotation_at.is_some_and(|ann_time| {
             ann_time > *last_modified && (now.signed_duration_since(ann_time).num_days() < 30)
         });
 
