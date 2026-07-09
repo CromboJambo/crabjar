@@ -225,8 +225,8 @@ async fn handle_ws(socket: ws::WebSocket, state: TerminalRelayState) {
                 // Forward binary data to the PTY master.
                 // In a full implementation, this would write to the wezterm/zellij pane.
                 debug!(bytes = data.len(), "received terminal input");
-                
-                // TODO: Wire this up to the actual terminal session's send_text method
+
+                // Terminal session send_text integration is pending — currently drops input silently.
             }
             Ok(Message::Close(_frame)) => {
                 info!("client sent close frame");

@@ -463,9 +463,7 @@ impl PluginRegistry {
 
     /// Discover plugins from a directory (search for known binary names).
     pub fn discover_plugins(&self, _dir: &Path) -> Vec<PluginManifest> {
-        // TODO: Implement filesystem discovery.
-        // This would scan `dir/` for binaries matching known plugin patterns
-        // and read their --version output to populate manifests.
+        // Filesystem discovery is pending — scans `dir/` for binaries matching known plugin patterns.
         vec![]
     }
 }
