@@ -182,18 +182,13 @@ pub trait Plugin: Send + Sync {
 // ============================================================================
 
 /// Policy for handling process crashes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum RestartPolicy {
     /// Never restart (default).
+    #[default]
     NoRestart,
     /// Restart up to N times with exponential backoff.
     Retry { max_retries: u32 },
-}
-
-impl Default for RestartPolicy {
-    fn default() -> Self {
-        Self::NoRestart
-    }
 }
 
 /// Errors that can occur when spawning a plugin process.
