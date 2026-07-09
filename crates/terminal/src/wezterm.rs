@@ -137,22 +137,18 @@ impl TerminalBackend for WeztermBackend {
         let list_output = self.run_cli(&["list", "--output-format", "json"]).await?;
 
         // Parse the list output to find panes in this session
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&list_output) {
-            if let Some(panes) = json.get("windows").and_then(|w| w.get(0)).and_then(|w| w.get("panes")) {
-                if let Some(pane_array) = panes.as_array() {
-                    if let Some(first_pane) = pane_array.first() {
-                        if let Some(pane_id) = first_pane.get("id").and_then(|p| p.as_u64()) {
-                            // Send text to the specific pane
-                            self.run_cli(&[
-                                "send-text",
-                                "--pane-id", &pane_id.to_string(),
-                                input,
-                            ]).await?;
-                            return Ok(());
-                        }
-                    }
-                }
-            }
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&list_output)
+            && let Some(panes) = json.get("windows").and_then(|w| w.get(0)).and_then(|w| w.get("panes"))
+            && let Some(pane_array) = panes.as_array()
+            && let Some(first_pane) = pane_array.first()
+            && let Some(pane_id) = first_pane.get("id").and_then(|p| p.as_u64()) {
+            // Send text to the specific pane
+            self.run_cli(&[
+                "send-text",
+                "--pane-id", &pane_id.to_string(),
+                input,
+            ]).await?;
+            return Ok(());
         }
 
         // Fallback: send to focused pane without specific targeting
@@ -168,20 +164,16 @@ impl TerminalBackend for WeztermBackend {
         // Get text from the first available pane in the session
         let list_output = self.run_cli(&["list", "--output-format", "json"]).await?;
         
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&list_output) {
-            if let Some(panes) = json.get("windows").and_then(|w| w.get(0)).and_then(|w| w.get("panes")) {
-                if let Some(pane_array) = panes.as_array() {
-                    if let Some(first_pane) = pane_array.first() {
-                        if let Some(pane_id) = first_pane.get("id").and_then(|p| p.as_u64()) {
-                            // Get text from the specific pane
-                            return self.run_cli(&[
-                                "get-text",
-                                "--pane-id", &pane_id.to_string(),
-                            ]).await;
-                        }
-                    }
-                }
-            }
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&list_output)
+            && let Some(panes) = json.get("windows").and_then(|w| w.get(0)).and_then(|w| w.get("panes"))
+            && let Some(pane_array) = panes.as_array()
+            && let Some(first_pane) = pane_array.first()
+            && let Some(pane_id) = first_pane.get("id").and_then(|p| p.as_u64()) {
+            // Get text from the specific pane
+            return self.run_cli(&[
+                "get-text",
+                "--pane-id", &pane_id.to_string(),
+            ]).await;
         }
 
         // Fallback: get text from focused pane
@@ -192,12 +184,11 @@ impl TerminalBackend for WeztermBackend {
         // Kill all windows in the workspace/session
         let output = self.run_cli(&["list", "--output-format", "json"]).await?;
         
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output) {
-            if let Some(windows) = json.get("windows").and_then(|w| w.as_array()) {
-                for _window in windows {
-                    // Kill each window
-                    let _ = self.run_cli(&["cli", "kill-window"]).await;
-                }
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&output)
+            && let Some(windows) = json.get("windows").and_then(|w| w.as_array()) {
+            for _window in windows {
+                // Kill each window
+                let _ = self.run_cli(&["cli", "kill-window"]).await;
             }
         }
 
