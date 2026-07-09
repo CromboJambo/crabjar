@@ -145,9 +145,9 @@ impl SearchStorage {
 
     /// Check if tantivy index files exist.
     fn has_index_files(path: &Path) -> bool {
-        path.join("tantivy").exists() || fs::read_dir(path).ok().map_or(false, |mut entries| {
+        path.join("tantivy").exists() || fs::read_dir(path).ok().is_some_and(|mut entries| {
             entries.any(|e| {
-                e.as_ref().ok().map_or(false, |entry| {
+                e.as_ref().ok().is_some_and(|entry| {
                     let name = entry.file_name();
                     let name_str = name.to_string_lossy();
                     name_str.starts_with("tantivy") || name_str == "meta" || name_str.ends_with(".json")
@@ -196,7 +196,7 @@ impl SearchStorage {
             path_field => file.relative_path.clone(),
             content_field => content_text,
             mtime_field => file.mtime as i64,
-            size_field => file.size as u64,
+            size_field => file.size,
             extension_field => file.extension.clone(),
         );
 
@@ -259,7 +259,7 @@ impl SearchStorage {
         let extension_field = self.schema.get_field("extension").map_err(|e| format!("Missing 'extension' field: {}", e))?;
 
         // Parse the query using tantivy's query parser
-        let query_parser = QueryParser::for_index(&self.index_reader.searcher().index(), vec![content_field]);
+        let query_parser = QueryParser::for_index(self.index_reader.searcher().index(), vec![content_field]);
 
         let parsed_query = query_parser.parse_query(query).map_err(|e| format!("Failed to parse query: {}", e))?;
 
