@@ -32,10 +32,7 @@
 /// ┌──────────┐     WebSocket       │                     │                         └──────────┘
 /// │          │    ──────────────►  │                     │
 /// │ Client 2 │ ◄─────────────────  │                     │
-/// │          │    WebSocket        │                     │
-/// └──────────┘                     └─────────────────────┘
 /// ```
-
 use anyhow::{Context, Result};
 use axum::{
     extract::ws::{self, Message, WebSocketUpgrade},
