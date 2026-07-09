@@ -165,7 +165,7 @@ impl TerminalSession {
         
         let mut recorder = AsciinemaRecorder::new(
             &self.session_name,
-            &self.backend.name(),
+            self.backend.name(),
             output_path.to_path_buf(),
         );
         
