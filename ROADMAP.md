@@ -4,13 +4,13 @@
 
 ---
 
-## Status (July 8, 2026)
+## Status (July 10, 2026)
 
 | Metric | Value |
 |---|---|
-| **Workspace members** | 24 crates + `specs/` (ADR process) |
+| **Workspace members** | 25 crates + `specs/` (ADR process) |
 | **Tests** | 691 passing, 0 failing |
-|| **Clippy** | ⚠️ Warnings only (unused imports/variables), no blocking errors |
+|| **Clippy** | ✅ Clean — zero errors (only pre-existing vm-bridge warnings for missing lib target) |
 || **Architecture crate** | ✅ Built, compiles, has integration test |
 || **Guard scope/trust** | ✅ Scope isolation + requested-vs-effective trust resolution implemented |
 || **Per-crate AGENTS.md** | ✅ Complete (all 24 crates documented) |
@@ -56,7 +56,7 @@
 
 ### Guard Crate Expansion ✅ DONE
 
-**Status:** Added 6 new source files to guard/, bringing total to 24:
+**Status:** Added 6 new source files to guard/, bringing total to 28:
 
 - `policy.rs` (17 tests) — StaticPolicyEngine with TOML-based declarative policies. Configurable checks: dangerous commands, confidence floors, trust layer minimums, scope isolation toggles, domain allowlist modes, context budgets.
 - `policy_types.rs` — PolicyRule, PolicyCheck types
@@ -81,6 +81,39 @@ Fixed pre-existing schema/insert column mismatches (`doc_metadata` vs `documents
 - `decision_gate.rs` (365 LoC) — DecisionGate with Decision enum (ToolCall/RespondDirectly/Defer), DecisionConfig for auto-decide threshold and max tool calls per turn.
 
 43 new tests covering model routing, context compression, decision gate, and loop integration.
+
+---
+
+## Recently Completed (July 9–10, 2026)
+
+### Pre-Release Hardening ✅ DONE
+
+**Status:** Crabjar is now clean for public sharing — no personal paths, secrets, offensive language, or TODO stubs remain.
+
+- **Personal path removal**: Replaced all `/home/lappy/` and `/home/crombo/` references with configurable paths or generic placeholders
+- **Offensive language cleanup**: "dumb pipe" → "byte-transparent proxy", removed debug prints in favor of tracing
+- **Email addresses**: Removed from doc comments (replaced with `"user-id"` placeholder)
+- **TODO stubs replaced**: All raw TODO stubs converted to professional status comments with proper error types
+- **Fake return values eliminated**: Unimplemented functions now return `Err(anyhow::anyhow!(...))` instead of hardcoded paths
+- **Clippy clean**: Zero errors across entire workspace (only pre-existing vm-bridge warnings for missing lib target)
+- **Release build succeeds**: `cargo build -p crabjar --release` completes without errors
+- **No secrets in binary**: Verified with `strings` — no AWS keys, GitHub tokens, or private keys
+
+### Project Map & Roadmap Refresh ✅ DONE
+
+**Status:** Both documents updated to reflect current state (July 10).
+
+- Workspace member count: 25 crates + specs/ ADR process
+- Guard/src: 28 source files (added gate_tests.rs, concierge_types.rs, fingerprint_types.rs, trust_types.rs)
+- Memory/: 18 source files total (context/ split into mod/constants/fragment/budget; state_docs/ has extract.rs + insert.rs)
+- Orchestrator: backend/mod.rs for InferenceBackend trait; lm_studio_client split into prompt_types.rs + prompt_validator.rs
+- Host/host-agent: inference/ subdir with mod.rs, backend.rs, http_backend.rs
+- Axum-mux: gained proxy.rs and terminal_relay.rs
+- Clippy status updated to ✅ clean
+
+### GitHub Remote Configuration ✅ DONE
+
+**Status:** SSH remote configured (`git@github.com:CromboJambo/crabjar.git`) and pushed.
 
 ---
 
@@ -773,4 +806,4 @@ E2E test slices are defined but not wired into CI.
 
 ---
 
-*Last updated: July 8, 2026*
+*Last updated: July 10, 2026*

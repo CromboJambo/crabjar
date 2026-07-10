@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: July 8 2026
+> Generated: July 10 2026
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -18,7 +18,7 @@ CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes stat
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 24 members, shared deps
+├── Cargo.toml               # Workspace root — 25 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── build.rs                 # Root build script
 ├── AGENTS.md               # Repository guidelines
@@ -71,26 +71,34 @@ crabjar/
 ├── src/manifest.json        # src directory manifest
 │
 │  Supporting crates
-├── memory/                  # agent-context crate, SQLite-backed storage
+├── memory/                  # agent-context crate, SQLite-backed storage (18 source files)
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── lib.rs
 │   │   ├── error.rs
 │   │   ├── models.rs
 │   │   ├── schema.rs
+│   │   ├── store.rs
+│   │   ├── context/           # ContextFragmentBuilder with token budget (4 files)
+│   │   │   ├── mod.rs
+│   │   │   ├── constants.rs
+│   │   │   ├── fragment.rs
+│   │   │   └── budget.rs
 │   │   ├── state_docs/      # state-docs querier (drift_status)
 │   │   │   ├── mod.rs
 │   │   │   ├── indexer.rs
+│   │   │   ├── extract.rs     # markdown parsing (~400 LoC)
+│   │   │   ├── insert.rs      # SQLite writes (~144 LoC)
 │   │   │   ├── querier.rs
 │   │   │   ├── renderer.rs
 │   │   │   ├── models.rs
-│   │   └── schema.rs
+│   │   │   └── schema.rs
 │   └── tests/
 │       └── state_docs_tests.rs
 ├── memory/files/            # memory crate helper files
 │   ├── index.md
 │   └── manifest.json
-├── guard/                   # Trust layers, annealing, execution gate, scope isolation
+├── guard/                   # Trust layers, annealing, execution gate, scope isolation (28 source files)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
@@ -149,6 +157,10 @@ crabjar/
 │   ├── README.md
 │   ├── ROADMAP.md
 │   └── AGENTS.md
+│   └── src/
+│       ├── lib.rs
+│       ├── proxy.rs           # WebSocket proxy for display protocols
+│       └── terminal_relay.rs  # Terminal session relay (WebSocket → stdin/stdout)
 ├── crabjar-architecture/    # Mechanical dependency boundary enforcement
 │   ├── Cargo.toml
 │   ├── AGENTS.md
@@ -274,7 +286,8 @@ crabjar/
 │           ├── session.rs   # SessionState + SessionStore (SQLite)
 │           ├── error.rs     # LmStudioError + ToolCallInfo
 │           ├── endpoints.rs # Endpoint converters (native, OpenAI, Anthropic)
-│           ├── prompt_envelope.rs # PromptEnvelope + PromptValidator (instruction-hijack defense)
+│           ├── prompt_types.rs    # PromptEnvelope types + error enum (~223 LoC)
+│           ├── prompt_validator.rs # Instruction-hijack detection logic (~624 LoC)
 │           └── tests.rs     # Unit tests (40+)
 │   └── prompts/
 │       └── default_system.md # Default system prompt template
@@ -349,7 +362,7 @@ crabjar/
 
 ### 2.3 Workspace Members
 
-Declared in Cargo.toml `[workspace.members]`: 24 crates total.
+Declared in Cargo.toml `[workspace.members]`: 25 crates total.
 - **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
 - **Plugin system**: `crabjar-plugin` (WASM runtime, lifecycle management)
 - **File search**: `file_search` (BM25 indexing with Tantivy 0.22)
@@ -646,7 +659,7 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 
 ### Last Audit
 
-2026-07-08 — Fresh filesystem scan. Workspace: 24 members + `specs/` (ADR process). Guard: 24 source files (added policy.rs, policy_types.rs, context_budget.rs, command_risk.rs, risk_config.rs, db_error.rs; split guard_db_impl into impl/queries/types). Memory/state_docs: 9 files (split indexer into extract.rs + insert.rs). Telemetry: 5 files (added command_executor.rs). Host/host-agent: 8 source files + inference/ subdir (added model_routing.rs, context_compression.rs, decision_gate.rs — ReAct loop with phase-aware routing, token budget compression, and decision gating). File search: 3 source files. crabjar-plugin: stub crate. crabjar-architecture: 3 source files. crates/terminal: 4 source files (wezterm/zellij backends + recording). Skills: 32 agent skills. Version: 0.12.0, Rust 2024 edition. Total tests: 691 passing, 0 failing. ADR process established in specs/. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
+2026-07-10 — Fresh filesystem scan. Workspace: 25 members + `specs/` (ADR process). Guard: 28 source files (added gate_tests.rs, concierge_types.rs, fingerprint_types.rs, trust_types.rs; all under 500 LoC). Memory/: 18 source files total (error.rs, models.rs, schema.rs, store.rs added; context/ split into mod/constants/fragment/budget; state_docs/ has extract.rs + insert.rs). Orchestrator: 11 .rs files (added backend/mod.rs for InferenceBackend trait; lm_studio_client split into prompt_types.rs + prompt_validator.rs). Host/host-agent: 13 source files (inference/ subdir with mod.rs, backend.rs, http_backend.rs). Axum-mux: gained proxy.rs and terminal_relay.rs. File search: 3 source files. crabjar-plugin: stub crate. crabjar-architecture: 3 source files. crates/terminal: 5 source files (added recording.rs). Skills: 32 agent skills. Version: 0.12.0, Rust 2024 edition. Total tests: 691 passing, 0 failing. Clippy clean — zero errors (only pre-existing vm-bridge warnings for missing lib target). ADR process established in specs/. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
 
 ### Known Items
 
