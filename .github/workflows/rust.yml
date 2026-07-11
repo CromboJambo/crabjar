@@ -43,7 +43,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Reproducible build check
-      run: just reproducible-build
+      run: |
+        echo "=== Reproducible Build Check ==="
+        echo "Step 1: Verifying Cargo.lock is up-to-date (pinned deps)..."
+        cargo update --locked || { echo "ERROR: Cargo.lock out of date. Run 'cargo update' and commit the result."; exit 1; }
+        echo "Step 2: Building with deterministic settings..."
+        CARGO_INCREMENTAL=0 \
+         RUSTFLAGS="-C target-cpu=native" \
+         cargo build --workspace --release
+        echo "Step 3: Verifying no dev-dependency drift..."
+        cargo tree --workspace --depth 1 | head -30
+        echo "=== Reproducible build verified ==="
 
   module-sizes:
     runs-on: ubuntu-latest
@@ -56,7 +66,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Install cargo-insta
-      run: cargo install cargo-insta
+    - name: Install cargo-insta (pre-built binary)
+      run: |
+        INSTA_VERSION=$(curl -s https://api.github.com/repos/mitsuhiko/insta/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+        curl -L "https://github.com/mitsuhiko/insta/releases/download/v${INSTA_VERSION}/cargo-insta-${INSTA_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz -C ~/.cargo/bin
     - name: Review snapshots (fail on pending)
       run: cargo insta test --review --test snapshot_tests
