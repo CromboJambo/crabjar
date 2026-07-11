@@ -161,6 +161,26 @@ These docs decay. Here's how to handle it:
 
 > **Key principle**: The *conventions* in these docs matter more than the *inventory*. A module-splitting rule is useful forever. A specific file count is only useful for the next 7 days.
 
+## Git & CI Rules
+
+### Remote URL — SSH only, never change it
+
+The git remote MUST stay as `git@github.com:CromboJambo/crabjar.git`. Never switch to HTTPS or modify the remote URL in response to push failures. Push failures are almost always an SSH agent issue (no running ssh-agent, missing key, passphrase prompt) — not a remote configuration problem. If you can't push from this session, leave the commit locally and tell the user to push manually from their terminal where SSH auth works.
+
+### CI: no `just` dependency on GitHub runners
+
+GitHub Actions runners do **not** have `just` installed. Any CI job that calls `just <target>` will fail. Replace with inline bash commands that replicate the Justfile target logic. The `Justfile` is a local convenience only — CI must be self-contained.
+
+### CI: pre-built binaries, not crates.io installs
+
+Tools like `cargo-insta`, `cargo-audit`, etc. should install from pre-built GitHub release binaries, never via `cargo install`. Compiling Rust tools from source on every runner wastes 30-60s and can fail on memory-constrained runners. Use the pattern:
+```bash
+# Get latest version tag
+VERSION=$(curl -s https://api.github.com/repos/<owner>/<repo>/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
+# Download and extract pre-built binary
+curl -L "https://github.com/<owner>/<repo>/releases/download/v${VERSION}/<binary>-x86_64-unknown-linux-musl.tar.gz" | tar xz -C ~/.cargo/bin
+```
+
 ## LLM Runner
 
 Experimental (in `llm-workspace/`). CPU fallback kernels operational; GPU path stubbed; K-family dequantization unimplemented. See `llmrunner.md` for gap analysis.
