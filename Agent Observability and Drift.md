@@ -1,0 +1,381 @@
+---
+title: "Agent Observability and Drift"
+source: "https://chatgpt.com/c/6a6ce0cc-731c-83ea-9b5d-c36eca1875ce"
+author:
+published:
+created: 2026-07-31
+description: "ChatGPT conversation with 5 messages"
+tags:
+  - "clippings"
+---
+**ChatGPT said**
+
+I think you're converging on something that a lot of current AI infrastructure intentionally separates for engineering reasons, but doesn't necessarily *have* to separate conceptually.
+
+Today the stack is usually:
+
+```
+Model
+    ↓
+Inference Server
+    ↓
+Agent Framework
+    ↓
+Tools
+```
+
+because each piece can be swapped independently.
+
+But if an agent is capable of self-improvement, there's a feedback loop that's missing:
+
+```
+Observe
+    ↓
+Act
+    ↓
+Evaluate
+    ↓
+Identify Weakness
+    ↓
+Generate Training Data
+    ↓
+Fine-tune
+    ↓
+Compare
+    ↓
+Deploy?
+```
+
+The agent is actually in the best position to answer questions like:
+
+- "What did I struggle with?"
+- "Which mistakes keep recurring?"
+- "Which tool calls were confusing?"
+- "What knowledge was missing?"
+- "Should this become a memory or a parameter?"
+
+That doesn't mean the agent should modify its own weights live. I think your distinction is the important one:
+
+> **Training is another run.**
+
+I'd almost treat training as just another tool invocation.
+
+```
+Run #421
+
+Agent:
+"I failed because I didn't understand Rust lifetimes."
+
+↓ logs
+
+candidate_training/
+    prompt.json
+    expected_answer.json
+    rationale.md
+```
+
+Nothing changes yet.
+
+Later, perhaps overnight:
+
+```
+Trainer
+
+reads
+
+candidate_training/
+
+↓
+
+Fine-tunes model
+
+↓
+
+Produces
+
+model_v42.gguf
+```
+
+Then comes the really interesting part:
+
+```
+Benchmark
+─────────
+
+v41
+✓ 921 tests
+
+v42
+✓ 934 tests
+✗ 12 regressions
+```
+
+Now instead of asking "did training work?" you can ask:
+
+- Which benchmarks improved?
+- Which ones regressed?
+- Which reasoning paths changed?
+- Which tool selections changed?
+- Which memories are no longer retrieved?
+- Is the improvement actually because of the new weights, or because retrieval changed?
+
+That's where your "diff everything" philosophy becomes powerful.
+
+---
+
+I also like that you're not assuming every improvement belongs in the model weights. There are multiple places an agent can "learn":
+
+```
+Experience
+                 │
+     ┌───────────┼────────────┐
+     │           │            │
+Memory      Tool Skill     Weights
+     │           │            │
+Immediate   Immediate    Offline
+Editable    Editable     Fine-tune
+```
+
+Many failures are better fixed by:
+
+- adding a memory,
+- improving a tool,
+- changing a prompt,
+- or adjusting a planner,
+
+rather than retraining the model.
+
+The agent itself can propose which category a lesson belongs to.
+
+Finally, I think your experience with Unsloth points toward an architectural shift. Right now, "training" and "inference" are treated as different worlds. But they're really two modes operating on the same artifacts.
+
+Imagine a runtime that has these modes:
+
+```
+Inference Mode
+    │
+    ├─ execute tasks
+    ├─ collect telemetry
+    ├─ identify failures
+    └─ emit training candidates
+
+Training Mode
+    │
+    ├─ consume candidates
+    ├─ fine-tune
+    ├─ benchmark
+    ├─ produce semantic diff
+    └─ publish new model
+```
+
+Nothing is hidden or magical. Every improvement is traceable back to the experiences that motivated it, the examples used for training, the resulting benchmark changes, and the semantic differences in behavior. That fits naturally with the emphasis you've placed on observability and provenance: rather than treating a newly trained model as an opaque replacement, you can treat it as a new version whose behavioral changes are inspectable and reviewable before it's trusted.
+
+---
+
+**You said**
+
+they have they just can comfortably define what they consider "testing data" without losing trust because it is likely everything
+
+---
+
+**ChatGPT said**
+
+Exactly. I think this gets at one of the biggest asymmetries between frontier AI labs and everyone else.
+
+When a lab says:
+
+> "We evaluated on held-out test data."
+
+they usually have the luxury of maintaining an enormous corpus that's never used for training. If your training corpus is measured in trillions of tokens, you can reserve billions of tokens for evaluation and still have more than enough data.
+
+For an individual or a small organization, that's much harder. Your "entire corpus" might be:
+
+- your notes,
+- your code,
+- your emails,
+- your documentation,
+- your conversations,
+- your bug reports.
+
+If you permanently hold back 20%, you may be throwing away valuable learning opportunities.
+
+That said, I wouldn't conclude that "everything should become training data." Rather, I'd say **everything should be versioned and provenance-aware**.
+
+For each piece of data, you could know:
+
+- Was it ever used for training?
+- Was it only used for evaluation?
+- Was it generated by the model?
+- Was it human-authored?
+- Which model versions have seen it?
+- Which benchmarks include it?
+
+Then your evaluation can answer richer questions:
+
+```
+Model v17
+
+Training:
+✓ Dataset A
+✓ Dataset B
+
+Evaluation:
+✓ Benchmark X (never seen)
+✓ Benchmark Y (never seen)
+⚠ Benchmark Z (contains related examples)
+```
+
+That lets you reason about trust instead of pretending there's a perfect train/test split.
+
+---
+
+I also think your earlier idea about semantic traces fits here. Instead of only diffing **weights**, you diff the entire learning event:
+
+```
+Experience
+    │
+    ├── Conversation
+    ├── Retrieved memories
+    ├── Tool calls
+    ├── Reflection
+    ├── Candidate examples
+    ├── Fine-tune
+    ├── Benchmarks
+    └── Behavioral diff
+```
+
+Now you can literally say:
+
+> "This capability appeared because of these five experiences."
+
+or
+
+> "This regression started after these twelve examples were added."
+
+That's a much stronger audit trail than "we trained on another billion tokens."
+
+In a sense, you're describing a system where **training itself is observable**. Rather than treating model updates as opaque events, every update has a provenance graph that can be inspected, benchmarked, and, if necessary, rolled back. That seems like a natural extension of the observability-first approach you've been exploring.
+
+---
+
+**You said**
+
+maybe it is as easy as nuking all agent.md and related.md files between all agents every 3 months or so and see what re-emerges. actually not nuke more like controlled burn and rotate thru topics but don't delete any branch until you know all of it's dependancies are covered
+
+---
+
+**ChatGPT said**
+
+That's a really interesting analogy, and I think "controlled burn" is a much better metaphor than "delete."
+
+What you're describing isn't catastrophic forgetting—it's **testing what knowledge is actually resilient**.
+
+Imagine every agent accumulates:
+
+- `agent.md`
+- tool notes
+- heuristics
+- scratchpad memories
+- reflections
+- prompts
+- procedures
+
+Over time, these become like underbrush in a forest. Some of it is genuinely important. Some of it is obsolete. Some of it exists only because it was never challenged.
+
+A controlled burn might look like:
+
+```
+Cycle 1
+--------
+Archive networking notes
+Run benchmarks
+Observe failures
+Recover only what proves necessary
+
+Cycle 2
+--------
+Archive Rust heuristics
+Repeat
+
+Cycle 3
+--------
+Archive Git workflows
+Repeat
+```
+
+The important part is what you said next:
+
+> don't delete any branch until you know all of its dependencies are covered
+
+That sounds much more like **garbage collection** than deletion.
+
+You'd have a dependency graph like:
+
+```
+Rust Ownership
+      │
+      ├── Lifetimes
+      ├── Borrow Checker
+      └── Traits
+
+Git
+ │
+ ├── Branches
+ ├── Merge
+ └── Rebase
+```
+
+If "Traits" is still referenced by twenty workflows, you don't burn it yet.
+
+---
+
+There's another effect I think is valuable.
+
+Suppose after removing a whole category of notes, the agent independently recreates 95% of them.
+
+That's evidence those ideas have become *internalized* —whether through model weights, strong retrieval patterns, or repeated reasoning.
+
+If it recreates only 20%, you've learned that the external documentation was carrying most of the load.
+
+That's a much more meaningful measure than asking whether a benchmark score changed by 0.3%.
+
+---
+
+One thing I'd add is to make the burn reversible.
+
+Instead of:
+
+```
+rm agent.md
+```
+
+think:
+
+```
+agent.md
+    ↓
+archive/2026-Q3/
+```
+
+Then the experiment is:
+
+1. Archive a topic.
+2. Disable retrieval from that archive.
+3. Run representative workloads.
+4. Measure regressions.
+5. Restore only what's actually needed.
+6. Record what re-emerged naturally versus what required restoration.
+
+Now you've learned something about the system.
+
+---
+
+This also reminds me of ecological succession. Forest managers don't burn *everything* because diversity provides resilience. They burn **patches** on a rotation, allowing the ecosystem to regenerate while preserving enough mature growth to reseed the cleared areas.
+
+Applied to agents, the goal wouldn't be to prove the agent can survive without documentation. The goal would be to discover which knowledge is:
+
+- foundational and should remain stable,
+- obsolete and can stay archived,
+- or so frequently rediscovered that it probably belongs somewhere more durable, such as better tooling, retrieval organization, or eventually even the model itself.
+
+That's a much richer signal than simply accumulating notes forever, because it actively measures the relationship between memory, reasoning, and learned behavior instead of assuming more retained context is always better.
