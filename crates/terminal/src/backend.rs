@@ -25,26 +25,20 @@ pub trait TerminalBackend: std::fmt::Debug + Send + Sync {
     fn name(&self) -> &str;
 
     /// Check if this backend is available on the system
-    fn is_available() -> bool where Self: Sized;
+    fn is_available() -> bool
+    where
+        Self: Sized;
 
     /// Spawn a new detached terminal session.
     ///
     /// Returns a `SpawnResult` with pane/session metadata.
-    async fn spawn(
-        &self,
-        session_name: &str,
-        working_dir: &Path,
-    ) -> anyhow::Result<SpawnResult>;
+    async fn spawn(&self, session_name: &str, working_dir: &Path) -> anyhow::Result<SpawnResult>;
 
     /// Send text/keys to an active terminal session's focused pane.
     async fn send_text(&self, session_name: &str, input: &str) -> anyhow::Result<()>;
 
     /// Read the last N lines of terminal output from a session.
-    async fn read_output(
-        &self,
-        session_name: &str,
-        lines: usize,
-    ) -> anyhow::Result<String>;
+    async fn read_output(&self, session_name: &str, lines: usize) -> anyhow::Result<String>;
 
     /// Kill/terminate an entire terminal session.
     async fn kill_session(&self, session_name: &str) -> anyhow::Result<()>;

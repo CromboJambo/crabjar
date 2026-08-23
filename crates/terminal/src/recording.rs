@@ -70,11 +70,7 @@ pub struct AsciinemaRecorder {
 
 impl AsciinemaRecorder {
     /// Create a new recorder with the given session metadata.
-    pub fn new(
-        session_name: &str,
-        backend: &str,
-        output_path: PathBuf,
-    ) -> Self {
+    pub fn new(session_name: &str, backend: &str, output_path: PathBuf) -> Self {
         let metadata = RecordingMetadata {
             version: ASCIINEMA_VERSION,
             width: 0, // Will be set if available from terminal
@@ -131,7 +127,7 @@ impl AsciinemaRecorder {
         if let Some(ref mut writer) = self.writer {
             // Note: In a full implementation, you'd rewrite the header with correct duration
             // For now, we just close cleanly
-            
+
             writer.flush()?;
         }
 
@@ -147,7 +143,7 @@ impl AsciinemaRecorder {
         }
 
         let elapsed = self.start_time.elapsed().as_secs_f64();
-        
+
         let event = RecordingEvent {
             time: (elapsed * 1000.0).round() / 1000.0, // Millisecond precision
             event_type: 'i',
@@ -169,7 +165,7 @@ impl AsciinemaRecorder {
         }
 
         let elapsed = self.start_time.elapsed().as_secs_f64();
-        
+
         let event = RecordingEvent {
             time: (elapsed * 1000.0).round() / 1000.0,
             event_type: 'o',
