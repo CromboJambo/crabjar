@@ -70,3 +70,4 @@ Skip the formal process when:
 | # | Title | Status | Date |
 |---|-------|--------|------|
 | 001 | Specify Decision Process | Accepted | 2026-07-08 |
+| 002 | Herdr as Execution Substrate | Proposed | 2026-08-23 |
