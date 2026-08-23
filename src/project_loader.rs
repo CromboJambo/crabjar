@@ -69,7 +69,8 @@ impl ProjectLoader {
     }
 
     fn resolve_tool_path(&self, tool_path: &str) -> PathBuf {
-        let path = PathBuf::from(tool_path);
+        let expanded = expand_env(tool_path);
+        let path = PathBuf::from(&expanded);
         if path.is_absolute() {
             return path;
         }
@@ -84,6 +85,73 @@ impl ProjectLoader {
     pub fn get_current_config(&self) -> Option<&ProjectConfig> {
         self.current_config.as_ref()
     }
+}
+
+/// Expand shell-style environment variable references in a tool path.
+///
+/// Supports `${VAR}`, `${VAR:-default}`, and bare `$VAR`. Default values may
+/// contain further `$` references (e.g. `${CARGO_OXIDE_PATH:-$HOME/.cargo/bin/x}`),
+/// which are expanded recursively. Unset variables with no default expand to
+/// an empty string.
+fn expand_env(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] != '$' {
+            out.push(chars[i]);
+            i += 1;
+            continue;
+        }
+        // chars[i] == '$'
+        if i + 1 < chars.len() && chars[i + 1] == '{' {
+            // ${...} form
+            let start = i + 2;
+            let mut j = start;
+            while j < chars.len() && chars[j] != '}' {
+                j += 1;
+            }
+            if j >= chars.len() {
+                // Malformed (no closing brace): emit the remainder as-is.
+                out.push_str(&input[i..]);
+                break;
+            }
+            let inner: String = chars[start..j].iter().collect();
+            let (name, default) = match inner.split_once(":-") {
+                Some((n, d)) => (n.to_string(), Some(d.to_string())),
+                None => (inner.clone(), None),
+            };
+            match std::env::var(&name).ok().filter(|v| !v.is_empty()) {
+                Some(v) => out.push_str(&v),
+                None => {
+                    if let Some(d) = default {
+                        out.push_str(&expand_env(&d));
+                    }
+                }
+            }
+            i = j + 1;
+        } else if i + 1 < chars.len() {
+            // Bare $VAR
+            let mut j = i + 1;
+            while j < chars.len() && (chars[j].is_alphanumeric() || chars[j] == '_') {
+                j += 1;
+            }
+            if j == i + 1 {
+                // '$' not followed by a name char: literal.
+                out.push('$');
+                i += 1;
+            } else {
+                let name: String = chars[i + 1..j].iter().collect();
+                out.push_str(&std::env::var(&name).unwrap_or_default());
+                i = j;
+            }
+        } else {
+            // Trailing '$'
+            out.push('$');
+            i += 1;
+        }
+    }
+    out
 }
 
 #[cfg(test)]
@@ -216,5 +284,73 @@ commands = ["cmd1"]
         loader.load_from_directory(dir.path()).await.unwrap();
 
         assert!(loader.get_current_config().is_none());
+    }
+
+    #[test]
+    fn test_expand_env_plain_var() {
+        unsafe { std::env::set_var("CRABJAR_TEST_TOOL_PATH", "/opt/tools/tool") };
+        assert_eq!(expand_env("$CRABJAR_TEST_TOOL_PATH"), "/opt/tools/tool");
+        assert_eq!(expand_env("${CRABJAR_TEST_TOOL_PATH}"), "/opt/tools/tool");
+        unsafe { std::env::remove_var("CRABJAR_TEST_TOOL_PATH") };
+    }
+
+    #[test]
+    fn test_expand_env_default_when_unset() {
+        unsafe { std::env::remove_var("CRABJAR_TEST_UNSET_VAR") };
+        assert_eq!(
+            expand_env("${CRABJAR_TEST_UNSET_VAR:-/fallback/tool}"),
+            "/fallback/tool"
+        );
+    }
+
+    #[test]
+    fn test_expand_env_nested_default() {
+        // The real-world shape: ${VAR:-$HOME/...}
+        let home = std::env::var("HOME").unwrap();
+        assert_eq!(
+            expand_env("${CRABJAR_TEST_UNSET_VAR:-$HOME/.cargo/bin/cargo-oxide}"),
+            format!("{home}/.cargo/bin/cargo-oxide")
+        );
+    }
+
+    #[test]
+    fn test_expand_env_var_wins_over_default() {
+        unsafe { std::env::set_var("CRABJAR_TEST_TOOL_PATH", "/primary/tool") };
+        assert_eq!(
+            expand_env("${CRABJAR_TEST_TOOL_PATH:-/fallback/tool}"),
+            "/primary/tool"
+        );
+        unsafe { std::env::remove_var("CRABJAR_TEST_TOOL_PATH") };
+    }
+
+    #[test]
+    fn test_expand_env_unset_no_default_is_empty() {
+        unsafe { std::env::remove_var("CRABJAR_TEST_UNSET_VAR") };
+        assert_eq!(expand_env("${CRABJAR_TEST_UNSET_VAR}/suffix"), "/suffix");
+    }
+
+    #[test]
+    fn test_expand_env_literal_dollar_and_malformed() {
+        // `$5` is a valid name in this impl (alphanumeric, bash positional
+        // param semantics) so it expands to empty; `${broken` has no closing
+        // brace and is emitted as-is.
+        assert_eq!(
+            expand_env("price is $5 and ${broken"),
+            "price is  and ${broken"
+        );
+        assert_eq!(expand_env("a $ b"), "a $ b");
+        assert_eq!(expand_env("trailing $"), "trailing $");
+    }
+
+    #[test]
+    fn test_resolve_tool_path_expands_env() {
+        let home = std::env::var("HOME").unwrap();
+        let loader = ProjectLoader::new();
+        let resolved =
+            loader.resolve_tool_path("${CRABJAR_TEST_UNSET_VAR:-$HOME/.cargo/bin/cargo-oxide}");
+        assert_eq!(
+            resolved,
+            std::path::PathBuf::from(format!("{home}/.cargo/bin/cargo-oxide"))
+        );
     }
 }
