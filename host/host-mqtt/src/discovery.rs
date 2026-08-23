@@ -225,7 +225,6 @@ impl HaDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::MqttConfig;
 
     #[test]
     fn test_ha_discovery_creation() {

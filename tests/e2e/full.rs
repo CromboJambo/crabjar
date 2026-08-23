@@ -64,10 +64,7 @@ tool_execution_enabled = false
     )
     .unwrap();
 
-    let output = run_in(
-        &temp,
-        &["exec", "--command=echo", "--reason=e2e-test"],
-    );
+    let output = run_in(&temp, &["exec", "--command=echo", "--reason=e2e-test"]);
     assert!(!output.status.success());
 
     let body = json_stdout(&output);
@@ -147,19 +144,55 @@ fn full_domain_allowlist_trust_layers() {
     let allowlist = crabjar_guard::DomainAllowlist::with_entries(entries);
 
     // Layer 3 (high) can access all domains
-    assert!(allowlist.check_for_trust_layer("trusted.example.com", 3).is_ok());
-    assert!(allowlist.check_for_trust_layer("monitored.example.com", 3).is_ok());
-    assert!(allowlist.check_for_trust_layer("restricted.example.com", 3).is_ok());
+    assert!(
+        allowlist
+            .check_for_trust_layer("trusted.example.com", 3)
+            .is_ok()
+    );
+    assert!(
+        allowlist
+            .check_for_trust_layer("monitored.example.com", 3)
+            .is_ok()
+    );
+    assert!(
+        allowlist
+            .check_for_trust_layer("restricted.example.com", 3)
+            .is_ok()
+    );
 
     // Layer 2 (medium) can access trusted + monitored, but not restricted
-    assert!(allowlist.check_for_trust_layer("trusted.example.com", 2).is_ok());
-    assert!(allowlist.check_for_trust_layer("monitored.example.com", 2).is_ok());
-    assert!(allowlist.check_for_trust_layer("restricted.example.com", 2).is_err());
+    assert!(
+        allowlist
+            .check_for_trust_layer("trusted.example.com", 2)
+            .is_ok()
+    );
+    assert!(
+        allowlist
+            .check_for_trust_layer("monitored.example.com", 2)
+            .is_ok()
+    );
+    assert!(
+        allowlist
+            .check_for_trust_layer("restricted.example.com", 2)
+            .is_err()
+    );
 
     // Layer 1 (low) can access trusted only
-    assert!(allowlist.check_for_trust_layer("trusted.example.com", 1).is_ok());
-    assert!(allowlist.check_for_trust_layer("monitored.example.com", 1).is_err());
-    assert!(allowlist.check_for_trust_layer("restricted.example.com", 1).is_err());
+    assert!(
+        allowlist
+            .check_for_trust_layer("trusted.example.com", 1)
+            .is_ok()
+    );
+    assert!(
+        allowlist
+            .check_for_trust_layer("monitored.example.com", 1)
+            .is_err()
+    );
+    assert!(
+        allowlist
+            .check_for_trust_layer("restricted.example.com", 1)
+            .is_err()
+    );
 }
 
 /// Direct library test: wildcard domain matching.
@@ -240,17 +273,20 @@ async fn full_telemetry_flight_recorder_cycle() {
 
     // Open connection and create flight recorder
     let conn = rusqlite::Connection::open(&db_path).unwrap();
-    let mut recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
-        &conn,
-        "e2e-test-session",
-    );
+    let mut recorder =
+        crabjar_telemetry::flight_recorder::FlightRecorder::new(&conn, "e2e-test-session");
 
     // Init schema
     recorder.init().expect("flight recorder init failed");
 
     // Execute a command (spawns echo subprocess)
     let cmd_id = recorder
-        .execute_command("echo", &["hello".to_string()], temp.path().to_str().unwrap(), "e2e-test")
+        .execute_command(
+            "echo",
+            &["hello".to_string()],
+            temp.path().to_str().unwrap(),
+            "e2e-test",
+        )
         .await
         .expect("execute_command failed");
 
@@ -258,7 +294,7 @@ async fn full_telemetry_flight_recorder_cycle() {
 
     // Query records back
     let records = recorder.query_records(10).expect("query_records failed");
-    assert!(records.len() >= 1);
+    assert!(!records.is_empty());
 
     let record = &records[0];
     assert_eq!(record.command, "echo");
@@ -271,8 +307,8 @@ async fn full_telemetry_flight_recorder_cycle() {
 /// Direct library test: WorkItemStore create → save → load → update → list_ids.
 #[tokio::test]
 async fn full_agent_loop_persistence() {
-    use crabjar_host_core::{Status, TaskStatus, WorkItem};
     use crabjar_host_agent::WorkItemStore;
+    use crabjar_host_core::{Status, TaskStatus, WorkItem};
 
     let temp = tempfile::tempdir().unwrap();
     let db_path = temp.path().join("work_items.db");
@@ -296,7 +332,9 @@ async fn full_agent_loop_persistence() {
     assert!((loaded.confidence - 0.5).abs() < f32::EPSILON);
 
     // Update status
-    wi.set_status(Status::Executing { current_task: Some(1) });
+    wi.set_status(Status::Executing {
+        current_task: Some(1),
+    });
     wi.set_confidence(0.95);
     store.save(&wi).await.expect("update save failed");
 
@@ -481,11 +519,7 @@ tool_execution_enabled = true
     // Approve a non-existent action ID — should succeed (no-op) or return structured response
     let output = run_in(
         &temp,
-        &[
-            "guard",
-            "approve",
-            "--action-id=nonexistent-e2e-test-id",
-        ],
+        &["guard", "approve", "--action-id=nonexistent-e2e-test-id"],
     );
 
     // The command may succeed with a message about the action not being found
@@ -544,7 +578,11 @@ fn full_guard_db_schema() {
         .expect("schema query failed");
 
     // Should have at least the core tables: action_requests, trust_resolutions, pending_queue, interrupted_log, etc.
-    assert!(table_count >= 4, "expected >= 4 tables, got {}", table_count);
+    assert!(
+        table_count >= 4,
+        "expected >= 4 tables, got {}",
+        table_count
+    );
 }
 
 /// Direct library test: GuardDb persist + retrieve pending queue entry.
@@ -574,9 +612,11 @@ fn full_guard_db_pending_queue() {
         .expect("persist pending entry failed");
 
     // Retrieve it back using read_pending_queue (no filter param)
-    let entries = guard_db.read_pending_queue().expect("read pending queue failed");
+    let entries = guard_db
+        .read_pending_queue()
+        .expect("read pending queue failed");
 
-    assert!(entries.len() >= 1);
+    assert!(!entries.is_empty());
     assert_eq!(entries[0].id, "e2e-test-entry");
 }
 
@@ -614,10 +654,7 @@ fn full_knowledge_lifecycle() {
     assert_eq!(verify_body["data"]["bad_ids"], Value::Array(vec![]));
 
     // List events
-    let events_output = run_in(
-        &temp,
-        &["knowledge", "events", "--limit=10"],
-    );
+    let events_output = run_in(&temp, &["knowledge", "events", "--limit=10"]);
     assert!(events_output.status.success());
     let events_body = json_stdout(&events_output);
     assert_eq!(events_body["success"], true);
@@ -640,10 +677,7 @@ fn full_knowledge_lifecycle() {
     assert_eq!(deactivate_body["data"]["id"], id);
 
     // Query should return no results for the deactivated entry's tags
-    let query_output = run_in(
-        &temp,
-        &["knowledge", "query", "--tags=lifecycle,e2e"],
-    );
+    let query_output = run_in(&temp, &["knowledge", "query", "--tags=lifecycle,e2e"]);
     assert!(query_output.status.success());
     let query_body = json_stdout(&query_output);
     assert_eq!(query_body["success"], true);

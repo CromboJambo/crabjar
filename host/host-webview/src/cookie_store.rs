@@ -330,12 +330,9 @@ mod tests {
     use super::*;
 
     fn temp_db() -> PathBuf {
-        // Create a unique temp directory and return a path inside it
+        // Create a unique temp directory and keep it alive for the test
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("cookies.db");
-        // Leak the TempDir so the directory persists for the test
-        let leaked = dir.into_path();
-        leaked.join("cookies.db")
+        dir.keep().join("cookies.db")
     }
 
     #[tokio::test]

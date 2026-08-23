@@ -143,7 +143,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
 
-        let mut recorder = FlightRecorder::new(&conn, "test-session-run");
+        let recorder = FlightRecorder::new(&conn, "test-session-run");
         recorder.init().unwrap();
 
         let mut executor = StructuredCommandExecutor::new(recorder);
@@ -168,7 +168,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let conn = rusqlite::Connection::open(dir.path().join("flight.db")).unwrap();
 
-        let mut recorder = FlightRecorder::new(&conn, "test-session-fail");
+        let recorder = FlightRecorder::new(&conn, "test-session-fail");
         recorder.init().unwrap();
 
         let mut executor = StructuredCommandExecutor::new(recorder);

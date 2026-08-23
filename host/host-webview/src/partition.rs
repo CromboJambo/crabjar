@@ -155,14 +155,14 @@ impl PartitionManager {
 }
 
 #[cfg(test)]
+#[allow(clippy::arc_with_non_send_sync)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
 
     fn temp_db() -> PathBuf {
         let dir = tempfile::tempdir().unwrap();
-        let leaked = dir.into_path();
-        leaked.join("partitions.db")
+        dir.keep().join("partitions.db")
     }
 
     #[tokio::test]

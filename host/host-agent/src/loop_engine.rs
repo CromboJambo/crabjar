@@ -8,9 +8,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::context_compression::{CompressionConfig, ContextCompressor};
 use crate::model_routing::{LoopPhase, ModelRouter};
 use crate::work_item_store::WorkItemStore;
-use crate::context_compression::{CompressionConfig, ContextCompressor};
 use crabjar_guard::Scope;
 use crabjar_host_core::work_item::Observation;
 
@@ -555,7 +555,7 @@ mod tests {
     #[tokio::test]
     async fn test_persistence_save_and_resume() {
         let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.into_path().join("work_items.db");
+        let db_path = dir.keep().join("work_items.db");
 
         let bus = Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();
@@ -589,7 +589,7 @@ mod tests {
     #[tokio::test]
     async fn test_inference_backend_heuristic_default() {
         let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.into_path().join("work_items.db");
+        let db_path = dir.keep().join("work_items.db");
 
         let bus = Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();
@@ -611,7 +611,7 @@ mod tests {
     #[tokio::test]
     async fn test_router_with_phase_config() {
         let dir = tempfile::tempdir().unwrap();
-        let db_path = dir.into_path().join("work_items.db");
+        let db_path = dir.keep().join("work_items.db");
 
         let bus = Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();

@@ -129,7 +129,7 @@ mod tests {
         let mqtt = MqttClient::new(MqttConfig::default());
         let config = MqttConfig::default();
         let bridge = MediaBridge::new(mqtt, config);
-        assert!(bridge.mqtt.is_enabled() == false);
+        assert!(!bridge.mqtt.is_enabled());
     }
 
     #[test]

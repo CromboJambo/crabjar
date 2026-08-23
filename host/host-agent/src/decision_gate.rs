@@ -247,17 +247,13 @@ impl DecisionGate {
         }
 
         // Find the first pending/in-progress task and recommend it
-        if let Some(task) = work_item
-            .plan
-            .iter()
-            .find(|t| {
-                matches!(
-                    t.status,
-                    crabjar_host_core::work_item::TaskStatus::Pending
-                        | crabjar_host_core::work_item::TaskStatus::InProgress
-                )
-            })
-        {
+        if let Some(task) = work_item.plan.iter().find(|t| {
+            matches!(
+                t.status,
+                crabjar_host_core::work_item::TaskStatus::Pending
+                    | crabjar_host_core::work_item::TaskStatus::InProgress
+            )
+        }) {
             // Extract tool name from task description (first word)
             let tool_name = task
                 .description
@@ -359,7 +355,13 @@ mod tests {
         let gate = DecisionGate::default_gate();
         let mut wi = make_work_item("test objective");
         wi.add_task("task 1");
-        wi.update_task(0, TaskStatus::Failed { reason: "error".into() }, None);
+        wi.update_task(
+            0,
+            TaskStatus::Failed {
+                reason: "error".into(),
+            },
+            None,
+        );
         wi.set_confidence(0.2);
 
         let decision = gate.decide(&wi);
@@ -377,7 +379,7 @@ mod tests {
 
         // Add 3 completed tasks
         for i in 0..3 {
-            wi.add_task(&format!("task {}", i));
+            wi.add_task(format!("task {}", i));
             wi.update_task(i, TaskStatus::Completed, Some("done".into()));
         }
         // Add 1 pending task

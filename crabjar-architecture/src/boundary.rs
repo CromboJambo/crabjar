@@ -289,9 +289,7 @@ mod tests {
         let allowed = allowed_dependencies(guard_layer);
         assert!(
             allowed.contains(&context_layer),
-            "guard (layer {}) should be able to depend on agent-context (layer {})",
-            guard_layer,
-            context_layer
+            "guard (layer {guard_layer}) should be able to depend on agent-context (layer {context_layer})"
         );
     }
 
@@ -304,9 +302,7 @@ mod tests {
         let allowed = allowed_dependencies(orch_layer);
         assert!(
             allowed.contains(&guard_layer),
-            "orchestrator (layer {}) should be able to depend on guard (layer {})",
-            orch_layer,
-            guard_layer
+            "orchestrator (layer {orch_layer}) should be able to depend on guard (layer {guard_layer})"
         );
     }
 
@@ -409,9 +405,7 @@ mod tests {
             let crate_layer = layer_map[host_crate];
             assert!(
                 allowed.contains(&crate_layer),
-                "crabjar-host (layer {}) should depend on {}",
-                host_layer,
-                host_crate
+                "crabjar-host (layer {host_layer}) should depend on {host_crate}"
             );
         }
     }
@@ -488,7 +482,7 @@ mod tests {
             result
                 .unwrap_err()
                 .iter()
-                .map(|v| v.to_string())
+                .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join("\n")
         );

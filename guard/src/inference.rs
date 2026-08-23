@@ -147,7 +147,6 @@ impl ModelInferenceOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action::ActionStatus;
     use crate::trust_types::TrustScore;
 
     #[test]
@@ -321,6 +320,9 @@ mod tests {
             false,
         )
         .with_skill_residue("skill-residue-data");
-        assert_eq!(outcome.skill_residue, Some("skill-residue-data".to_string()));
+        assert_eq!(
+            outcome.skill_residue,
+            Some("skill-residue-data".to_string())
+        );
     }
 }

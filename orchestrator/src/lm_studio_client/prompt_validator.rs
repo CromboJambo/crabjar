@@ -8,7 +8,7 @@
 //! - XML/HTML tag spoofing of system content
 //! - Markdown code block command injection
 
-use super::prompt_types::{PromptEnvelope, PromptMetadata, PromptError, SourceLabel};
+use super::prompt_types::{PromptEnvelope, PromptError, PromptMetadata, SourceLabel};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Validation rules for prompt content.
@@ -164,13 +164,23 @@ impl PromptValidator {
 
         // Boundary markers that could trick the model into thinking it's reading a new section.
         let boundary_markers = [
-            "---\n", "\n---\n", "...\n", "\n...\n", "\n\n---\n", "---\n\n", "```\n", "\n```\n",
+            "---\n",
+            "\n---\n",
+            "...\n",
+            "\n...\n",
+            "\n\n---\n",
+            "---\n\n",
+            "```\n",
+            "\n```\n",
         ];
 
         for marker in &boundary_markers {
             if user_text.starts_with(marker) {
                 return Err(PromptError::InjectionDetected {
-                    pattern: format!("boundary marker '{}' at start of user content", marker.trim()),
+                    pattern: format!(
+                        "boundary marker '{}' at start of user content",
+                        marker.trim()
+                    ),
                     in_source: envelope.user_content.label,
                 });
             }
@@ -192,8 +202,11 @@ impl PromptValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lm_studio_client::prompt_types::{compute_provenance, LabeledContent, PromptEnvelope};
-    
+    use crate::lm_studio_client::prompt_types::{
+        LabeledContent, PromptEnvelope, compute_provenance,
+    };
+    use crate::lm_studio_client::types::LmStudioEndpoint;
+
     // ---- SourceLabel tests ----
 
     #[test]

@@ -165,9 +165,7 @@ mod tests {
 
     fn temp_db() -> PathBuf {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("work_items.db");
-        let leaked = dir.into_path();
-        leaked.join("work_items.db")
+        dir.keep().join("work_items.db")
     }
 
     fn sample_work_item() -> WorkItem {

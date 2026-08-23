@@ -331,6 +331,7 @@ pub enum AuthError {
 }
 
 #[cfg(test)]
+#[allow(clippy::arc_with_non_send_sync)]
 mod tests {
     use super::*;
 
@@ -367,7 +368,6 @@ mod tests {
         let challenge = generate_pkce_code_challenge();
         // Base64URL encoded SHA256 of a UUID string = 43 chars
         assert!(!challenge.is_empty());
-        assert!(challenge.len() > 0);
         // Should only contain URL-safe base64 characters
         for c in challenge.chars() {
             assert!(c.is_alphanumeric() || c == '-' || c == '_');
