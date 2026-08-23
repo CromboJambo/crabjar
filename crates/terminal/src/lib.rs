@@ -61,6 +61,7 @@
 //! ```
 
 pub mod backend;
+mod herdr;
 mod recording;
 mod wezterm;
 mod zellij;
@@ -68,6 +69,7 @@ mod zellij;
 use std::path::{Path, PathBuf};
 
 pub use backend::*;
+pub use herdr::HerdrBackend;
 pub use recording::*;
 pub use wezterm::WeztermBackend;
 pub use zellij::ZellijBackend;
@@ -103,7 +105,11 @@ pub struct TerminalSession {
 
 impl TerminalSession {
     /// Create a new terminal session with the given backend
-    pub fn new(backend: Box<dyn TerminalBackend + Send + Sync>, name: &str, working_dir: PathBuf) -> Self {
+    pub fn new(
+        backend: Box<dyn TerminalBackend + Send + Sync>,
+        name: &str,
+        working_dir: PathBuf,
+    ) -> Self {
         Self {
             backend,
             session_name: name.to_string(),
@@ -116,16 +122,16 @@ impl TerminalSession {
     /// Spawn a new detached terminal session
     pub async fn spawn(&mut self) -> anyhow::Result<()> {
         tracing::info!(session = %self.session_name, backend = ?self.backend.name(), "spawning terminal session");
-        
-        let result = self.backend.spawn(
-            &self.session_name,
-            &self.working_dir,
-        ).await?;
-        
+
+        let result = self
+            .backend
+            .spawn(&self.session_name, &self.working_dir)
+            .await?;
+
         if let Some(pane) = &result.pane_id {
             self.pane_id = Some(pane.clone());
         }
-        
+
         Ok(())
     }
 
@@ -144,10 +150,10 @@ impl TerminalSession {
     /// Capture a snapshot of the current terminal state
     pub async fn snapshot(&self) -> anyhow::Result<Snapshot> {
         tracing::debug!(session = %self.session_name, "capturing terminal snapshot");
-        
+
         let output = self.backend.read_output(&self.session_name, 100).await?;
         let line_vec: Vec<String> = output.lines().map(|l| l.to_string()).collect();
-        
+
         Ok(Snapshot {
             session_name: self.session_name.clone(),
             backend: self.backend.name().to_string(),
@@ -162,28 +168,28 @@ impl TerminalSession {
     /// Start recording this session as asciinema v2
     pub async fn record(&mut self, output_path: &Path) -> anyhow::Result<PathBuf> {
         tracing::info!(session = %self.session_name, path = ?output_path, "starting asciinema recording");
-        
+
         let mut recorder = AsciinemaRecorder::new(
             &self.session_name,
             self.backend.name(),
             output_path.to_path_buf(),
         );
-        
+
         recorder.start()?;
         self.recorder = Some(recorder);
-        
+
         Ok(output_path.to_path_buf())
     }
 
     /// Stop recording (if active) and terminate the session
     pub async fn stop(&mut self) -> anyhow::Result<()> {
         tracing::info!(session = %self.session_name, "stopping terminal session");
-        
+
         // Stop recorder first if active
         if let Some(ref mut recorder) = self.recorder.take() {
             recorder.stop()?;
         }
-        
+
         self.backend.kill_session(&self.session_name).await
     }
 
@@ -213,7 +219,11 @@ impl TerminalManager {
     }
 
     /// Create a new terminal session with auto-detection (wezterm > zellij)
-    pub fn create_session(&mut self, name: &str, working_dir: PathBuf) -> anyhow::Result<TerminalSession> {
+    pub fn create_session(
+        &mut self,
+        name: &str,
+        working_dir: PathBuf,
+    ) -> anyhow::Result<TerminalSession> {
         // Auto-detect backend: prefer wezterm, fall back to zellij
         let backend_name = if WeztermBackend::is_available() {
             "wezterm"
@@ -230,7 +240,7 @@ impl TerminalManager {
         };
 
         let session = TerminalSession::new(backend, name, working_dir);
-        
+
         tracing::info!(session = %name, backend = backend_name, "created terminal session");
         Ok(session)
     }

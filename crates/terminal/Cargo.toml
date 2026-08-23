@@ -31,3 +31,7 @@ tracing = { workspace = true }
 
 # Time
 chrono = { workspace = true, features = ["serde"] }
+
+[dev-dependencies]
+# Scratch dirs for the herdr-spike example
+tempfile = { workspace = true }
