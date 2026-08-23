@@ -209,6 +209,8 @@ rusqlite.workspace = true
 
 # CLI parsing
 clap.workspace = true
+crossterm.workspace = true
+ratatui.workspace = true
 
 # UUID
 uuid.workspace = true
