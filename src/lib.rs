@@ -96,6 +96,12 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: MetricsCommand,
     },
+
+    /// Spatial habitat: positioned computational state (ADR-003)
+    Habitat {
+        #[command(subcommand)]
+        command: HabitatCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -380,6 +386,76 @@ pub enum MetricsCommand {
     Tests,
     /// Run just the module size check (500 LoC rule)
     Modules,
+}
+
+/// Spatial habitat subcommands (ADR-003)
+#[derive(Debug, Subcommand, Clone)]
+pub enum HabitatCommand {
+    /// Render the habitat snapshot (areas, entities, divergences)
+    Snapshot {
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Create (or reuse) a coarse-geometry area
+    AddArea {
+        /// Area name (e.g. "desk")
+        name: String,
+        /// Grid width in cells
+        #[arg(long, default_value_t = 16)]
+        grid_w: i64,
+        /// Grid height in cells
+        #[arg(long, default_value_t = 4)]
+        grid_h: i64,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Place (or move) a positioned entity in the model
+    Place {
+        /// Stable entity id (e.g. a guard pending-entry id or agent id)
+        id: String,
+        /// Area name to place the entity in
+        #[arg(long)]
+        area: String,
+        /// Entity kind: agent, artifact, pending_guard_action, suspended_runtime, unresolved_decision
+        #[arg(long)]
+        kind: String,
+        /// State string (for agents: working/blocked/idle)
+        #[arg(long, default_value = "idle")]
+        state: String,
+        /// Human-readable label
+        #[arg(long, default_value = "")]
+        label: String,
+        /// Grid x position
+        #[arg(long)]
+        x: i64,
+        /// Grid y position
+        #[arg(long)]
+        y: i64,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Record a divergence between physical environment and model (exposed, never auto-corrected)
+    Divergence {
+        /// Area name the divergence concerns
+        #[arg(long)]
+        area: String,
+        /// Description of the discrepancy
+        description: String,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Resolve a divergence (the human decided which side is authoritative)
+    Resolve {
+        /// Divergence id
+        id: i64,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
 }
 
 pub mod bitwarden;

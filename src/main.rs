@@ -13,7 +13,7 @@ mod tool_registry_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
 use crabjar_lib::{
-    BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
+    BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand, HabitatCommand,
     KnowledgeCommand, MetricsCommand, ToolCommand,
 };
 use doctor::handle_doctor_command;
@@ -81,6 +81,8 @@ async fn main() {
             .await
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Metrics { command }) => handle_metrics_command(command)
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Habitat { command }) => handle_habitat_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         None => {
             print_json(&error_response("missing command", true));
@@ -353,6 +355,133 @@ fn handle_dotfile_command(
 
     match command {
         DotfileCommand::Promote { path } => manager.propose(&path, &path),
+    }
+}
+
+/// Handle spatial habitat commands (SQLite-backed via agent_context::habitat, ADR-003).
+fn handle_habitat_command(
+    command: HabitatCommand,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    match command {
+        HabitatCommand::Snapshot { db_path } => {
+            let store = agent_context::habitat::HabitatStore::open(&db_path)?;
+            let snap = store.snapshot()?;
+            Ok(json!({
+                "success": true,
+                "message": format!(
+                    "habitat snapshot: {} areas, {} entities, {} open divergences",
+                    snap.areas.len(),
+                    snap.clutter(),
+                    snap.open_divergences()
+                ),
+                "payload": {
+                    "areas": snap.areas,
+                    "entities": snap.entities,
+                    "divergences": snap.divergences,
+                    "clutter": snap.clutter(),
+                    "open_divergences": snap.open_divergences(),
+                },
+                "doubt": {
+                    "assumptions": [
+                        "positions are user-placed or HA-area-derived; the model does not scan physical geometry",
+                        "entity state strings are free-form; agent states expected to be working/blocked/idle",
+                    ],
+                    "blind_spots": [
+                        "no physical sensor coupling yet (host-mqtt seam unconnected)",
+                        "divergence records are only as good as the observations that create them",
+                    ],
+                    "last_validation": "snapshot read from habitat.db at invocation time",
+                    "stale_after": "immediately after any entity placement or divergence record",
+                },
+            }))
+        }
+        HabitatCommand::AddArea {
+            name,
+            grid_w,
+            grid_h,
+            db_path,
+        } => {
+            let store = agent_context::habitat::HabitatStore::open(&db_path)?;
+            let id = store.upsert_area(&name, grid_w, grid_h)?;
+            Ok(json!({
+                "success": true,
+                "message": format!("area '{}' ready (id {})", name, id),
+                "payload": { "area": { "id": id, "name": name, "grid_w": grid_w, "grid_h": grid_h } },
+            }))
+        }
+        HabitatCommand::Place {
+            id,
+            area,
+            kind,
+            state,
+            label,
+            x,
+            y,
+            db_path,
+        } => {
+            let parsed_kind = agent_context::habitat::EntityKind::parse(&kind).ok_or_else(|| {
+                format!(
+                    "unknown entity kind '{}' (expected one of: agent, artifact, pending_guard_action, suspended_runtime, unresolved_decision)",
+                    kind
+                )
+            })?;
+            let store = agent_context::habitat::HabitatStore::open(&db_path)?;
+            let area_id = store
+                .area_id_by_name(&area)?
+                .ok_or_else(|| format!("area '{}' not found; run `crabjar habitat add-area` first", area))?;
+            let entity = agent_context::habitat::HabitatEntity {
+                id: id.clone(),
+                area_id,
+                kind: parsed_kind,
+                state: state.clone(),
+                label: label.clone(),
+                x,
+                y,
+                created_at: String::new(),
+                updated_at: String::new(),
+            };
+            store.upsert_entity(&entity)?;
+            Ok(json!({
+                "success": true,
+                "message": format!("entity '{}' placed in '{}' at ({}, {})", id, area, x, y),
+                "payload": {
+                    "entity": {
+                        "id": id,
+                        "area": area,
+                        "kind": kind,
+                        "state": state,
+                        "label": label,
+                        "x": x,
+                        "y": y,
+                    }
+                },
+            }))
+        }
+        HabitatCommand::Divergence {
+            area,
+            description,
+            db_path,
+        } => {
+            let store = agent_context::habitat::HabitatStore::open(&db_path)?;
+            let area_id = store
+                .area_id_by_name(&area)?
+                .ok_or_else(|| format!("area '{}' not found; run `crabjar habitat add-area` first", area))?;
+            let id = store.record_divergence(area_id, &description)?;
+            Ok(json!({
+                "success": true,
+                "message": "divergence recorded — exposed, not auto-corrected",
+                "payload": { "divergence": { "id": id, "area": area, "description": description, "status": "open" } },
+            }))
+        }
+        HabitatCommand::Resolve { id, db_path } => {
+            let store = agent_context::habitat::HabitatStore::open(&db_path)?;
+            store.resolve_divergence(id)?;
+            Ok(json!({
+                "success": true,
+                "message": format!("divergence {} resolved", id),
+                "payload": { "divergence": { "id": id, "status": "resolved" } },
+            }))
+        }
     }
 }
 
