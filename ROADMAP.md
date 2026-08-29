@@ -41,6 +41,35 @@
 
 ---
 
+## Recently Completed (August 23, 2026)
+
+### Spatial Habitat ADR ✅ DONE (Proposed)
+
+**Status:** `specs/ADR-003_spatial_habitat_layer.md` (Proposed) — pins the spatial layer from the "Multiplexed Agent Spreadsheet" conversation.
+
+- Crabjar owns a persistent **spatial habitat**: a model of the user's lived environment over which computational state (agents, artifacts, pending guard actions, suspended runtimes) is laid out. Clutter = memory; a messy desk is unresolved state made visible.
+- **HA is the physical truth source and does not own the virtual world** — HA says "the desk is here, 22.4°C, someone sitting"; crabjar says "three agents and an unresolved decision are here". Seam: `host/host-mqtt` (MQTT + HA discovery, layer 4).
+- **Low-fidelity rendering is a constraint, not an aesthetic** — the render is a persistent diagram of computational life, not a videogame apartment; realism invites performing the environment instead of representing state.
+- **Divergence is exposed, never auto-corrected** — "physical environment and spatial model diverged" is surfaced to the human; the user owns the desync. Detection ≠ authorization applied to representation.
+- Cross-referenced with [[ADR-002]] (flywheel/mechanism/clutch/frontend nouns; the spreadsheet and habitat are the same "addressable cell consuming the clutch" primitive).
+
+**Next artifact (per ADR-003):** habitat spike — SQLite-backed position store + TUI panel rendering pending guard actions and agent states as positioned entities.
+
+### Herdr Backend Spike ✅ DONE
+
+**Status:** `crates/terminal/src/herdr.rs` (374 LoC) — third `TerminalBackend` implementation per [[ADR-002]] decision 5.
+
+- Session → Herdr workspace mapping: `spawn` → `workspace create`, `send_text`/`read_output` → `pane send-text`/`pane read --source visible`, `kill_session` → `workspace close`, splits → `pane split`
+- Connection state carried in backend (binary path + reserved socket path); `is_available_async()` = binary on PATH **and** server reachable
+- `agent_status()` exposes Herdr's `working`/`blocked`/`idle`/`done` states (feeds the guard approval flow per ADR-002)
+- Spike caveats documented inline: root-pane-only I/O, no reconnection, agent state not yet wired into `TerminalSession`
+
+### ADR-002: Herdr as Execution Substrate ✅ DONE (Proposed)
+
+**Status:** `specs/ADR-002_herdr_as_execution_substrate.md` (Proposed) — pins the crabjar/Herdr split: Herdr is the execution substrate (flywheel/mechanism), crabjar is the trust layer (clutch), integration mode is client/orchestrator, trust boundary stays on the crabjar side of the seam.
+
+---
+
 ## Recently Completed (July 8, 2026)
 
 ### ADR Process ✅ DONE
