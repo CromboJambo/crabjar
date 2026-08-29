@@ -3,7 +3,7 @@ id: ADR-002
 title: Herdr as Execution Substrate
 status: Proposed
 date: 2026-08-23
-see_also: [[ADR-001]]
+see_also: [[ADR-001]], [[ADR-003]]
 ---
 
 # ADR-002: Herdr as Execution Substrate
