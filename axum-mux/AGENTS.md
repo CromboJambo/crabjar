@@ -14,7 +14,7 @@ Layer 3: runtime — execution runtime, may depend on layers 0, 1, 2, 3.
 
 ## Key Files
 
-- `src/lib.rs` — crate entry point
+- `src/main.rs` — binary entry (supervisor/worker re-exec model)
 - WebSocket proxy logic
 - Process supervisor logic
 
@@ -24,6 +24,6 @@ Layer 3: runtime — execution runtime, may depend on layers 0, 1, 2, 3.
 
 ## Pitfalls
 
-- vm-bridge has no lib target (WASM-only) — host-screen and apps/teams reference it but it won't compile on native
+- vm-bridge is binary-only (no lib target) but a *native* binary (tokio + axum, no wasm) — it builds fine on native. Do not add it as a library dependency; nothing embeds it (see ADR-005)
 - Hardened by design: no protocol parsing, just byte transport
 - Can be extended with screen sharing in the future

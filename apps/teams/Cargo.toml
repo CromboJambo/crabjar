@@ -16,7 +16,6 @@ async-trait.workspace = true
 crabjar-host-core = { path = "../../host/host-core" }
 crabjar-host-system = { path = "../../host/host-system" }
 crabjar-host-webview = { path = "../../host/host-webview" }
-vm-bridge = { path = "../../axum-mux" }
 
 [dev-dependencies]
 tempfile.workspace = true

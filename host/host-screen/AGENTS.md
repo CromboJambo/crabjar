@@ -21,11 +21,11 @@ Layer 4: host — host runtime crates, may depend on layers 0, 1, 2, 3, 4.
 
 ## Dependencies
 
-- tokio, async-trait, thiserror, tracing, anyhow, serde, serde_json, reqwest, futures-core, vm-bridge, rtp
+- tokio, async-trait, thiserror, tracing, anyhow, serde, serde_json, reqwest, futures-core, rtp
 
 ## Pitfalls
 
-- vm-bridge has no lib target (WASM-only) — this crate references it but it won't compile on native
+- vm-bridge (axum-mux) is a binary-only native crate (no lib target) — do not add it as a library dependency; it is not used by this crate
 - Screen capture requires different implementations for X11 vs. Wayland
 - PipeWire is the primary capture source on Wayland
 - Audio capture needs separate handling for microphone vs. system audio

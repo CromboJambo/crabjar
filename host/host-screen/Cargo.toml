@@ -16,8 +16,5 @@ serde_json.workspace = true
 reqwest.workspace = true
 futures-core = "0.3"
 
-# vm-bridge integration
-vm-bridge = { path = "../../axum-mux" }
-
 # Screen capture
 rtp = { version = "0.6", optional = true }

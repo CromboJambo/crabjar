@@ -20,11 +20,11 @@ Layer 5: product — product-facing crates, may depend on layers 0, 1, 2, 3, 4, 
 
 ## Dependencies
 
-- tokio, serde, serde_json, tracing, uuid, chrono, async-trait, crabjar-host-core, crabjar-host-system, crabjar-host-webview, vm-bridge, tempfile
+- tokio, serde, serde_json, tracing, uuid, chrono, async-trait, crabjar-host-core, crabjar-host-system, crabjar-host-webview, tempfile
 
 ## Pitfalls
 
-- vm-bridge has no lib target (WASM-only) — this crate references it but it won't compile on native
+- vm-bridge (axum-mux) is a binary-only native crate (no lib target) — do not add it as a library dependency; it is not used by this crate
 - Teams plugin is the reference application — follow its patterns for new plugins
 - JSON-RPC messages must conform to the plugin protocol schema
 - Session lifecycle must handle disconnect/reconnect gracefully

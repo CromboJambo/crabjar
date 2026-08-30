@@ -39,11 +39,12 @@ representation, not over versions"):
 The operational consequence the user named: *fleet agents and internal agents
 need to know if they are inside looking out or outside looking in, and face the
 right direction when they shout orders.* Without that orientation, agents couple
-across the glass. The counterexample already in the tree is `vm-bridge`
-(directory `axum-mux/`, no lib target, WASM-only): `host-screen` — an
-abstraction over display protocols — depends on it, so the concrete has welded
+across the glass. The counterexample already in the tree was `vm-bridge`
+(directory `axum-mux/`, binary-only, no lib target): `host-screen` — an
+abstraction over display protocols — depended on it, so the concrete had welded
 *through* the glass to another concrete. That is the failure mode the rule
-exists to prevent.
+exists to prevent. (The dead deps were dropped 2026-08-30; the naming
+counterexample stands.)
 
 Forces at play:
 
