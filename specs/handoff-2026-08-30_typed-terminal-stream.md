@@ -168,10 +168,20 @@ asciinema's relative times); v1 records still parse (`at` defaults to the
 epoch). Asciinema v2 stays a **lossy** projection — documented in the
 module.
 
-### 5. Make the relay a thin `TerminalEvent` transport
-`axum-mux/src/terminal_relay.rs` forwards `TerminalEvent` frames (replacing the
-"drops input silently" stub at line 253). It owns no session state. The
-SPICE/VNC `proxy.rs` path stays raw binary — untouched.
+### 5. Make the relay a thin `TerminalEvent` transport ✅ DONE (2026-08-30)
+`axum-mux/src/terminal_relay.rs` (436 LoC) now forwards `TerminalEvent`
+frames. Binary I/O frames become `Raw` events (the escape hatch) fanned out
+to all joined clients; the relay stamps `at`, never mints ids (the receiving
+session re-stamps `id`). `publish_event()` is the producer's entry point;
+`start()` returns the bound address plus the shared state handle.
+`ControlMessage` tags are snake_case + `deny_unknown_fields`, so a text
+frame is unambiguously a control message or a `TerminalEvent`. The per-client
+loop `select!`s on the broadcast receiver — idle clients receive published
+events (the old `try_recv`-after-inbound-traffic pattern dropped them).
+Live round-trip tests (tokio-tungstenite, 5 tests) live in
+`axum-mux/src/terminal_relay_tests.rs` (split off for the 500 LoC gate).
+`proxy.rs` (SPICE/VNC) untouched — stays raw binary (ADR-005 Decision 5).
+`crabjar-terminal` registered in the architecture layer model (layer 3).
 
 ### ~~6. Drop the three dead lib-deps + fix the WASM doc line~~ ✅ DONE (2026-08-30)
 Deps dropped (root, host-screen, apps/teams), "WASM-only" annotations
