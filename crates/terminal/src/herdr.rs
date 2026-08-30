@@ -95,7 +95,7 @@ impl HerdrBackend {
     /// All herdr CLI commands print a JSON envelope:
     /// `{"id": "cli:...", "result": {...}}`. Commands that print nothing
     /// on success (e.g. `pane send-text`) yield `Value::Null`.
-    async fn run_json(&self, args: &[&str]) -> anyhow::Result<serde_json::Value> {
+    pub(crate) async fn run_json(&self, args: &[&str]) -> anyhow::Result<serde_json::Value> {
         let mut cmd = Command::new(&self.binary);
         cmd.args(args);
 
@@ -130,7 +130,7 @@ impl HerdrBackend {
     }
 
     /// Look up (workspace_id, pane_id) for a session.
-    fn session_pane(&self, session_name: &str) -> anyhow::Result<(String, String)> {
+    pub(crate) fn session_pane(&self, session_name: &str) -> anyhow::Result<(String, String)> {
         let map = self
             .sessions
             .lock()
@@ -145,7 +145,7 @@ impl HerdrBackend {
     /// Most herdr CLI commands print a JSON envelope, but `pane read`
     /// prints the pane's raw terminal text — callers for that command
     /// must not parse JSON.
-    async fn run_raw(&self, args: &[&str]) -> anyhow::Result<String> {
+    pub(crate) async fn run_raw(&self, args: &[&str]) -> anyhow::Result<String> {
         let mut cmd = Command::new(&self.binary);
         cmd.args(args);
 
@@ -190,8 +190,10 @@ impl HerdrBackend {
         let (_, pane_id) = self.session_pane(session_name)?;
 
         let result = self.run_json(&["pane", "get", &pane_id]).await?;
+        // `pane get` nests the pane object under `.pane`.
         let status = result
-            .get("agent_status")
+            .get("pane")
+            .and_then(|p| p.get("agent_status"))
             .and_then(|v| v.as_str())
             .map(String::from);
 

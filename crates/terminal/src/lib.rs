@@ -62,6 +62,7 @@
 
 pub mod backend;
 pub(crate) mod herdr;
+mod herdr_exec;
 mod recording;
 pub mod stream;
 mod wezterm;
