@@ -23,6 +23,9 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 
+# Patterns (verifier: regex_match)
+regex = { workspace = true }
+
 # CLI parsing (for detecting installed tools)
 which = { workspace = true }
 
