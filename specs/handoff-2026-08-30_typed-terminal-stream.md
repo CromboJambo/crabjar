@@ -13,17 +13,33 @@ Two half-built stubs of the same idea. Neither is a working baseline — this is
 greenfield on top of them.
 
 ### 1. `crates/terminal/` (package `crabjar-terminal`) — ✅ compiles, stream model live
-- `src/stream.rs` (430 LoC) — **the ADR-005 substrate**: `TerminalEvent`
-  (Prompt/Command/Output/Raw, monotonic ids), `SessionStream`, `Block`,
-  `Receipt`, `SessionRecord` (versioned native JSONL). 5 unit tests.
+- `src/stream.rs` (394 LoC) — **the ADR-005 substrate**: `TerminalEvent`
+  (Prompt/Command/Output/Raw, monotonic ids + per-event `at` timestamp),
+  `SessionStream`, `Block` (+ `Block::receipt`), `Receipt`,
+  `STREAM_VERSION = 2` (v2 added `at`; v1 records still parse — `at`
+  defaults to the epoch).
+- `src/session_record.rs` (188 LoC) — `SessionRecord`: versioned native
+  JSONL (the faithful on-disk form), `to_jsonl`/`from_jsonl`/`save`/`load`,
+  v1-migration test.
+- `src/copy_paste.rs` (227 LoC) — **ADR-005 item 3**: `Selection`
+  (event-range or block copy), `copy_event_range`/`copy_block`,
+  `paste_jsonl` (faithful), `paste_asciinema` (lossy), `Selection::receipts`
+  (reconstruct receipts from a selection alone).
+- `src/verifiers.rs` (342 LoC) — **the deterministic task scorers**
+  (README parity item): `exit_code`, `file_exists` (relative paths resolve
+  against the receipt's cwd), `regex_match`, `json_path` (dot-path into the
+  output's JSON). Pure functions of `(Receipt, expectation)` →
+  `VerifierResult { verifier, passed, detail }`.
 - `src/herdr_exec.rs` (160 LoC) — `HerdrBackend::run_command` → typed
   `Receipt` via the structured round-trip (see Remaining work #1).
-- `src/recording.rs` (201 LoC) — `AsciinemaRecorder`, asciinema v2 (JSONL:
-  header + `[time, "i"|"o", data]`). **Still unfed** — item 4 rewires it as
-  a serializer of the stream.
-- `src/lib.rs` (266 LoC) — `TerminalSession` + `TerminalManager`. Backends:
-  wezterm (primary), zellij (fallback), herdr. `record()`/`send()`/`read()`/
-  `snapshot()` exist.
+- `src/recording.rs` (415 LoC) — `AsciinemaSerializer` (renamed from
+  `AsciinemaRecorder`): asciinema v2 is now a **serializer of the stream**,
+  not the model. Batch mode (`from_events`) and live mode (`event`, fed
+  from `TerminalSession::send`/`read`). Lossy by design — documented.
+- `src/lib.rs` (346 LoC) — `TerminalSession` + `TerminalManager`.
+  `send`/`read` now append to the session's `SessionStream` (send →
+  `Command`, read → `Raw` escape hatch) and feed the serializer when
+  recording. New: `session_record()` accessor.
 - `src/backend.rs` (95 LoC) — `TerminalBackend` trait: `spawn`, `send_text`,
   `read_output` (last N lines), `kill_session`, `split_pane_*`.
 - `src/herdr.rs` (376 LoC) — the ADR-002 execution substrate backend
@@ -32,7 +48,9 @@ greenfield on top of them.
 - `src/wezterm.rs` (267), `src/zellij.rs` (248) — backend impls.
 - `examples/herdr-spike.rs` — ADR-002 backend spike (still green).
 - `examples/herdr-stream-spike.rs` — **ADR-005 verification**: 3 real
-  commands → 3 Receipts → 3 blocks → JSONL round-trip. Run:
+  commands → 3 Receipts → 3 blocks → JSONL round-trip → copy-paste
+  (block copy, both paste targets, receipt reconstruction) → all four
+  verifiers run against the live receipts. Run:
   `cargo run -p crabjar-terminal --example herdr-stream-spike` (needs a
   live herdr server).
 - `Cargo.toml` description already says "asciinema recording" — the idea is
@@ -126,18 +144,29 @@ grouping, `Receipt`, `SessionRecord` (versioned native JSONL,
 `STREAM_VERSION = 1`). 5 unit tests. Landed in `crabjar-terminal`, not a
 new crate (see ADR-005 ongoing concerns).
 
-### 3. Type-safe copy-paste → receipts — PARTIAL
-The `Receipt` type exists and herdr produces real ones. Still to do:
-copy = select an event/block range (API for it), paste = serialize to a
-typed target, and wire the CodeWhale-style verifiers
-(`exit_code`/`file_exists`/`regex_match`/`json_path`, see
-`crabjar/README.md`) to consume `Receipt`.
+### 3. Type-safe copy-paste → receipts ✅ DONE (2026-08-30)
+`crates/terminal/src/copy_paste.rs`: copy = `copy_event_range(stream,
+first_id, last_id)` or `copy_block(stream, &block)` → a self-contained
+`Selection`; paste = `Selection::paste_jsonl` (faithful sub-record) or
+`paste_asciinema` (lossy projection); `Selection::receipts` reconstructs
+`Receipt`s from the selection alone. The CodeWhale-style verifiers landed
+in `crates/terminal/src/verifiers.rs` — `exit_code`, `file_exists`,
+`regex_match`, `json_path` as pure functions of `(Receipt, expectation)`.
+Verified live in the extended herdr-stream-spike (steps 6–7): block copy
+by address, both paste targets round-trip, and all four verifiers run
+against real receipts (including a negative control that must fail).
 
-### 4. Make the recorder a serializer, not the model
-Rewire `AsciinemaRecorder` to serialize the `TerminalEvent` stream to asciinema
-v2 (today it's unfed). Feed it from `send()`/`read()` in `lib.rs`. Note
-asciinema v2 is a **lossy** projection (its `i`/`o` events drop block ids and
-exit codes) — the native JSONL is the faithful on-disk form.
+### 4. Make the recorder a serializer, not the model ✅ DONE (2026-08-30)
+`AsciinemaRecorder` → `AsciinemaSerializer` (`recording.rs`): batch mode
+(`from_events`) projects a whole stream/selection; live mode (`event`) is
+fed from `TerminalSession::send` (→ `i` events) and `read` (→ `o` events).
+`TerminalSession` now carries a `SessionStream` — every `send`/`read`
+appends (read lands in `Raw`, the escape hatch: scrollback is unsegmented)
+— and `session_record()` exposes the typed stream as a `SessionRecord`.
+`STREAM_VERSION` bumped 1 → 2 (per-event `at` timestamp, needed for
+asciinema's relative times); v1 records still parse (`at` defaults to the
+epoch). Asciinema v2 stays a **lossy** projection — documented in the
+module.
 
 ### 5. Make the relay a thin `TerminalEvent` transport
 `axum-mux/src/terminal_relay.rs` forwards `TerminalEvent` frames (replacing the
@@ -197,7 +226,7 @@ it anyway; it's churn across the `path = "..."` refs.
   session — `export PATH="$HOME/.cargo/bin:$PATH"` first.
 - **500 LoC rule** is a CI gate. `terminal_relay.rs` is 293 — room to grow,
   but if the `TerminalEvent` model + block logic lands in `crabjar-terminal`,
-  watch `lib.rs` (263) and `recording.rs` (201); split by concern if they
+  watch `lib.rs` (346) and `recording.rs` (415); split by concern if they
   approach 500.
 - **Git remote is SSH-only** (`git@github.com:CromboJambo/crabjar.git`) — never
   switch to HTTPS; if push fails, leave the commit local and tell the user to

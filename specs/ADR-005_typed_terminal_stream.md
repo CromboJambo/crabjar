@@ -16,7 +16,11 @@ companion handoff) proved out on herdr: `HerdrBackend::run_command`
 (`{ command, output, exit_code, duration, cwd }`) for real commands via the
 structured round-trip — no PTY scraping. The `TerminalEvent` model, block
 grouping, and native JSONL form live in `crates/terminal/src/stream.rs`;
+copy-paste (`copy_paste.rs`), the four verifiers (`verifiers.rs`), and the
+asciinema v2 serializer (`recording.rs`) are live;
 `crates/terminal/examples/herdr-stream-spike.rs` is the verification.
+Remaining: item 5 (the `axum-mux` relay as thin `TerminalEvent` transport) —
+likely its own session.
 
 ## Context
 
