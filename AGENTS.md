@@ -49,6 +49,14 @@ Key subsystems:
 
 For crate-level details, use `ls` on the crate directory or read its `AGENTS.md`.
 
+## The Glass (Abstraction Boundary)
+
+The glass encloses crabjar's stable, depended-on substrate (guard, host-core, the exec pipeline); the concrete — integrations, wire representations, version-specific behavior — lives outside and is disposable. A good abstraction is one the outside can come and go through and the inside doesn't flinch.
+
+- **Inside agents look out** (decisions flow out as data; never name a concrete from inside). **Outside agents look in** (report concrete results in as data; never mutate the contract from outside). Shouting the wrong way = coupling across the glass.
+- **Naming:** `crabjar-*` = crabjar's own infrastructure; no prefix = an integration/abstraction over the outside world.
+- Full principle + the `vm-bridge` anti-pattern: `specs/ADR-004`.
+
 ## Execution Pipeline
 
 `crabjar exec` passes through: `request → guard → concierge → telemetry → outcome → trust update`.

@@ -41,6 +41,15 @@ When adding agent access:
 3. Run `symlink-apply.sh` to create the symlink
 4. Verify with `symlink-enforce.sh`
 
+### 5. The Glass (Abstraction Boundary Orientation)
+*   **The glass encloses the stable, generic, depended-on substrate** (crabjar's own machinery: guard, host-core, the exec pipeline). The concrete — integrations, wire representations, version-specific behavior — lives on the other side and is meant to be disposable.
+*   **A good abstraction is one the outside can come and go through and the inside doesn't flinch.** Test: can you swap the concrete without touching the abstraction? If not, the concrete has welded through the glass. Anti-pattern: `vm-bridge` (no lib target, welded into `host-screen`).
+*   **Face the right direction when you shout orders:**
+    *   *Inside (substrate) agents look OUT.* They define and consume the contract; their decisions flow outward as data through the glass. Never name a specific concrete from inside.
+    *   *Outside (integration/fleet) agents look IN.* They consume the contract and report concrete results inward as data. Never reach in and mutate the contract.
+    *   Shouting the wrong way = coupling across the glass (concrete↔concrete, or an abstraction hardcoding a concrete). This is detection ≠ authorization (principle 0) made spatial.
+*   **Naming falls out of the glass:** `crabjar-*` = crabjar's own infrastructure (inside); no prefix = an integration with / abstraction over the outside world (outside). Full principle: `specs/ADR-004`.
+
 ## Workflow: "Dreaming Mode"
 The agent shall utilize a continuous "Dreaming/Refinement" loop during or after complex conversations to:
 1.  **Analyze Patterns**: Identify recurring errors or structural shifts in the conversation.
