@@ -78,9 +78,15 @@ impl<'a> ExecutionGate<'a> {
             PolicyResult::Pending => Some(GateResult::Pending),
             PolicyResult::DryRun => Some(GateResult::DryRun),
             PolicyResult::Revoked { reason } => Some(GateResult::Revoked { reason }),
-            PolicyResult::ContextExhausted { used, budget, remaining } => {
-                Some(GateResult::ContextExhausted { used, budget, remaining })
-            }
+            PolicyResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            } => Some(GateResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            }),
             PolicyResult::OversizedFragment { actual, max } => {
                 Some(GateResult::OversizedFragment { actual, max })
             }
@@ -195,7 +201,9 @@ impl<'a> ExecutionGate<'a> {
             if !actor_scope.can_access(target_scope) {
                 // Check for valid CrossScopeAuth bypass
                 let cross_scope_allowed = ctx.cross_scope_auth.as_ref().is_some_and(|auth| {
-                    auth.is_valid(3600) && auth.actor_scope == *actor_scope && auth.target_scope == *target_scope
+                    auth.is_valid(3600)
+                        && auth.actor_scope == *actor_scope
+                        && auth.target_scope == *target_scope
                 });
 
                 if !cross_scope_allowed {

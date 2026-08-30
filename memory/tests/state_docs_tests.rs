@@ -1055,7 +1055,10 @@ fn staleness_label_returns_correct_string() {
     let fresh = StalenessStatus::Fresh;
     let stale = StalenessStatus::Stale { days: 10 };
     let expired = StalenessStatus::Expired { days: 20 };
-    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+    let moldy = StalenessStatus::Moldy {
+        days: 45,
+        has_recent_context: false,
+    };
 
     assert_eq!(fresh.label(), "fresh");
     assert_eq!(stale.label(), "stale");
@@ -1068,7 +1071,10 @@ fn staleness_warning_only_for_non_fresh() {
     let fresh = StalenessStatus::Fresh;
     let stale = StalenessStatus::Stale { days: 10 };
     let expired = StalenessStatus::Expired { days: 20 };
-    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+    let moldy = StalenessStatus::Moldy {
+        days: 45,
+        has_recent_context: false,
+    };
 
     assert!(fresh.warning().is_none());
     assert!(stale.warning().is_some());
@@ -1081,7 +1087,10 @@ fn staleness_age_days_returns_correct_value() {
     let fresh = StalenessStatus::Fresh;
     let stale = StalenessStatus::Stale { days: 10 };
     let expired = StalenessStatus::Expired { days: 20 };
-    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+    let moldy = StalenessStatus::Moldy {
+        days: 45,
+        has_recent_context: false,
+    };
 
     assert_eq!(fresh.age_days(), 0);
     assert_eq!(stale.age_days(), 10);
@@ -1094,7 +1103,10 @@ fn staleness_is_trustworthy_only_fresh_or_stale() {
     let fresh = StalenessStatus::Fresh;
     let stale = StalenessStatus::Stale { days: 10 };
     let expired = StalenessStatus::Expired { days: 20 };
-    let moldy = StalenessStatus::Moldy { days: 45, has_recent_context: false };
+    let moldy = StalenessStatus::Moldy {
+        days: 45,
+        has_recent_context: false,
+    };
 
     assert!(fresh.is_trustworthy());
     assert!(stale.is_trustworthy());

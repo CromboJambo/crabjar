@@ -208,7 +208,10 @@ impl PromptEnvelope {
 
     /// Return the combined text that would be sent to the model.
     pub fn to_model_text(&self) -> String {
-        format!("{}\n\n{}", self.system_prompt.content, self.user_content.content)
+        format!(
+            "{}\n\n{}",
+            self.system_prompt.content, self.user_content.content
+        )
     }
 
     /// Get the system prompt content (for API serialization).

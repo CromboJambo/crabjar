@@ -4,8 +4,8 @@
 //! defines `TrustManager`.
 
 pub use crate::trust_types::{
-    AnnealConfig, AnnealResult, PidTrustRecord, RevokedLogEntry, RetrievalBand, ReviewAction,
-    ReviewRecord, TrustLayer, TrustScore,
+    AnnealConfig, AnnealResult, PidTrustRecord, RetrievalBand, ReviewAction, ReviewRecord,
+    RevokedLogEntry, TrustLayer, TrustScore,
 };
 
 use rusqlite::params;
@@ -46,10 +46,7 @@ impl<'a> TrustManager<'a> {
         Ok(layers)
     }
 
-    pub fn layer_for_score(
-        &self,
-        score: TrustScore,
-    ) -> Result<Option<TrustLayer>, GuardDbError> {
+    pub fn layer_for_score(&self, score: TrustScore) -> Result<Option<TrustLayer>, GuardDbError> {
         let layers = self.list_layers()?;
         for layer in &layers {
             if layer.contains_score(score) {
@@ -257,8 +254,8 @@ impl<'a> TrustManager<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::trust_types::{AnnealConfig, RetrievalBand, ReviewAction, TrustLayer, TrustScore};
     use crate::memory_types::NodeKind;
+    use crate::trust_types::{AnnealConfig, RetrievalBand, ReviewAction, TrustLayer, TrustScore};
 
     #[test]
     fn trust_score_new_clamps_to_one() {
@@ -419,8 +416,7 @@ mod tests {
 
     #[test]
     fn retrieval_band_with_kinds() {
-        let band = RetrievalBand::default()
-            .with_kinds(vec![NodeKind::Fact, NodeKind::Rule]);
+        let band = RetrievalBand::default().with_kinds(vec![NodeKind::Fact, NodeKind::Rule]);
         assert!(band.kinds.is_some());
         assert_eq!(band.kinds.as_ref().unwrap().len(), 2);
     }

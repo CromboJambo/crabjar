@@ -65,7 +65,15 @@ pub fn annotation_confidence(annotation: &Annotation, defaults: &ConfidenceDefau
     let message = annotation.message.to_ascii_lowercase();
     let mut confidence: f64 = base;
 
-    for marker in ["maybe", "might", "should", "todo", "follow-up", "follow up", "?"] {
+    for marker in [
+        "maybe",
+        "might",
+        "should",
+        "todo",
+        "follow-up",
+        "follow up",
+        "?",
+    ] {
         if message.contains(marker) {
             confidence -= 0.10;
         }

@@ -434,7 +434,12 @@ fn test_context_budget_rejects_when_exhausted() {
 
     let result = gate.check(ctx).unwrap();
     assert!(result.is_context_exhausted());
-    if let GateResult::ContextExhausted { used, budget: b, remaining } = &result {
+    if let GateResult::ContextExhausted {
+        used,
+        budget: b,
+        remaining,
+    } = &result
+    {
         assert_eq!(*used, 0);
         assert_eq!(*b, 1000);
         assert_eq!(*remaining, 1000);

@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 use crate::guard_db::{GuardDb, GuardDbError};
 use crate::memory_types::{EdgeRelation, MemoryEdge, MemoryNode, NodeKind};
-use crate::trust::TrustScore;
 use crate::trust::RetrievalBand;
+use crate::trust::TrustScore;
 
 /// Manages the memory graph: nodes, edges, and graph queries.
 pub struct MemoryGraph<'a> {
@@ -201,7 +201,10 @@ impl<'a> MemoryGraph<'a> {
         if let Some(ref kinds) = band.kinds {
             query.push_str(&format!(
                 " AND n.kind IN ({})",
-                (0..kinds.len()).map(|_| "?".to_string()).collect::<Vec<_>>().join(", ")
+                (0..kinds.len())
+                    .map(|_| "?".to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             for kind in kinds {
                 params.push(Box::new(format!("{}", kind)));

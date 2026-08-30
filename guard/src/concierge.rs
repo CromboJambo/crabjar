@@ -6,10 +6,10 @@ pub use crate::concierge_types::{GateConcierge, InterruptedLogEntry, PendingQueu
 
 use tracing::{error, info, warn};
 
-use crate::concierge_types::ApprovalStore;
-use crate::guard_db::{GuardDb, GuardDbError};
 use crate::GateResult;
 use crate::action::ActionStatus;
+use crate::concierge_types::ApprovalStore;
+use crate::guard_db::{GuardDb, GuardDbError};
 use uuid::Uuid;
 
 impl GateConcierge {
@@ -154,7 +154,11 @@ impl GateConcierge {
                 );
                 (ActionStatus::Denied, None, Some(entry))
             }
-            GateResult::ContextExhausted { used, budget, remaining } => {
+            GateResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            } => {
                 let reason = format!(
                     "Context budget exhausted: {used} / {budget} tokens used, {remaining} remaining"
                 );
@@ -188,9 +192,8 @@ impl GateConcierge {
                 (ActionStatus::Denied, None, Some(entry))
             }
             GateResult::OversizedFragment { actual, max } => {
-                let reason = format!(
-                    "Context fragment too large: {actual} tokens exceeds max of {max}"
-                );
+                let reason =
+                    format!("Context fragment too large: {actual} tokens exceeds max of {max}");
                 let entry = InterruptedLogEntry {
                     id: Uuid::new_v4().to_string(),
                     gate_result_id: gate_result_id.clone(),
@@ -268,7 +271,11 @@ impl GateConcierge {
         );
 
         let lease = if is_persistent {
-            crate::fingerprint::ApprovalLease::persistent(fingerprint.clone(), scope.clone(), granted_by.to_string())
+            crate::fingerprint::ApprovalLease::persistent(
+                fingerprint.clone(),
+                scope.clone(),
+                granted_by.to_string(),
+            )
         } else {
             crate::fingerprint::ApprovalLease::new(
                 fingerprint.clone(),

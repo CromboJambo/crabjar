@@ -46,16 +46,16 @@ pub fn run_test_count() -> serde_json::Value {
             if let Some(pos) = first.find(" passed") {
                 let num_str = &first[..pos]; // everything before " passed"
                 // num_str is like "test result: ok. 73" — extract last number
-            if let Some(last_word) = num_str.split_whitespace().last()
-                && let Ok(val) = last_word.parse::<usize>()
-            {
-                total_passed += val;
-                crate_results.push(json!({
-                    "passed": val,
-                    "failed": 0,
-                    "ignored": 0,
-                }));
-            }
+                if let Some(last_word) = num_str.split_whitespace().last()
+                    && let Ok(val) = last_word.parse::<usize>()
+                {
+                    total_passed += val;
+                    crate_results.push(json!({
+                        "passed": val,
+                        "failed": 0,
+                        "ignored": 0,
+                    }));
+                }
             }
 
             // Parse remaining segments: "0 failed", "0 ignored"
@@ -83,7 +83,9 @@ pub fn run_test_count() -> serde_json::Value {
         let mut running_total: usize = 0;
         for line in combined.lines() {
             let words: Vec<&str> = line.split_whitespace().collect();
-            if words.len() >= 3 && words[1] == "running" && words[2] == "tests"
+            if words.len() >= 3
+                && words[1] == "running"
+                && words[2] == "tests"
                 && let Ok(val) = words[0].parse::<usize>()
             {
                 running_total += val;

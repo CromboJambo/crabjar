@@ -1,6 +1,6 @@
 pub mod extract;
-pub mod insert;
 pub mod indexer;
+pub mod insert;
 pub mod models;
 pub mod querier;
 pub mod renderer;
@@ -31,7 +31,9 @@ pub mod renderer;
 /// Every abstraction carries its own doubt. The confidence table is mandatory.
 pub mod schema;
 
-pub use models::{Annotation, CodeBlock, ConfidenceAssessment, DocMetadata, Section, StalenessStatus, Table};
+pub use models::{
+    Annotation, CodeBlock, ConfidenceAssessment, DocMetadata, Section, StalenessStatus, Table,
+};
 pub use querier::StateDocQuerier;
 pub use renderer::Renderer;
 pub use schema::migrate;

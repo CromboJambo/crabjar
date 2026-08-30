@@ -426,9 +426,12 @@ fn handle_habitat_command(
                 )
             })?;
             let store = agent_context::habitat::HabitatStore::open(&db_path)?;
-            let area_id = store
-                .area_id_by_name(&area)?
-                .ok_or_else(|| format!("area '{}' not found; run `crabjar habitat add-area` first", area))?;
+            let area_id = store.area_id_by_name(&area)?.ok_or_else(|| {
+                format!(
+                    "area '{}' not found; run `crabjar habitat add-area` first",
+                    area
+                )
+            })?;
             let entity = agent_context::habitat::HabitatEntity {
                 id: id.clone(),
                 area_id,
@@ -463,9 +466,12 @@ fn handle_habitat_command(
             db_path,
         } => {
             let store = agent_context::habitat::HabitatStore::open(&db_path)?;
-            let area_id = store
-                .area_id_by_name(&area)?
-                .ok_or_else(|| format!("area '{}' not found; run `crabjar habitat add-area` first", area))?;
+            let area_id = store.area_id_by_name(&area)?.ok_or_else(|| {
+                format!(
+                    "area '{}' not found; run `crabjar habitat add-area` first",
+                    area
+                )
+            })?;
             let id = store.record_divergence(area_id, &description)?;
             Ok(json!({
                 "success": true,
@@ -609,10 +615,8 @@ async fn handle_exec(
     );
 
     // Auto-construct CrossScopeAuth if scopes differ (same-scope → None, no-op)
-    let cross_scope_auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(
-        &project_scope,
-        &project_scope,
-    );
+    let cross_scope_auth =
+        crabjar_guard::CrossScopeAuth::auto_for_scopes(&project_scope, &project_scope);
 
     let gate_result = gate.check(crabjar_guard::GateContext {
         action_type: "exec",
@@ -695,7 +699,9 @@ async fn handle_exec(
             let discovered_tools = if let Some(ref conn) = tool_registry_conn {
                 let registry = crabjar_tool_registry::ToolRegistry::new(conn);
                 registry.init().ok();
-                registry.discover_tools("cli", &project_root).unwrap_or_default()
+                registry
+                    .discover_tools("cli", &project_root)
+                    .unwrap_or_default()
             } else {
                 vec![]
             };

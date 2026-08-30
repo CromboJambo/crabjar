@@ -200,7 +200,9 @@ impl StateDocQuerier {
 
         // Query the raw string first, then parse outside the closure to avoid
         // rusqlite::Error type mismatch with chrono::ParseError.
-        let s: String = stmt.query_row(rusqlite::params![doc_name], |row| row.get(0)).ok()?;
+        let s: String = stmt
+            .query_row(rusqlite::params![doc_name], |row| row.get(0))
+            .ok()?;
         chrono::DateTime::parse_from_rfc3339(&s)
             .ok()
             .map(|dt| dt.with_timezone(&chrono::Utc))

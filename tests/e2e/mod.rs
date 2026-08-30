@@ -153,10 +153,7 @@ fn smoke_knowledge_query_returns_json() {
     assert!(insert_body["data"]["id"].is_number());
 
     // Query the entry back
-    let query_output = run_in(
-        &temp,
-        &["knowledge", "query", "--tags=e2e,smoke"],
-    );
+    let query_output = run_in(&temp, &["knowledge", "query", "--tags=e2e,smoke"]);
     assert!(query_output.status.success());
 
     let query_body = json_stdout(&query_output);

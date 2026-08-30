@@ -237,7 +237,13 @@ mod tests {
         trust_layer: u32,
         confidence: f64,
     ) -> PolicyContext {
-        PolicyContext::new("test", command, args, trust_layer, TrustScore::new(confidence))
+        PolicyContext::new(
+            "test",
+            command,
+            args,
+            trust_layer,
+            TrustScore::new(confidence),
+        )
     }
 
     #[test]
@@ -307,7 +313,10 @@ confidence_floor = 0.6
 
         // Layer 2 below minimum of 3
         let ctx_low = make_context("echo", vec![], 2, 0.9);
-        assert!(matches!(engine.evaluate(&ctx_low), PolicyResult::Interrupted { .. }));
+        assert!(matches!(
+            engine.evaluate(&ctx_low),
+            PolicyResult::Interrupted { .. }
+        ));
 
         // Layer 3 meets minimum
         let ctx_high = make_context("echo", vec![], 3, 0.9);
@@ -337,7 +346,10 @@ confidence_floor = 0.6
             context_fragment_tokens: None,
         };
 
-        assert!(matches!(engine.evaluate(&ctx), PolicyResult::Interrupted { .. }));
+        assert!(matches!(
+            engine.evaluate(&ctx),
+            PolicyResult::Interrupted { .. }
+        ));
     }
 
     #[test]
@@ -409,7 +421,10 @@ domain_allowlist_mode = "strict"
             context_fragment_tokens: None,
         };
 
-        assert!(matches!(engine.evaluate(&ctx), PolicyResult::Interrupted { .. }));
+        assert!(matches!(
+            engine.evaluate(&ctx),
+            PolicyResult::Interrupted { .. }
+        ));
     }
 
     #[test]
@@ -466,7 +481,10 @@ confidence_floor = 0.9
 
         // Should fail with low confidence
         let ctx = make_context("echo", vec![], 3, 0.7);
-        assert!(matches!(engine.evaluate(&ctx), PolicyResult::Interrupted { .. }));
+        assert!(matches!(
+            engine.evaluate(&ctx),
+            PolicyResult::Interrupted { .. }
+        ));
 
         // Reload with lower confidence floor
         std::fs::write(
@@ -511,11 +529,7 @@ confidence_floor = 0.6
 
         let dir = tempdir().unwrap();
         let config_path = dir.path().join("policy.toml");
-        std::fs::write(
-            &config_path,
-            r#"min_trust_layer = 2"#,
-        )
-        .unwrap();
+        std::fs::write(&config_path, r#"min_trust_layer = 2"#).unwrap();
 
         let engine = StaticPolicyEngine::from_file(&config_path).unwrap();
         assert!(engine.source_description().contains("policy.toml"));
@@ -552,9 +566,14 @@ confidence_floor = 0.6
         let proceed = PolicyResult::Proceed.into_gate_result();
         assert!(matches!(proceed, crate::gate_result::GateResult::Proceed));
 
-        let interrupted = PolicyResult::Interrupted { reason: "test".to_string() }
-            .into_gate_result();
-        assert!(matches!(interrupted, crate::gate_result::GateResult::Interrupted { .. }));
+        let interrupted = PolicyResult::Interrupted {
+            reason: "test".to_string(),
+        }
+        .into_gate_result();
+        assert!(matches!(
+            interrupted,
+            crate::gate_result::GateResult::Interrupted { .. }
+        ));
 
         let pending = PolicyResult::Pending.into_gate_result();
         assert!(matches!(pending, crate::gate_result::GateResult::Pending));
@@ -562,9 +581,14 @@ confidence_floor = 0.6
         let dry_run = PolicyResult::DryRun.into_gate_result();
         assert!(matches!(dry_run, crate::gate_result::GateResult::DryRun));
 
-        let revoked = PolicyResult::Revoked { reason: "test".to_string() }
-            .into_gate_result();
-        assert!(matches!(revoked, crate::gate_result::GateResult::Revoked { .. }));
+        let revoked = PolicyResult::Revoked {
+            reason: "test".to_string(),
+        }
+        .into_gate_result();
+        assert!(matches!(
+            revoked,
+            crate::gate_result::GateResult::Revoked { .. }
+        ));
     }
 
     #[test]

@@ -334,10 +334,7 @@ impl GuardDb {
 
         if approved {
             // Approved: just remove from pending_queue
-            conn.execute(
-                "DELETE FROM pending_queue WHERE id = ?1",
-                params![id_val],
-            )?;
+            conn.execute("DELETE FROM pending_queue WHERE id = ?1", params![id_val])?;
             tracing::info!(pending_id = %id_val, "Pending queue entry approved and removed");
         } else {
             // Rejected: move to interrupted_log then delete from pending_queue
@@ -356,10 +353,7 @@ impl GuardDb {
                 ],
             )?;
 
-            conn.execute(
-                "DELETE FROM pending_queue WHERE id = ?1",
-                params![id_val],
-            )?;
+            conn.execute("DELETE FROM pending_queue WHERE id = ?1", params![id_val])?;
 
             tracing::info!(pending_id = %id_val, "Pending queue entry rejected and moved to interrupted_log");
         }
@@ -460,7 +454,8 @@ mod tests {
         assert_eq!(pending.len(), 1);
 
         // Approve it
-        db.resolve_pending_queue_entry("test-pending-1", true).unwrap();
+        db.resolve_pending_queue_entry("test-pending-1", true)
+            .unwrap();
 
         // Verify it's removed from the queue
         let pending = db.read_pending_queue().unwrap();
@@ -491,7 +486,8 @@ mod tests {
         db.persist_pending_queue_entry(&entry).unwrap();
 
         // Reject it
-        db.resolve_pending_queue_entry("test-pending-2", false).unwrap();
+        db.resolve_pending_queue_entry("test-pending-2", false)
+            .unwrap();
 
         // Verify it's removed from pending queue
         let pending = db.read_pending_queue().unwrap();

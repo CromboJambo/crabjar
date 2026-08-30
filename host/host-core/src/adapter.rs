@@ -112,7 +112,11 @@ pub struct IncomingMessage {
 }
 
 impl IncomingMessage {
-    pub fn text(from: impl Into<String>, content: impl Into<String>, source: impl Into<String>) -> Self {
+    pub fn text(
+        from: impl Into<String>,
+        content: impl Into<String>,
+        source: impl Into<String>,
+    ) -> Self {
         Self {
             from: from.into(),
             content: content.into(),

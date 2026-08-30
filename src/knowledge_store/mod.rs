@@ -8,7 +8,10 @@ mod confidence;
 pub use bridge::KnowledgeBridge;
 
 /// Build a structured knowledge response for CLI output.
-pub fn knowledge_response(message: impl Into<String>, data: serde_json::Value) -> serde_json::Value {
+pub fn knowledge_response(
+    message: impl Into<String>,
+    data: serde_json::Value,
+) -> serde_json::Value {
     serde_json::json!({
         "success": true,
         "message": message.into(),

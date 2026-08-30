@@ -210,13 +210,13 @@ impl AcpAgentServer {
                             pid: None,
                             scope: None,
                             target_scope: None,
-        cross_scope_auth: None,
+                            cross_scope_auth: None,
                             domains: vec![], // zed-acp-server: no known domains at this layer
                             context_budget: None,
                             context_fragment_tokens: None,
-                            });
+                        });
 
-                                        match gate_result {
+                        match gate_result {
                             Ok(GateResult::Proceed) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
@@ -266,7 +266,11 @@ impl AcpAgentServer {
                                     "guided_exit": true,
                                 }),
                             }),
-                            Ok(GateResult::ContextExhausted { used, budget, remaining }) => Ok(AcpResponse::Result {
+                            Ok(GateResult::ContextExhausted {
+                                used,
+                                budget,
+                                remaining,
+                            }) => Ok(AcpResponse::Result {
                                 value: json!({
                                     "session_id": session_id,
                                     "tool": function_name,
@@ -278,17 +282,19 @@ impl AcpAgentServer {
                                     "status": "denied",
                                 }),
                             }),
-                            Ok(GateResult::OversizedFragment { actual, max }) => Ok(AcpResponse::Result {
-                                value: json!({
-                                    "session_id": session_id,
-                                    "tool": function_name,
-                                    "arguments": arguments,
-                                    "gate_result": "oversized_fragment",
-                                    "actual": actual,
-                                    "max": max,
-                                    "status": "denied",
-                                }),
-                            }),
+                            Ok(GateResult::OversizedFragment { actual, max }) => {
+                                Ok(AcpResponse::Result {
+                                    value: json!({
+                                        "session_id": session_id,
+                                        "tool": function_name,
+                                        "arguments": arguments,
+                                        "gate_result": "oversized_fragment",
+                                        "actual": actual,
+                                        "max": max,
+                                        "status": "denied",
+                                    }),
+                                })
+                            }
                             Err(e) => Ok(AcpResponse::Error {
                                 message: format!("gate error: {}", e),
                             }),

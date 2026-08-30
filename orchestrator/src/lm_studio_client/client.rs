@@ -158,7 +158,11 @@ impl LmStudioClient {
         }
 
         // Build the unified request from the validated envelope.
-        let req = UnifiedChatRequest::from_config(&self.config, envelope.user_content_str().to_string(), previous_response_id);
+        let req = UnifiedChatRequest::from_config(
+            &self.config,
+            envelope.user_content_str().to_string(),
+            previous_response_id,
+        );
         let mut req_with_system = req;
         req_with_system.system_prompt = Some(envelope.system_content().to_string());
 
@@ -217,7 +221,11 @@ impl LmStudioClient {
         }
 
         // Build the unified request from the validated envelope.
-        let req = UnifiedChatRequest::from_config(&self.config, envelope.user_content_str().to_string(), previous_response_id);
+        let req = UnifiedChatRequest::from_config(
+            &self.config,
+            envelope.user_content_str().to_string(),
+            previous_response_id,
+        );
         let mut req_with_system = req;
         req_with_system.system_prompt = Some(envelope.system_content().to_string());
 

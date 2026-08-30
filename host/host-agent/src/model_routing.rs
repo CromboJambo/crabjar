@@ -155,9 +155,7 @@ impl ModelRouter {
 
     /// Get the config for a phase (resolves to default if not set).
     pub fn config_for(&self, phase: LoopPhase) -> &PhaseConfig {
-        self.phases
-            .get(&phase)
-            .unwrap_or(&self.default)
+        self.phases.get(&phase).unwrap_or(&self.default)
     }
 
     /// Get the backend kind for a phase.
@@ -178,7 +176,11 @@ impl ModelRouter {
     /// Create a default router optimized for the agent loop:
     /// - plan/reflect → http with reasoning model
     /// - others → heuristic
-    pub fn default_for_loop(http_endpoint: String, http_model: String, http_api_key: Option<String>) -> Self {
+    pub fn default_for_loop(
+        http_endpoint: String,
+        http_model: String,
+        http_api_key: Option<String>,
+    ) -> Self {
         let mut router = Self::new(PhaseConfig::heuristic());
 
         // Plan and reflect benefit from a stronger reasoning model
@@ -204,9 +206,11 @@ impl ModelRouter {
                     tracing::warn!(phase = %phase, "HTTP backend configured but endpoint is empty; falling back to heuristic");
                     return None;
                 }
-                Some(Box::new(
-                    crate::inference::HttpBackend::new(endpoint, model, api_key.clone()),
-                ))
+                Some(Box::new(crate::inference::HttpBackend::new(
+                    endpoint,
+                    model,
+                    api_key.clone(),
+                )))
             }
         }
     }
@@ -256,7 +260,11 @@ pub struct PhaseBuilder {
 
 impl PhaseBuilder {
     /// Create a builder with reasoning models for plan/reflect phases.
-    pub fn reasoning_for_planning(plan_endpoint: String, plan_model: String, plan_api_key: Option<String>) -> Self {
+    pub fn reasoning_for_planning(
+        plan_endpoint: String,
+        plan_model: String,
+        plan_api_key: Option<String>,
+    ) -> Self {
         Self {
             plan_model: Some(plan_model),
             plan_endpoint: Some(plan_endpoint),
@@ -268,7 +276,12 @@ impl PhaseBuilder {
     }
 
     /// Set explicit reflect phase config (separate from plan).
-    pub fn with_reflect(mut self, endpoint: String, model: String, api_key: Option<String>) -> Self {
+    pub fn with_reflect(
+        mut self,
+        endpoint: String,
+        model: String,
+        api_key: Option<String>,
+    ) -> Self {
         self.reflect_endpoint = Some(endpoint);
         self.reflect_model = Some(model);
         self.reflect_api_key = api_key;
@@ -369,11 +382,7 @@ mod tests {
 
     #[test]
     fn test_router_build_backend_http() {
-        let config = PhaseConfig::http(
-            "http://localhost:1234".into(),
-            "gpt-4".into(),
-            None,
-        );
+        let config = PhaseConfig::http("http://localhost:1234".into(), "gpt-4".into(), None);
         let mut router = ModelRouter::new(PhaseConfig::heuristic());
         router.set_phase(LoopPhase::Plan, config);
 
@@ -390,11 +399,7 @@ mod tests {
 
     #[test]
     fn test_router_build_backend_empty_endpoint() {
-        let config = PhaseConfig::http(
-            "".into(),
-            "gpt-4".into(),
-            None,
-        );
+        let config = PhaseConfig::http("".into(), "gpt-4".into(), None);
         let mut router = ModelRouter::new(PhaseConfig::heuristic());
         router.set_phase(LoopPhase::Plan, config);
 

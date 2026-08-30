@@ -204,7 +204,9 @@ impl ContextFragmentBuilder {
         let id = self.id.unwrap_or_default();
         let label = self.label.unwrap_or_default();
         let content = self.content.unwrap_or_default();
-        let token_count = self.token_count.ok_or(super::ContextError::InvalidTokenCount(0))?;
+        let token_count = self
+            .token_count
+            .ok_or(super::ContextError::InvalidTokenCount(0))?;
 
         ContextFragment::new(id, label, content, token_count).map(|mut f| {
             if !self.metadata.is_empty()

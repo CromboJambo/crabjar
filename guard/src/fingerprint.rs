@@ -5,4 +5,6 @@
 //! adopts this pattern to close the gap where pattern-based approvals create
 //! a false sense of security.
 
-pub use crate::fingerprint_types::{ApprovalLease, ApprovalScope, InMemoryApprovalStore, InvocationFingerprint};
+pub use crate::fingerprint_types::{
+    ApprovalLease, ApprovalScope, InMemoryApprovalStore, InvocationFingerprint,
+};

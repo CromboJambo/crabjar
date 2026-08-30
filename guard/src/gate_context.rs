@@ -152,8 +152,7 @@ mod tests {
 
     #[test]
     fn gate_context_with_pid() {
-        let ctx = GateContext::new("test", "echo", vec![], 0, TrustScore::new(0.5))
-            .with_pid(1234);
+        let ctx = GateContext::new("test", "echo", vec![], 0, TrustScore::new(0.5)).with_pid(1234);
         assert_eq!(ctx.pid, Some(1234));
     }
 

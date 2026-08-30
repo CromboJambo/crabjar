@@ -523,7 +523,10 @@ fn resolve_annotation_deactivates_derived_knowledge() {
     );
     assert!(query_before.status.success());
     let query_before_body = json_stdout(&query_before);
-    assert_eq!(query_before_body["data"]["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_before_body["data"]["rows"].as_array().unwrap().len(),
+        1
+    );
 
     let resolve = run_in(
         &temp,
@@ -548,7 +551,10 @@ fn resolve_annotation_deactivates_derived_knowledge() {
     );
     assert!(query_after.status.success());
     let query_after_body = json_stdout(&query_after);
-    assert_eq!(query_after_body["data"]["rows"].as_array().unwrap().len(), 0);
+    assert_eq!(
+        query_after_body["data"]["rows"].as_array().unwrap().len(),
+        0
+    );
 
     let overlay: Value = serde_json::from_str(
         &fs::read_to_string(docs_dir.join("overlay").join("alpha_state.overlay.json")).unwrap(),
@@ -729,7 +735,10 @@ fn resolve_one_annotation_does_not_deactivate_other() {
     let query_before = run_in(&temp, &["knowledge", "query", "--tags=state-doc"]);
     assert!(query_before.status.success());
     let query_before_body = json_stdout(&query_before);
-    assert_eq!(query_before_body["data"]["rows"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        query_before_body["data"]["rows"].as_array().unwrap().len(),
+        2
+    );
 
     let resolve = run_in(
         &temp,
@@ -749,7 +758,10 @@ fn resolve_one_annotation_does_not_deactivate_other() {
     let query_after = run_in(&temp, &["knowledge", "query", "--tags=state-doc"]);
     assert!(query_after.status.success());
     let query_after_body = json_stdout(&query_after);
-    assert_eq!(query_after_body["data"]["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_after_body["data"]["rows"].as_array().unwrap().len(),
+        1
+    );
     assert_eq!(
         query_after_body["data"]["rows"][0]["meta"]["annotation_id"],
         "beta-state-md-456-0"
@@ -815,7 +827,13 @@ fn query_one_tag_does_not_return_unrelated_rows() {
     let query_alpha_tag = run_in(&temp, &["knowledge", "query", "--tags=alpha,state"]);
     assert!(query_alpha_tag.status.success());
     let query_alpha_tag_body = json_stdout(&query_alpha_tag);
-    assert_eq!(query_alpha_tag_body["data"]["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_alpha_tag_body["data"]["rows"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     assert_eq!(
         query_alpha_tag_body["data"]["rows"][0]["meta"]["annotation_id"],
         "alpha-state-md-123-0"
@@ -824,7 +842,13 @@ fn query_one_tag_does_not_return_unrelated_rows() {
     let query_beta_tag = run_in(&temp, &["knowledge", "query", "--tags=beta"]);
     assert!(query_beta_tag.status.success());
     let query_beta_tag_body = json_stdout(&query_beta_tag);
-    assert_eq!(query_beta_tag_body["data"]["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_beta_tag_body["data"]["rows"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     assert_eq!(
         query_beta_tag_body["data"]["rows"][0]["meta"]["annotation_id"],
         "beta-state-md-456-0"
@@ -833,10 +857,22 @@ fn query_one_tag_does_not_return_unrelated_rows() {
     let query_alpha_tag = run_in(&temp, &["knowledge", "query", "--tags=alpha"]);
     assert!(query_alpha_tag.status.success());
     let query_alpha_tag_body = json_stdout(&query_alpha_tag);
-    assert_eq!(query_alpha_tag_body["data"]["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_alpha_tag_body["data"]["rows"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 
     let query_beta_tag = run_in(&temp, &["knowledge", "query", "--tags=beta"]);
     assert!(query_beta_tag.status.success());
     let query_beta_tag_body = json_stdout(&query_beta_tag);
-    assert_eq!(query_beta_tag_body["data"]["rows"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        query_beta_tag_body["data"]["rows"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 }

@@ -99,7 +99,11 @@ impl PluginContext {
 
     /// Create a gate for tool authorization within this context.
     pub fn create_gate(&self) -> ExecutionGate<'_> {
-        ExecutionGate::new(&self.guard_db, false, self.cwd.to_string_lossy().to_string())
+        ExecutionGate::new(
+            &self.guard_db,
+            false,
+            self.cwd.to_string_lossy().to_string(),
+        )
     }
 }
 
@@ -250,7 +254,12 @@ impl ProcessPool {
 
     /// Default configuration for Rust plugins (100ms startup budget).
     pub fn default_rust() -> Self {
-        Self::new(8, Duration::from_millis(100), Duration::from_secs(30), RestartPolicy::NoRestart)
+        Self::new(
+            8,
+            Duration::from_millis(100),
+            Duration::from_secs(30),
+            RestartPolicy::NoRestart,
+        )
     }
 
     /// Spawn a plugin subprocess and return a handle.
@@ -300,7 +309,12 @@ impl ProcessPool {
         use tokio::io::AsyncReadExt;
         let mut handshake_buf = Vec::new();
 
-        match tokio::time::timeout(self.startup_timeout, child_stdout.read_to_end(&mut handshake_buf)).await {
+        match tokio::time::timeout(
+            self.startup_timeout,
+            child_stdout.read_to_end(&mut handshake_buf),
+        )
+        .await
+        {
             Ok(Ok(_)) => {
                 // Handshake received — plugin started successfully.
                 debug!(
@@ -350,7 +364,9 @@ impl ProcessPool {
         _timeout: Duration,
     ) -> Result<ToolResult, PluginError> {
         // JSON-RPC communication over stdin/stdout is pending.
-        Err(PluginError::NotImplemented("execute_with_timeout not yet implemented".to_string()))
+        Err(PluginError::NotImplemented(
+            "execute_with_timeout not yet implemented".to_string(),
+        ))
     }
 
     /// Check health of all running plugins.
@@ -418,7 +434,11 @@ impl PluginRegistry {
     }
 
     /// Register a plugin by name.
-    pub async fn register(&self, name: String, plugin: std::sync::Arc<dyn Plugin>) -> Result<(), PluginError> {
+    pub async fn register(
+        &self,
+        name: String,
+        plugin: std::sync::Arc<dyn Plugin>,
+    ) -> Result<(), PluginError> {
         let mut plugins = self.plugins.write().await;
         if plugins.iter().any(|(n, _)| n == &name) {
             return Err(PluginError::AlreadyRegistered(name));
@@ -430,7 +450,10 @@ impl PluginRegistry {
     /// Get a plugin by name.
     pub async fn get(&self, name: &str) -> Option<std::sync::Arc<dyn Plugin>> {
         let plugins = self.plugins.read().await;
-        plugins.iter().find(|(n, _)| n == name).map(|(_, p)| Arc::clone(p))
+        plugins
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, p)| Arc::clone(p))
     }
 
     /// List all registered plugin names.
@@ -458,7 +481,10 @@ impl PluginRegistry {
                 return plugin.execute_tool(tool_name, args).await;
             }
         }
-        Err(PluginError::NotFound(format!("tool '{}' not found", tool_name)))
+        Err(PluginError::NotFound(format!(
+            "tool '{}' not found",
+            tool_name
+        )))
     }
 
     /// Discover plugins from a directory (search for known binary names).
@@ -539,12 +565,18 @@ mod tests {
     async fn test_plugin_registry_duplicate_rejection() {
         let registry = PluginRegistry::new();
         registry
-            .register("mock".to_string(), std::sync::Arc::new(MockPlugin::new("mock")))
+            .register(
+                "mock".to_string(),
+                std::sync::Arc::new(MockPlugin::new("mock")),
+            )
             .await
             .unwrap();
 
         let result = registry
-            .register("mock".to_string(), std::sync::Arc::new(MockPlugin::new("mock2")))
+            .register(
+                "mock".to_string(),
+                std::sync::Arc::new(MockPlugin::new("mock2")),
+            )
             .await;
         assert!(result.is_err());
     }
@@ -573,7 +605,10 @@ mod tests {
     async fn test_plugin_registry_tool_not_found() {
         let registry = PluginRegistry::new();
         registry
-            .register("mock".to_string(), std::sync::Arc::new(MockPlugin::new("mock")))
+            .register(
+                "mock".to_string(),
+                std::sync::Arc::new(MockPlugin::new("mock")),
+            )
             .await
             .unwrap();
 

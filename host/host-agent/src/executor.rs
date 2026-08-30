@@ -1,8 +1,8 @@
+use crabjar_guard::Scope;
 /// TaskExecutor — runs individual tasks defined in a WorkItem's plan.
 ///
 /// Each task is independently executable. Results are captured and stored.
 use crabjar_host_core::{WorkItem, work_item::TaskStatus};
-use crabjar_guard::Scope;
 
 pub struct TaskExecutor {
     /// Default scope for gate context (can be overridden per-call).

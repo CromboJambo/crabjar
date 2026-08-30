@@ -33,10 +33,10 @@
 
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
 use crate::context_budget::ContextBudget;
 use crate::scope::Scope;
 use crate::trust::TrustScore;
+use serde::{Deserialize, Serialize};
 
 /// Trait for policy evaluation engines.
 ///
@@ -122,7 +122,8 @@ impl Default for PolicyConfig {
 impl PolicyConfig {
     /// Load policy config from a TOML file.
     pub fn load(path: &Path) -> Result<Self, String> {
-        let content = std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
         let mut config: Self = toml::from_str(&content)
             .map_err(|e| format!("Failed to parse policy config at {}: {}", path.display(), e))?;
         config.source_path = Some(path.to_path_buf());
@@ -140,8 +141,10 @@ impl PolicyConfig {
 
     /// Save policy config to a TOML file.
     pub fn save(&self, path: &Path) -> Result<(), String> {
-        let content = toml::to_string_pretty(self).map_err(|e| format!("Failed to serialize policy config: {}", e))?;
-        std::fs::write(path, content).map_err(|e| format!("Failed to write {}: {}", path.display(), e))
+        let content = toml::to_string_pretty(self)
+            .map_err(|e| format!("Failed to serialize policy config: {}", e))?;
+        std::fs::write(path, content)
+            .map_err(|e| format!("Failed to write {}: {}", path.display(), e))
     }
 
     /// Check if this config differs from another (for hot-reload detection).
@@ -249,9 +252,7 @@ pub enum PolicyResult {
     Proceed,
 
     /// Action was interrupted — do not execute.
-    Interrupted {
-        reason: String,
-    },
+    Interrupted { reason: String },
 
     /// Action requires human review before proceeding.
     Pending,
@@ -260,9 +261,7 @@ pub enum PolicyResult {
     DryRun,
 
     /// Process trust has been revoked.
-    Revoked {
-        reason: String,
-    },
+    Revoked { reason: String },
 
     /// Context budget exhausted.
     ContextExhausted {
@@ -272,10 +271,7 @@ pub enum PolicyResult {
     },
 
     /// Context fragment exceeds per-fragment hard cap.
-    OversizedFragment {
-        actual: usize,
-        max: usize,
-    },
+    OversizedFragment { actual: usize, max: usize },
 }
 
 impl PolicyResult {
@@ -292,13 +288,21 @@ impl PolicyResult {
     pub fn into_gate_result(self) -> crate::gate_result::GateResult {
         match self {
             PolicyResult::Proceed => crate::gate_result::GateResult::Proceed,
-            PolicyResult::Interrupted { reason } => crate::gate_result::GateResult::Interrupted { reason },
+            PolicyResult::Interrupted { reason } => {
+                crate::gate_result::GateResult::Interrupted { reason }
+            }
             PolicyResult::Pending => crate::gate_result::GateResult::Pending,
             PolicyResult::DryRun => crate::gate_result::GateResult::DryRun,
             PolicyResult::Revoked { reason } => crate::gate_result::GateResult::Revoked { reason },
-            PolicyResult::ContextExhausted { used, budget, remaining } => {
-                crate::gate_result::GateResult::ContextExhausted { used, budget, remaining }
-            }
+            PolicyResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            } => crate::gate_result::GateResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            },
             PolicyResult::OversizedFragment { actual, max } => {
                 crate::gate_result::GateResult::OversizedFragment { actual, max }
             }
@@ -307,8 +311,18 @@ impl PolicyResult {
 }
 
 /// Helper functions for default values.
-fn default_min_trust_layer() -> u32 { 2 }
-fn default_confidence_floor() -> f64 { 0.6 }
-fn default_cross_scope_ttl() -> u64 { 3600 }
-fn default_domain_mode() -> DomainAllowlistMode { DomainAllowlistMode::Strict }
-fn default_true() -> bool { true }
+fn default_min_trust_layer() -> u32 {
+    2
+}
+fn default_confidence_floor() -> f64 {
+    0.6
+}
+fn default_cross_scope_ttl() -> u64 {
+    3600
+}
+fn default_domain_mode() -> DomainAllowlistMode {
+    DomainAllowlistMode::Strict
+}
+fn default_true() -> bool {
+    true
+}

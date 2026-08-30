@@ -40,7 +40,10 @@ impl StalenessStatus {
             // Moldy: check if there's been any annotation activity since last modification.
             // If annotations were added after the doc was last modified, it has recent context.
             // This is a conservative heuristic — actual check requires querying annotations table.
-            Self::Moldy { days, has_recent_context: false }
+            Self::Moldy {
+                days,
+                has_recent_context: false,
+            }
         }
     }
 
@@ -69,7 +72,10 @@ impl StalenessStatus {
             if has_recent_context {
                 Self::Expired { days }
             } else {
-                Self::Moldy { days, has_recent_context: false }
+                Self::Moldy {
+                    days,
+                    has_recent_context: false,
+                }
             }
         }
     }

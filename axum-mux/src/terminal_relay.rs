@@ -91,7 +91,7 @@ pub struct TerminalRelayState {
 struct SessionData {
     /// Broadcast sender for fanning out terminal output to all connected clients.
     broadcast_tx: broadcast::Sender<Vec<u8>>,
-    
+
     /// Number of currently connected clients.
     client_count: usize,
 }
@@ -102,28 +102,34 @@ impl TerminalRelayState {
             sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-    
+
     /// Get or create a broadcast channel for the given session.
-    async fn get_or_create_session(&self, session_name: &str) -> Result<broadcast::Receiver<Vec<u8>>> {
+    async fn get_or_create_session(
+        &self,
+        session_name: &str,
+    ) -> Result<broadcast::Receiver<Vec<u8>>> {
         let mut sessions = self.sessions.lock().await;
-        
+
         if let Some(session_data) = sessions.get_mut(session_name) {
             // Session already exists, increment client count
             session_data.client_count += 1;
             return Ok(session_data.broadcast_tx.subscribe());
         }
-        
+
         // Create new session with broadcast channel
         let (broadcast_tx, _) = broadcast::channel(1024);
-        
-        sessions.insert(session_name.to_string(), SessionData {
-            broadcast_tx: broadcast_tx.clone(),
-            client_count: 1,
-        });
-        
+
+        sessions.insert(
+            session_name.to_string(),
+            SessionData {
+                broadcast_tx: broadcast_tx.clone(),
+                client_count: 1,
+            },
+        );
+
         Ok(broadcast_tx.subscribe())
     }
-    
+
     /// Remove a session when all clients have disconnected.
     async fn remove_session(&self, session_name: &str) {
         let mut sessions = self.sessions.lock().await;
@@ -154,7 +160,10 @@ pub async fn serve(bind_addr: String, port: u16) -> Result<()> {
     Ok(())
 }
 
-async fn ws_handler(ws: WebSocketUpgrade, State(state): State<TerminalRelayState>) -> impl IntoResponse {
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<TerminalRelayState>,
+) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_ws(socket, state))
         .into_response()
 }
@@ -167,7 +176,12 @@ async fn handle_ws(socket: ws::WebSocket, state: TerminalRelayState) {
     let (mut ws_sink, mut ws_stream) = socket.split();
 
     // Send initial pong to confirm connection
-    if let Err(e) = ws_sink.send(Message::Text(serde_json::to_string(&ControlMessage::Pong { ts: now_ms() }).unwrap())).await {
+    if let Err(e) = ws_sink
+        .send(Message::Text(
+            serde_json::to_string(&ControlMessage::Pong { ts: now_ms() }).unwrap(),
+        ))
+        .await
+    {
         warn!(error = %e, "failed to send initial pong");
         return;
     }
@@ -183,7 +197,12 @@ async fn handle_ws(socket: ws::WebSocket, state: TerminalRelayState) {
                 if let Ok(control) = serde_json::from_str::<ControlMessage>(&text) {
                     match control {
                         ControlMessage::Ping => {
-                            let _ = ws_sink.send(Message::Text(serde_json::to_string(&ControlMessage::Pong { ts: now_ms() }).unwrap())).await;
+                            let _ = ws_sink
+                                .send(Message::Text(
+                                    serde_json::to_string(&ControlMessage::Pong { ts: now_ms() })
+                                        .unwrap(),
+                                ))
+                                .await;
                         }
                         ControlMessage::Join { session, pane_id } => {
                             info!(session = %session, ?pane_id, "client joining terminal session");
@@ -199,9 +218,14 @@ async fn handle_ws(socket: ws::WebSocket, state: TerminalRelayState) {
                                 }
                                 Err(e) => {
                                     warn!(error = %e, "failed to join session");
-                                    let _ = ws_sink.send(Message::Text(serde_json::to_string(&ControlMessage::Error { 
-                                        message: format!("Failed to join session: {}", e) 
-                                    }).unwrap())).await;
+                                    let _ = ws_sink
+                                        .send(Message::Text(
+                                            serde_json::to_string(&ControlMessage::Error {
+                                                message: format!("Failed to join session: {}", e),
+                                            })
+                                            .unwrap(),
+                                        ))
+                                        .await;
                                 }
                             }
                         }

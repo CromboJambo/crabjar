@@ -1,7 +1,9 @@
 // crabjar/memory/src/state_docs/insert.rs
 // SQLite insertion functions — write parsed state-doc data to the database.
 
-use crate::state_docs::models::{Annotation, CodeBlock, ConfidenceAssessment, DocMetadata, Section, Table};
+use crate::state_docs::models::{
+    Annotation, CodeBlock, ConfidenceAssessment, DocMetadata, Section, Table,
+};
 use rusqlite::{Connection, params};
 use std::path::Path;
 
@@ -33,7 +35,9 @@ pub fn insert_section(
 ) -> Result<(), crate::Error> {
     let path = doc_path.to_string_lossy().to_string();
     // Get or create a doc_id for this path (simple approach: use hash of path as integer key)
-    let doc_id_hash: u64 = path.bytes().fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
+    let doc_id_hash: u64 = path
+        .bytes()
+        .fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
     conn.execute(
         "INSERT INTO sections (doc_id, level, title, start_line, end_line, parent_id, content_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
@@ -50,13 +54,11 @@ pub fn insert_section(
 }
 
 /// Insert a table into the tables table
-pub fn insert_table(
-    conn: &Connection,
-    doc_path: &Path,
-    table: &Table,
-) -> Result<(), crate::Error> {
+pub fn insert_table(conn: &Connection, doc_path: &Path, table: &Table) -> Result<(), crate::Error> {
     let path = doc_path.to_string_lossy().to_string();
-    let doc_id_hash: u64 = path.bytes().fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
+    let doc_id_hash: u64 = path
+        .bytes()
+        .fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
     let headers_json = serde_json::to_string(&table.headers).unwrap_or_default();
     conn.execute(
         "INSERT INTO tables (doc_id, section_id, start_line, end_line, headers, rows) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -79,7 +81,9 @@ pub fn insert_code_block(
     block: &CodeBlock,
 ) -> Result<(), crate::Error> {
     let path = doc_path.to_string_lossy().to_string();
-    let doc_id_hash: u64 = path.bytes().fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
+    let doc_id_hash: u64 = path
+        .bytes()
+        .fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
     conn.execute(
         "INSERT INTO code_blocks (doc_id, section_id, start_line, end_line, language, content, content_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![
@@ -102,7 +106,9 @@ pub fn insert_confidence(
     conf: &ConfidenceAssessment,
 ) -> Result<(), crate::Error> {
     let path = doc_path.to_string_lossy().to_string();
-    let doc_id_hash: u64 = path.bytes().fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
+    let doc_id_hash: u64 = path
+        .bytes()
+        .fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
     let assumptions_json = serde_json::to_string(&conf.assumptions).unwrap_or_default();
     let blind_spots_json = serde_json::to_string(&conf.blind_spots).unwrap_or_default();
     conn.execute(
@@ -126,7 +132,9 @@ pub fn insert_annotation(
     annotation: &Annotation,
 ) -> Result<(), crate::Error> {
     let path = doc_path.to_string_lossy().to_string();
-    let doc_id_hash: u64 = path.bytes().fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
+    let doc_id_hash: u64 = path
+        .bytes()
+        .fold(0u64, |h, b| h.wrapping_add(b as u64).wrapping_mul(31));
     conn.execute(
         "INSERT INTO annotations (doc_id, section_id, line_number, kind, message, author, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![

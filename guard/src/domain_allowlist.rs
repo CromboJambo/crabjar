@@ -55,7 +55,11 @@ pub struct DomainEntry {
 }
 
 impl DomainEntry {
-    pub fn new(domain: impl Into<String>, trust_level: DomainTrustLevel, source: impl Into<String>) -> Self {
+    pub fn new(
+        domain: impl Into<String>,
+        trust_level: DomainTrustLevel,
+        source: impl Into<String>,
+    ) -> Self {
         Self {
             domain: domain.into(),
             trust_level,
@@ -249,7 +253,11 @@ impl DomainAllowlist {
             // GitHub
             DomainEntry::new("github.com", DomainTrustLevel::Trusted, "default"),
             DomainEntry::new("api.github.com", DomainTrustLevel::Trusted, "default"),
-            DomainEntry::new("*.githubusercontent.com", DomainTrustLevel::Trusted, "default"),
+            DomainEntry::new(
+                "*.githubusercontent.com",
+                DomainTrustLevel::Trusted,
+                "default",
+            ),
             // Rust/Crates
             DomainEntry::new("crates.io", DomainTrustLevel::Trusted, "default"),
             DomainEntry::new("crates-io.com", DomainTrustLevel::Trusted, "default"),
@@ -263,7 +271,11 @@ impl DomainAllowlist {
             DomainEntry::new("registry.npmjs.org", DomainTrustLevel::Monitored, "default"),
             // PyPI
             DomainEntry::new("pypi.org", DomainTrustLevel::Monitored, "default"),
-            DomainEntry::new("files.pythonhosted.org", DomainTrustLevel::Monitored, "default"),
+            DomainEntry::new(
+                "files.pythonhosted.org",
+                DomainTrustLevel::Monitored,
+                "default",
+            ),
             // npm registry mirrors
             DomainEntry::new("registry.npmjs.com", DomainTrustLevel::Monitored, "default"),
             // Rust toolchain
@@ -272,8 +284,16 @@ impl DomainAllowlist {
             // Cargo git
             DomainEntry::new("git.crates.io", DomainTrustLevel::Trusted, "default"),
             // Tailscale (for internal networking)
-            DomainEntry::new("login.tailscale.com", DomainTrustLevel::Monitored, "default"),
-            DomainEntry::new("control.tailscale.com", DomainTrustLevel::Monitored, "default"),
+            DomainEntry::new(
+                "login.tailscale.com",
+                DomainTrustLevel::Monitored,
+                "default",
+            ),
+            DomainEntry::new(
+                "control.tailscale.com",
+                DomainTrustLevel::Monitored,
+                "default",
+            ),
             // Hugging Face (for model downloads)
             DomainEntry::new("huggingface.co", DomainTrustLevel::Restricted, "default"),
             DomainEntry::new("*.huggingface.co", DomainTrustLevel::Restricted, "default"),
@@ -389,24 +409,64 @@ mod tests {
         let entries = vec![
             DomainEntry::new("trusted.example.com", DomainTrustLevel::Trusted, "test"),
             DomainEntry::new("monitored.example.com", DomainTrustLevel::Monitored, "test"),
-            DomainEntry::new("restricted.example.com", DomainTrustLevel::Restricted, "test"),
+            DomainEntry::new(
+                "restricted.example.com",
+                DomainTrustLevel::Restricted,
+                "test",
+            ),
         ];
         let allowlist = DomainAllowlist::with_entries(entries);
 
         // Layer 3 (high) can access all
-        assert!(allowlist.check_for_trust_layer("trusted.example.com", 3).is_ok());
-        assert!(allowlist.check_for_trust_layer("monitored.example.com", 3).is_ok());
-        assert!(allowlist.check_for_trust_layer("restricted.example.com", 3).is_ok());
+        assert!(
+            allowlist
+                .check_for_trust_layer("trusted.example.com", 3)
+                .is_ok()
+        );
+        assert!(
+            allowlist
+                .check_for_trust_layer("monitored.example.com", 3)
+                .is_ok()
+        );
+        assert!(
+            allowlist
+                .check_for_trust_layer("restricted.example.com", 3)
+                .is_ok()
+        );
 
         // Layer 2 (medium) can access trusted + monitored
-        assert!(allowlist.check_for_trust_layer("trusted.example.com", 2).is_ok());
-        assert!(allowlist.check_for_trust_layer("monitored.example.com", 2).is_ok());
-        assert!(allowlist.check_for_trust_layer("restricted.example.com", 2).is_err());
+        assert!(
+            allowlist
+                .check_for_trust_layer("trusted.example.com", 2)
+                .is_ok()
+        );
+        assert!(
+            allowlist
+                .check_for_trust_layer("monitored.example.com", 2)
+                .is_ok()
+        );
+        assert!(
+            allowlist
+                .check_for_trust_layer("restricted.example.com", 2)
+                .is_err()
+        );
 
         // Layer 1 (low) can access trusted only
-        assert!(allowlist.check_for_trust_layer("trusted.example.com", 1).is_ok());
-        assert!(allowlist.check_for_trust_layer("monitored.example.com", 1).is_err());
-        assert!(allowlist.check_for_trust_layer("restricted.example.com", 1).is_err());
+        assert!(
+            allowlist
+                .check_for_trust_layer("trusted.example.com", 1)
+                .is_ok()
+        );
+        assert!(
+            allowlist
+                .check_for_trust_layer("monitored.example.com", 1)
+                .is_err()
+        );
+        assert!(
+            allowlist
+                .check_for_trust_layer("restricted.example.com", 1)
+                .is_err()
+        );
     }
 
     #[test]

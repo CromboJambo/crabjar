@@ -65,5 +65,4 @@ impl GuardDb {
     pub fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
         self.conn.lock().unwrap()
     }
-
 }

@@ -45,26 +45,8 @@ pub const HIGH_RISK_COMMANDS: &[&str] = &[
 
 /// Medium-risk commands that require review.
 pub const MEDIUM_RISK_COMMANDS: &[&str] = &[
-    "git",
-    "clone",
-    "checkout",
-    "branch",
-    "docker",
-    "podman",
-    "ssh",
-    "scp",
-    "rsync",
-    "vim",
-    "vi",
-    "nano",
-    "emacs",
-    "cargo",
-    "rustc",
-    "python",
-    "pip",
-    "node",
-    "npm",
-    "npx",
+    "git", "clone", "checkout", "branch", "docker", "podman", "ssh", "scp", "rsync", "vim", "vi",
+    "nano", "emacs", "cargo", "rustc", "python", "pip", "node", "npm", "npx",
 ];
 
 /// Risk level for a command. Higher risk means more scrutiny.

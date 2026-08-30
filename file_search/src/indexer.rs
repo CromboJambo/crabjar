@@ -54,7 +54,11 @@ pub struct IndexedFile {
 impl IndexedFile {
     fn new(path: &Path, root: &Path) -> Option<Self> {
         let absolute = path.canonicalize().ok()?;
-        let relative = absolute.strip_prefix(root).ok()?.to_string_lossy().into_owned();
+        let relative = absolute
+            .strip_prefix(root)
+            .ok()?
+            .to_string_lossy()
+            .into_owned();
         let metadata = std::fs::metadata(&absolute).ok()?;
 
         if !metadata.is_file() {
@@ -140,7 +144,8 @@ impl FileIndexer {
 
                     // Check file size
                     if let Ok(metadata) = entry.metadata()
-                        && metadata.len() > self.config.max_file_size {
+                        && metadata.len() > self.config.max_file_size
+                    {
                         debug!(
                             path = ?entry.path(),
                             size = metadata.len(),

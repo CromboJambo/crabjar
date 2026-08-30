@@ -1,23 +1,27 @@
 // crabjar/src/knowledge_store/bridge.rs
 // KnowledgeBridge - bridge between state-docs and knowledge store.
 
-use std::path::{Path, PathBuf};
 use agent_context::state_docs::Annotation;
 use agent_context::{KnowledgeEntry, KnowledgeKind, Source, Store};
 use chrono::Utc;
 use rusqlite::Connection;
 use serde_json::json;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-use super::confidence::{annotation_confidence, ConfidenceDefaults, now_unix_ms};
+use super::confidence::{ConfidenceDefaults, annotation_confidence, now_unix_ms};
 
 /// Result of a gated knowledge insert.
 #[derive(Debug, Clone)]
 pub enum GatedInsertResult {
     #[allow(dead_code)]
-    Inserted { id: i64 },
+    Inserted {
+        id: i64,
+    },
     #[allow(dead_code)]
-    Quarantined { id: i64 },
+    Quarantined {
+        id: i64,
+    },
     DryRun,
 }
 
@@ -63,7 +67,9 @@ impl KnowledgeBridge {
 
     /// Resolve a state-doc path from project root
     pub fn resolve_doc_path(&self, doc_name: &str) -> Result<PathBuf, agent_context::Error> {
-        let docs_dir = self.project_root.join(agent_context::state_docs::STATE_DOCS_DIR);
+        let docs_dir = self
+            .project_root
+            .join(agent_context::state_docs::STATE_DOCS_DIR);
         Ok(docs_dir.join(format!("{}.md", doc_name)))
     }
 
@@ -72,9 +78,12 @@ impl KnowledgeBridge {
         &self,
         path: &Path,
     ) -> Result<serde_json::Value, agent_context::Error> {
-        let overlay_dir = path.parent().unwrap()
+        let overlay_dir = path
+            .parent()
+            .unwrap()
             .join(agent_context::state_docs::OVERLAY_DIR);
-        let stem = path.file_name()
+        let stem = path
+            .file_name()
             .unwrap()
             .to_string_lossy()
             .trim_end_matches(".md")
@@ -114,7 +123,10 @@ impl KnowledgeBridge {
         entry.provenance_id = provenance_id;
         entry.source = Source::Agent;
         entry.weight = confidence;
-        let doc_name = annotation.doc_name.strip_suffix(".md").unwrap_or(&annotation.doc_name);
+        let doc_name = annotation
+            .doc_name
+            .strip_suffix(".md")
+            .unwrap_or(&annotation.doc_name);
         entry.tags = std::iter::once("state-doc".to_string())
             .chain(doc_name.split('_').map(|s| s.to_string()))
             .collect();
@@ -128,23 +140,30 @@ impl KnowledgeBridge {
         limit: usize,
         source_doc: &str,
     ) -> Result<Vec<serde_json::Value>, agent_context::Error> {
-        let rows = self.knowledge_store.query(tags, limit, "", source_doc, "")?;
-        Ok(rows.into_iter().map(|row| {
-            let mut meta = row.metadata;
-            if let Some(source_id) = meta.get("source_id").cloned()
-                && let Some(meta_obj) = meta.as_object_mut()
-            {
-                meta_obj.entry("annotation_id".to_string()).or_insert(source_id);
-            }
-            json!({
-                "id": row.id,
-                "content": row.content,
-                "tags": row.tags,
-                "meta": meta.clone(),
-                "metadata": meta,
-                "active": row.active,
+        let rows = self
+            .knowledge_store
+            .query(tags, limit, "", source_doc, "")?;
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let mut meta = row.metadata;
+                if let Some(source_id) = meta.get("source_id").cloned()
+                    && let Some(meta_obj) = meta.as_object_mut()
+                {
+                    meta_obj
+                        .entry("annotation_id".to_string())
+                        .or_insert(source_id);
+                }
+                json!({
+                    "id": row.id,
+                    "content": row.content,
+                    "tags": row.tags,
+                    "meta": meta.clone(),
+                    "metadata": meta,
+                    "active": row.active,
+                })
             })
-        }).collect())
+            .collect())
     }
 
     /// Sync all open annotations for a state-doc into the knowledge store
@@ -158,16 +177,28 @@ impl KnowledgeBridge {
         if let Some(entries) = overlay.get("entries").and_then(|v| v.as_array()) {
             for entry in entries {
                 let status = entry.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                if status != "open" { continue; }
+                if status != "open" {
+                    continue;
+                }
                 let id_str = entry.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                if id_str.is_empty() { continue; }
-                if self.knowledge_store.find_active_by_source(Self::STATE_DOC_SOURCE_TYPE, id_str)?.is_some() {
+                if id_str.is_empty() {
+                    continue;
+                }
+                if self
+                    .knowledge_store
+                    .find_active_by_source(Self::STATE_DOC_SOURCE_TYPE, id_str)?
+                    .is_some()
+                {
                     continue;
                 }
                 let _annotation_id = id_str.parse::<i64>().unwrap_or(0);
                 let message = entry.get("message").and_then(|v| v.as_str()).unwrap_or("");
                 let kind_str = entry.get("kind").and_then(|v| v.as_str()).unwrap_or("note");
-                let kind = match kind_str { "note" => KnowledgeKind::Context, "question" => KnowledgeKind::Instruction, _ => KnowledgeKind::Context };
+                let kind = match kind_str {
+                    "note" => KnowledgeKind::Context,
+                    "question" => KnowledgeKind::Instruction,
+                    _ => KnowledgeKind::Context,
+                };
                 let mut knowledge = KnowledgeEntry::new(message, kind)
                     .meta("source_id", id_str)
                     .meta("source_doc", doc_name)
@@ -193,17 +224,24 @@ impl KnowledgeBridge {
 
     /// List all state-docs that have synced annotations in the knowledge store
     pub fn list_synced_state_docs(&self) -> Result<Vec<String>, agent_context::Error> {
-        let docs_dir = self.project_root.join(agent_context::state_docs::STATE_DOCS_DIR);
+        let docs_dir = self
+            .project_root
+            .join(agent_context::state_docs::STATE_DOCS_DIR);
         let mut synced = Vec::new();
         if let Ok(entries) = std::fs::read_dir(&docs_dir) {
             for entry in entries {
                 if let Ok(e) = entry
                     && let Some(name) = e.file_name().to_string_lossy().strip_suffix(".md")
                 {
-                    let overlay_path = e.path().parent().unwrap()
+                    let overlay_path = e
+                        .path()
+                        .parent()
+                        .unwrap()
                         .join(agent_context::state_docs::OVERLAY_DIR)
                         .join(format!("{}.overlay.json", name));
-                    if overlay_path.exists() { synced.push(name.to_string()); }
+                    if overlay_path.exists() {
+                        synced.push(name.to_string());
+                    }
                 }
             }
         }
@@ -217,9 +255,14 @@ impl KnowledgeBridge {
     ) -> Result<Vec<serde_json::Value>, agent_context::Error> {
         let overlay = self.load_overlay_for_path(&self.resolve_doc_path(doc_name)?)?;
 
-        let tags: Vec<&str> = overlay.get("entries")
+        let tags: Vec<&str> = overlay
+            .get("entries")
             .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|e| e.get("doc").and_then(|v| v.as_str())).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|e| e.get("doc").and_then(|v| v.as_str()))
+                    .collect()
+            })
             .unwrap_or_default();
 
         self.query_state_docs(&tags, 100, doc_name)
@@ -228,7 +271,9 @@ impl KnowledgeBridge {
     /// Get recent events from the knowledge store's event log
     pub fn get_events(&self, limit: usize) -> Result<Vec<serde_json::Value>, agent_context::Error> {
         let rows = self.knowledge_store.events(limit)?;
-        if rows.is_empty() { return Ok(vec![]); }
+        if rows.is_empty() {
+            return Ok(vec![]);
+        }
         Ok(rows.into_iter().map(|row| json!({ "id": row.id, "event_type": row.event_type, "timestamp": row.timestamp })).collect())
     }
 
@@ -238,7 +283,12 @@ impl KnowledgeBridge {
         annotation_id: &str,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        Ok(self.knowledge_store.deactivate_by_source(Self::STATE_DOC_SOURCE_TYPE, annotation_id, Source::Agent, reason)?)
+        Ok(self.knowledge_store.deactivate_by_source(
+            Self::STATE_DOC_SOURCE_TYPE,
+            annotation_id,
+            Source::Agent,
+            reason,
+        )?)
     }
 
     /// Deactivates all knowledge entries by provenance_id across all provenance sources.
@@ -247,7 +297,11 @@ impl KnowledgeBridge {
         provenance_id: &str,
         reason: Option<&str>,
     ) -> Result<usize, agent_context::Error> {
-        Ok(self.knowledge_store.deactivate_by_provenance_id(provenance_id, Source::Agent, reason)?)
+        Ok(self.knowledge_store.deactivate_by_provenance_id(
+            provenance_id,
+            Source::Agent,
+            reason,
+        )?)
     }
 
     /// Insert a standalone knowledge entry.
@@ -281,7 +335,8 @@ impl KnowledgeBridge {
 
         let gate_result = if let Some(guard_db) = &self.guard_db {
             let gate = crabjar_guard::ExecutionGate::new(guard_db, false, &self.project_root);
-            gate.check_knowledge_write(source_str).map_err(|e| agent_context::Error::Internal(e.to_string()))?
+            gate.check_knowledge_write(source_str)
+                .map_err(|e| agent_context::Error::Internal(e.to_string()))?
         } else {
             crabjar_guard::GateResult::Proceed
         };
@@ -301,18 +356,39 @@ impl KnowledgeBridge {
             }
             crabjar_guard::GateResult::Pending => {
                 let mut pending_entry = entry;
-                let mut new_meta = pending_entry.metadata.as_object().cloned().unwrap_or_else(serde_json::Map::new);
+                let mut new_meta = pending_entry
+                    .metadata
+                    .as_object()
+                    .cloned()
+                    .unwrap_or_else(serde_json::Map::new);
                 new_meta.insert("quarantined".to_string(), serde_json::json!(true));
-                new_meta.insert("quarantined_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+                new_meta.insert(
+                    "quarantined_at".to_string(),
+                    serde_json::json!(chrono::Utc::now().to_rfc3339()),
+                );
                 pending_entry.metadata = serde_json::Value::Object(new_meta);
                 let id = self.knowledge_store.insert(pending_entry)?;
                 Ok(GatedInsertResult::Quarantined { id })
             }
-            crabjar_guard::GateResult::Interrupted { reason } => Err(agent_context::Error::Internal(format!("Knowledge write blocked: {}", reason))),
+            crabjar_guard::GateResult::Interrupted { reason } => Err(
+                agent_context::Error::Internal(format!("Knowledge write blocked: {}", reason)),
+            ),
             crabjar_guard::GateResult::DryRun => Ok(GatedInsertResult::DryRun),
-            crabjar_guard::GateResult::Revoked { reason } => Err(agent_context::Error::Internal(format!("Knowledge write revoked: {}", reason))),
-            crabjar_guard::GateResult::ContextExhausted { used, budget, remaining } => Err(agent_context::Error::Internal(format!("Knowledge write blocked: context budget exhausted ({used} / {budget} tokens, {remaining} remaining)"))),
-            crabjar_guard::GateResult::OversizedFragment { actual, max } => Err(agent_context::Error::Internal(format!("Knowledge write blocked: context fragment too large ({actual} tokens exceeds max of {max})"))),
+            crabjar_guard::GateResult::Revoked { reason } => Err(agent_context::Error::Internal(
+                format!("Knowledge write revoked: {}", reason),
+            )),
+            crabjar_guard::GateResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            } => Err(agent_context::Error::Internal(format!(
+                "Knowledge write blocked: context budget exhausted ({used} / {budget} tokens, {remaining} remaining)"
+            ))),
+            crabjar_guard::GateResult::OversizedFragment { actual, max } => {
+                Err(agent_context::Error::Internal(format!(
+                    "Knowledge write blocked: context fragment too large ({actual} tokens exceeds max of {max})"
+                )))
+            }
         }
     }
 
@@ -340,7 +416,10 @@ impl KnowledgeBridge {
         ).unwrap_or(false);
 
         if !is_quarantined {
-            return Err(agent_context::Error::Internal(format!("Entry {} is not quarantined", id)));
+            return Err(agent_context::Error::Internal(format!(
+                "Entry {} is not quarantined",
+                id
+            )));
         }
 
         conn.execute(
@@ -404,29 +483,69 @@ impl KnowledgeBridge {
         reason: &str,
     ) -> Result<(usize, Annotation), agent_context::Error> {
         let overlay_path = self.resolve_doc_path(doc_name)?;
-        let overlay_dir = overlay_path.parent().unwrap()
+        let overlay_dir = overlay_path
+            .parent()
+            .unwrap()
             .join(agent_context::state_docs::OVERLAY_DIR);
         let overlay_file = overlay_dir.join(format!(
             "{}.overlay.json",
-            overlay_path.file_name().unwrap().to_string_lossy().trim_end_matches(".md")
+            overlay_path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .trim_end_matches(".md")
         ));
 
         let mut overlay = self.load_overlay_for_path(&overlay_path)?;
 
-        let resolved_entry = overlay.get("entries").and_then(|v| v.as_array())
-            .and_then(|a| a.iter().find(|e| e.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id))
-            .ok_or_else(|| agent_context::Error::Internal(format!("annotation not found: {}", annotation_id)))?;
+        let resolved_entry = overlay
+            .get("entries")
+            .and_then(|v| v.as_array())
+            .and_then(|a| {
+                a.iter()
+                    .find(|e| e.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id)
+            })
+            .ok_or_else(|| {
+                agent_context::Error::Internal(format!("annotation not found: {}", annotation_id))
+            })?;
 
-        let id = resolved_entry.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-        let source_doc = resolved_entry.get("doc").and_then(|v| v.as_str()).unwrap_or(doc_name).to_string();
+        let id = resolved_entry
+            .get("id")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        let source_doc = resolved_entry
+            .get("doc")
+            .and_then(|v| v.as_str())
+            .unwrap_or(doc_name)
+            .to_string();
         let section_id = resolved_entry.get("section_id").and_then(|v| v.as_i64());
-        let line = resolved_entry.get("line").and_then(|v| v.as_u64()).map(|l| l as usize).unwrap_or(0);
-        let kind = resolved_entry.get("kind").and_then(|v| v.as_str()).unwrap_or("note").to_string();
-        let message = resolved_entry.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let author = resolved_entry.get("author").and_then(|v| v.as_str()).unwrap_or("agent").to_string();
-        let created_at = resolved_entry.get("created_at_unix_ms")
+        let line = resolved_entry
+            .get("line")
             .and_then(|v| v.as_u64())
-            .map(|ms| chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ms as i64).unwrap_or(Utc::now()))
+            .map(|l| l as usize)
+            .unwrap_or(0);
+        let kind = resolved_entry
+            .get("kind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("note")
+            .to_string();
+        let message = resolved_entry
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let author = resolved_entry
+            .get("author")
+            .and_then(|v| v.as_str())
+            .unwrap_or("agent")
+            .to_string();
+        let created_at = resolved_entry
+            .get("created_at_unix_ms")
+            .and_then(|v| v.as_u64())
+            .map(|ms| {
+                chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ms as i64)
+                    .unwrap_or(Utc::now())
+            })
             .unwrap_or(Utc::now());
 
         if let Some(entries) = overlay.get_mut("entries").and_then(|v| v.as_array_mut()) {
@@ -434,7 +553,10 @@ impl KnowledgeBridge {
                 if entry.get("id").and_then(|v| v.as_str()).unwrap_or("") == annotation_id {
                     if let Some(obj) = entry.as_object_mut() {
                         obj.insert("status".to_string(), serde_json::json!("resolved"));
-                        obj.insert("resolved_at_unix_ms".to_string(), serde_json::json!(now_unix_ms()));
+                        obj.insert(
+                            "resolved_at_unix_ms".to_string(),
+                            serde_json::json!(now_unix_ms()),
+                        );
                         obj.insert("resolution_reason".to_string(), serde_json::json!(reason));
                     }
                     break;
@@ -444,22 +566,39 @@ impl KnowledgeBridge {
 
         std::fs::create_dir_all(&overlay_dir).ok();
         let json = serde_json::to_string_pretty(&overlay).map_err(agent_context::Error::Json)?;
-        std::fs::write(&overlay_file, json).map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
+        std::fs::write(&overlay_file, json)
+            .map_err(|e| agent_context::Error::Io(std::io::Error::other(e.to_string())))?;
 
         let deactivated = self.deactivate_annotation_knowledge(annotation_id, Some(reason))?;
 
-        let resolved = Annotation { id, doc_name: source_doc, section_id, line, kind, message, author, status: "resolved".to_string(), created_at };
+        let resolved = Annotation {
+            id,
+            doc_name: source_doc,
+            section_id,
+            line,
+            kind,
+            message,
+            author,
+            status: "resolved".to_string(),
+            created_at,
+        };
         Ok((deactivated, resolved))
     }
 
     /// Promote a raw event from mirror-log to a knowledge entry
     pub fn promote_event(&self, event_id: i64) -> Result<String, agent_context::Error> {
-        let conn = self.mirror_log_conn.as_ref().ok_or_else(|| agent_context::Error::Internal("mirror-log connection not available".to_string()))?;
+        let conn = self.mirror_log_conn.as_ref().ok_or_else(|| {
+            agent_context::Error::Internal("mirror-log connection not available".to_string())
+        })?;
 
         let id_str = event_id.to_string();
-        let (content, _source, meta): (String, String, Option<String>) = conn.query_row(
-            "SELECT content, source, meta FROM events WHERE id = ?1", [&id_str], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        ).map_err(|e| agent_context::Error::Internal(format!("Failed to find event: {}", e)))?;
+        let (content, _source, meta): (String, String, Option<String>) = conn
+            .query_row(
+                "SELECT content, source, meta FROM events WHERE id = ?1",
+                [&id_str],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(|e| agent_context::Error::Internal(format!("Failed to find event: {}", e)))?;
 
         let provenance_id = Uuid::new_v4().to_string();
         let defaults = ConfidenceDefaults::default();
@@ -467,13 +606,16 @@ impl KnowledgeBridge {
         entry.source_type = "mirror_log_event".to_string();
         entry.source_id = event_id.to_string();
         entry.source = Source::Agent;
-        entry = entry.meta("confidence", defaults.promote_confidence)
+        entry = entry
+            .meta("confidence", defaults.promote_confidence)
             .meta("derived_at_unix_ms", now_unix_ms())
             .meta("status", "active")
             .meta("provenance_id", provenance_id)
             .meta("provenance_source", "mirror_log_event")
             .meta("provenance_set_at_unix_ms", now_unix_ms());
-        if let Some(m) = meta { entry = entry.meta("event-meta", json!(m)); }
+        if let Some(m) = meta {
+            entry = entry.meta("event-meta", json!(m));
+        }
 
         let new_id = self.knowledge_store.insert(entry)?;
         Ok(new_id.to_string())

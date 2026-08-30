@@ -44,7 +44,9 @@ pub struct TerminalPanel {
 impl TerminalPanel {
     /// Create a new terminal panel with the given configuration.
     /// Returns `None` if no terminal backend is available (wezterm/zellij not installed).
-    pub async fn try_new(config: TerminalPanelConfig) -> Result<Option<Self>, Box<dyn std::error::Error>> {
+    pub async fn try_new(
+        config: TerminalPanelConfig,
+    ) -> Result<Option<Self>, Box<dyn std::error::Error>> {
         let mut manager = TerminalManager::new();
 
         // Try to create and spawn a session; fail gracefully if no backend available
@@ -62,16 +64,24 @@ impl TerminalPanel {
                 }
             }
             Err(e) => {
-                tracing::info!("No terminal backend available (wezterm/zellij not installed): {}", e);
+                tracing::info!(
+                    "No terminal backend available (wezterm/zellij not installed): {}",
+                    e
+                );
                 Ok(None)
             }
         }
     }
 
     /// Create a new terminal panel (convenience wrapper — panics if unavailable).
-    #[deprecated(since = "0.1.0", note = "Use `try_new` instead for graceful degradation")]
+    #[deprecated(
+        since = "0.1.0",
+        note = "Use `try_new` instead for graceful degradation"
+    )]
     pub async fn new(config: TerminalPanelConfig) -> Result<Self, Box<dyn std::error::Error>> {
-        Self::try_new(config).await?.ok_or_else(|| "No terminal backend available".into())
+        Self::try_new(config)
+            .await?
+            .ok_or_else(|| "No terminal backend available".into())
     }
 
     /// Send text input to the terminal session.
@@ -84,16 +94,19 @@ impl TerminalPanel {
     }
 
     /// Update the output buffer with fresh data from the terminal.
-    pub async fn update_output(&mut self, max_lines: usize) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn update_output(
+        &mut self,
+        max_lines: usize,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(ref session) = self.session {
             let sess = session.lock().await;
             // Use snapshot() to get current terminal state
             let snap = sess.snapshot().await?;
-            
+
             for line in &snap.lines {
                 self.output_buffer.push(line.clone());
             }
-            
+
             // Trim buffer to max_lines
             while self.output_buffer.len() > max_lines {
                 self.output_buffer.remove(0);
@@ -113,12 +126,13 @@ impl TerminalPanel {
         };
 
         // Create lines from the output buffer
-        let lines: Vec<Line> = self.output_buffer.iter()
+        let lines: Vec<Line> = self
+            .output_buffer
+            .iter()
             .map(|line| Line::from(Span::raw(line.clone())))
             .collect();
 
-        let paragraph = Paragraph::new(lines)
-            .block(block);
+        let paragraph = Paragraph::new(lines).block(block);
 
         frame.render_widget(paragraph, area);
     }

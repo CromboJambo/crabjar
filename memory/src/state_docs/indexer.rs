@@ -1,7 +1,7 @@
 // crabjar/memory/src/state_docs/indexer.rs
 // High-level indexing orchestration — reads files, delegates to extract/insert.
 
-use crate::state_docs::models::{Annotation};
+use crate::state_docs::models::Annotation;
 use std::fs;
 use std::path::Path;
 
@@ -9,7 +9,7 @@ use super::extract::*;
 use super::insert::*;
 
 // Re-export extraction functions for test compatibility (tests import via indexer module path)
-pub use super::extract::{extract_metadata, extract_sections, extract_tables, extract_code_blocks};
+pub use super::extract::{extract_code_blocks, extract_metadata, extract_sections, extract_tables};
 
 /// Test-only wrappers — tests reference these by name via the indexer module path.
 pub fn extract_metadata_for_test(content: &str) -> crate::state_docs::models::DocMetadata {
@@ -20,9 +20,7 @@ pub fn extract_sections_for_test(content: &str) -> Vec<crate::state_docs::models
     extract_sections(content)
 }
 
-pub fn extract_code_blocks_for_test(
-    content: &str,
-) -> Vec<crate::state_docs::models::CodeBlock> {
+pub fn extract_code_blocks_for_test(content: &str) -> Vec<crate::state_docs::models::CodeBlock> {
     extract_code_blocks(content)
 }
 
@@ -58,7 +56,8 @@ pub fn index_doc(
 
     // Fall back to filename (without .md) if no frontmatter name provided
     if metadata.doc_name.is_empty()
-        && let Some(name) = doc_path.file_stem().and_then(|s| s.to_str()) {
+        && let Some(name) = doc_path.file_stem().and_then(|s| s.to_str())
+    {
         metadata.doc_name = name.trim_end_matches(".md").to_string();
     }
 

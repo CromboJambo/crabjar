@@ -143,10 +143,7 @@ impl ContextCompressor {
         // Group by stage
         let mut by_stage: HashMap<&str, Vec<&Observation>> = HashMap::new();
         for obs in observations {
-            by_stage
-                .entry(obs.stage.as_str())
-                .or_default()
-                .push(obs);
+            by_stage.entry(obs.stage.as_str()).or_default().push(obs);
         }
 
         // Convert to sorted vec for deterministic output
@@ -163,10 +160,7 @@ impl ContextCompressor {
             // Group by kind within stage
             let mut by_kind: HashMap<&str, Vec<&Observation>> = HashMap::new();
             for obs in &obs_list {
-                by_kind
-                    .entry(obs.kind.as_str())
-                    .or_default()
-                    .push(obs);
+                by_kind.entry(obs.kind.as_str()).or_default().push(obs);
             }
 
             for (kind, kind_obs) in by_kind.into_iter() {

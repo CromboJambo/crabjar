@@ -331,7 +331,8 @@ async fn execute_with_guard(
     // Construct scope for this orchestrator instance
     let actor_scope = crabjar_guard::Scope::project("orchestrator");
     let target_scope = actor_scope.clone();
-    let cross_scope_auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+    let cross_scope_auth =
+        crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
 
     let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
@@ -489,7 +490,9 @@ async fn execute_tool_call(
             Ok(conn) => {
                 let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
                 if registry.init().is_ok() {
-registry.discover_tools("orchestrator", &project_root).unwrap_or_default()
+                    registry
+                        .discover_tools("orchestrator", &project_root)
+                        .unwrap_or_default()
                 } else {
                     Vec::new()
                 }
@@ -553,10 +556,9 @@ registry.discover_tools("orchestrator", &project_root).unwrap_or_default()
             let command_args = &args[1..];
 
             // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| {
-                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-                });
+            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
+                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+            });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/mirror.db", guard_root),
@@ -571,7 +573,8 @@ registry.discover_tools("orchestrator", &project_root).unwrap_or_default()
             // Construct scope for this orchestrator instance
             let actor_scope = crabjar_guard::Scope::project("orchestrator");
             let target_scope = actor_scope.clone();
-            let cross_scope_auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+            let cross_scope_auth =
+                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
 
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
@@ -722,10 +725,9 @@ registry.discover_tools("orchestrator", &project_root).unwrap_or_default()
         }
         "search_logs" => {
             // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| {
-                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-                });
+            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
+                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+            });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/mirror.db", guard_root),
@@ -851,10 +853,9 @@ registry.discover_tools("orchestrator", &project_root).unwrap_or_default()
         }
         "recent_events" => {
             // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| {
-                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-                });
+            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
+                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+            });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/guard.db", guard_root),
@@ -973,10 +974,9 @@ registry.discover_tools("orchestrator", &project_root).unwrap_or_default()
         }
         "by_source" => {
             // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-                .unwrap_or_else(|_| {
-                    std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-                });
+            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
+                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
+            });
 
             let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
                 format!("{}/guard.db", guard_root),
@@ -1244,9 +1244,7 @@ async fn main() -> anyhow::Result<()> {
     let events_db_path = std::env::var("MIRROR_LOG_DB_PATH")
         .unwrap_or_else(|_| format!("{}/memory/events.db", crabjar_root.display()));
     let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-        .unwrap_or_else(|_| {
-            std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-        });
+        .unwrap_or_else(|_| std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string()));
 
     // Initialize knowledge store schema
     let kconn = rusqlite::Connection::open(&knowledge_db_path)

@@ -8,14 +8,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tantivy::schema::*;
-use tantivy::{doc, Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, Term};
+use tantivy::{Index, IndexReader, IndexWriter, ReloadPolicy, TantivyDocument, Term, doc};
 use tracing::{debug, warn};
 
-use crate::indexer::{IndexedFile, FileIndexer};
+use crate::indexer::{FileIndexer, IndexedFile};
 
 /// SQLite schema version. Bump this when the schema changes.
 const SCHEMA_VERSION: i32 = 1;
@@ -43,12 +43,13 @@ impl SearchStorage {
         let index_path = root_dir.join(TANTIVY_INDEX_DIR);
 
         // Ensure index directory exists
-        fs::create_dir_all(&index_path).map_err(|e| format!("Failed to create index dir: {}", e))?;
+        fs::create_dir_all(&index_path)
+            .map_err(|e| format!("Failed to create index dir: {}", e))?;
 
         // Open SQLite database in the same directory
         let db_path = root_dir.join(".crabjar_search.db");
-        let db_conn = Connection::open(&db_path)
-            .map_err(|e| format!("Failed to open search DB: {}", e))?;
+        let db_conn =
+            Connection::open(&db_path).map_err(|e| format!("Failed to open search DB: {}", e))?;
 
         // Initialize schema
         Self::init_schema(&db_conn)?;
@@ -124,9 +125,11 @@ impl SearchStorage {
         // Try to open existing index first
         if path.join("tantivy").exists() || Self::has_index_files(path) {
             debug!(path = ?path, "Opening existing tantivy index");
-            let index = Index::open_in_dir(path).map_err(|e| format!("Failed to open tantivy index: {}", e))?;
+            let index = Index::open_in_dir(path)
+                .map_err(|e| format!("Failed to open tantivy index: {}", e))?;
 
-            let writer = index.writer(50_000_000) // 50MB heap
+            let writer = index
+                .writer(50_000_000) // 50MB heap
                 .map_err(|e| format!("Failed to create index writer: {}", e))?;
 
             Ok((index, writer))
@@ -136,7 +139,8 @@ impl SearchStorage {
             let index = Index::create_in_dir(path, schema.clone())
                 .map_err(|e| format!("Failed to create tantivy index: {}", e))?;
 
-            let writer = index.writer(50_000_000)
+            let writer = index
+                .writer(50_000_000)
                 .map_err(|e| format!("Failed to create index writer: {}", e))?;
 
             Ok((index, writer))
@@ -145,15 +149,18 @@ impl SearchStorage {
 
     /// Check if tantivy index files exist.
     fn has_index_files(path: &Path) -> bool {
-        path.join("tantivy").exists() || fs::read_dir(path).ok().is_some_and(|mut entries| {
-            entries.any(|e| {
-                e.as_ref().ok().is_some_and(|entry| {
-                    let name = entry.file_name();
-                    let name_str = name.to_string_lossy();
-                    name_str.starts_with("tantivy") || name_str == "meta" || name_str.ends_with(".json")
+        path.join("tantivy").exists()
+            || fs::read_dir(path).ok().is_some_and(|mut entries| {
+                entries.any(|e| {
+                    e.as_ref().ok().is_some_and(|entry| {
+                        let name = entry.file_name();
+                        let name_str = name.to_string_lossy();
+                        name_str.starts_with("tantivy")
+                            || name_str == "meta"
+                            || name_str.ends_with(".json")
+                    })
                 })
             })
-        })
     }
 
     /// Create the tantivy schema for file search.
@@ -185,11 +192,26 @@ impl SearchStorage {
         let content_text = tokens.join(" ");
 
         // Get field handles from schema
-        let path_field = self.schema.get_field("path").map_err(|e| format!("Missing 'path' field: {}", e))?;
-        let content_field = self.schema.get_field("content").map_err(|e| format!("Missing 'content' field: {}", e))?;
-        let mtime_field = self.schema.get_field("mtime").map_err(|e| format!("Missing 'mtime' field: {}", e))?;
-        let size_field = self.schema.get_field("size").map_err(|e| format!("Missing 'size' field: {}", e))?;
-        let extension_field = self.schema.get_field("extension").map_err(|e| format!("Missing 'extension' field: {}", e))?;
+        let path_field = self
+            .schema
+            .get_field("path")
+            .map_err(|e| format!("Missing 'path' field: {}", e))?;
+        let content_field = self
+            .schema
+            .get_field("content")
+            .map_err(|e| format!("Missing 'content' field: {}", e))?;
+        let mtime_field = self
+            .schema
+            .get_field("mtime")
+            .map_err(|e| format!("Missing 'mtime' field: {}", e))?;
+        let size_field = self
+            .schema
+            .get_field("size")
+            .map_err(|e| format!("Missing 'size' field: {}", e))?;
+        let extension_field = self
+            .schema
+            .get_field("extension")
+            .map_err(|e| format!("Missing 'extension' field: {}", e))?;
 
         // Add to tantivy index using doc! macro
         let doc = doc!(
@@ -228,14 +250,18 @@ impl SearchStorage {
         let path_str = path.to_string_lossy().to_string();
 
         // Get field handle for path
-        let path_field = self.schema.get_field("path").map_err(|e| format!("Missing 'path' field: {}", e))?;
+        let path_field = self
+            .schema
+            .get_field("path")
+            .map_err(|e| format!("Missing 'path' field: {}", e))?;
 
         // Delete from tantivy (returns number of deleted documents)
         self.index_writer
             .delete_term(Term::from_field_text(path_field, &path_str));
 
         // Delete from SQLite
-        self.db_conn.execute("DELETE FROM files WHERE path = ?1", params![&path_str])
+        self.db_conn
+            .execute("DELETE FROM files WHERE path = ?1", params![&path_str])
             .map_err(|e| format!("Failed to remove from DB: {}", e))?;
 
         Ok(())
@@ -243,7 +269,9 @@ impl SearchStorage {
 
     /// Commit pending changes to the tantivy index.
     pub fn commit(&mut self) -> Result<(), String> {
-        self.index_writer.commit().map_err(|e| format!("Failed to commit index: {}", e))?;
+        self.index_writer
+            .commit()
+            .map_err(|e| format!("Failed to commit index: {}", e))?;
         Ok(())
     }
 
@@ -252,30 +280,53 @@ impl SearchStorage {
         let searcher = self.index_reader.searcher();
 
         // Get field handles from schema
-        let content_field = self.schema.get_field("content").map_err(|e| format!("Missing 'content' field: {}", e))?;
-        let path_field = self.schema.get_field("path").map_err(|e| format!("Missing 'path' field: {}", e))?;
-        let mtime_field = self.schema.get_field("mtime").map_err(|e| format!("Missing 'mtime' field: {}", e))?;
-        let size_field = self.schema.get_field("size").map_err(|e| format!("Missing 'size' field: {}", e))?;
-        let extension_field = self.schema.get_field("extension").map_err(|e| format!("Missing 'extension' field: {}", e))?;
+        let content_field = self
+            .schema
+            .get_field("content")
+            .map_err(|e| format!("Missing 'content' field: {}", e))?;
+        let path_field = self
+            .schema
+            .get_field("path")
+            .map_err(|e| format!("Missing 'path' field: {}", e))?;
+        let mtime_field = self
+            .schema
+            .get_field("mtime")
+            .map_err(|e| format!("Missing 'mtime' field: {}", e))?;
+        let size_field = self
+            .schema
+            .get_field("size")
+            .map_err(|e| format!("Missing 'size' field: {}", e))?;
+        let extension_field = self
+            .schema
+            .get_field("extension")
+            .map_err(|e| format!("Missing 'extension' field: {}", e))?;
 
         // Parse the query using tantivy's query parser
-        let query_parser = QueryParser::for_index(self.index_reader.searcher().index(), vec![content_field]);
+        let query_parser =
+            QueryParser::for_index(self.index_reader.searcher().index(), vec![content_field]);
 
-        let parsed_query = query_parser.parse_query(query).map_err(|e| format!("Failed to parse query: {}", e))?;
+        let parsed_query = query_parser
+            .parse_query(query)
+            .map_err(|e| format!("Failed to parse query: {}", e))?;
 
         // Execute search
-        let top_docs = searcher.search(&parsed_query, &TopDocs::with_limit(limit)).map_err(|e| format!("Search failed: {}", e))?;
+        let top_docs = searcher
+            .search(&parsed_query, &TopDocs::with_limit(limit))
+            .map_err(|e| format!("Search failed: {}", e))?;
 
         // Convert results to SearchResult
         let mut results = Vec::new();
         for (_score, doc_address) in top_docs {
-            let retrieved_doc: TantivyDocument = searcher.doc(doc_address).map_err(|e| format!("Failed to retrieve document: {}", e))?;
+            let retrieved_doc: TantivyDocument = searcher
+                .doc(doc_address)
+                .map_err(|e| format!("Failed to retrieve document: {}", e))?;
 
             // Extract fields from the document
             let path = Self::get_text_field(&retrieved_doc, &self.schema, path_field)?;
             let mtime = Self::get_i64_field(&retrieved_doc, &self.schema, mtime_field).unwrap_or(0);
             let size = Self::get_u64_field(&retrieved_doc, &self.schema, size_field).unwrap_or(0);
-            let extension = Self::get_text_field(&retrieved_doc, &self.schema, extension_field).unwrap_or_default();
+            let extension = Self::get_text_field(&retrieved_doc, &self.schema, extension_field)
+                .unwrap_or_default();
 
             results.push(SearchResult {
                 path,
@@ -291,19 +342,23 @@ impl SearchStorage {
 
     /// Get all indexed files from SQLite.
     pub fn list_indexed_files(&self) -> Result<Vec<IndexedFile>, String> {
-        let mut stmt = self.db_conn.prepare("SELECT path, relative_path, size, mtime, extension FROM files")
+        let mut stmt = self
+            .db_conn
+            .prepare("SELECT path, relative_path, size, mtime, extension FROM files")
             .map_err(|e| format!("Failed to prepare query: {}", e))?;
 
-        let file_iter = stmt.query_map([], |row| {
-            let path_str: String = row.get(0)?;
-            Ok(IndexedFile {
-                path: PathBuf::from(path_str),
-                relative_path: row.get(1)?,
-                size: row.get(2)?,
-                mtime: row.get(3)?,
-                extension: row.get(4)?,
+        let file_iter = stmt
+            .query_map([], |row| {
+                let path_str: String = row.get(0)?;
+                Ok(IndexedFile {
+                    path: PathBuf::from(path_str),
+                    relative_path: row.get(1)?,
+                    size: row.get(2)?,
+                    mtime: row.get(3)?,
+                    extension: row.get(4)?,
+                })
             })
-        }).map_err(|e| format!("Failed to execute query: {}", e))?;
+            .map_err(|e| format!("Failed to execute query: {}", e))?;
 
         let mut files = Vec::new();
         for file_result in file_iter {
@@ -318,7 +373,9 @@ impl SearchStorage {
 
     /// Get the count of indexed files.
     pub fn index_count(&self) -> Result<usize, String> {
-        let count: i64 = self.db_conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
+        let count: i64 = self
+            .db_conn
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))
             .map_err(|e| format!("Failed to get count: {}", e))?;
 
         Ok(count as usize)
@@ -326,11 +383,14 @@ impl SearchStorage {
 
     /// Check if a file is indexed.
     pub fn is_indexed(&self, path: &Path) -> Result<bool, String> {
-        let exists: bool = self.db_conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM files WHERE path = ?1)",
-            params![path.to_string_lossy()],
-            |row| row.get(0),
-        ).map_err(|e| format!("Failed to check index status: {}", e))?;
+        let exists: bool = self
+            .db_conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM files WHERE path = ?1)",
+                params![path.to_string_lossy()],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Failed to check index status: {}", e))?;
 
         Ok(exists)
     }
@@ -343,7 +403,8 @@ impl SearchStorage {
         }
 
         // Clear SQLite
-        self.db_conn.execute("DELETE FROM files", [])
+        self.db_conn
+            .execute("DELETE FROM files", [])
             .map_err(|e| format!("Failed to clear DB: {}", e))?;
 
         Ok(())
@@ -356,13 +417,21 @@ impl SearchStorage {
 
     /// Reload the index reader to see newly committed documents.
     pub fn reload(&mut self) -> Result<(), String> {
-        self.index_reader.reload().map_err(|e| format!("Failed to reload index: {}", e))?;
+        self.index_reader
+            .reload()
+            .map_err(|e| format!("Failed to reload index: {}", e))?;
         Ok(())
     }
 
     /// Helper to extract a text field from a document.
-    fn get_text_field(doc: &TantivyDocument, _schema: &Schema, field: Field) -> Result<String, String> {
-        let values = doc.get_first(field).ok_or_else(|| "Missing field".to_string())?;
+    fn get_text_field(
+        doc: &TantivyDocument,
+        _schema: &Schema,
+        field: Field,
+    ) -> Result<String, String> {
+        let values = doc
+            .get_first(field)
+            .ok_or_else(|| "Missing field".to_string())?;
         match values {
             OwnedValue::Str(s) => Ok(s.clone()),
             _ => Err(format!("Expected text field, got {:?}", values)),
@@ -432,7 +501,9 @@ mod tests {
         };
 
         // Index the file
-        storage.index_file(&test_file, "fn main() { println!(\"hello world\"); }").unwrap();
+        storage
+            .index_file(&test_file, "fn main() { println!(\"hello world\"); }")
+            .unwrap();
         storage.commit().unwrap();
         storage.reload().unwrap();
 
@@ -463,7 +534,9 @@ mod tests {
         storage.commit().unwrap();
 
         // Remove the file
-        storage.remove_file(Path::new("/tmp/remove_test.rs")).unwrap();
+        storage
+            .remove_file(Path::new("/tmp/remove_test.rs"))
+            .unwrap();
         storage.commit().unwrap();
 
         assert_eq!(storage.index_count().unwrap(), 0);

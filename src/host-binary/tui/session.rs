@@ -61,11 +61,7 @@ impl SessionStore {
     }
 
     /// Save session messages to disk.
-    pub fn save(
-        &self,
-        id: &str,
-        messages: &[Message],
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save(&self, id: &str, messages: &[Message]) -> Result<(), Box<dyn std::error::Error>> {
         let path = self.data_dir.join(format!("{}.json", id));
         let content = serde_json::to_string_pretty(messages)?;
         fs::write(&path, content)?;
@@ -84,7 +80,8 @@ impl SessionStore {
             let entry = entry?;
             let path = entry.path();
             if path.extension().is_some_and(|ext| ext == "json")
-                && let Some(stem) = path.file_stem() {
+                && let Some(stem) = path.file_stem()
+            {
                 ids.push(stem.to_string_lossy().to_string());
             }
         }

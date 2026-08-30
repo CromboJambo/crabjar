@@ -39,7 +39,9 @@ pub use client::LmStudioClient;
 #[allow(unused_imports)]
 pub use error::ToolCallInfo;
 #[allow(unused_imports)]
-pub use prompt_types::{compute_provenance, LabeledContent, PromptEnvelope, PromptMetadata, SourceLabel};
+pub use prompt_types::{
+    LabeledContent, PromptEnvelope, PromptMetadata, SourceLabel, compute_provenance,
+};
 #[allow(unused_imports)]
 pub use prompt_validator::PromptValidator;
 #[allow(unused_imports)]

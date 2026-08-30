@@ -42,10 +42,7 @@ pub fn run_module_sizes() -> serde_json::Value {
         if line.is_empty() {
             continue;
         }
-        if let Ok(wc_output) = std::process::Command::new("wc")
-            .args(["-l", line])
-            .output()
-        {
+        if let Ok(wc_output) = std::process::Command::new("wc").args(["-l", line]).output() {
             let wc_stdout = String::from_utf8_lossy(&wc_output.stdout);
             if let Some(first_word) = wc_stdout.split_whitespace().next()
                 && let Ok(locl) = first_word.parse::<usize>()

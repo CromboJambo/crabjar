@@ -260,13 +260,8 @@ mod tests {
 
     #[test]
     fn action_request_new() {
-        let request = ActionRequest::new(
-            "test-1",
-            "execute",
-            "echo hello",
-            2,
-            TrustScore::new(0.7),
-        );
+        let request =
+            ActionRequest::new("test-1", "execute", "echo hello", 2, TrustScore::new(0.7));
         assert_eq!(request.id, "test-1");
         assert_eq!(request.action_type, "execute");
         assert_eq!(request.trust_layer, 2);
@@ -298,8 +293,8 @@ mod tests {
 
     #[test]
     fn action_request_mark_denied() {
-        let request = ActionRequest::new("test-5", "execute", "echo", 2, TrustScore::new(0.5))
-            .mark_denied();
+        let request =
+            ActionRequest::new("test-5", "execute", "echo", 2, TrustScore::new(0.5)).mark_denied();
         assert_eq!(request.status, ActionStatus::Denied);
     }
 
