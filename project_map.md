@@ -587,6 +587,8 @@ Runtime execution is executor-capable. Execution is opt-in via `.crabjar_config.
 
 *Security model inspired by [ZeroClaw](https://github.com/zeroclaw-labs/zeroclaw) docs: six-layer security (channel pairing → autonomy → workspace → command policy → OS sandbox → tool receipts), three-level autonomy (ReadOnly/Supervised/Full), per-tool overrides, HMAC tool receipts. Crabjar extends with dynamic confidence bands + annealing (decay/reinforcement) — ZeroClaw uses static risk profiles.*
 
+*Authorization-order contract inspired by [CodeWhale](https://github.com/Hmbown/CodeWhale)'s `AUTHORIZATION_ORDER.md`: the gate's layers run in a fixed order and are monotonic — once a layer blocks or defers, no later layer may loosen the decision. An approval from one layer is not a universal bypass; the sole loosening mechanism (`CrossScopeAuth`) is scoped to the scope-isolation layer. Pinned by regression tests in `guard/src/authorization_order.rs` (10 tests).*
+
 ### Doubt Output Requirement
 
 Every derived output must include a `doubt` block with:
@@ -672,6 +674,7 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 - `guard/src/policy.rs` — StaticPolicyEngine with TOML-based declarative policies (17 tests)
 - `guard/src/context_budget.rs` — ContextBudget + MAX_TOKENS_PER_FRAGMENT (6 tests)
 - `guard/src/command_risk.rs` — CommandRisk, HIGH/MEDIUM_RISK_COMMANDS (6 tests)
+- `guard/src/authorization_order.rs` — monotonic authorization-order invariant tests (10; CodeWhale-informed)
 - `guard/src/guard_db_impl.rs` — 368 LoC (anneal + concierge + PID trust) — split from monolithic impl
 - `guard/src/guard_db_queries.rs` — 352 LoC (action requests + trust resolution) — split from monolithic impl
 - `guard/src/guard_db_types.rs` — 16 LoC (TrustResolutionEntry) — split from monolithic impl
@@ -722,7 +725,8 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 | `prov-map-drift-2026-06-27` | project_map.md regenerated — 22 members, guard/src fully updated (23 files), crabjar-architecture added to tree, vm_bridge added, host/host-agent added, orchestrator backend/mod.rs documented, shared deps refreshed (async-trait, tauri, rumqttc, tracing-error, etc.), CLI commands updated with guard resolution, section 9 cleaned up (removed stale codeburn/gguf/llm-runner references) | 2026-06-27 | Roadmap 1.3 update | crabjar/project_map.md |
 | `prov-map-drift-2026-07-06` | project_map.md regenerated — 24 members (added file_search + crabjar-plugin), tree diagram updated, Core Components table populated, workspace members section refreshed, Section 9 Crabjar Context updated with new crates, Drift Report Last Audit and Known Items updated | 2026-07-06 | Structural alignment refresh | crabjar/project_map.md
 | `prov-map-drift-2026-07-08` | project_map.md regenerated — generated date updated, Section 3 Build & Test expanded (module-sizes targets, reproducible-build, test count), Section 2.3 workspace members includes specs/ ADR process, Section 2.4 shared deps consolidated to single-line format, Section 2.5 profiles renamed and simplified, guard/src file listing expanded with policy/context_budget/command_risk/risk_config/db_error files, host/host-agent updated with model_routing/context_compression/decision_gate, Section 9 structure updated (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Drift Report Last Audit and Known Items refreshed with current state | 2026-07-08 | Structural alignment refresh + ADR process addition | crabjar/project_map.md
-| `prov-map-drift-2026-07-08b` | project_map.md regenerated — Section 9.1 structure list expanded (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Section 9.2 test count updated to 691 passing with breakdown by crate, Drift Report Known Items expanded with policy/context_budget/command_risk/risk_config/db_error files and ADR process entry | 2026-07-08 | Structural alignment refresh — second pass on Section 9 + Known Items | crabjar/project_map.md
+| `prov-map-drift-2026-07-08b` | project_map.md regenerated — Section 9.1 structure list expanded (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Section 9.2 test count updated to 691 passing with breakdown by crate, Drift Report Known Items expanded with policy/context_budget/command_risk/risk_config/db_error files and ADR process entry | 2026-07-08 | Structural alignment refresh — second pass on Section 9 + Known Items | crabjar/project_map.md |
+| `prov-comparity-codewhale` | README + project_map parity credit: CodeWhale (monotonic authorization order, Fleet identity contract, deterministic scorers, roster-doesn't-execute) + guard/src/authorization_order.rs invariant tests (10) | 2026-08-30 | Feature parity analysis | crabjar/README.md, crabjar/project_map.md, Hmbown/CodeWhale docs (AUTHORIZATION_ORDER.md, FLEET.md) |
 
 ---
 

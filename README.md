@@ -214,6 +214,15 @@ Crabjar's security and execution model draws from [ZeroClaw](https://github.com/
 
 Crabjar's contribution: dynamic confidence tracking + trust evolution (annealing).
 
+Crabjar's authorization-order contract draws from [CodeWhale](https://github.com/Hmbown/CodeWhale):
+- **Monotonic authorization order** — a later safety layer can only tighten, never loosen, an earlier block/hold; pinned by regression tests in `guard/src/authorization_order.rs`
+- **Fleet identity/selection contract** — stable member id + semantic role + exact model identity, with ambiguity errors that name candidates (pattern to adopt for apps/teams)
+- **Deterministic task scorers** — `exit_code` / `file_exists` / `regex_match` / `json_path` verifiers with typed receipts (pattern for ephemeral-VM task verdicts)
+- **Roster-doesn't-execute separation** — the fleet layer resolves membership only; execution runs under the runtime's policy
+
+CodeWhale's contribution: single-machine terminal coding agent with a multi-worker Fleet layer, OS sandboxing, and MCP/hooks/skills — a worker-shaped peer to crabjar's environment + trust layer.
+Crabjar's contribution: trust layers, annealing, provenance chains, ephemeral VM environment management, and state-docs — crabjar is the substrate CodeWhale-style workers would run on, not a replacement for them.
+
 ## Version
 
 0.12.0
