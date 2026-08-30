@@ -10,12 +10,13 @@ see_also: [[ADR-004]], [[ADR-002]]
 
 ## Status
 
-**Proposed**. This ADR pins the reframe of the `axum-mux`/`vm-bridge` relay
-and the `crabjar-terminal` recorder into a single substrate: a **typed,
-addressable terminal event stream**, with asciinema v2, WebSocket JSON, and a
-native JSONL format as swappable wire representations. It is ready to flip to
-**Accepted** once the segmentation spike (Remaining work #1 in the companion
-handoff) proves out on one backend.
+**Accepted** (2026-08-30). The segmentation spike (Remaining work #1 in the
+companion handoff) proved out on herdr: `HerdrBackend::run_command`
+(`crates/terminal/src/herdr_exec.rs`) returns a typed `Receipt`
+(`{ command, output, exit_code, duration, cwd }`) for real commands via the
+structured round-trip — no PTY scraping. The `TerminalEvent` model, block
+grouping, and native JSONL form live in `crates/terminal/src/stream.rs`;
+`crates/terminal/examples/herdr-stream-spike.rs` is the verification.
 
 ## Context
 
@@ -174,14 +175,20 @@ new typed stream.
 
 ### Ongoing concerns
 
-- **Segmentation per backend.** Prove it on **herdr** first (ADR-002's
-  execution substrate; `crates/terminal/src/herdr.rs`, 374 lines — it may
-  already emit structured session events that make segmentation nearly free).
-  wezterm's scrollback API is the second tractable route. Pattern-based prompt
-  matching (pexpect-style) is the fragile fallback.
-- **Where the stream lives.** `crabjar-terminal` today, or a small new crate if
-  the stream should be decoupled from the multiplexer backends. Decide at the
-  spike.
+- **Segmentation per backend.** Proven on **herdr** (ADR-002's execution
+  substrate) — but via a different route than the spike predicted. Herdr 0.8.2
+  does *not* emit per-command structured session events; instead the backend
+  drives its own round-trip: `pane run` a marker-wrapped line,
+  `pane wait-output --regex` the exit-code sentinel (a plain `--match` fires
+  on the pane's echo of the submitted line, before the command runs), then
+  `pane read --source recent` sliced between markers (with a retry loop — the
+  wait can match before the read buffer flushes). `pane get` supplies `cwd`.
+  wezterm's scrollback API is still the second tractable route; pattern-based
+  prompt matching (pexpect-style) remains the fragile fallback.
+- **Where the stream lives.** Decided at the spike: `crabjar-terminal`
+  (`src/stream.rs`), with the herdr execution path in `src/herdr_exec.rs`.
+  No new crate — the stream is small and the backends are the only
+  producers.
 - **The `vm-bridge`/`axum-mux` name.** Per ADR-004 this is a concrete
   (integration, outside the glass) — no `crabjar-` prefix is correct, but the
   name should describe the capability (a terminal/display relay), not the

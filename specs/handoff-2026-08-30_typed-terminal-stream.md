@@ -12,21 +12,29 @@ thin transport.
 Two half-built stubs of the same idea. Neither is a working baseline — this is
 greenfield on top of them.
 
-### 1. `crates/terminal/` (package `crabjar-terminal`) — ✅ compiles, recording is a stub
+### 1. `crates/terminal/` (package `crabjar-terminal`) — ✅ compiles, stream model live
+- `src/stream.rs` (430 LoC) — **the ADR-005 substrate**: `TerminalEvent`
+  (Prompt/Command/Output/Raw, monotonic ids), `SessionStream`, `Block`,
+  `Receipt`, `SessionRecord` (versioned native JSONL). 5 unit tests.
+- `src/herdr_exec.rs` (160 LoC) — `HerdrBackend::run_command` → typed
+  `Receipt` via the structured round-trip (see Remaining work #1).
 - `src/recording.rs` (201 LoC) — `AsciinemaRecorder`, asciinema v2 (JSONL:
-  header + `[time, "i"|"o", data]`). **Never fed.** In `src/lib.rs`,
-  `TerminalSession::record()` starts the recorder and `stop()` closes it, but
-  `send()` and `read()` never call `record_input`/`record_output`. It writes a
-  header and an empty body.
-- `src/lib.rs` (263 LoC) — `TerminalSession` + `TerminalManager`. Backends:
+  header + `[time, "i"|"o", data]`). **Still unfed** — item 4 rewires it as
+  a serializer of the stream.
+- `src/lib.rs` (266 LoC) — `TerminalSession` + `TerminalManager`. Backends:
   wezterm (primary), zellij (fallback), herdr. `record()`/`send()`/`read()`/
   `snapshot()` exist.
 - `src/backend.rs` (95 LoC) — `TerminalBackend` trait: `spawn`, `send_text`,
   `read_output` (last N lines), `kill_session`, `split_pane_*`.
-- `src/herdr.rs` (374 LoC) — **the ADR-002 execution substrate backend.**
-  Read this first for the spike — it may already emit structured session
-  events that make segmentation nearly free.
+- `src/herdr.rs` (376 LoC) — the ADR-002 execution substrate backend
+  (session mapping + trait impl). Structured execution moved to
+  `herdr_exec.rs` (500 LoC gate).
 - `src/wezterm.rs` (267), `src/zellij.rs` (248) — backend impls.
+- `examples/herdr-spike.rs` — ADR-002 backend spike (still green).
+- `examples/herdr-stream-spike.rs` — **ADR-005 verification**: 3 real
+  commands → 3 Receipts → 3 blocks → JSONL round-trip. Run:
+  `cargo run -p crabjar-terminal --example herdr-stream-spike` (needs a
+  live herdr server).
 - `Cargo.toml` description already says "asciinema recording" — the idea is
   half-present in the tree.
 
@@ -94,34 +102,36 @@ WASM-only and "won't compile on native." It is a native binary; it built in
 
 ## Remaining work (in priority order)
 
-### 1. Prove segmentation on ONE backend — herdr (blocking — the whole ADR hangs on this)
-PTY bytes → `TerminalEvent` (where does a command end and its output begin).
-Start with `crates/terminal/src/herdr.rs` (374 LoC) — ADR-002's execution
-substrate; it may already emit structured session events, which would make
-segmentation nearly free for that path. Deliverable: a `TerminalEvent` stream
-with `Command`/`Output` boundaries (and `Raw` fallback) for a herdr session
-running a few real commands, with a test that asserts the boundaries. **Do not
-generalize to wezterm/zellij until this is green.** wezterm's scrollback API
-is the second tractable route; pattern-based prompt matching (pexpect-style)
-is the fragile fallback — use it only if the structured route isn't available.
+### ~~1. Prove segmentation on ONE backend — herdr~~ ✅ DONE (2026-08-30)
+Proven via a different route than predicted: herdr 0.8.2 does not emit
+per-command structured events, so the backend drives its own round-trip.
+`HerdrBackend::run_command` (`crates/terminal/src/herdr_exec.rs`):
+`pane run` a marker-wrapped line → `pane wait-output --regex` the
+exit-code sentinel → `pane read --source recent` sliced between markers
+(retry loop for buffer flush). `pane get` supplies `cwd`. Verified live:
+`cargo run -p crabjar-terminal --example herdr-stream-spike` → 3 real
+commands (multi-line, subshell exit 7, pwd) → 3 Receipts → 3 blocks →
+JSONL round-trip, `success: true`.
+**Pitfalls found (baked into the code):** `--match` fires on the pane's
+echo of the submitted line (use `--regex '^<sentinel>[0-9]'`); `pane get`
+nests the pane under `.pane` (the old top-level reads always returned
+None); read after wait needs a retry (wait can match before the read
+buffer flushes); `exit N` in the pane's interactive shell kills the pane
+(subshell it in tests).
 
-### 2. Define the `TerminalEvent` model + block addressing
-The type from ADR-005 Decision 2: `Prompt { id, cwd? }`, `Command { id, text,
-started_at }`, `Output { id, data, exit_code? }`, `Raw { id, data }`. Events
-carry monotonic ids (same shape as the guard's append-only event store).
-**Blocks** group events into prompt→command→output units; a block is the
-addressable cell and the copy-paste unit. Decide where it lives:
-`crabjar-terminal` today, or a small new crate if the stream should be
-decoupled from the multiplexer backends. Add a version field (it will need a
-migration path, like the state-docs schema).
+### 2. Define the `TerminalEvent` model + block addressing ✅ DONE (2026-08-30)
+`crates/terminal/src/stream.rs` (430 LoC): `TerminalEvent` (Prompt/Command/
+Output/Raw, monotonic ids assigned by `SessionStream::push`), `Block`
+grouping, `Receipt`, `SessionRecord` (versioned native JSONL,
+`STREAM_VERSION = 1`). 5 unit tests. Landed in `crabjar-terminal`, not a
+new crate (see ADR-005 ongoing concerns).
 
-### 3. Type-safe copy-paste → receipts
-Copy = select an event/block range. Paste = serialize to a typed target. The
-payoff: a command run in a session becomes a **receipt**
-(`{ command, output, exit_code, duration, cwd }`) — the input shape the
-CodeWhale-style verifiers (`exit_code`/`file_exists`/`regex_match`/`json_path`,
-see `crabjar/README.md`) consume. This is the whole point: agents stop
-scraping output.
+### 3. Type-safe copy-paste → receipts — PARTIAL
+The `Receipt` type exists and herdr produces real ones. Still to do:
+copy = select an event/block range (API for it), paste = serialize to a
+typed target, and wire the CodeWhale-style verifiers
+(`exit_code`/`file_exists`/`regex_match`/`json_path`, see
+`crabjar/README.md`) to consume `Receipt`.
 
 ### 4. Make the recorder a serializer, not the model
 Rewire `AsciinemaRecorder` to serialize the `TerminalEvent` stream to asciinema
@@ -134,13 +144,10 @@ exit codes) — the native JSONL is the faithful on-disk form.
 "drops input silently" stub at line 253). It owns no session state. The
 SPICE/VNC `proxy.rs` path stays raw binary — untouched.
 
-### 6. Drop the three dead lib-deps + fix the WASM doc line
-Remove `vm-bridge = { path = "axum-mux" }` from root `Cargo.toml:234`,
-`host/host-screen/Cargo.toml:20`, `apps/teams/Cargo.toml:19` (and the root
-workspace dep). Correct the "WASM-only" annotation in `axum-mux/AGENTS.md` and
-the dependent crates' AGENTS.md. Verify the `missing a lib target` warning is
-gone from a clean `cargo build --workspace`. (Independent of the ADR-005
-design — do this regardless.)
+### ~~6. Drop the three dead lib-deps + fix the WASM doc line~~ ✅ DONE (2026-08-30)
+Deps dropped (root, host-screen, apps/teams), "WASM-only" annotations
+corrected in the three AGENTS.md files and ADR-004 (counterexample now
+past tense). `cargo check --workspace` is warning-free.
 
 ### 7. (optional, only if touching it) Rename `axum-mux`/`vm-bridge`
 Per ADR-004 this is a concrete (integration, outside the glass) — no
