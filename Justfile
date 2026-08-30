@@ -25,6 +25,34 @@ test-e2e-smoke:
 test-e2e-full:
     cargo test -p crabjar --test e2e_full
 
+# Narrow-scope test: pass a crate DIRECTORY (e.g. `guard`, `host/host-core`,
+# `memory`). Resolves the package name from <dir>/Cargo.toml at runtime, so the
+# directory works even when it != the package name (ADR-004: the glass; e.g.
+# `guard` -> `crabjar-guard`). Use this instead of `cargo test -p <dir>`, which
+# fails with "package ID specification did not match any packages".
+test-crate +dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -f "{{dir}}/Cargo.toml" ] || { echo "no {{dir}}/Cargo.toml — pass a crate directory (e.g. guard, host/host-core)"; exit 1; }
+    name=$(grep -m1 '^name' "{{dir}}/Cargo.toml" | sed 's/^name *= *//; s/"//g')
+    cargo test -p "$name"
+
+# Same as test-crate, for `cargo check`.
+check-crate +dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -f "{{dir}}/Cargo.toml" ] || { echo "no {{dir}}/Cargo.toml — pass a crate directory (e.g. guard, host/host-core)"; exit 1; }
+    name=$(grep -m1 '^name' "{{dir}}/Cargo.toml" | sed 's/^name *= *//; s/"//g')
+    cargo check -p "$name"
+
+# Same as test-crate, for `cargo clippy`.
+clippy-crate +dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -f "{{dir}}/Cargo.toml" ] || { echo "no {{dir}}/Cargo.toml — pass a crate directory (e.g. guard, host/host-core)"; exit 1; }
+    name=$(grep -m1 '^name' "{{dir}}/Cargo.toml" | sed 's/^name *= *//; s/"//g')
+    cargo clippy -p "$name"
+
 clean:
     cargo clean
 

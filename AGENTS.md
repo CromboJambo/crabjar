@@ -10,7 +10,7 @@ Use `just` for workflows:
 - `just test`: `cargo test --workspace`
 - `just clean`: removes build artifacts
 
-Narrow scope: `cargo check/clippy/test -p <crate>`
+Narrow scope: `just test-crate <dir>` / `just check-crate <dir>` / `just clippy-crate <dir>` — pass a crate *directory* (e.g. `guard`, `host/host-core`). These resolve the package name at runtime; bare `cargo test -p guard` fails because the package is `crabjar-guard` (ADR-004: the glass).
 
 ## Build Reproducibility
 
