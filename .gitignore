@@ -39,3 +39,4 @@ llmrunner.md
 src/dinit.rs
 .agents/GitCloneResearch/
 state-docs.db
+unsloth_compiled_cache/
