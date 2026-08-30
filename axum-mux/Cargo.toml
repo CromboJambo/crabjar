@@ -13,3 +13,12 @@ toml = "0.7"
 anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+chrono = { workspace = true }
+# Typed terminal event stream (ADR-005 substrate) — the relay forwards
+# TerminalEvent frames; it owns no session state.
+crabjar-terminal = { path = "../crates/terminal" }
+
+[dev-dependencies]
+# WebSocket client for the relay's live round-trip tests (same 0.24
+# major as axum 0.7's built-in ws feature, so the lockfile stays put).
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }

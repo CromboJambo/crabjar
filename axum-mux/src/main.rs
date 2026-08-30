@@ -7,6 +7,8 @@ use tokio::process::Command;
 mod manifest;
 mod proxy;
 mod terminal_relay;
+#[cfg(test)]
+mod terminal_relay_tests;
 
 use manifest::Manifest;
 
