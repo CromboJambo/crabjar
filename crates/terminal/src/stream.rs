@@ -7,10 +7,10 @@
 //! ## Event vocabulary
 //!
 //! ```text
-//! Prompt  { id, cwd? }
-//! Command { id, text, started_at }
-//! Output  { id, data, exit_code? }
-//! Raw     { id, data }        // fallback when segmentation fails
+//! Prompt  { id, at, cwd? }
+//! Command { id, text, started_at, at }
+//! Output  { id, data, exit_code?, at }
+//! Raw     { id, data, at }        // fallback when segmentation fails
 //! ```
 //!
 //! `Raw` is the escape hatch: when segmentation can't cleanly split a
@@ -24,6 +24,13 @@
 //! is the addressable cell and the copy-paste unit. A completed block
 //! yields a [`Receipt`] — `{ command, output, exit_code, duration, cwd }` —
 //! the input shape the deterministic task scorers consume.
+//!
+//! ## Copy-paste
+//!
+//! Copy = select an event id range or a block (see [`crate::copy_paste`]).
+//! Paste = serialize the selection to a wire target (native JSONL or
+//! asciinema v2). The native JSONL is the faithful form; asciinema v2 is a
+//! lossy projection (its `i`/`o` events drop block ids and exit codes).
 
 use std::time::Duration;
 
@@ -32,25 +39,36 @@ use serde::{Deserialize, Serialize};
 
 /// Stream format version. Bump with a migration path when the event
 /// vocabulary changes (same discipline as the state-docs schema).
-pub const STREAM_VERSION: u32 = 1;
+///
+/// v2 (2026-08-30): every event carries an `at` timestamp (needed for the
+/// asciinema v2 serializer's relative times). v1 events lack the field;
+/// `from_jsonl` defaults it to the epoch.
+pub const STREAM_VERSION: u32 = 2;
 
 /// A single terminal event. Each event carries a monotonic id (same shape
-/// as the guard's append-only event store) and a timestamp.
+/// as the guard's append-only event store) and an `at` timestamp.
+///
+/// `at` is `#[serde(default)]` to the epoch so v1 records (no per-event
+/// time) still parse — see [`crate::session_record`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TerminalEvent {
     /// A shell prompt was observed. `cwd` is set when the backend reports it.
     Prompt {
         id: u64,
+        #[serde(default = "epoch")]
         at: DateTime<Utc>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cwd: Option<String>,
     },
-    /// A command was submitted to the shell.
+    /// A command was submitted to the shell. `started_at` is the submission
+    /// time; `at` is when the event was appended to the stream.
     Command {
         id: u64,
         text: String,
         started_at: DateTime<Utc>,
+        #[serde(default = "epoch")]
+        at: DateTime<Utc>,
     },
     /// Command output. `exit_code` is set when the backend reports it.
     Output {
@@ -58,14 +76,26 @@ pub enum TerminalEvent {
         data: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         exit_code: Option<i32>,
+        #[serde(default = "epoch")]
+        at: DateTime<Utc>,
     },
     /// Unsegmented bytes — the escape hatch when segmentation fails.
-    Raw { id: u64, data: String },
+    Raw {
+        id: u64,
+        data: String,
+        #[serde(default = "epoch")]
+        at: DateTime<Utc>,
+    },
+}
+
+/// Serde default for `at`: the epoch (v1 migration path).
+fn epoch() -> DateTime<Utc> {
+    DateTime::from_timestamp(0, 0).expect("epoch is a valid timestamp")
 }
 
 /// A prompt → command → output unit. The addressable cell and the
 /// copy-paste unit of a recorded session.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Block {
     /// Monotonic id of the first event in the block.
     pub first_event_id: u64,
@@ -82,6 +112,30 @@ pub struct Block {
     /// Working directory at submission time, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
+    /// Command submission time (for duration computation; absent for
+    /// command-less blocks).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<DateTime<Utc>>,
+}
+
+impl Block {
+    /// The block's [`Receipt`], when it is a complete command block.
+    ///
+    /// `last_at` is the timestamp of the block's last event (its output);
+    /// duration is `last_at - started_at`. Command-less blocks (raw runs)
+    /// yield `None`.
+    pub fn receipt(&self, last_at: DateTime<Utc>) -> Option<Receipt> {
+        let command = self.command.as_ref()?;
+        let started_at = self.started_at?;
+        let duration = (last_at - started_at).to_std().unwrap_or(Duration::ZERO);
+        Some(Receipt {
+            command: command.clone(),
+            output: self.output.clone(),
+            exit_code: self.exit_code,
+            duration,
+            cwd: self.cwd.clone(),
+        })
+    }
 }
 
 /// The receipt: the input shape the deterministic task scorers consume
@@ -117,30 +171,41 @@ impl SessionStream {
         Self::default()
     }
 
-    /// Append an event, assigning the next monotonic id.
+    /// Append an event, assigning the next monotonic id and the `at`
+    /// timestamp.
     ///
-    /// The id is assigned here — callers never mint ids themselves, which
-    /// keeps the stream's monotonicity invariant mechanical.
+    /// The id and timestamp are assigned here — callers never mint them
+    /// themselves, which keeps the stream's monotonicity invariant
+    /// mechanical.
     pub fn push(&mut self, event: TerminalEvent) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
+        let at = Utc::now();
         let stamped = match event {
-            TerminalEvent::Prompt { at, cwd, .. } => TerminalEvent::Prompt {
-                id,
-                at,
-                cwd,
-            },
-            TerminalEvent::Command { text, started_at, .. } => TerminalEvent::Command {
+            TerminalEvent::Prompt { at: _, cwd, .. } => TerminalEvent::Prompt { id, at, cwd },
+            TerminalEvent::Command {
+                id: _,
+                text,
+                started_at,
+                at: _,
+            } => TerminalEvent::Command {
                 id,
                 text,
                 started_at,
+                at,
             },
-            TerminalEvent::Output { data, exit_code, .. } => TerminalEvent::Output {
+            TerminalEvent::Output {
+                id: _,
+                data,
+                exit_code,
+                at: _,
+            } => TerminalEvent::Output {
                 id,
                 data,
                 exit_code,
+                at,
             },
-            TerminalEvent::Raw { data, .. } => TerminalEvent::Raw { id, data },
+            TerminalEvent::Raw { id: _, data, at: _ } => TerminalEvent::Raw { id, data, at },
         };
         self.events.push(stamped);
         id
@@ -164,11 +229,13 @@ impl SessionStream {
             id: 0,
             text: receipt.command.clone(),
             started_at: Utc::now(),
+            at: Utc::now(),
         });
         let output_id = self.push(TerminalEvent::Output {
             id: 0,
             data: receipt.output.clone(),
             exit_code: receipt.exit_code,
+            at: Utc::now(),
         });
         (prompt_id, command_id, output_id)
     }
@@ -183,8 +250,18 @@ impl SessionStream {
         while i < self.events.len() {
             if let (
                 TerminalEvent::Prompt { id: pid, cwd, .. },
-                Some(TerminalEvent::Command { id: _cid, text, .. }),
-                Some(TerminalEvent::Output { id: oid, data, exit_code, .. }),
+                Some(TerminalEvent::Command {
+                    id: _cid,
+                    text,
+                    started_at,
+                    ..
+                }),
+                Some(TerminalEvent::Output {
+                    id: oid,
+                    data,
+                    exit_code,
+                    ..
+                }),
             ) = (
                 &self.events[i],
                 self.events.get(i + 1),
@@ -197,6 +274,7 @@ impl SessionStream {
                     output: data.clone(),
                     exit_code: *exit_code,
                     cwd: cwd.clone(),
+                    started_at: Some(*started_at),
                 });
                 i += 3;
             } else {
@@ -226,6 +304,7 @@ impl SessionStream {
                     output,
                     exit_code: None,
                     cwd: None,
+                    started_at: None,
                 });
                 i = j;
             }
@@ -255,86 +334,6 @@ fn starts_triple(events: &[TerminalEvent], at: usize) -> bool {
             Some(TerminalEvent::Output { .. })
         )
     )
-}
-
-/// A versioned, on-disk session record: the native JSONL form.
-///
-/// Line 1 is the header (`{"version": N, "session": ..., "backend": ...}`);
-/// every following line is one `TerminalEvent`. This is the faithful
-/// on-disk form — asciinema v2 is a lossy projection of it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionRecord {
-    /// Stream format version.
-    pub version: u32,
-    /// Session name.
-    pub session: String,
-    /// Backend name (herdr, wezterm, zellij).
-    pub backend: String,
-    /// The events, in submission order.
-    pub events: Vec<TerminalEvent>,
-}
-
-impl SessionRecord {
-    /// Serialize to native JSONL (header line + one event per line).
-    pub fn to_jsonl(&self) -> String {
-        let mut out = String::new();
-        let header = serde_json::json!({
-            "version": self.version,
-            "session": self.session,
-            "backend": self.backend,
-        });
-        out.push_str(&header.to_string());
-        out.push('\n');
-        for event in &self.events {
-            out.push_str(&event.to_json_line());
-            out.push('\n');
-        }
-        out
-    }
-
-    /// Parse native JSONL (header line + one event per line).
-    pub fn from_jsonl(text: &str) -> anyhow::Result<Self> {
-        let mut lines = text.lines();
-        let header_line = lines
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("empty session record"))?;
-        let header: serde_json::Value = serde_json::from_str(header_line)?;
-        let version = header
-            .get("version")
-            .and_then(|v| v.as_u64())
-            .ok_or_else(|| anyhow::anyhow!("session record header missing version"))?
-            as u32;
-        let session = header
-            .get("session")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("session record header missing session"))?
-            .to_string();
-        let backend = header
-            .get("backend")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
-        let events = lines
-            .filter(|l| !l.trim().is_empty())
-            .map(|line| {
-                serde_json::from_str::<TerminalEvent>(line)
-                    .map_err(|e| anyhow::anyhow!("bad event line: {e}"))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        Ok(Self {
-            version,
-            session,
-            backend,
-            events,
-        })
-    }
-}
-
-impl TerminalEvent {
-    /// Serialize a single event to one JSONL line.
-    pub fn to_json_line(&self) -> String {
-        serde_json::to_string(self).expect("TerminalEvent serialization cannot fail")
-    }
 }
 
 #[cfg(test)]
@@ -376,6 +375,7 @@ mod tests {
         assert_eq!(blocks[0].exit_code, Some(0));
         assert_eq!(blocks[0].first_event_id, 0);
         assert_eq!(blocks[0].last_event_id, 2);
+        assert!(blocks[0].started_at.is_some());
         assert_eq!(blocks[1].command.as_deref(), Some("echo b"));
         assert_eq!(blocks[1].exit_code, Some(1));
         assert_eq!(blocks[1].first_event_id, 3);
@@ -384,32 +384,17 @@ mod tests {
     #[test]
     fn raw_events_never_lost_on_grouping() {
         let mut s = SessionStream::new();
-        s.push(TerminalEvent::Raw { id: 0, data: "???".into() });
+        s.push(TerminalEvent::Raw {
+            id: 0,
+            data: "???".into(),
+            at: Utc::now(),
+        });
         s.push_receipt(&receipt("echo a", "a", 0));
         let blocks = s.blocks();
         assert_eq!(blocks.len(), 2);
         assert!(blocks[0].command.is_none());
         assert_eq!(blocks[0].output, "???");
         assert_eq!(blocks[1].command.as_deref(), Some("echo a"));
-    }
-
-    #[test]
-    fn jsonl_round_trip_preserves_events() {
-        let mut s = SessionStream::new();
-        s.push_receipt(&receipt("echo a", "a", 0));
-        s.push(TerminalEvent::Raw { id: 0, data: "x".into() });
-        let record = SessionRecord {
-            version: STREAM_VERSION,
-            session: "test".into(),
-            backend: "herdr".into(),
-            events: s.events().to_vec(),
-        };
-        let jsonl = record.to_jsonl();
-        let parsed = SessionRecord::from_jsonl(&jsonl).expect("parse");
-        assert_eq!(parsed.version, STREAM_VERSION);
-        assert_eq!(parsed.session, "test");
-        assert_eq!(parsed.backend, "herdr");
-        assert_eq!(parsed.events, record.events);
     }
 
     #[test]

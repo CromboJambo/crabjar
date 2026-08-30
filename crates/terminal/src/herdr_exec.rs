@@ -104,13 +104,7 @@ impl HerdrBackend {
         for _ in 0..20 {
             text = self
                 .run_raw(&[
-                    "pane",
-                    "read",
-                    &pane_id,
-                    "--source",
-                    "recent",
-                    "--lines",
-                    "2000",
+                    "pane", "read", &pane_id, "--source", "recent", "--lines", "2000",
                 ])
                 .await
                 .context("pane read")?;

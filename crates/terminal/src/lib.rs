@@ -1,8 +1,8 @@
 //! # crabjar-terminal
 //!
 //! Terminal multiplexer integration for agent harness.
-//! Provides a unified API for spawning, controlling, and recording terminal sessions
-//! via wezterm (primary) or zellij (fallback).
+//! Provides a unified API for spawning, controlling, and recording terminal
+//! sessions via wezterm (primary) or zellij (fallback).
 //!
 //! ## Architecture
 //!
@@ -11,8 +11,8 @@
 //! │                    TerminalManager                         │
 //! ├─────────────────────────────────────────────────────────────┤
 //! │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-//! │  │ WeztermBackend│  │ ZellijBackend│  │ AsciinemaRecorder│  │
-//! │  │ (primary)    │  │ (fallback)   │  │ (v2 format)      │  │
+//! │  │ WeztermBackend│  │ ZellijBackend│  │ AsciinemaSerializer│ │
+//! │  │ (primary)    │  │ (fallback)   │  │ (v2 serializer)  │  │
 //! │  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
 //! └─────────┼─────────────────┼────────────────────┼────────────┘
 //!           │                 │                    │
@@ -20,13 +20,22 @@
 //! ┌─────────────────────────────────────────────────────────────┐
 //! │                   TerminalSession                          │
 //! │  • spawn() — start detached session                        │
-//! │  • send()  — send text/keys to pane                        │
-//! │  • read()  — read terminal output                          │
+//! │  • send()  — send text/keys to pane (→ Command event)      │
+//! │  • read()  — read terminal output (→ Output event)         │
 //! │  • snapshot() — capture screen/buffer state                │
-//! │  • record() — start asciinema v2 recording                 │
+//! │  • record() — start asciinema v2 serialization             │
+//! │  • session_record() — the typed stream (ADR-005 substrate) │
 //! │  • stop()  — kill session                                  │
 //! └─────────────────────────────────────────────────────────────┘
 //! ```
+//!
+//! ## The typed stream (ADR-005)
+//!
+//! Every `send`/`read` on a session appends to its [`SessionStream`] —
+//! the append-only, monotonic-id event stream that is the source of truth
+//! for a recorded session. asciinema v2 (via [`AsciinemaSerializer`]) and
+//! native JSONL (via [`SessionRecord`]) are serializers of that stream,
+//! never the model. See `crates/terminal/src/stream.rs`.
 //!
 //! ## Usage
 //!
@@ -61,19 +70,26 @@
 //! ```
 
 pub mod backend;
+pub mod copy_paste;
 pub(crate) mod herdr;
 mod herdr_exec;
-mod recording;
+pub mod recording;
+pub mod session_record;
 pub mod stream;
+pub mod verifiers;
 mod wezterm;
 mod zellij;
 
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 pub use backend::*;
+pub use copy_paste::*;
 pub use herdr::HerdrBackend;
 pub use recording::*;
+pub use session_record::*;
 pub use stream::*;
+pub use verifiers::*;
 pub use wezterm::WeztermBackend;
 pub use zellij::ZellijBackend;
 
@@ -96,14 +112,20 @@ pub struct Snapshot {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
-/// Terminal session — wraps a backend with lifecycle management
+/// Terminal session — wraps a backend with lifecycle management.
+///
+/// Every `send`/`read` also appends to the session's typed event stream
+/// (ADR-005): `send` → `Command`, `read` → `Raw` (unsegmented scrollback —
+/// the `Raw` escape hatch; structured backends like herdr produce real
+/// `Output` events via `HerdrBackend::run_command`).
 #[derive(Debug)]
 pub struct TerminalSession {
     backend: Box<dyn TerminalBackend + Send + Sync>,
     session_name: String,
     working_dir: PathBuf,
     pane_id: Option<String>,
-    recorder: Option<AsciinemaRecorder>,
+    serializer: Option<Mutex<AsciinemaSerializer>>,
+    stream: Mutex<SessionStream>,
 }
 
 impl TerminalSession {
@@ -118,7 +140,8 @@ impl TerminalSession {
             session_name: name.to_string(),
             working_dir,
             pane_id: None,
-            recorder: None,
+            serializer: None,
+            stream: Mutex::new(SessionStream::new()),
         }
     }
 
@@ -138,16 +161,56 @@ impl TerminalSession {
         Ok(())
     }
 
-    /// Send text/keys to the terminal session
+    /// Send text/keys to the terminal session.
+    ///
+    /// Also appends a `Command` event to the session stream (ADR-005) and
+    /// feeds it to the asciinema serializer when recording.
     pub async fn send(&self, input: &str) -> anyhow::Result<()> {
         tracing::debug!(session = %self.session_name, chars = input.len(), "sending input");
-        self.backend.send_text(&self.session_name, input).await
+        self.backend.send_text(&self.session_name, input).await?;
+
+        let event = TerminalEvent::Command {
+            id: 0,
+            text: input.trim_end_matches('\n').to_string(),
+            started_at: chrono::Utc::now(),
+            at: chrono::Utc::now(),
+        };
+        {
+            let mut stream = self.stream.lock().expect("stream lock poisoned");
+            stream.push(event.clone());
+        }
+        if let Some(ser) = &self.serializer {
+            ser.lock()
+                .expect("serializer lock poisoned")
+                .event(&event)?;
+        }
+        Ok(())
     }
 
-    /// Read the last N lines of terminal output
+    /// Read the last N lines of terminal output.
+    ///
+    /// Also appends a `Raw` event to the session stream (ADR-005): scrollback
+    /// reads are unsegmented, so they land in the `Raw` escape hatch rather
+    /// than corrupting a `Command`/`Output` boundary.
     pub async fn read(&self, lines: usize) -> anyhow::Result<String> {
         tracing::debug!(session = %self.session_name, lines, "reading terminal output");
-        self.backend.read_output(&self.session_name, lines).await
+        let output = self.backend.read_output(&self.session_name, lines).await?;
+
+        let event = TerminalEvent::Raw {
+            id: 0,
+            data: output.clone(),
+            at: chrono::Utc::now(),
+        };
+        {
+            let mut stream = self.stream.lock().expect("stream lock poisoned");
+            stream.push(event.clone());
+        }
+        if let Some(ser) = &self.serializer {
+            ser.lock()
+                .expect("serializer lock poisoned")
+                .event(&event)?;
+        }
+        Ok(output)
     }
 
     /// Capture a snapshot of the current terminal state
@@ -168,29 +231,46 @@ impl TerminalSession {
         })
     }
 
-    /// Start recording this session as asciinema v2
+    /// Start serializing this session to asciinema v2.
+    ///
+    /// The serializer is fed from `send()` (→ `i` events) and `read()`
+    /// (→ `o` events) from this point on. Asciinema v2 is a lossy
+    /// projection — the typed stream (see [`Self::session_record`]) stays
+    /// the source of truth.
     pub async fn record(&mut self, output_path: &Path) -> anyhow::Result<PathBuf> {
-        tracing::info!(session = %self.session_name, path = ?output_path, "starting asciinema recording");
+        tracing::info!(session = %self.session_name, path = ?output_path, "starting asciinema serialization");
 
-        let mut recorder = AsciinemaRecorder::new(
+        let mut serializer = AsciinemaSerializer::new(
             &self.session_name,
             self.backend.name(),
             output_path.to_path_buf(),
         );
 
-        recorder.start()?;
-        self.recorder = Some(recorder);
+        serializer.start()?;
+        self.serializer = Some(Mutex::new(serializer));
 
         Ok(output_path.to_path_buf())
     }
 
-    /// Stop recording (if active) and terminate the session
+    /// The session's typed event stream as a [`SessionRecord`] (the
+    /// faithful native JSONL form).
+    pub fn session_record(&self) -> SessionRecord {
+        let stream = self.stream.lock().expect("stream lock poisoned");
+        SessionRecord {
+            version: STREAM_VERSION,
+            session: self.session_name.clone(),
+            backend: self.backend.name().to_string(),
+            events: stream.events().to_vec(),
+        }
+    }
+
+    /// Stop serialization (if active) and terminate the session
     pub async fn stop(&mut self) -> anyhow::Result<()> {
         tracing::info!(session = %self.session_name, "stopping terminal session");
 
-        // Stop recorder first if active
-        if let Some(ref mut recorder) = self.recorder.take() {
-            recorder.stop()?;
+        // Stop serializer first if active
+        if let Some(ser) = self.serializer.take() {
+            ser.lock().expect("serializer lock poisoned").stop()?;
         }
 
         self.backend.kill_session(&self.session_name).await
@@ -201,9 +281,9 @@ impl TerminalSession {
         &self.session_name
     }
 
-    /// Check if recording is active
+    /// Check if serialization is active
     pub fn is_recording(&self) -> bool {
-        self.recorder.is_some()
+        self.serializer.is_some()
     }
 }
 
