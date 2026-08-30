@@ -347,6 +347,17 @@ mod tests {
     }
 
     #[test]
+    fn test_vm_bridge_can_depend_on_crabjar_terminal() {
+        // vm-bridge (layer 3) can depend on crabjar-terminal (layer 3) — same layer is OK.
+        // The relay forwards TerminalEvent frames from the typed stream (ADR-005 item 5).
+        let layer_map = crate_to_layer();
+        let bridge_layer = layer_map["vm-bridge"];
+        let terminal_layer = layer_map["crabjar-terminal"];
+        let allowed = allowed_dependencies(bridge_layer);
+        assert!(allowed.contains(&terminal_layer));
+    }
+
+    #[test]
     fn test_zed_acp_server_can_depend_on_guard() {
         // zed-acp-server (layer 6) can depend on guard (layer 1)
         let layer_map = crate_to_layer();

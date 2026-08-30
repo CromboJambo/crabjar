@@ -38,6 +38,7 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     // Layer 3: runtime — execution runtime
     map.insert("orchestrator", 3);
     map.insert("vm-bridge", 3); // axum-mux
+    map.insert("crabjar-terminal", 3); // crates/terminal — typed terminal stream (ADR-005)
 
     // Layer 4: host — host runtime crates
     map.insert("crabjar-host-core", 4);
