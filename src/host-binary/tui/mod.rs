@@ -5,7 +5,9 @@
 //! and streams results back as they complete.
 
 pub mod app;
+pub mod habitat_panel;
 pub mod input;
+mod render;
 mod session;
 pub mod terminal_panel;
 
@@ -13,6 +15,7 @@ use app::{App, AppState};
 use crabjar_guard::GuardDb;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
+use habitat_panel::HabitatPanel;
 use ratatui::DefaultTerminal;
 use std::io;
 use tokio::sync::mpsc;
@@ -22,6 +25,7 @@ pub async fn run(
     objective: Option<&str>,
     session_id: Option<&str>,
     guard_db: Option<GuardDb>,
+    habitat_panel: Option<HabitatPanel>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Setup terminal — use a wrapper to avoid move issues
     let mut stdout = io::stdout();
@@ -32,7 +36,14 @@ pub async fn run(
     let mut terminal = ratatui::Terminal::new(backend)?;
 
     // Run the TUI app (blocks until user quits)
-    let result = run_app(&mut terminal, objective, session_id, guard_db).await;
+    let result = run_app(
+        &mut terminal,
+        objective,
+        session_id,
+        guard_db,
+        habitat_panel,
+    )
+    .await;
 
     // Restore terminal
     drop(terminal);
@@ -48,11 +59,12 @@ async fn run_app(
     initial_objective: Option<&str>,
     session_id: Option<&str>,
     guard_db: Option<GuardDb>,
+    habitat_panel: Option<HabitatPanel>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (tx, mut rx) = mpsc::channel(64);
 
     // Build the app state
-    let mut app = App::new(initial_objective, session_id, guard_db)?;
+    let mut app = App::new(initial_objective, session_id, guard_db, habitat_panel)?;
 
     loop {
         terminal.draw(|frame| app.render(frame))?;
@@ -68,7 +80,9 @@ async fn run_app(
                         // so it can't be moved into tokio::spawn. The TUI already blocks on run_app,
                         // and the UI is in "Running" state during execution anyway.
                         if let Err(e) = app.run_agent_loop(&text, &tx).await {
-                            let _ = tx.send(AppState::Error(format!("Agent error: {}", e))).await;
+                            let _ = tx
+                                .send(AppState::Error(format!("Agent error: {}", e)))
+                                .await;
                         }
                     }
                     input::Action::Quit => break,

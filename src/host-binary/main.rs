@@ -3,10 +3,10 @@ mod dashboard;
 mod tui;
 
 use clap::{Parser, Subcommand};
+use crabjar_guard::Scope as GuardScope;
 use crabjar_host_agent::AgentLoop;
 use crabjar_host_core::{EventBus, HostConfig, PluginRegistry};
 use crabjar_host_observe::MetricsCollector;
-use crabjar_guard::Scope as GuardScope;
 use std::sync::Arc;
 
 #[derive(Parser, Debug)]
@@ -147,7 +147,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Initialize guard DB co-located with data directory
             let guard_db_path = format!("{}/guard.db", cli.data_dir);
             let guard_db = crabjar_guard::GuardDb::open(&guard_db_path).ok();
-            tui::run(obj, sid, guard_db).await?;
+            // Initialize habitat store co-located with data directory (ADR-003)
+            let habitat_db_path = format!("{}/habitat.db", cli.data_dir);
+            let habitat_panel = agent_context::habitat::HabitatStore::open(&habitat_db_path)
+                .ok()
+                .and_then(|store| tui::habitat_panel::HabitatPanel::with_store(store).ok());
+            tui::run(obj, sid, guard_db, habitat_panel).await?;
         }
         Commands::PluginList => {
             let plugins = plugin_registry.list().await;
@@ -163,16 +168,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Tick => {
-            let mut loop_engine = AgentLoop::new(event_bus, metrics)
-                .with_scope(GuardScope::project("host"));
+            let mut loop_engine =
+                AgentLoop::new(event_bus, metrics).with_scope(GuardScope::project("host"));
             loop_engine.start("Auto-tick objective");
             let result = loop_engine.tick().await?;
             println!("{}", serde_json::to_string_pretty(&result)?);
         }
         Commands::Run { objective } => {
             tracing::info!(objective = %objective, "Starting agent loop");
-            let mut loop_engine = AgentLoop::new(event_bus, metrics)
-                .with_scope(GuardScope::project("host"));
+            let mut loop_engine =
+                AgentLoop::new(event_bus, metrics).with_scope(GuardScope::project("host"));
             loop_engine.start(&objective);
 
             let mut iterations = 0;

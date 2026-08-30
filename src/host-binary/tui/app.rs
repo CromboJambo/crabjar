@@ -2,6 +2,7 @@
 //!
 //! Manages conversation history, agent loop lifecycle, and guard interaction.
 
+use super::habitat_panel::HabitatPanel;
 use super::input;
 use super::session::SessionStore;
 use super::terminal_panel::TerminalPanel;
@@ -9,8 +10,6 @@ use crabjar_guard::GuardDb;
 use crabjar_host_agent::{AgentLoop, LoopResult};
 use crabjar_host_core::EventBus;
 use crabjar_host_observe::MetricsCollector;
-use ratatui::Frame;
-use std::borrow::Cow;
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
@@ -30,10 +29,21 @@ pub enum AppState {
 /// Message types in the conversation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Message {
-    User { text: String },
-    Agent { text: String },
-    ToolCall { name: String, args: String, result: String },
-    Guard { action: String, pending: bool },
+    User {
+        text: String,
+    },
+    Agent {
+        text: String,
+    },
+    ToolCall {
+        name: String,
+        args: String,
+        result: String,
+    },
+    Guard {
+        action: String,
+        pending: bool,
+    },
 }
 
 /// The main application state.
@@ -52,6 +62,10 @@ pub struct App {
     pub current_session_id: Option<String>,
     /// Terminal panel for displaying agent terminal sessions
     pub terminal_panel: Option<TerminalPanel>,
+    /// Habitat panel — spatial cartography of computational state (ADR-003)
+    pub habitat_panel: Option<HabitatPanel>,
+    /// Whether the habitat panel is visible (toggled with 'h')
+    pub show_habitat: bool,
     /// Guard database for pending queue operations
     pub guard_db: Option<GuardDb>,
 }
@@ -62,6 +76,7 @@ impl App {
         initial_objective: Option<&str>,
         session_id: Option<&str>,
         guard_db: Option<GuardDb>,
+        habitat_panel: Option<HabitatPanel>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut app = Self {
             state: AppState::Idle,
@@ -71,6 +86,8 @@ impl App {
             session_store: None,
             current_session_id: None,
             terminal_panel: None,
+            habitat_panel,
+            show_habitat: false,
             guard_db,
         };
 
@@ -88,7 +105,8 @@ impl App {
         // Load or create session
         if let Some(sid) = session_id
             && let Some(ref store) = app.session_store
-            && let Ok(session) = store.load(sid) {
+            && let Ok(session) = store.load(sid)
+        {
             app.current_session_id = Some(sid.to_string());
             for msg in &session.messages {
                 app.messages.push(msg.clone());
@@ -97,14 +115,17 @@ impl App {
 
         // If no session loaded, create a new one
         if app.current_session_id.is_none()
-            && let Some(ref store) = app.session_store {
+            && let Some(ref store) = app.session_store
+        {
             let sid = store.create()?;
             app.current_session_id = Some(sid);
         }
 
         // Add initial objective if provided
         if let Some(obj) = initial_objective {
-            app.messages.push(Message::User { text: obj.to_string() });
+            app.messages.push(Message::User {
+                text: obj.to_string(),
+            });
         }
 
         Ok(app)
@@ -147,16 +168,27 @@ impl App {
                         Ok(Some(input::Action::Submit(text)))
                     }
                     // Ctrl+C: quit
-                    KeyCode::Char('c') if key.modifiers == crossterm::event::KeyModifiers::CONTROL => {
+                    KeyCode::Char('c')
+                        if key.modifiers == crossterm::event::KeyModifiers::CONTROL =>
+                    {
                         Ok(Some(input::Action::Quit))
                     }
                     // Arrow keys for scrolling when not in input mode
-                    KeyCode::Up if self.state != AppState::Idle && !self.input_buffer.is_empty() => {
+                    KeyCode::Up
+                        if self.state != AppState::Idle && !self.input_buffer.is_empty() =>
+                    {
                         self.scroll_offset = self.scroll_offset.saturating_add(1);
                         Ok(None)
                     }
-                    KeyCode::Down if self.state != AppState::Idle && !self.input_buffer.is_empty() => {
+                    KeyCode::Down
+                        if self.state != AppState::Idle && !self.input_buffer.is_empty() =>
+                    {
                         self.scroll_offset = self.scroll_offset.saturating_sub(1);
+                        Ok(None)
+                    }
+                    // 'h': toggle habitat panel (ADR-003)
+                    KeyCode::Char('h') if self.state == AppState::Idle => {
+                        self.toggle_habitat();
                         Ok(None)
                     }
                     // Backspace in input buffer
@@ -176,156 +208,29 @@ impl App {
         }
     }
 
-    /// Render the app to the terminal.
-    pub fn render(&mut self, frame: &mut Frame<'_>) {
-        use ratatui::layout::{Constraint, Direction, Layout};
-        use ratatui::style::{Color, Modifier, Style};
-        use ratatui::text::{Line, Span};
-        use ratatui::widgets::{Block, Borders, Paragraph};
-
-        // Split into left (terminal) and right (chat) panels
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .margin(1)
-            .constraints([
-                Constraint::Percentage(40),  // Terminal panel
-                Constraint::Percentage(60),  // Chat panel
-            ])
-            .split(frame.area());
-
-        // Render terminal panel on the left
-        if let Some(ref panel) = self.terminal_panel {
-            panel.render(frame, chunks[0]);
-        } else {
-            // Fallback: show a placeholder when no terminal is available
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .title(" Terminal [unavailable] ");
-            frame.render_widget(block, chunks[0]);
+    /// Toggle the habitat panel visibility and refresh its snapshot.
+    pub fn toggle_habitat(&mut self) {
+        self.show_habitat = !self.show_habitat;
+        if self.show_habitat
+            && let Some(ref mut panel) = self.habitat_panel
+            && let Err(e) = panel.refresh()
+        {
+            tracing::warn!("Failed to refresh habitat panel: {e}");
         }
-
-        // Split the right side into chat components
-        let chat_chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .margin(1)
-            .constraints([
-                Constraint::Length(3),  // Title bar
-                Constraint::Min(0),     // Message area (grows)
-                Constraint::Length(3),  // Status bar
-                Constraint::Length(1),  // Input line
-            ])
-            .split(chunks[1]);
-
-        // Title bar
-        let title = match &self.state {
-            AppState::Idle => Cow::Borrowed("CrabJar Agent — Ready"),
-            AppState::Running => Cow::Borrowed("CrabJar Agent — Running..."),
-            AppState::AwaitingApproval { action_desc, .. } => {
-                Cow::Owned(format!("CrabJar Agent — Awaiting Approval: {}", action_desc))
-            }
-            AppState::Error(e) => Cow::Owned(format!("CrabJar Agent — Error: {}", e)),
-        };
-
-        let title_widget = Paragraph::new(title.as_ref())
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" CrabJar "),
-            )
-            .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
-
-        frame.render_widget(title_widget, chat_chunks[0]);
-
-        // Message area with scrollback
-        let visible_messages: Vec<&Message> = self.messages.iter().rev().take(20).collect();
-        let mut lines: Vec<Line<'_>> = Vec::new();
-
-        for msg in visible_messages {
-            match msg {
-                Message::User { text } => {
-                    lines.push(Line::from(vec![
-                        Span::raw(" > "),
-                        Span::styled(text.clone(), Style::default().fg(Color::Yellow)),
-                    ]));
-                }
-                Message::Agent { text } => {
-                    // Truncate long agent responses for display
-                    let display = if text.len() > 200 {
-                        format!("{}...", &text[..197])
-                    } else {
-                        text.clone()
-                    };
-                    lines.push(Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled(display, Style::default().fg(Color::White)),
-                    ]));
-                }
-                Message::ToolCall { name, args, result } => {
-                    let display_result = if result.len() > 100 {
-                        format!("{}...", &result[..97])
-                    } else {
-                        result.clone()
-                    };
-                    lines.push(Line::from(vec![
-                        Span::styled(format!("[tool: {}]", name), Style::default().fg(Color::Blue)),
-                        Span::raw(" "),
-                        Span::styled(args, Style::default().fg(Color::Magenta)),
-                    ]));
-                    lines.push(Line::from(vec![
-                        Span::raw("    → "),
-                        Span::styled(display_result, Style::default().fg(Color::Green)),
-                    ]));
-                }
-                Message::Guard { action, pending } => {
-                    let color = if *pending { Color::Red } else { Color::Green };
-                    lines.push(Line::from(vec![
-                        Span::styled(
-                            format!("[guard: {}]", action),
-                            Style::default().fg(color).add_modifier(Modifier::BOLD),
-                        ),
-                    ]));
-                }
-            }
-        }
-
-        let message_widget = Paragraph::new(lines)
-            .block(Block::default().borders(Borders::ALL).title(" Conversation "));
-
-        frame.render_widget(message_widget, chat_chunks[1]);
-
-        // Status bar
-        let status_text: Cow<'_, str> = match &self.state {
-            AppState::Idle => Cow::Borrowed(" Enter your request below "),
-            AppState::Running => Cow::Borrowed(" Agent is working... "),
-            AppState::AwaitingApproval { id: _, action_desc } => {
-                Cow::Owned(format!(
-                    " Guard pending: {} [a=approve / r=reject] ",
-                    action_desc
-                ))
-            }
-            AppState::Error(_) => Cow::Borrowed(" Error occurred "),
-        };
-
-        let status_widget = Paragraph::new(status_text.as_ref())
-            .style(Style::default().fg(Color::Yellow));
-
-        frame.render_widget(status_widget, chat_chunks[2]);
-
-        // Input line
-        let input_widget = Paragraph::new(self.input_buffer.clone())
-            .block(Block::default().borders(Borders::ALL).title(" Input "));
-
-        frame.render_widget(input_widget, chat_chunks[3]);
     }
 
     /// Set the current app state.
     pub fn set_state(&mut self, state: AppState) {
         match &state {
             AppState::Running => {
-                self.messages.push(Message::Agent { text: "Starting agent loop...".to_string() });
+                self.messages.push(Message::Agent {
+                    text: "Starting agent loop...".to_string(),
+                });
             }
             AppState::Idle => {
-                self.messages.push(Message::Agent { text: "Ready for next request.".to_string() });
+                self.messages.push(Message::Agent {
+                    text: "Ready for next request.".to_string(),
+                });
             }
             _ => {}
         }
@@ -366,11 +271,13 @@ impl App {
         let bus = std::sync::Arc::new(EventBus::new(16));
         let metrics = MetricsCollector::new();
 
-        let mut loop_engine = AgentLoop::new(bus, metrics)
-            .with_scope(crabjar_guard::Scope::project("tui"));
+        let mut loop_engine =
+            AgentLoop::new(bus, metrics).with_scope(crabjar_guard::Scope::project("tui"));
         loop_engine.start(objective);
 
-        self.messages.push(Message::Agent { text: format!("Starting: {}", objective) });
+        self.messages.push(Message::Agent {
+            text: format!("Starting: {}", objective),
+        });
 
         // Run the loop with iteration tracking
         let max_iterations = 50;
@@ -379,34 +286,48 @@ impl App {
 
             match loop_engine.tick().await {
                 Ok(result) => match result {
-                    LoopResult::IterationComplete { work_item_id: _, confidence, tasks_completed } => {
+                    LoopResult::IterationComplete {
+                        work_item_id: _,
+                        confidence,
+                        tasks_completed,
+                    } => {
                         self.messages.push(Message::Agent {
                             text: format!(
                                 "Iteration {}: confidence={:.0}%, tasks={}",
-                                i, confidence * 100.0, tasks_completed
+                                i,
+                                confidence * 100.0,
+                                tasks_completed
                             ),
                         });
 
                         // Check if we should continue based on confidence
                         if confidence >= 0.85 {
-                            self.messages.push(Message::Agent { text: "Sufficient confidence reached.".to_string() });
+                            self.messages.push(Message::Agent {
+                                text: "Sufficient confidence reached.".to_string(),
+                            });
                             tx.send(AppState::Idle).await?;
                             break;
                         }
                     }
                     LoopResult::Completed { work_item_id: _ } => {
-                        self.messages.push(Message::Agent { text: "Task completed successfully.".to_string() });
+                        self.messages.push(Message::Agent {
+                            text: "Task completed successfully.".to_string(),
+                        });
                         tx.send(AppState::Idle).await?;
                         break;
                     }
                     LoopResult::Failed { reason, .. } => {
-                        self.messages.push(Message::Agent { text: format!("Failed: {}", reason) });
+                        self.messages.push(Message::Agent {
+                            text: format!("Failed: {}", reason),
+                        });
                         tx.send(AppState::Error(reason)).await?;
                         break;
                     }
                 },
                 Err(e) => {
-                    self.messages.push(Message::Agent { text: format!("Loop error: {}", e) });
+                    self.messages.push(Message::Agent {
+                        text: format!("Loop error: {}", e),
+                    });
                     tx.send(AppState::Error(e.to_string())).await?;
                     break;
                 }
@@ -415,7 +336,8 @@ impl App {
             // Check for pending guard actions and surface them to the user
             if let Some(ref db) = self.guard_db
                 && let Ok(pending_entries) = db.read_pending_queue()
-                && !pending_entries.is_empty() {
+                && !pending_entries.is_empty()
+            {
                 // Surface the first pending entry as a guard message
                 let entry = &pending_entries[0];
                 let action_desc = format!(
@@ -438,7 +360,8 @@ impl App {
                 tx.send(AppState::AwaitingApproval {
                     id: entry.id.clone(),
                     action_desc: action_desc.clone(),
-                }).await?;
+                })
+                .await?;
 
                 // Break out of the loop — wait for user input via keyboard shortcuts
                 break;
@@ -450,7 +373,8 @@ impl App {
 
         // Save to session if we have a store
         if let Some(ref store) = self.session_store
-            && let Some(ref sid) = self.current_session_id {
+            && let Some(ref sid) = self.current_session_id
+        {
             store.save(sid, &self.messages)?;
         }
 
