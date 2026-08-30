@@ -52,11 +52,6 @@ crabjar/
 │   └── commands.rs
 ├── src/crabjar_config/      # workspace config crate
 │   └── mod.rs
-├── src/vm_bridge/           # per-VM websocket relay (screen/terminal)
-│   ├── lib.rs
-│   ├── relay.rs
-│   ├── screen.rs
-│   └── terminal.rs
 ├── src/host-binary/         # host binary crate
 │   ├── AGENTS.md
 │   ├── Cargo.toml
@@ -550,7 +545,7 @@ The `handle_chat` handler uses the `InferenceBackend` trait — switches between
 
 **Goal:** Integrate vm-bridge as the display/screen sharing layer for crabjar's agent orchestration.
 
-- [x] vm-bridge exists at `src/vm_bridge/` with lib.rs, relay.rs, screen.rs, terminal.rs
+- [x] vm-bridge existed at `src/vm_bridge/` — deleted 2026-08-30 (orphaned: never wired into the crate; `axum-mux/` is the live relay, ADR-005)
 - [ ] Wire into crabjar-host for Teams plugin integration
 - [ ] Add `crabjar-screen` crate for screen capture
   - [ ] PipeWire integration for screen share sources
@@ -625,7 +620,6 @@ crabjar contains:
 - crates/terminal (wezterm/zellij backends + asciinema v2 recording)
 - .agents/skills/ (32 agent skills)
 - .agents/references/ (may be empty)
-- src/vm_bridge/ (per-VM websocket relay)
 - src/bitwarden/ (bitwarden CLI integration)
 - src/knowledge_store/ (knowledge store commands with bridge + confidence)
 - src/crabjar_config/ (workspace config crate)
@@ -690,7 +684,6 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 - `file_search/` — BM25-based file indexing and search with Tantivy 0.22 (lib.rs, indexer.rs, storage.rs) — 6 tests
 - `crabjar-plugin/` — WASM runtime + lifecycle management (stub crate)
 - `axum-mux/` — vm-bridge (per-VM websocket relay, screen capture, terminal multiplexer)
-- `src/vm_bridge/` — per-VM websocket relay (lib.rs, relay.rs, screen.rs, terminal.rs)
 - `src/crabjar_config/` — workspace config crate (underscore, not hyphen)
 - `src/bitwarden/commands.rs` — additional bitwarden command handler
 - `src/host-binary/` — host binary crate with TUI (cli.rs, dashboard.rs, main.rs, Cargo.toml, AGENTS.md)
