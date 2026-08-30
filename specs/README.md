@@ -72,3 +72,5 @@ Skip the formal process when:
 | 001 | Specify Decision Process | Accepted | 2026-07-08 |
 | 002 | Herdr as Execution Substrate | Proposed | 2026-08-23 |
 | 003 | Spatial Habitat Layer | Proposed | 2026-08-23 |
+| 004 | The Glass — Abstraction Boundary Orientation | Proposed | 2026-08-30 |
+| 005 | Typed Terminal Stream as Session Substrate | Proposed | 2026-08-30 |
