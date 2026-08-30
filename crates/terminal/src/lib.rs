@@ -61,8 +61,9 @@
 //! ```
 
 pub mod backend;
-mod herdr;
+pub(crate) mod herdr;
 mod recording;
+pub mod stream;
 mod wezterm;
 mod zellij;
 
@@ -71,6 +72,7 @@ use std::path::{Path, PathBuf};
 pub use backend::*;
 pub use herdr::HerdrBackend;
 pub use recording::*;
+pub use stream::*;
 pub use wezterm::WeztermBackend;
 pub use zellij::ZellijBackend;
 
