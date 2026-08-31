@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn truncate_respects_char_boundaries() {
-        let s: String = std::iter::repeat('é').take(100).collect();
+        let s: String = "é".repeat(100);
         let t = truncate(&s, 10);
         assert_eq!(t.chars().count(), 13); // 10 + "..."
         assert!(t.ends_with("..."));
