@@ -142,16 +142,41 @@ agent carries the mechanical burden fully; the strategic one (direction)
 stays with the user — and even that is deferred, because the user is also a
 probe at a higher layer.
 
-### The agent's objective: observe the wall, not stay green
+### The agent's objective: drive the road, not aim for the wall
 
-The agent's objective function is to **observe the fail point**, not to keep
-the build green. It is forbidden from working around the wall (cheating the
-test, mocking the dependency, skipping the flaky case) — every workaround
-destroys the map. The verifiers (exit code, file exists, regex) are
-*readings* of the attempt, not *goals to pass*. This is probe-not-prover
-made concrete as an objective: the agent drives *toward* the wall on purpose
-where the user's theory predicts it, and records the observation when it
-arrives.
+The agent's objective function is to **drive the theory's road faithfully**,
+not to keep the build green and not to aim for the wall. The wall is where
+the road ends — a consequence of the theory being wrong, not a target. The
+agent drives until it hits the boundary, and the observation is the boundary
+itself.
+
+Three refinements to "observe the wall":
+
+1. **Full collision, not just near miss.** A near miss (test fails, "close")
+   is a reading. The full collision (keep going, see what the deep break
+   actually looks like) is the map. The agent does not stop at the bumper —
+   it goes through, to see the full shape of the break.
+2. **Not deliberately headlong.** The agent does not *aim* for the wall. It
+   *drives the theory's road*. The wall is a consequence of the driving, not
+   a target. The difference is the difference between a crash test and a
+   road test: in a crash test you hit the wall on purpose; in a road test
+   you drive until the road ends and the wall is what's there.
+3. **The co-driver's jump scare is worse by design.** The agent (driver)
+   experiences the crash in real-time, with full context of the approach.
+   The user (co-driver) gets the *report* — the observation — without the
+   real-time context. The user's "jump scare" is the after-the-fact reading:
+   surprising (you didn't see it coming live) and incomplete (you don't have
+   the full approach). This is why the stream (ADR-005) is load-bearing: the
+   attempt's diff + conditions capture the *crash*; the stream captures the
+   *approach*. The user reads the stream to understand how the agent got to
+   the wall, not just what the wall looked like.
+
+The agent is forbidden from working around the wall (cheating the test,
+mocking the dependency, skipping the flaky case) — every workaround destroys
+the map. The verifiers (exit code, file exists, regex) are *readings* of the
+attempt, not *goals to pass*. This is probe-not-prover made concrete as an
+objective: the agent drives the road, hits the wall as a consequence, and
+records the observation.
 
 ### The report
 
