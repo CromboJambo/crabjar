@@ -1,0 +1,33 @@
+# Grandfathered modules already over the 500-LoC gate (as of the
+# 2026-08-31 main-debt fix). The gate enforces "no NEW file over the
+# limit" — anything not on this list that exceeds the threshold fails.
+#
+# To shrink this: split a module, then remove its line here. The list
+# should only ever get shorter. A module reappearing here after removal
+# is a regression the gate will catch.
+crabjar-architecture/src/boundary.rs
+crabjar-plugin/src/lib.rs
+file_search/src/storage.rs
+guard/src/concierge.rs
+guard/src/domain_allowlist.rs
+guard/src/gate_tests.rs
+guard/src/guard_db_impl.rs
+guard/src/policy.rs
+guard/src/scope.rs
+host/host-agent/src/loop_engine.rs
+host/host-graph/src/client.rs
+memory/src/state_docs/renderer.rs
+memory/src/store.rs
+memory/tests/state_docs_tests.rs
+orchestrator/src/lm_studio_client/prompt_validator.rs
+orchestrator/src/lm_studio_client/tests.rs
+orchestrator/src/main.rs
+src/knowledge_store/bridge.rs
+src/main.rs
+src/skill-reference-store/src/skillset.rs
+telemetry/src/flight_recorder.rs
+telemetry/src/schema.rs
+tests/cli.rs
+tests/e2e/full.rs
+tool_registry/src/schema.rs
+tool_registry/src/tool_registry.rs
