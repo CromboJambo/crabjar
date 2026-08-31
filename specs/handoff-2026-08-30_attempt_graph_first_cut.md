@@ -1,10 +1,14 @@
 # Session handoff: crabjar — ADR-006 attempt graph, first cut (record-only)
 
-Companion to `specs/ADR-006_attempt_graph_falsification_record.md`. Read that
-first — it is the spec; this file tells you what exists, what was rejected,
-and where to start. The goal: the **record-only first cut** — the `Attempt`
-model, the bounded triage queue, the structured report, and the
-`crabjar attempts status` dashboard. No auto-rewind (second cut).
+**STATUS (updated after implementation): first cut is DONE.** Items 1–5
+below are implemented, tested, and committed as `850f23e` (model + queue)
+and `26993fd` (dashboard). The open design point (⚠️) was resolved as
+option (b): approach warnings ride on the attempt as annotations;
+`STREAM_VERSION` stays 2. The remaining work is the **second cut**
+(item 6) — fine-tier `git revert` + coarse-tier VM restore. Read
+`specs/ADR-006_attempt_graph_falsification_record.md` first — it is the
+spec; this file tells you what exists, what was rejected, and where to
+start.
 
 ## What exists today (verified, not from docs)
 
@@ -113,7 +117,11 @@ decision with its own migration test, not a side effect of this cut.
 
 ## Remaining work (in priority order)
 
-### 1. `Attempt` model — `crates/terminal/src/attempts.rs` (new file)
+> **Items 1–5: DONE** (commits `850f23e`, `26993fd`). Kept here as the
+> as-built record. Only item 6 remains, and it is explicitly out of scope
+> for this cut.
+
+### 1. `Attempt` model — `crates/terminal/src/attempts.rs` ✅ DONE
 The core type. Shape per the ADR:
 
 ```rust
@@ -152,8 +160,7 @@ exists in the workspace (check `guard/` and the CLI contract helpers before
 defining a new one). Unit tests: construction, `broken` condition
 detection, judgment round-trip through serde.
 
-### 2. Bounded triage queue — same file or `queue.rs` (watch the 500 LoC
-gate; split if `attempts.rs` approaches it)
+### 2. Bounded triage queue — `crates/terminal/src/queue.rs` ✅ DONE
 - `TriageQueue { attempts: VecDeque<Attempt>, budget: usize }`
 - `push` → lands `Unjudged`; when `len >= budget`, `push` is **refused**
   with a structured refusal (queue full, N unjudged, oldest age) — the
@@ -163,7 +170,7 @@ gate; split if `attempts.rs` approaches it)
 - `oldest_age()` for the dashboard.
 - Unit tests: budget refusal, judgment validation, oldest-age computation.
 
-### 3. `crabjar attempts status` — root `src/` CLI
+### 3. `crabjar attempts status` — root `src/` CLI ✅ DONE
 Structured JSON per the CLI output contract, with a `doubt` block:
 unjudged count, oldest age, broken conditions awaiting diagnosis, queue
 budget usage, theory staleness (wire to
@@ -173,14 +180,14 @@ Follow the existing subcommand registration pattern (see `state` and
 `knowledge` subcommands). Snapshot tests if the project's `insta` setup
 covers CLI output (check `tests/snapshots/`).
 
-### 4. Structured report — `attempts.rs`
+### 4. Structured report — `attempts.rs` ✅ DONE
 `report(attempt) -> serde_json::Value`: the failed attempt's diff reference
 + broken preconditions as **pointers into the graph** (addressable — the
 consumer can jump to the attempt and its conditions), prose summary on top,
 `doubt` block per contract. This is what the agent emits instead of freeform
 "it failed."
 
-### 5. Approach warnings — annotation form (see ⚠️ above)
+### 5. Approach warnings — annotation form (see ⚠️ above) ✅ DONE
 An `ApproachWarning { predicted_break: String, proximity: ... }` annotation
 on the attempt, surfaced in the structured report and the dashboard. No
 stream change in this cut.
