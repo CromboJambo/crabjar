@@ -13,8 +13,8 @@ mod tool_registry_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
 use crabjar_lib::{
-    BackendCommand, BitwardenCommand, AttemptsCommand, DoctorCommand, DotfileCommand,
-    GuardCommand, HabitatCommand, KnowledgeCommand, MetricsCommand, ToolCommand,
+    AttemptsCommand, BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
+    HabitatCommand, KnowledgeCommand, MetricsCommand, ToolCommand,
 };
 use doctor::handle_doctor_command;
 use dotfile_manager::DotfileManager;
@@ -1019,7 +1019,10 @@ fn handle_attempts_command(
                             std::path::PathBuf::from("state-docs"),
                         );
                         let status = querier.staleness_status(&theory);
-                        if status["last_modified"].as_str().map(|s| !s.is_empty()).unwrap_or(false)
+                        if status["last_modified"]
+                            .as_str()
+                            .map(|s| !s.is_empty())
+                            .unwrap_or(false)
                         {
                             theory_staleness = status;
                             theory_blind_spot = None;

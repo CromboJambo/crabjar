@@ -73,10 +73,7 @@ pub struct Attempt {
 impl Attempt {
     /// Preconditions that are broken — the *why* of a failed attempt.
     pub fn broken_conditions(&self) -> Vec<&Condition> {
-        self.preconditions
-            .iter()
-            .filter(|c| c.broken)
-            .collect()
+        self.preconditions.iter().filter(|c| c.broken).collect()
     }
 }
 

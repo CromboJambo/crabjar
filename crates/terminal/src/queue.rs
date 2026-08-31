@@ -230,7 +230,9 @@ impl TriageQueue {
         out.push_str(&header.to_string());
         out.push('\n');
         for attempt in &self.attempts {
-            out.push_str(&serde_json::to_string(attempt).expect("Attempt serialization cannot fail"));
+            out.push_str(
+                &serde_json::to_string(attempt).expect("Attempt serialization cannot fail"),
+            );
             out.push('\n');
         }
         out
@@ -255,7 +257,8 @@ impl TriageQueue {
         let budget = header
             .get("budget")
             .and_then(|v| v.as_u64())
-            .ok_or_else(|| anyhow::anyhow!("queue record header missing budget"))? as usize;
+            .ok_or_else(|| anyhow::anyhow!("queue record header missing budget"))?
+            as usize;
         let attempts = lines
             .filter(|l| !l.trim().is_empty())
             .map(|line| {
@@ -342,10 +345,7 @@ mod tests {
         assert_eq!(i1, 0);
         assert_eq!(i2, 1);
         assert_eq!(q.len(), 2);
-        assert!(matches!(
-            q.get(i1).unwrap().status,
-            AttemptStatus::Unjudged
-        ));
+        assert!(matches!(q.get(i1).unwrap().status, AttemptStatus::Unjudged));
     }
 
     #[test]
