@@ -10,7 +10,12 @@ docker-compose.yml
 docker-compose.override.yml
 
 # cargo
-Cargo.lock
+# Cargo.lock is intentionally committed (see AGENTS.md "Build
+# Reproducibility"): the reproducible-build CI gate runs
+# `cargo update --locked`, which fails on a fresh checkout without it.
+# axum-mux is a member of the root workspace, so its nested lock is an
+# orphaned artifact superseded by the root Cargo.lock — ignore it.
+axum-mux/Cargo.lock
 
 # git
 .gitmodules
