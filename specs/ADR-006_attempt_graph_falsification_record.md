@@ -56,6 +56,17 @@ condition broke*.
    yet, or under constraints not understandable yet. Neither party has a
    clean failure definition at attempt time.
 
+5. **In a simulation, the wall is the observation, not the fail point.**
+   Agentic coding is already the maintainer/merge-manager simulator; the
+   agent is the racecar. A race and a simulation differ on one thing — what
+   the crash is for. In a race the crash ends the run, so you keep the car
+   off the wall at all cost. In a simulation the crash is a *reading*: the
+   rewind (Decision) prices the fail point at zero, so the agent can hit it
+   as often as it wants, and the *observation* of it (diff + conditions +
+   local outcome) is the durable asset — not the broken state, which is
+   rewound away. The racer's instinct (stay green, avoid the crash) is the
+   maintainer's enemy: an agent that avoids the wall never maps it.
+
 ### The constraints (verified on this box, 2026-08-30)
 
 - **No `btrfs` CLI** on the host; `/tmp` is **tmpfs**. CoW snapshots are
@@ -130,6 +141,17 @@ No overlap. The agent's diligence is *faithfulness*, not curation. The
 agent carries the mechanical burden fully; the strategic one (direction)
 stays with the user — and even that is deferred, because the user is also a
 probe at a higher layer.
+
+### The agent's objective: observe the wall, not stay green
+
+The agent's objective function is to **observe the fail point**, not to keep
+the build green. It is forbidden from working around the wall (cheating the
+test, mocking the dependency, skipping the flaky case) — every workaround
+destroys the map. The verifiers (exit code, file exists, regex) are
+*readings* of the attempt, not *goals to pass*. This is probe-not-prover
+made concrete as an objective: the agent drives *toward* the wall on purpose
+where the user's theory predicts it, and records the observation when it
+arrives.
 
 ### The report
 
