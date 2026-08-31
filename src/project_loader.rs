@@ -158,6 +158,14 @@ fn expand_env(input: &str) -> String {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::Mutex;
+
+    /// The runtime environment is process-global and not thread-safe (which
+    /// is why `std::env::set_var`/`remove_var` are `unsafe`). The harness
+    /// runs `#[test]`s in parallel threads, so the tests that mutate the
+    /// environment must serialize on this lock or they race each other and
+    /// flake under `--all-targets --all-features`.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -288,6 +296,7 @@ commands = ["cmd1"]
 
     #[test]
     fn test_expand_env_plain_var() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::set_var("CRABJAR_TEST_TOOL_PATH", "/opt/tools/tool") };
         assert_eq!(expand_env("$CRABJAR_TEST_TOOL_PATH"), "/opt/tools/tool");
         assert_eq!(expand_env("${CRABJAR_TEST_TOOL_PATH}"), "/opt/tools/tool");
@@ -296,6 +305,7 @@ commands = ["cmd1"]
 
     #[test]
     fn test_expand_env_default_when_unset() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("CRABJAR_TEST_UNSET_VAR") };
         assert_eq!(
             expand_env("${CRABJAR_TEST_UNSET_VAR:-/fallback/tool}"),
@@ -315,6 +325,7 @@ commands = ["cmd1"]
 
     #[test]
     fn test_expand_env_var_wins_over_default() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::set_var("CRABJAR_TEST_TOOL_PATH", "/primary/tool") };
         assert_eq!(
             expand_env("${CRABJAR_TEST_TOOL_PATH:-/fallback/tool}"),
@@ -325,6 +336,7 @@ commands = ["cmd1"]
 
     #[test]
     fn test_expand_env_unset_no_default_is_empty() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("CRABJAR_TEST_UNSET_VAR") };
         assert_eq!(expand_env("${CRABJAR_TEST_UNSET_VAR}/suffix"), "/suffix");
     }
