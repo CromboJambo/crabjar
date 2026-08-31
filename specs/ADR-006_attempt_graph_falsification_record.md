@@ -161,15 +161,16 @@ Three refinements to "observe the wall":
    a target. The difference is the difference between a crash test and a
    road test: in a crash test you hit the wall on purpose; in a road test
    you drive until the road ends and the wall is what's there.
-3. **The co-driver's jump scare is worse by design.** The agent (driver)
-   experiences the crash in real-time, with full context of the approach.
-   The user (co-driver) gets the *report* — the observation — without the
-   real-time context. The user's "jump scare" is the after-the-fact reading:
-   surprising (you didn't see it coming live) and incomplete (you don't have
-   the full approach). This is why the stream (ADR-005) is load-bearing: the
-   attempt's diff + conditions capture the *crash*; the stream captures the
-   *approach*. The user reads the stream to understand how the agent got to
-   the wall, not just what the wall looked like.
+3. **The co-driver tenses up before the crash, not after.** The co-driver
+   (user) has better environmental awareness — they see the wall coming from
+   a higher vantage — but worse real-time reaction — they can't steer. The
+   tension is not surprise; it's *seeing it coming and not being able to do
+   anything about it*. The agent should emit **approach warnings** — "the
+   theory predicts this will break at X, I'm getting close" — so the user
+   can tense up *before* the full collision. The stream (ADR-005) captures
+   the approach; the *prediction* of the approach is what the co-driver
+   needs. The after-the-fact report (diff + conditions + local outcome) is
+   the crash; the approach warning is the tension.
 
 The agent is forbidden from working around the wall (cheating the test,
 mocking the dependency, skipping the flaky case) — every workaround destroys
