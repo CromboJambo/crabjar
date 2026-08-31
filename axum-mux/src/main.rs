@@ -6,6 +6,7 @@ use tokio::process::Command;
 
 mod manifest;
 mod proxy;
+mod review;
 mod terminal_relay;
 #[cfg(test)]
 mod terminal_relay_tests;
@@ -27,6 +28,26 @@ async fn main() -> Result<()> {
             .and_then(|p| p.parse::<u16>().ok())
             .unwrap_or(8082);
         return terminal_relay::serve("0.0.0.0".to_string(), port).await;
+    }
+
+    // Live review bridge: run commands in a herdr session and publish
+    // the typed event stream to the relay for unintrusive review.
+    // `--review <port> <session> <cmd1> [cmd2 ...]`
+    if let Some(pos) = args.iter().position(|a| a == "--review") {
+        let rest: Vec<String> = args[pos + 1..].to_vec();
+        let port = rest
+            .first()
+            .and_then(|p| p.parse::<u16>().ok())
+            .context("--review requires a port (0 = ephemeral)")?;
+        let session = rest
+            .get(1)
+            .cloned()
+            .context("--review requires a session name")?;
+        let commands: Vec<&str> = rest[2..].iter().map(String::as_str).collect();
+        if commands.is_empty() {
+            anyhow::bail!("--review requires at least one command");
+        }
+        return review::run(port, &session, &commands).await;
     }
 
     // Re-exec mode: this same binary, invoked as a per-VM worker.
