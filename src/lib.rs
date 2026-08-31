@@ -102,6 +102,12 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: HabitatCommand,
     },
+
+    /// Attempt graph: falsification record and triage queue (ADR-006)
+    Attempts {
+        #[command(subcommand)]
+        command: AttemptsCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -454,6 +460,24 @@ pub enum HabitatCommand {
         id: i64,
         /// SQLite database path
         #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+}
+
+/// Attempt graph subcommands (ADR-006, record-only first cut)
+#[derive(Debug, Subcommand, Clone)]
+pub enum AttemptsCommand {
+    /// Maintenance debt dashboard: unjudged count, oldest age, broken
+    /// conditions, queue budget usage, theory staleness
+    Status {
+        /// Path to the triage queue record (JSONL)
+        #[arg(long, default_value = "attempts.jsonl")]
+        queue_path: String,
+        /// Name of the theory state-doc (staleness-checked when indexed)
+        #[arg(long, default_value = "theory")]
+        theory: String,
+        /// SQLite database path for the theory state-doc
+        #[arg(long, default_value = "state-docs.db")]
         db_path: String,
     },
 }

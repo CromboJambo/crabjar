@@ -147,6 +147,34 @@ fn test_cli_tool_list_output() {
     );
 }
 
+/// Test that CLI `attempts status` returns valid JSON structure.
+#[test]
+fn test_cli_attempts_status_output() {
+    let output = Command::new("cargo")
+        .args(["run", "-p", "crabjar", "--", "attempts", "status"])
+        .output()
+        .expect("Failed to run crabjar attempts status");
+
+    assert!(
+        output.status.success(),
+        "crabjar attempts status failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Output is not valid JSON");
+
+    insta::assert_json_snapshot!(
+        "cli_attempts_status_output",
+        serde_json::json!({
+            "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
+            "unjudged": parsed.get("attempts").and_then(|v| v.get("unjudged")).and_then(|v| v.as_u64()).unwrap_or(0),
+            "has_doubt": parsed.get("doubt").is_some(),
+        })
+    );
+}
+
 /// Test that CLI `guard queue` returns valid JSON structure.
 #[test]
 fn test_cli_guard_queue_output() {

@@ -206,6 +206,7 @@ agent-context = { path = "memory" }
 crabjar-guard = { path = "guard" }
 crabjar-telemetry = { path = "telemetry" }
 crabjar-tool-registry = { path = "tool_registry" }
+crabjar-terminal = { path = "crates/terminal" }
 
 # Database
 rusqlite.workspace = true

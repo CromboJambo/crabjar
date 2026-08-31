@@ -1,0 +1,9 @@
+---
+source: tests/snapshot_tests.rs
+expression: "serde_json::json!({\n    \"success\":\n    parsed.get(\"success\").and_then(|v| v.as_bool()).unwrap_or(false),\n    \"unjudged\":\n    parsed.get(\"attempts\").and_then(|v|\n    v.get(\"unjudged\")).and_then(|v| v.as_u64()).unwrap_or(0), \"has_doubt\":\n    parsed.get(\"doubt\").is_some(),\n})"
+---
+{
+  "has_doubt": true,
+  "success": true,
+  "unjudged": 0
+}

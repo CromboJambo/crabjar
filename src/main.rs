@@ -13,8 +13,8 @@ mod tool_registry_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
 use crabjar_lib::{
-    BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand, HabitatCommand,
-    KnowledgeCommand, MetricsCommand, ToolCommand,
+    BackendCommand, BitwardenCommand, AttemptsCommand, DoctorCommand, DotfileCommand,
+    GuardCommand, HabitatCommand, KnowledgeCommand, MetricsCommand, ToolCommand,
 };
 use doctor::handle_doctor_command;
 use dotfile_manager::DotfileManager;
@@ -83,6 +83,8 @@ async fn main() {
         Some(CliCommand::Metrics { command }) => handle_metrics_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Habitat { command }) => handle_habitat_command(command)
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Attempts { command }) => handle_attempts_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         None => {
             print_json(&error_response("missing command", true));
@@ -990,6 +992,72 @@ fn handle_guard_command(
     }
 }
 
+/// Handle attempt graph commands (ADR-006, record-only first cut).
+fn handle_attempts_command(
+    command: AttemptsCommand,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    match command {
+        AttemptsCommand::Status {
+            queue_path,
+            theory,
+            db_path,
+        } => {
+            let queue = crabjar_terminal::TriageQueue::load(std::path::Path::new(&queue_path))
+                .unwrap_or_else(|_| crabjar_terminal::TriageQueue::new(10));
+
+            // Theory staleness: wire to the state-docs querier when the
+            // theory doc is indexed; otherwise report null with a blind
+            // spot (the theory doc is not yet created).
+            let mut theory_staleness = serde_json::Value::Null;
+            let mut theory_blind_spot =
+                Some("theory state-doc not yet created or indexed".to_string());
+            match rusqlite::Connection::open(&db_path) {
+                Ok(conn) => {
+                    if let Ok(()) = agent_context::state_docs::migrate(&conn) {
+                        let querier = agent_context::state_docs::StateDocQuerier::new(
+                            conn,
+                            std::path::PathBuf::from("state-docs"),
+                        );
+                        let status = querier.staleness_status(&theory);
+                        if status["last_modified"].as_str().map(|s| !s.is_empty()).unwrap_or(false)
+                        {
+                            theory_staleness = status;
+                            theory_blind_spot = None;
+                        }
+                    }
+                }
+                Err(_) => {
+                    // No db yet — the theory doc is simply not indexed.
+                }
+            }
+
+            let mut blind_spots = vec![
+                "queue read is a point-in-time snapshot; attempts pushed after the read are not reflected".to_string(),
+                "oldest age is wall-clock at invocation time".to_string(),
+            ];
+            if let Some(bs) = theory_blind_spot {
+                blind_spots.push(bs);
+            }
+
+            Ok(json!({
+                "success": true,
+                "message": "attempt graph maintenance debt dashboard",
+                "attempts": queue.status(),
+                "theory_staleness": theory_staleness,
+                "doubt": {
+                    "assumptions": [
+                        "the queue record is the faithful on-disk form of the unjudged attempts (JSONL, ADR-006 first cut)",
+                        "judged attempts leave the queue; the durable record is the git graph + the ADR-005 stream",
+                    ],
+                    "blind_spots": blind_spots,
+                    "last_validation": "queue record read from disk at invocation time",
+                    "stale_after": "the next push or judgment to the triage queue",
+                },
+            }))
+        }
+    }
+}
+
 fn error_response(message: &str, show_usage: bool) -> serde_json::Value {
     let mut response = json!({
         "success": false,
@@ -1035,6 +1103,7 @@ fn usage_lines() -> &'static [&'static str] {
         "crabjar doctor check",
         "crabjar backend set --backend=<lm-studio|native>",
         "crabjar backend get",
+        "crabjar attempts status",
     ]
 }
 
