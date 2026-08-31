@@ -74,3 +74,4 @@ Skip the formal process when:
 | 003 | Spatial Habitat Layer | Proposed | 2026-08-23 |
 | 004 | The Glass — Abstraction Boundary Orientation | Proposed | 2026-08-30 |
 | 005 | Typed Terminal Stream as Session Substrate | Proposed | 2026-08-30 |
+| 006 | Attempt Graph as Falsification Record | Accepted | 2026-08-30 |
