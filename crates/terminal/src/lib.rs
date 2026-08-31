@@ -69,8 +69,10 @@
 //! }
 //! ```
 
+pub mod attempts;
 pub mod backend;
 pub mod copy_paste;
+pub mod queue;
 pub(crate) mod herdr;
 mod herdr_exec;
 pub mod recording;
@@ -83,8 +85,10 @@ mod zellij;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+pub use attempts::*;
 pub use backend::*;
 pub use copy_paste::*;
+pub use queue::*;
 pub use herdr::HerdrBackend;
 pub use recording::*;
 pub use session_record::*;
