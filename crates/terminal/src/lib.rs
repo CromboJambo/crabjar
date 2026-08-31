@@ -72,6 +72,7 @@
 pub mod attempts;
 pub mod backend;
 pub mod copy_paste;
+pub mod git_repo;
 pub(crate) mod herdr;
 mod herdr_exec;
 pub mod queue;
@@ -88,6 +89,7 @@ use std::sync::Mutex;
 pub use attempts::*;
 pub use backend::*;
 pub use copy_paste::*;
+pub use git_repo::GitRepo;
 pub use herdr::HerdrBackend;
 pub use queue::*;
 pub use recording::*;

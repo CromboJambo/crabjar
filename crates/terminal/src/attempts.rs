@@ -35,6 +35,22 @@ use serde::{Deserialize, Serialize};
 
 use crate::stream::Receipt;
 
+/// The tier a rewind uses (ADR-006, two tiers).
+///
+/// The attempt's `invertible` flag decides the tier; this enum is that
+/// decision made explicit so the record carries it and the consumer can
+/// route.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RewindTier {
+    /// Fine tier: `git revert` of the attempt's delta. Surgical — the
+    /// record survives in history.
+    Fine,
+    /// Coarse tier: ephemeral VM destroy + restore. The home is the
+    /// habitat VM layer (ADR-002/003), not yet live; the decision is
+    /// recorded here, the execution is deferred to that layer.
+    Coarse,
+}
+
 /// The attempt: `Receipt` + `diff` + `preconditions` + `invertible` +
 /// `parent` (trunk commit) + `intent` + judgment state.
 ///
@@ -74,6 +90,18 @@ impl Attempt {
     /// Preconditions that are broken — the *why* of a failed attempt.
     pub fn broken_conditions(&self) -> Vec<&Condition> {
         self.preconditions.iter().filter(|c| c.broken).collect()
+    }
+
+    /// The tier this attempt's rewind uses. The `invertible` flag is the
+    /// decision: invertible deltas revert surgically (fine); non-invertible
+    /// work (`rm -rf`, `git push`, migrations) has no clean local inverse
+    /// and routes to the coarse tier (VM destroy + restore).
+    pub fn tier(&self) -> RewindTier {
+        if self.invertible {
+            RewindTier::Fine
+        } else {
+            RewindTier::Coarse
+        }
     }
 }
 
