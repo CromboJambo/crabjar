@@ -4,11 +4,21 @@
 below are implemented, tested, and committed as `850f23e` (model + queue)
 and `26993fd` (dashboard). The open design point (⚠️) was resolved as
 option (b): approach warnings ride on the attempt as annotations;
-`STREAM_VERSION` stays 2. The remaining work is the **second cut**
-(item 6) — fine-tier `git revert` + coarse-tier VM restore. Read
-`specs/ADR-006_attempt_graph_falsification_record.md` first — it is the
-spec; this file tells you what exists, what was rejected, and where to
-start.
+`STREAM_VERSION` stays 2.
+
+**SECOND CUT — fine tier DONE (2026-08-31).** Item 6's fine tier is
+implemented and committed: `2b94ea4` (git backend + tier decision),
+`8ab9e6e` (rewind orchestration + pre-flight), `8728b81` (CLI command).
+`crabjar attempts rewind <commit> [--workdir <dir>] [--trunk <sha>]
+[--dry-run]` is live and verified end-to-end against a real scratch repo
+(clean revert, trunk-moved refusal with overlap list, not-on-line
+refusal). The **coarse tier is still deferred**: its home is the habitat
+VM layer (ADR-002/003), not yet live; coarse-tier rewinds are refused
+with `coarse_tier_not_live` (decision recorded, execution deferred).
+
+Read `specs/ADR-006_attempt_graph_falsification_record.md` first — it is
+the spec; this file tells you what exists, what was rejected, and where
+to start.
 
 ## What exists today (verified, not from docs)
 
@@ -192,9 +202,14 @@ An `ApproachWarning { predicted_break: String, proximity: ... }` annotation
 on the attempt, surfaced in the structured report and the dashboard. No
 stream change in this cut.
 
-### 6. (Second cut — do NOT start) Fine-tier `git revert` + coarse-tier VM
-restore. The `invertible` flag and the tier decision are recorded now;
-executing the rewind is the next session.
+### 6. (Second cut) Fine-tier `git revert` + coarse-tier VM restore.
+**Fine tier: DONE** (commits `2b94ea4`, `8ab9e6e`, `8728b81`):
+`crates/terminal/src/git_repo.rs` (GitRepo: graph reads,
+`trunk_moved_in_regions`, `revert`), `crates/terminal/src/rewind.rs`
+(tier router: `preflight` / `rewind` / `rewind_commit` /
+`preflight_commit`, `RewindOutcome`, `RewindRefusal`), CLI `attempts
+rewind`. **Coarse tier: still deferred** — refused with
+`coarse_tier_not_live` until the habitat VM layer (ADR-002/003) is live.
 
 ## Key implementation decisions
 
@@ -215,7 +230,9 @@ executing the rewind is the next session.
 
 ## What not to do
 
-- **Don't implement auto-rewind.** Second cut. The first cut is record-only.
+- **Don't implement agent-auto-rewind.** Rewind is user-initiated, never
+  agent-auto (ADR-006). The CLI command is the user's act; the agent's
+  job is to record and report, not to revert.
 - **Don't bump `STREAM_VERSION`.** The stream vocabulary does not change
   this cut.
 - **Don't add a third state space.** No new database, no new file format
@@ -270,3 +287,10 @@ executing the rewind is the next session.
 - `axum-mux/src/review.rs` — the existing producer; the second cut will
   wire attempts into it, so keep the `Attempt` shape compatible with how
   `review.rs` appends receipts to the stream.
+- `crates/terminal/src/rewind.rs` — the tier router; `preflight` is the
+  pure pre-flight function, `rewind` the executor, `rewind_commit` the
+  CLI entry point. Refusal reasons are the wire vocabulary.
+- `crates/terminal/src/git_repo.rs` — the git shell-out; `run()` bails
+  with stderr context on non-zero exit (the herdr.rs pattern).
+- `src/cli_commands.rs` — the subcommand enums, split out of `src/lib.rs`
+  by the 500 LoC gate (re-exported, no API change).
