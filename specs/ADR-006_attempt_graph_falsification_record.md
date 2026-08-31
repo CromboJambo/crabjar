@@ -116,6 +116,8 @@ User (fully, strategic):
   - judge direction — deferred; may arrive under different constraints
   - navigate the graph; bring state back to fail points
   - promote (branch → trunk) — a trust decision on the guard substrate
+  - triage the bounded queue — enforced, not aspirational; see
+    "The Maintainer's Contract"
 
 Record (the medium between the layers):
   - outlasts both parties until understanding arrives
@@ -138,6 +140,39 @@ as the summary on top. Per the CLI output contract, every report carries a
 `doubt` block — including `blind_spots` for what the agent could not
 observe (processes, network, external state). The record tags what it
 couldn't resolve, so the future reader knows where to look.
+
+### The Maintainer's Contract (forced, not aspirational)
+
+The agent's mapping duty and the user's triage duty are coupled by a
+bounded queue: producer (agent, keeps mapping) / consumer (user, triage) /
+finite buffer. "Good maintainer" is not a personality trait; it is what
+the mechanics make you do.
+
+1. **Bounded triage queue.** Every attempt lands `unjudged`. The queue has
+   a budget (count and/or age). When full, the agent **stops mapping** —
+   new attempts are refused with a structured report: queue full, N
+   unjudged, oldest X days; triage to continue. If the maintainer is
+   absent, the system halts instead of accumulating garbage. A halted map
+   is itself the signal that maintenance is missing. (guard pending-queue
+   pattern)
+2. **Promote and discard both require an annotation.** One-line direction
+   judgment on promote; one-line reason on discard. Both carry a `doubt`
+   block — assumptions and blind spots *of the judgment*. The CLI rejects
+   a judgment without its doubt block. (CLI output contract, applied to
+   the user's side)
+3. **The theory is a state-doc.** The theory under test is a state-doc
+   with the existing staleness tiers (fresh <7d → moldy >30d). Stale or
+   expired → every agent report warns "failures may be against a theory
+   you've outgrown." Re-indexing (revising the theory) resets the clock.
+   (`StateDocQuerier::staleness_status()` — already built)
+4. **Maintenance debt is visible.** `crabjar attempts status`: unjudged
+   count, oldest age, broken conditions awaiting diagnosis, theory
+   staleness, queue budget usage. The maintainer dashboard. Structured
+   JSON with a `doubt` block, per the CLI output contract.
+
+"Good maintainer" reduces to four mechanical habits: triage before the
+agent halts, label every promote/discard, keep the theory doc fresh, watch
+the debt metric. None can be skipped without the system visibly stopping.
 
 ### Two tiers
 
@@ -198,6 +233,10 @@ couldn't resolve, so the future reader knows where to look.
   = the fail point the user brings state back to.
 - **No new state space.** The Attempt is a view over the git graph + the
   ADR-005 stream. Both already exist and are tested.
+- **Maintainer discipline is enforced by mechanics.** The bounded queue,
+  annotated judgments, state-doc theory, and debt dashboard make the
+  triage duties of a good maintainer visible, bounded, and impossible to
+  skip silently. The system halts rather than rots.
 
 ### Negative consequences (trade-offs)
 
