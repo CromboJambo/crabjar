@@ -357,6 +357,28 @@ pub enum HabitatCommand {
         #[arg(long, default_value = "habitat.db")]
         db_path: String,
     },
+    /// Emit the habitat run-state contract (dagr v3 run.json) — the
+    /// producer side of the habitat dashboard. Pure projection of the
+    /// triage queue, guard pending queue, and theory state-doc staleness;
+    /// the renderer (dagr pane, or a future skin) is a pure function of
+    /// the emitted file.
+    Contract {
+        /// Path to the triage queue record (JSONL)
+        #[arg(long, default_value = "attempts.jsonl")]
+        queue_path: String,
+        /// Guard database path (pending actions)
+        #[arg(long, default_value = "guard.db")]
+        guard_db: String,
+        /// Name of the theory state-doc (staleness-checked when indexed)
+        #[arg(long, default_value = "theory")]
+        theory: String,
+        /// SQLite database path for the theory state-doc
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+        /// Write the contract to this path (default: stdout only)
+        #[arg(long)]
+        out: Option<String>,
+    },
 }
 
 /// Attempt graph subcommands (ADR-006)

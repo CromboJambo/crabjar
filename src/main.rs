@@ -490,6 +490,53 @@ fn handle_habitat_command(
                 "payload": { "divergence": { "id": id, "status": "resolved" } },
             }))
         }
+        HabitatCommand::Contract {
+            queue_path,
+            guard_db,
+            theory,
+            db_path,
+            out,
+        } => {
+            let queue = crabjar_terminal::TriageQueue::load(std::path::Path::new(&queue_path))
+                .unwrap_or_else(|_| crabjar_terminal::TriageQueue::new(10));
+            let pending = crabjar_lib::habitat_contract::read_pending_actions(&guard_db);
+            let theory_status =
+                crabjar_lib::habitat_contract::read_theory_status(&db_path, &theory);
+            let contract = crabjar_lib::habitat_contract::build_contract(
+                &queue, &pending, &theory_status,
+            );
+
+            let mut message = format!(
+                "habitat contract: {} tasks ({} triage, {} guard, 1 theory)",
+                contract["tasks"].as_array().unwrap().len(),
+                queue.len(),
+                pending.len(),
+            );
+            if let Some(path) = &out {
+                std::fs::write(path, serde_json::to_string_pretty(&contract)?)?;
+                message.push_str(&format!(" → {path}"));
+            }
+
+            Ok(json!({
+                "success": true,
+                "message": message,
+                "payload": { "contract": contract },
+                "doubt": {
+                    "assumptions": [
+                        "a terminal receipt is the agent's own report, so settled attempts are evidence tier 'reported', not 'verified'",
+                        "judged attempts leave the queue; the durable record is the git graph + the ADR-005 stream",
+                        "pending actions are read from pending_queue only; executed/denied requests are not projected",
+                    ],
+                    "blind_spots": [
+                        "queue and guard reads are point-in-time snapshots; the contract is stale the moment state moves",
+                        "no VM/pane liveness yet — the coarse tier (ADR-002/003) is not live, so attempts carry no locator",
+                        "the theory doc is a single task; per-section drift is not projected",
+                    ],
+                    "last_validation": "sources read from disk at invocation time",
+                    "stale_after": "the next push, judgment, or guard action",
+                },
+            }))
+        }
     }
 }
 
@@ -1249,6 +1296,7 @@ fn usage_lines() -> &'static [&'static str] {
         "crabjar backend get",
         "crabjar attempts status",
         "crabjar attempts rewind <commit> [--workdir <dir>] [--trunk <sha>] [--dry-run]",
+        "crabjar habitat contract [--queue-path <p>] [--guard-db <p>] [--out <p>]",
     ]
 }
 
