@@ -45,3 +45,7 @@ src/dinit.rs
 .agents/GitCloneResearch/
 state-docs.db
 unsloth_compiled_cache/
+
+# habitat dashboard: generated contract + triage queue data
+.dagr/
+attempts.jsonl
