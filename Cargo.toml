@@ -23,8 +23,6 @@ members = [
     # Host apps
     "apps/teams",
     "apps/terrarium",
-    # Glider simulation (Conway's Game of Life)
-    "crates/glider",
     # Host binary
     "src/host-binary",
     # Skill crates
@@ -35,8 +33,6 @@ members = [
     "zed-acp-server",
     # Plugin system
     "crabjar-plugin",
-    # File search engine
-    "file_search",
 ]
 
 resolver = "2"
