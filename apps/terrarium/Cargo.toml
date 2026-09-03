@@ -1,0 +1,32 @@
+[package]
+name = "crabjar-app-terrarium"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Crabjar terrarium — a ratty/RGP habitat rendered on the terminal grid"
+
+[[bin]]
+name = "crabjar-terrarium"
+path = "src/main.rs"
+
+# Plugin binary for Hermes/Herdr integration (stdio JSON-RPC)
+[[bin]]
+name = "crabjar-terrarium-plugin"
+path = "src/plugin.rs"
+
+# Standalone demo binary (isometric rendering)
+[[bin]]
+name = "crabjar-terrarium-demo"
+path = "src/demo_isometric.rs"
+
+[dependencies]
+ratatui.workspace = true
+crossterm.workspace = true
+ratatui-ratty = "0.4.0"
+libc = "0.2"
+
+# Plugin deps
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+uuid = { version = "1.23", features = ["v4", "serde"] }

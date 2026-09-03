@@ -53,6 +53,7 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     // Layer 5: product — product-facing crates
     map.insert("crabjar-host", 5); // host-binary
     map.insert("crabjar-app-teams", 5); // apps/teams
+    map.insert("crabjar-app-terrarium", 5); // apps/terrarium
 
     // Layer 6: bridge — external protocol bridges
     map.insert("zed-acp-bridge", 6);

@@ -22,6 +22,9 @@ members = [
     "crates/terminal",
     # Host apps
     "apps/teams",
+    "apps/terrarium",
+    # Glider simulation (Conway's Game of Life)
+    "crates/glider",
     # Host binary
     "src/host-binary",
     # Skill crates

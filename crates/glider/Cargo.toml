@@ -1,0 +1,25 @@
+[package]
+name = "crabjar-glider"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "crabjar-glider"
+path = "src/main.rs"
+
+# Plugin binary for Hermes/Herdr integration (stdio JSON-RPC)
+[[bin]]
+name = "crabjar-glider-plugin"
+path = "src/plugin.rs"
+
+[dependencies]
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+rand = "0.9"
+clap = { workspace = true, features = ["derive"] }
+
+# Plugin deps
+tokio = { workspace = true, features = ["full"] }

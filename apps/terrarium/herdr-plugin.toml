@@ -1,0 +1,21 @@
+id = "terrarium.habitat"
+name = "Terrarium Habitat"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Text-mode terrarium simulation with crabs and gliders"
+platforms = ["linux", "macos"]
+
+[[build]]
+command = ["cargo", "build", "--release", "-p", "crabjar-app-terrarium"]
+platforms = ["linux", "macos"]
+
+[[panes]]
+id = "habitat"
+title = "Terrarium Habitat"
+placement = "split"
+command = ["./target/release/crabjar-terrarium-plugin"]
+
+[[actions]]
+id = "open_habitat"
+title = "Open Terrarium Habitat"
+contexts = ["workspace"]

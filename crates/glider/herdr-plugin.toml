@@ -1,0 +1,21 @@
+id = "glider.life"
+name = "Glider Life"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Conway's Game of Life visualization with glider patterns"
+platforms = ["linux", "macos"]
+
+[[build]]
+command = ["cargo", "build", "--release", "-p", "crabjar-glider"]
+platforms = ["linux", "macos"]
+
+[[panes]]
+id = "glider"
+title = "Glider Simulation"
+placement = "split"
+command = ["./target/release/crabjar-glider-plugin"]
+
+[[actions]]
+id = "open_glider"
+title = "Open Glider Simulation"
+contexts = ["workspace"]
