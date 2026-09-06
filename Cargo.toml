@@ -20,6 +20,8 @@ members = [
     "host/host-screen",
     # Terminal multiplexer integration
     "crates/terminal",
+    # Training dataset extraction (harvest stage of the MoC training harness)
+    "crates/train-extract",
     # Host apps
     "apps/teams",
     "apps/terrarium",
@@ -143,6 +145,9 @@ crabjar_lib = { path = ".", package = "crabjar" }
 
 # Tokenization
 tiktoken-rs = "0.11.0"
+
+# Model weights (dataset manifests; same crate pesti uses)
+safetensors = { version = "0.7.0", default-features = false, features = ["std"] }
 
 # Testing
 rstest = "0.26.1"

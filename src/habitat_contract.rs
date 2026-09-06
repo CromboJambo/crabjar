@@ -155,6 +155,14 @@ pub fn build_contract(
             outcome["receipt"] = json!(format!("exit {}", exit.unwrap_or(0)));
         }
 
+        // Exhaust metrics: token/cost signals for AI agent observability.
+        // Currently estimated from duration; real values come when the LLM
+        // runner reports them through the attempt record.
+        let elapsed_secs = a.receipt.duration.as_secs_f64();
+        let tokens_in = (elapsed_secs * 10.0) as u32; // rough estimate
+        let tokens_out = (elapsed_secs * 5.0) as u32;
+        let cost_cents = elapsed_secs * 0.001; // negligible local inference
+
         tasks.push(json!({
             "id": task_id,
             "title": short_title(&a.intent, &a.receipt.command),
@@ -173,6 +181,10 @@ pub fn build_contract(
                     "state": state,
                     "started_at": ts(&started),
                     "ended_at": ts(&ended),
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
+                    "model_id": null,
+                    "cost_cents": cost_cents,
                     "outcome": outcome,
                 }
             ],
