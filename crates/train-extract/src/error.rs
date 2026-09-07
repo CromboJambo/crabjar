@@ -3,7 +3,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum TrainExtractError {
     #[error("database error: {0}")]
-    Database(#[from] rusqlite::Error),
+    Database(String),
 
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
@@ -19,6 +19,12 @@ pub enum TrainExtractError {
 
     #[error("invalid path: {0}")]
     InvalidPath(String),
+}
+
+impl From<rusqlite::Error> for TrainExtractError {
+    fn from(e: rusqlite::Error) -> Self {
+        Self::Database(e.to_string())
+    }
 }
 
 pub type TrainExtractResult<T> = Result<T, TrainExtractError>;

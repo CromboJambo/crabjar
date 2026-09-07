@@ -147,6 +147,80 @@ pub fn export_dataset(
     export_jsonl(samples, &config)
 }
 
+/// Export the dataset as JSONL plus a safetensors metadata blob.
+///
+/// The JSONL + JSON manifest are always written first (via `export_jsonl`).
+/// Then a compact safetensors blob of per-sample numeric metadata (weights)
+/// is written alongside, so downstream tooling can load dataset statistics
+/// through the same crate pesti uses for model weights.
+pub fn export_safetensors_manifest(
+    samples: &[Sample],
+    config: &ExportConfig,
+) -> TrainExtractResult<DatasetManifest> {
+    let manifest = export_jsonl(samples, config)?;
+
+    fs::create_dir_all(&config.output_dir).map_err(|e| {
+        TrainExtractError::Export(format!("failed to create output dir: {e}"))
+    })?;
+
+    let weights: Vec<f32> = samples.iter().map(|s| s.weight as f32).collect();
+    let entry_count = samples.len() as f32;
+    let tensors: Vec<(&str, &[f32])> = vec![
+        ("sample_weights", &weights),
+        ("entry_count", std::slice::from_ref(&entry_count)),
+    ];
+    let blob = safetensors_blob(&tensors);
+    let path = format!("{}/{}.safetensors", config.output_dir, config.dataset_name);
+    fs::write(&path, &blob).map_err(|e| {
+        TrainExtractError::Export(format!("failed to write safetensors: {e}"))
+    })?;
+
+    // Round-trip check: the blob must be parseable by the same crate.
+    let (header_len, meta) = safetensors::SafeTensors::read_metadata(&blob)
+        .map_err(|e| TrainExtractError::Export(format!("safetensors round-trip failed: {e}")))?;
+    // File layout: 8-byte LE header length + header + data. The crate's own
+    // invariant (enforced by read_metadata) is N_LEN + n + data_len == len.
+    debug_assert_eq!(8 + header_len + meta.data_len(), blob.len());
+
+    tracing::debug!(path = %path, samples = samples.len(), "Wrote safetensors metadata blob");
+
+    Ok(manifest)
+}
+
+/// Serialize f32 tensors into a standalone safetensors file (16-byte LE
+/// header length + JSON header + concatenated data), matching the wire
+/// format of the `safetensors` crate.
+fn safetensors_blob(tensors: &[(&str, &[f32])]) -> Vec<u8> {
+    use std::fmt::Write as _;
+
+    let mut header = String::from("{");
+    let mut offset: u64 = 0;
+    for (name, data) in tensors {
+        if !header.ends_with('{') {
+            header.push(',');
+        }
+        let _ = write!(
+            header,
+            "\"{name}\":{{\"dtype\":\"F32\",\"shape\":[{}],\"data_offsets\":[{},{}]}}",
+            data.len(),
+            offset,
+            offset + (data.len() * 4) as u64
+        );
+        offset += (data.len() * 4) as u64;
+    }
+    header.push('}');
+
+    let mut out = Vec::with_capacity(8 + header.len() + offset as usize);
+    out.extend_from_slice(&(header.len() as u64).to_le_bytes());
+    out.extend_from_slice(header.as_bytes());
+    for (_, data) in tensors {
+        for value in *data {
+            out.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +228,7 @@ mod tests {
     use tempfile::tempdir;
 
     fn make_test_samples() -> Vec<Sample> {
+        let ts = chrono::Utc::now().timestamp();
         vec![
             Sample {
                 instruction: "What is the rule?".to_string(),
@@ -165,6 +240,7 @@ mod tests {
                 weight: 0.9,
                 tags: vec!["rust".to_string(), "error-handling".to_string()],
                 provenance_id: "knowledge:1".to_string(),
+                created_at: ts,
             },
             Sample {
                 instruction: "What is the pattern?".to_string(),
@@ -176,6 +252,7 @@ mod tests {
                 weight: 0.7,
                 tags: vec!["rust".to_string(), "naming".to_string()],
                 provenance_id: "knowledge:2".to_string(),
+                created_at: ts,
             },
         ]
     }
@@ -214,6 +291,7 @@ mod tests {
             dataset_name: "test".to_string(),
         };
         let manifest = export_jsonl(&samples, &config).unwrap();
+        assert_eq!(manifest.entry_count, 2);
 
         let manifest_path = dir.path().join("test.manifest.json");
         assert!(manifest_path.exists());
@@ -257,5 +335,46 @@ mod tests {
 
         let jsonl_path = dir.path().join("personal-knowledge.jsonl");
         assert!(jsonl_path.exists());
+    }
+
+    #[test]
+    fn export_safetensors_manifest_writes_parseable_blob() {
+        let dir = tempdir().unwrap();
+        let samples = make_test_samples();
+        let config = ExportConfig {
+            format: ExportFormat::Jsonl,
+            output_dir: dir.path().to_string_lossy().to_string(),
+            dataset_name: "st-test".to_string(),
+        };
+
+        let manifest = export_safetensors_manifest(&samples, &config).unwrap();
+        assert_eq!(manifest.entry_count, 2);
+
+        // JSONL + manifest still written
+        assert!(dir.path().join("st-test.jsonl").exists());
+        assert!(dir.path().join("st-test.manifest.json").exists());
+
+        // Safetensors blob exists and round-trips through the crate's parser.
+        let path = dir.path().join("st-test.safetensors");
+        assert!(path.exists());
+        let blob = fs::read(&path).unwrap();
+        let (header_len, _meta) = safetensors::SafeTensors::read_metadata(&blob).unwrap();
+        // File layout: 8-byte LE length prefix + header + data.
+        // Data = 2 sample weights * 4 bytes + 1 entry count * 4 bytes = 12.
+        assert_eq!(8 + header_len + 12, blob.len());
+
+        // Verify the weight values survive the round trip.
+        let (offsets_start, offsets_end) = _meta
+            .info("sample_weights")
+            .expect("sample_weights tensor present")
+            .data_offsets;
+        // Data offsets are relative to the start of the tensor section, which
+        // begins after the 8-byte length prefix and the JSON header.
+        let base = 8 + header_len;
+        let weights: Vec<f32> = blob[base + offsets_start..base + offsets_end]
+            .chunks_exact(4)
+            .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+            .collect();
+        assert_eq!(weights, vec![0.9f32, 0.7]);
     }
 }

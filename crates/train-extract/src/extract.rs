@@ -16,6 +16,9 @@ pub struct KnowledgeEntry {
     pub source_type: String,
     pub source_id: String,
     pub provenance_id: String,
+    pub active: bool,
+    /// Unix timestamp (seconds) of when the entry was created.
+    pub created_at: i64,
 }
 
 /// Extracted event from mirror-log.
@@ -26,6 +29,30 @@ pub struct LogEvent {
     pub source: String,
     pub meta: Option<String>,
     pub timestamp: i64,
+}
+
+/// A chunk of a state-doc section (reserved for the chunking pipeline;
+/// not populated by `extract()` yet).
+#[derive(Debug, Clone)]
+pub struct Chunk {
+    pub id: String,
+    pub event_id: String,
+    pub content: String,
+    pub chunk_index: usize,
+}
+
+/// A resolved state-doc annotation (from the agent-context state-docs store).
+#[derive(Debug, Clone)]
+pub struct Annotation {
+    pub id: String,
+    pub doc_name: String,
+    pub kind: String,
+    pub message: String,
+    pub status: String,
+    /// Reason recorded when the annotation was resolved.
+    pub resolution_reason: Option<String>,
+    pub confidence: f64,
+    pub created_at: i64,
 }
 
 /// Configuration for data extraction.
@@ -53,11 +80,30 @@ impl Default for ExtractConfig {
 }
 
 /// Parse a knowledge kind from the `kind` column.
-/// Accepts both plain strings (`pattern`) and JSON-quoted values (`"pattern"`).
+///
+/// Accepts plain strings (`pattern`) as well as JSON-quoted values
+/// (`"pattern"`), and falls back to [`KnowledgeKind::Context`] for anything
+/// unrecognized so one bad row can't fail the whole extraction.
 fn parse_kind(raw: &str) -> KnowledgeKind {
-    serde_json::from_str::<KnowledgeKind>(raw.trim())
-        .or_else(|_| serde_json::from_str::<&str>(raw.trim()).map(|s| s.to_string()).and_then(|s| serde_json::from_str(&format!("\"{s}\""))))
-        .unwrap_or(KnowledgeKind::Context)
+    let trimmed = raw.trim();
+    // Plain variant name (the canonical on-disk form, per memory/src/schema.rs).
+    if let Ok(kind) = serde_json::from_str(&format!("\"{trimmed}\"")) {
+        return kind;
+    }
+    // Already JSON-quoted.
+    if let Ok(kind) = serde_json::from_str::<KnowledgeKind>(trimmed) {
+        return kind;
+    }
+    KnowledgeKind::Context
+}
+
+/// List a table's column names (via PRAGMA table_info).
+fn table_columns(conn: &Connection, table: &str) -> TrainExtractResult<Vec<String>> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let cols: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(cols)
 }
 
 /// Extract data from the knowledge store and mirror-log databases.
@@ -83,17 +129,54 @@ pub fn extract(
 }
 
 /// Extract knowledge entries from the knowledge store.
+///
+/// The canonical agent-context schema (memory/src/schema.rs) has a fixed set
+/// of columns; newer stores may add `created_at`. We probe the actual table
+/// with PRAGMA and build the SELECT to match, so both shapes work.
 fn extract_knowledge_entries(
     conn: &Connection,
     config: &ExtractConfig,
 ) -> TrainExtractResult<Vec<KnowledgeEntry>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, content, kind, tags, metadata, weight, source, source_type, source_id, provenance_id
+    let columns = table_columns(conn, "knowledge_entries")?;
+
+    // Base columns that must exist (per memory/src/schema.rs).
+    const BASE: [&str; 8] = [
+        "id", "content", "kind", "tags", "metadata", "weight", "source", "active",
+    ];
+    for col in BASE {
+        if !columns.contains(&col.to_string()) {
+            return Err(TrainExtractError::Database(format!(
+                "knowledge_entries is missing required column '{col}'"
+            )));
+        }
+    }
+
+    // Optional columns: fall back to defaults when absent.
+    let optional = |col: &str, default: &str| -> String {
+        if columns.iter().any(|c| c == col) {
+            col.to_string()
+        } else {
+            format!("'{default}' AS {col}")
+        }
+    };
+
+    let sql = format!(
+        "SELECT id, content, kind, tags, metadata, weight, source, {}, {}, {}, active, {}
          FROM knowledge_entries
          WHERE active = 1
          ORDER BY id DESC
          LIMIT ?1",
-    )?;
+        optional("source_type", ""),
+        optional("source_id", ""),
+        optional("provenance_id", ""),
+        if columns.iter().any(|c| c == "created_at") {
+            "COALESCE(created_at, 0)".to_string()
+        } else {
+            "0 AS created_at".to_string()
+        },
+    );
+
+    let mut stmt = conn.prepare(&sql)?;
 
     let rows = stmt.query_map([config.max_entries as i64], |row| {
         let tags_str: String = row.get(3)?;
@@ -111,6 +194,8 @@ fn extract_knowledge_entries(
             source_type: row.get(7)?,
             source_id: row.get(8)?,
             provenance_id: row.get(9)?,
+            active: row.get(10)?,
+            created_at: row.get(11)?,
         })
     })?;
 
@@ -176,6 +261,11 @@ fn extract_events(
 pub struct ExtractedData {
     pub knowledge_entries: Vec<KnowledgeEntry>,
     pub events: Vec<LogEvent>,
+    /// State-doc chunks (reserved; not populated by `extract()` yet).
+    pub chunks: Vec<Chunk>,
+    /// Resolved state-doc annotations (reserved; not populated by `extract()` yet).
+    pub annotations: Vec<Annotation>,
+    /// Number of source samples (entries + events) extracted.
     pub sample_count: usize,
 }
 
@@ -190,7 +280,9 @@ impl ExtractedData {
         serde_json::json!({
             "knowledge_entries": self.knowledge_entries.len(),
             "events": self.events.len(),
-            "total_samples": self.knowledge_entries.len() + self.events.len(),
+            "chunks": self.chunks.len(),
+            "annotations": self.annotations.len(),
+            "total_samples": self.sample_count,
         })
     }
 

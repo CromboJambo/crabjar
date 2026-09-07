@@ -148,6 +148,7 @@ tiktoken-rs = "0.11.0"
 
 # Model weights (dataset manifests; same crate pesti uses)
 safetensors = { version = "0.7.0", default-features = false, features = ["std"] }
+agent-context = { path = "memory" }
 
 # Testing
 rstest = "0.26.1"

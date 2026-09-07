@@ -10,6 +10,9 @@ pub struct Sample {
     pub weight: f64,
     pub tags: Vec<String>,
     pub provenance_id: String,
+    /// Unix timestamp (seconds) of the source data; 0 = unknown.
+    #[serde(default)]
+    pub created_at: i64,
 }
 
 /// Where a sample came from.
@@ -118,6 +121,7 @@ fn format_knowledge_entry(entry: &KnowledgeEntry) -> Vec<Sample> {
         weight: entry.weight,
         tags: entry.tags.clone(),
         provenance_id: provenance,
+        created_at: entry.created_at,
     });
 
     samples
@@ -150,6 +154,7 @@ fn format_log_event(event: &LogEvent) -> Vec<Sample> {
         weight: 0.5,
         tags: vec![event.source.clone()],
         provenance_id: format!("event:{}", event.id),
+        created_at: event.timestamp,
     }]
 }
 
@@ -179,6 +184,7 @@ fn format_chunk(chunk: &Chunk) -> Vec<Sample> {
         weight: 0.3,
         tags: vec!["chunk".to_string()],
         provenance_id: format!("chunk:{}", chunk.id),
+        created_at: 0,
     }]
 }
 
@@ -213,25 +219,35 @@ fn format_annotation(annotation: &Annotation) -> Vec<Sample> {
         weight: annotation.confidence,
         tags: vec!["annotation".to_string(), annotation.doc_name.clone()],
         provenance_id: format!("annotation:{}:{}", annotation.doc_name, annotation.id),
+        created_at: annotation.created_at,
     });
 
     samples
 }
 
-/// Apply weighting to samples based on confidence decay and tag frequency.
+/// Apply weighting to samples based on per-sample confidence decay and tag frequency.
+///
+/// Each sample is decayed by its own age (from `created_at`):
+/// `weight * 2^(-age/half_life)`, floored at 0.01 and capped at 1.0 after
+/// tag boosts are applied. Samples with unknown timestamps (`created_at == 0`)
+/// are not decayed.
 pub fn apply_weighting(
     samples: Vec<Sample>,
-    recency_seconds: f64,
     decay_half_life: f64,
     tag_boost: &std::collections::HashMap<String, f64>,
 ) -> Vec<Sample> {
-    let decay = 2.0f64.powf(-(recency_seconds / decay_half_life));
+    let now = chrono::Utc::now().timestamp() as f64;
 
     samples
         .into_iter()
         .map(|mut sample| {
-            // Apply time decay
-            let decayed = sample.weight * decay;
+            // Apply time decay based on the sample's own age.
+            let decayed = if sample.created_at > 0 && decay_half_life > 0.0 {
+                let age = (now - sample.created_at as f64).max(0.0);
+                sample.weight * 2.0f64.powf(-age / decay_half_life)
+            } else {
+                sample.weight
+            };
 
             // Apply tag boost
             let mut tag_multiplier = 1.0;
@@ -254,6 +270,7 @@ mod tests {
     use agent_context::KnowledgeKind;
 
     fn make_sample_data() -> ExtractedData {
+        let ts = chrono::Utc::now().timestamp();
         ExtractedData {
             knowledge_entries: vec![
                 KnowledgeEntry {
@@ -263,11 +280,12 @@ mod tests {
                     tags: vec!["rust".to_string(), "error-handling".to_string()],
                     metadata: serde_json::json!({}),
                     weight: 0.9,
+                    source: "user".to_string(),
                     source_type: "user".to_string(),
                     source_id: "test-1".to_string(),
                     provenance_id: "prov-1".to_string(),
                     active: true,
-                    created_at: 1000000,
+                    created_at: ts,
                 },
                 KnowledgeEntry {
                     id: 2,
@@ -276,11 +294,12 @@ mod tests {
                     tags: vec!["rust".to_string(), "naming".to_string()],
                     metadata: serde_json::json!({}),
                     weight: 0.7,
-                    source_type: "agent".to_string(),
+                    source: "user".to_string(),
+                    source_type: "user".to_string(),
                     source_id: "test-2".to_string(),
                     provenance_id: "prov-2".to_string(),
                     active: true,
-                    created_at: 1000000,
+                    created_at: ts,
                 },
             ],
             events: vec![
@@ -332,6 +351,7 @@ mod tests {
             tags: vec!["test".to_string()],
             metadata: serde_json::json!({}),
             weight: 1.0,
+            source: "user".to_string(),
             source_type: "user".to_string(),
             source_id: "test".to_string(),
             provenance_id: "prov-1".to_string(),
@@ -403,6 +423,7 @@ mod tests {
 
     #[test]
     fn apply_weighting_reduces_weight_with_decay() {
+        let day_ago = chrono::Utc::now().timestamp() - 86400;
         let samples = vec![
             Sample {
                 instruction: "test".to_string(),
@@ -414,10 +435,11 @@ mod tests {
                 weight: 1.0,
                 tags: vec!["test".to_string()],
                 provenance_id: "test".to_string(),
+                created_at: day_ago,
             },
         ];
 
-        let decayed = apply_weighting(samples, 86400.0, 86400.0, &std::collections::HashMap::new());
+        let decayed = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
         assert!(decayed[0].weight < 1.0);
         assert!(decayed[0].weight > 0.0);
     }
@@ -435,10 +457,32 @@ mod tests {
                 weight: 0.5,
                 tags: vec!["test".to_string()],
                 provenance_id: "test".to_string(),
+                created_at: chrono::Utc::now().timestamp(),
             },
         ];
 
-        let result = apply_weighting(samples, 0.0, 86400.0, &std::collections::HashMap::new());
+        let result = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
+        assert!((result[0].weight - 0.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn apply_weighting_unknown_timestamp_not_decayed() {
+        let samples = vec![
+            Sample {
+                instruction: "test".to_string(),
+                response: "test".to_string(),
+                source: SampleSource::KnowledgeEntry {
+                    entry_id: 1,
+                    kind: "Pattern".to_string(),
+                },
+                weight: 0.5,
+                tags: vec!["test".to_string()],
+                provenance_id: "test".to_string(),
+                created_at: 0,
+            },
+        ];
+
+        let result = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
         assert_eq!(result[0].weight, 0.5);
     }
 
@@ -458,10 +502,11 @@ mod tests {
                 weight: 0.5,
                 tags: vec!["boosted".to_string()],
                 provenance_id: "test".to_string(),
+                created_at: chrono::Utc::now().timestamp(),
             },
         ];
 
-        let result = apply_weighting(samples, 0.0, 86400.0, &boost);
+        let result = apply_weighting(samples, 86400.0, &boost);
         assert_eq!(result[0].weight, 1.0); // 0.5 * 2.0 = 1.0, capped at 1.0
     }
 

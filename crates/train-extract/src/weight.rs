@@ -5,8 +5,6 @@ use std::collections::HashMap;
 /// Configuration for the weighting phase.
 #[derive(Debug, Clone)]
 pub struct WeightConfig {
-    /// Recency in seconds since the oldest entry.
-    pub recency_seconds: f64,
     /// Half-life in seconds for confidence decay.
     pub decay_half_life: f64,
     /// Tag-based boost multipliers.
@@ -16,20 +14,13 @@ pub struct WeightConfig {
 impl Default for WeightConfig {
     fn default() -> Self {
         Self {
-            recency_seconds: 86400.0 * 30.0, // 30 days
-            decay_half_life: 86400.0 * 7.0,  // 7 day half-life
+            decay_half_life: 86400.0 * 7.0, // 7 day half-life
             tag_boost: HashMap::new(),
         }
     }
 }
 
 impl WeightConfig {
-    /// Set the recency window in days.
-    pub fn recency_days(mut self, days: f64) -> Self {
-        self.recency_seconds = days * 86400.0;
-        self
-    }
-
     /// Set the decay half-life in days.
     pub fn half_life_days(mut self, days: f64) -> Self {
         self.decay_half_life = days * 86400.0;
@@ -46,7 +37,7 @@ impl WeightConfig {
 /// Weight samples from extracted data.
 pub fn weight_samples(data: &ExtractedData, config: &WeightConfig) -> Vec<Sample> {
     let raw_samples = format_samples(data);
-    apply_weighting(raw_samples, config.recency_seconds, config.decay_half_life, &config.tag_boost)
+    apply_weighting(raw_samples, config.decay_half_life, &config.tag_boost)
 }
 
 /// Compute tag frequency from extracted data for automatic boosting.
@@ -96,6 +87,7 @@ mod tests {
     use agent_context::KnowledgeKind;
 
     fn make_data_with_tags() -> ExtractedData {
+        let ts = chrono::Utc::now().timestamp();
         ExtractedData {
             knowledge_entries: vec![
                 KnowledgeEntry {
@@ -105,11 +97,12 @@ mod tests {
                     tags: vec!["rust".to_string(), "pattern".to_string()],
                     metadata: serde_json::json!({}),
                     weight: 1.0,
+                    source: "user".to_string(),
                     source_type: "user".to_string(),
                     source_id: "t1".to_string(),
                     provenance_id: "p1".to_string(),
                     active: true,
-                    created_at: 1000000,
+                    created_at: ts,
                 },
                 KnowledgeEntry {
                     id: 2,
@@ -118,11 +111,12 @@ mod tests {
                     tags: vec!["rust".to_string(), "naming".to_string()],
                     metadata: serde_json::json!({}),
                     weight: 1.0,
+                    source: "agent".to_string(),
                     source_type: "agent".to_string(),
                     source_id: "t2".to_string(),
                     provenance_id: "p2".to_string(),
                     active: true,
-                    created_at: 1000000,
+                    created_at: ts,
                 },
                 KnowledgeEntry {
                     id: 3,
@@ -131,16 +125,17 @@ mod tests {
                     tags: vec!["python".to_string()],
                     metadata: serde_json::json!({}),
                     weight: 1.0,
+                    source: "user".to_string(),
                     source_type: "user".to_string(),
                     source_id: "t3".to_string(),
                     provenance_id: "p3".to_string(),
                     active: true,
-                    created_at: 1000000,
+                    created_at: ts,
                 },
             ],
             events: vec![],
-            annotations: vec![],
             chunks: vec![],
+            annotations: vec![],
             sample_count: 3,
         }
     }
@@ -172,12 +167,10 @@ mod tests {
     #[test]
     fn weight_config_builder() {
         let config = WeightConfig::default()
-            .recency_days(14.0)
             .half_life_days(3.0)
             .tag_boost("rust", 1.5);
 
-        assert_eq!(config.recency_seconds, 14.0 * 86400.0);
         assert_eq!(config.decay_half_life, 3.0 * 86400.0);
-        assert_eq!(*config.tag_boost.get("rust").unwrap(), 1.5);
+        assert!(*config.tag_boost.get("rust").unwrap() == 1.5);
     }
 }

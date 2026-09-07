@@ -19,7 +19,6 @@ pub fn run_pipeline(
     mirror_log_conn: Option<&rusqlite::Connection>,
     weight_config: WeightConfig,
     export_config: ExportConfig,
-    store: Option<&crabjar_safetensors::SafetensorsStore>,
 ) -> TrainExtractResult<(Vec<Sample>, DatasetManifest)> {
     // Phase 1: Extract
     let config = ExtractConfig {
@@ -43,7 +42,7 @@ pub fn run_pipeline(
     }
 
     // Phase 4: Export
-    let manifest = export(&samples, &export_config, store)?;
+    let manifest = export(&samples, &export_config)?;
 
     Ok((samples, manifest))
 }
@@ -79,6 +78,8 @@ mod tests {
 
     fn make_test_db(dir: &tempfile::TempDir) -> (rusqlite::Connection, rusqlite::Connection) {
         let kconn = Connection::open(dir.path().join("knowledge.db")).unwrap();
+        // Mirrors the canonical agent-context schema (memory/src/schema.rs),
+        // plus a created_at column that newer stores may add.
         kconn.execute_batch(
             "CREATE TABLE knowledge_entries (
                 id INTEGER PRIMARY KEY,
@@ -87,7 +88,8 @@ mod tests {
                 tags TEXT NOT NULL DEFAULT '[]',
                 metadata TEXT NOT NULL DEFAULT '{}',
                 weight REAL NOT NULL DEFAULT 1.0,
-                active INTEGER NOT NULL DEFAULT 1,
+                source TEXT NOT NULL DEFAULT 'user',
+                active BOOLEAN NOT NULL DEFAULT 1,
                 source_type TEXT NOT NULL DEFAULT '',
                 source_id TEXT NOT NULL DEFAULT '',
                 provenance_id TEXT NOT NULL DEFAULT '',
@@ -99,11 +101,10 @@ mod tests {
         mconn.execute_batch(
             "CREATE TABLE events (
                 id TEXT PRIMARY KEY,
-                content TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
                 source TEXT NOT NULL,
-                meta TEXT,
-                created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-                active INTEGER NOT NULL DEFAULT 1
+                content TEXT NOT NULL,
+                meta TEXT
             )",
         ).unwrap();
 
@@ -156,8 +157,8 @@ mod tests {
         ).unwrap();
 
         mconn.execute(
-            "INSERT INTO events (id, content, source, meta, created_at, active)
-             VALUES ('evt-1', 'Updated Cargo.toml', 'file', null, 1000000, 1)",
+            "INSERT INTO events (id, timestamp, source, content)
+             VALUES ('evt-1', 1000000, 'file', 'Updated Cargo.toml')",
             [],
         ).unwrap();
 
@@ -174,7 +175,6 @@ mod tests {
             Some(&mconn),
             weight_config,
             export_config.clone(),
-            None,
         )
         .unwrap();
 
