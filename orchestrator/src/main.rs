@@ -260,10 +260,15 @@ async fn handle_chat(
     let mut backend = state.backend.lock().await;
     info!("Chat request received (backend: {})", (*backend).kind());
 
-    let response = backend.chat(user_input).await.map_err(|e| {
+    let (response, metrics) = backend.chat(user_input).await.map_err(|e| {
         error!("Inference backend error: {}", e);
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    info!(
+        "Inference complete: model={}, tokens_in={}, tokens_out={}, latency={}ms",
+        metrics.model_id, metrics.tokens_in, metrics.tokens_out, metrics.latency_ms
+    );
 
     // Check for tool calls first.
     let tool_calls = backend.extract_tool_calls(&response);

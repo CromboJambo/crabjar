@@ -155,13 +155,24 @@ pub fn build_contract(
             outcome["receipt"] = json!(format!("exit {}", exit.unwrap_or(0)));
         }
 
-        // Exhaust metrics: token/cost signals for AI agent observability.
-        // Currently estimated from duration; real values come when the LLM
-        // runner reports them through the attempt record.
-        let elapsed_secs = a.receipt.duration.as_secs_f64();
-        let tokens_in = (elapsed_secs * 10.0) as u32; // rough estimate
-        let tokens_out = (elapsed_secs * 5.0) as u32;
-        let cost_cents = elapsed_secs * 0.001; // negligible local inference
+        // Exhaust metrics: real values from the LLM runner (Phase 6).
+        // Falls back to duration-based estimates only if not yet reported.
+        let im = &a.inference_metrics;
+        let tokens_in = im.tokens_in.unwrap_or_else(|| {
+            let elapsed_secs = a.receipt.duration.as_secs_f64();
+            (elapsed_secs * 10.0) as u32 // rough estimate fallback
+        });
+        let tokens_out = im.tokens_out.unwrap_or_else(|| {
+            let elapsed_secs = a.receipt.duration.as_secs_f64();
+            (elapsed_secs * 5.0) as u32
+        });
+        let model_id = im.model_id.clone();
+        let cost_cents = if let Some(latency) = im.latency_ms {
+            // Real latency captured; local inference is "free"
+            0.0
+        } else {
+            a.receipt.duration.as_secs_f64() * 0.001
+        };
 
         tasks.push(json!({
             "id": task_id,
@@ -400,6 +411,7 @@ mod tests {
             recorded_at: Utc::now(),
             approach_warning: None,
             status: AttemptStatus::Unjudged,
+            inference_metrics: crabjar_terminal::InferenceMetrics::default(),
         }
     }
 

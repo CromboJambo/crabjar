@@ -6,6 +6,9 @@ pub use lm_studio_client::UnifiedChatResponse;
 
 use crate::lm_studio_client;
 
+pub mod metrics;
+pub use self::metrics::InferenceMetrics;
+
 // ---------------------------------------------------------------------------
 // Trait + enum
 // ---------------------------------------------------------------------------
@@ -13,8 +16,11 @@ use crate::lm_studio_client;
 /// Inference backend trait — the unified interface for all LLM backends.
 #[async_trait::async_trait]
 pub trait InferenceBackend: Send + Sync {
-    /// Send a chat request and return the response.
-    async fn chat(&mut self, user_input: String) -> Result<UnifiedChatResponse, InferenceError>;
+    /// Send a chat request and return the response with inference metrics.
+    async fn chat(
+        &mut self,
+        user_input: String,
+    ) -> Result<(UnifiedChatResponse, InferenceMetrics), InferenceError>;
 
     /// Extract text content from a response.
     fn extract_text(&self, response: &UnifiedChatResponse) -> String;
@@ -82,10 +88,30 @@ pub enum InferenceError {
 
 #[async_trait::async_trait]
 impl InferenceBackend for lm_studio_client::LmStudioClient {
-    async fn chat(&mut self, user_input: String) -> Result<UnifiedChatResponse, InferenceError> {
-        self.chat(user_input)
-            .await
-            .map_err(|e| InferenceError::RequestError(e.to_string()))
+    async fn chat(
+        &mut self,
+        user_input: String,
+    ) -> Result<(UnifiedChatResponse, InferenceMetrics), InferenceError> {
+        let start = std::time::Instant::now();
+        let response = self.chat(user_input).await.map_err(|e| {
+            InferenceError::RequestError(e.to_string())
+        })?;
+        let latency_ms = start.elapsed().as_millis() as u64;
+
+        // Estimate tokens from response text (LM Studio API doesn't always
+        // return token counts in the OpenAI-compatible endpoint).
+        let content = self.extract_text(&response);
+        let tokens_in = 0; // Not tracked by LM Studio client currently
+        let tokens_out = estimate_tokens(&content);
+
+        let metrics = InferenceMetrics::new(
+            tokens_in,
+            tokens_out,
+            "lm-studio".to_string(),
+            latency_ms,
+        );
+
+        Ok((response, metrics))
     }
 
     fn extract_text(&self, response: &UnifiedChatResponse) -> String {
@@ -117,4 +143,12 @@ impl InferenceBackend for lm_studio_client::LmStudioClient {
     fn kind(&self) -> BackendKind {
         BackendKind::LmStudio
     }
+}
+
+/// Rough token estimate: ~4 chars per token for English.
+fn estimate_tokens(text: &str) -> u32 {
+    if text.is_empty() {
+        return 0;
+    }
+    ((text.len() as f64) / 4.0).ceil() as u32
 }

@@ -25,6 +25,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::attempts::{Attempt, AttemptStatus, Judgment};
+use crate::InferenceMetrics;
 
 /// On-disk format version for the queue record.
 pub const QUEUE_VERSION: u32 = 1;
@@ -318,6 +319,7 @@ mod tests {
             recorded_at: Utc::now(),
             approach_warning: None,
             status: AttemptStatus::Unjudged,
+            inference_metrics: InferenceMetrics::default(),
         }
     }
 
