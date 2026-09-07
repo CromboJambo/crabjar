@@ -15,20 +15,20 @@ use std::time::SystemTime;
 pub struct GameEvent {
     /// Unique event ID (UUID v4)
     pub id: String,
-    
+
     /// Event type (world update, entity move, build action, etc.)
     #[serde(rename = "type")]
     pub event_type: EventType,
-    
+
     /// Timestamp when event occurred
     pub timestamp: u64,
-    
+
     /// Game tick when event occurred
     pub tick: u64,
-    
+
     /// Source of the event (agent, simulation, user)
     pub source: EventSource,
-    
+
     /// Event payload (varies by type)
     pub payload: EventPayload,
 }
@@ -44,7 +44,7 @@ pub enum EventType {
         new_tile_type: TileType,
         old_tile_type: Option<TileType>,
     },
-    
+
     /// Entity movement or position change
     EntityMove {
         entity_id: String,
@@ -54,7 +54,7 @@ pub enum EventType {
         to_y: f32,
         direction: Option<Direction>,
     },
-    
+
     /// Entity interaction with world or other entities
     EntityInteract {
         entity_id: String,
@@ -62,7 +62,7 @@ pub enum EventType {
         action: String,
         result: InteractionResult,
     },
-    
+
     /// Build/construction action
     BuildAction {
         entity_id: String,
@@ -71,7 +71,7 @@ pub enum EventType {
         structure_type: StructureType,
         height: i32,
     },
-    
+
     /// Agent command that triggered game action
     AgentCommand {
         agent_id: String,
@@ -87,10 +87,10 @@ pub enum EventType {
 pub enum EventSource {
     /// Agent-driven action (from agent work)
     Agent,
-    
+
     /// Simulation tick (autonomous game logic)
     Simulation,
-    
+
     /// User input (if keyboard controls enabled)
     User,
 }
@@ -151,7 +151,7 @@ pub enum StructureType {
 pub trait DagrGameProducer {
     /// Generate a single event from current game state.
     fn produce_event(&self) -> GameEvent;
-    
+
     /// Generate multiple events (batch mode).
     fn produce_batch(&self, count: usize) -> Vec<GameEvent> {
         (0..count).map(|_| self.produce_event()).collect()
@@ -316,11 +316,7 @@ impl EventType {
 }
 
 /// Build a full event from type + provenance. Payload is derived from the type.
-pub fn build_event(
-    event_type: EventType,
-    source: EventSource,
-    tick: u64,
-) -> GameEvent {
+pub fn build_event(event_type: EventType, source: EventSource, tick: u64) -> GameEvent {
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap_or_default()
@@ -385,7 +381,7 @@ pub enum GameAction {
         direction: Direction,
         ticks: u64,
     },
-    
+
     /// Build a structure at coordinates
     Build {
         entity_id: String,
@@ -394,7 +390,7 @@ pub enum GameAction {
         structure_type: StructureType,
         height: i32,
     },
-    
+
     /// Interact with a target
     Interact {
         entity_id: String,
@@ -413,7 +409,7 @@ pub fn parse_agent_command(json: &str) -> Result<AgentCommand, serde_json::Error
 // ============================================================================
 
 /// Query recent game events from state-docs index.
-/// 
+///
 /// This would integrate with crabjar's memory/state-docs system to persist
 /// and query game history.
 pub struct GameEventQuerier {
@@ -426,7 +422,7 @@ impl GameEventQuerier {
         // Implementation would query state-docs index
         vec![]
     }
-    
+
     /// Query events by entity ID.
     pub fn query_by_entity(&self, _entity_id: &str) -> Vec<GameEvent> {
         // Implementation would query state-docs index

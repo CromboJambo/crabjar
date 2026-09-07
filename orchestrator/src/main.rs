@@ -260,7 +260,7 @@ async fn handle_chat(
     let mut backend = state.backend.lock().await;
     info!("Chat request received (backend: {})", (*backend).kind());
 
-    let (response, metrics) = backend.chat(user_input).await.map_err(|e| {
+    let (response, metrics) = backend.generate(user_input).await.map_err(|e| {
         error!("Inference backend error: {}", e);
         axum::http::StatusCode::INTERNAL_SERVER_ERROR
     })?;

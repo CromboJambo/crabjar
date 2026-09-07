@@ -24,8 +24,8 @@ use std::time::Duration;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-use crate::attempts::{Attempt, AttemptStatus, Judgment};
 use crate::InferenceMetrics;
+use crate::attempts::{Attempt, AttemptStatus, Judgment};
 
 /// On-disk format version for the queue record.
 pub const QUEUE_VERSION: u32 = 1;

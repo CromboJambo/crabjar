@@ -199,9 +199,9 @@ fn extract_knowledge_entries(
         })
     })?;
 
-    let entries: Vec<KnowledgeEntry> = rows.collect::<Result<Vec<_>, _>>().map_err(|e| {
-        TrainExtractError::Export(format!("failed to read knowledge entries: {e}"))
-    })?;
+    let entries: Vec<KnowledgeEntry> = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| TrainExtractError::Export(format!("failed to read knowledge entries: {e}")))?;
 
     // Apply tag filter if specified
     let filtered = if config.tags.is_empty() {
@@ -210,12 +210,18 @@ fn extract_knowledge_entries(
         entries
             .into_iter()
             .filter(|entry| {
-                config.tags.iter().any(|tag| entry.tags.iter().any(|t| t == tag))
+                config
+                    .tags
+                    .iter()
+                    .any(|tag| entry.tags.iter().any(|t| t == tag))
             })
             .collect()
     };
 
-    tracing::debug!(entries_extracted = filtered.len(), "Extracted knowledge entries");
+    tracing::debug!(
+        entries_extracted = filtered.len(),
+        "Extracted knowledge entries"
+    );
 
     Ok(filtered)
 }
@@ -247,11 +253,14 @@ fn extract_events(
         })
     })?;
 
-    let events: Vec<LogEvent> = rows.collect::<Result<Vec<_>, _>>().map_err(|e| {
-        TrainExtractError::Export(format!("failed to read events: {e}"))
-    })?;
+    let events: Vec<LogEvent> = rows
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| TrainExtractError::Export(format!("failed to read events: {e}")))?;
 
-    tracing::debug!(events_extracted = events.len(), "Extracted mirror-log events");
+    tracing::debug!(
+        events_extracted = events.len(),
+        "Extracted mirror-log events"
+    );
 
     Ok(events)
 }
@@ -308,8 +317,9 @@ mod tests {
     /// - events: mirror-log schema (~/.mirror-log/mirror.db) — timestamp, no active
     fn make_test_db(dir: &tempfile::TempDir) -> (Connection, Connection) {
         let kconn = Connection::open(dir.path().join("knowledge.db")).unwrap();
-        kconn.execute_batch(
-            "CREATE TABLE knowledge_entries (
+        kconn
+            .execute_batch(
+                "CREATE TABLE knowledge_entries (
                 id INTEGER PRIMARY KEY,
                 content TEXT NOT NULL,
                 kind TEXT NOT NULL,
@@ -322,20 +332,21 @@ mod tests {
                 source_id TEXT NOT NULL DEFAULT '',
                 provenance_id TEXT NOT NULL DEFAULT ''
             )",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let mconn = Connection::open(dir.path().join("mirror.db")).unwrap();
-        mconn.execute_batch(
-            "CREATE TABLE events (
+        mconn
+            .execute_batch(
+                "CREATE TABLE events (
                 id TEXT PRIMARY KEY,
                 timestamp INTEGER NOT NULL,
                 source TEXT NOT NULL,
                 content TEXT NOT NULL,
                 meta TEXT
             )",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         (kconn, mconn)
     }
@@ -456,12 +467,13 @@ mod tests {
         )
         .unwrap();
 
-        mconn.execute(
-            "INSERT INTO events (id, timestamp, source, content, meta)
+        mconn
+            .execute(
+                "INSERT INTO events (id, timestamp, source, content, meta)
              VALUES ('evt-1', 1000000, 'file', 'test event', null)",
-            [],
-        )
-        .unwrap();
+                [],
+            )
+            .unwrap();
 
         let config = ExtractConfig::default();
         let data = extract(&kconn, Some(&mconn), &config).unwrap();

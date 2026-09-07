@@ -1,14 +1,18 @@
 pub mod error;
+pub mod export;
 pub mod extract;
 pub mod format;
-pub mod export;
 pub mod weight;
 
 pub use error::{TrainExtractError, TrainExtractResult};
-pub use extract::{extract, ExtractConfig, ExtractedData, KnowledgeEntry, LogEvent, Chunk, Annotation};
-pub use format::{format_samples, apply_weighting, Sample, SampleSource};
-pub use export::{export, export_jsonl, export_safetensors_manifest, ExportConfig, ExportFormat, DatasetManifest};
-pub use weight::{weight_samples, WeightConfig, compute_tag_boost, compute_recency};
+pub use export::{
+    DatasetManifest, ExportConfig, ExportFormat, export, export_jsonl, export_safetensors_manifest,
+};
+pub use extract::{
+    Annotation, Chunk, ExtractConfig, ExtractedData, KnowledgeEntry, LogEvent, extract,
+};
+pub use format::{Sample, SampleSource, apply_weighting, format_samples};
+pub use weight::{WeightConfig, compute_recency, compute_tag_boost, weight_samples};
 
 /// Full pipeline: extract → format → weight → export.
 ///
@@ -53,11 +57,7 @@ pub fn quick_export(
     mirror_log_conn: Option<&rusqlite::Connection>,
     output_dir: impl AsRef<std::path::Path>,
 ) -> TrainExtractResult<DatasetManifest> {
-    let data = extract(
-        knowledge_conn,
-        mirror_log_conn,
-        &ExtractConfig::default(),
-    )?;
+    let data = extract(knowledge_conn, mirror_log_conn, &ExtractConfig::default())?;
 
     let samples = weight_samples(&data, &WeightConfig::default());
     let dir = output_dir.as_ref().to_string_lossy().to_string();
@@ -73,15 +73,16 @@ pub fn quick_export(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
     use rusqlite::Connection;
+    use tempfile::tempdir;
 
     fn make_test_db(dir: &tempfile::TempDir) -> (rusqlite::Connection, rusqlite::Connection) {
         let kconn = Connection::open(dir.path().join("knowledge.db")).unwrap();
         // Mirrors the canonical agent-context schema (memory/src/schema.rs),
         // plus a created_at column that newer stores may add.
-        kconn.execute_batch(
-            "CREATE TABLE knowledge_entries (
+        kconn
+            .execute_batch(
+                "CREATE TABLE knowledge_entries (
                 id INTEGER PRIMARY KEY,
                 content TEXT NOT NULL,
                 kind TEXT NOT NULL,
@@ -95,18 +96,21 @@ mod tests {
                 provenance_id TEXT NOT NULL DEFAULT '',
                 created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
             )",
-        ).unwrap();
+            )
+            .unwrap();
 
         let mconn = Connection::open(dir.path().join("mirror.db")).unwrap();
-        mconn.execute_batch(
-            "CREATE TABLE events (
+        mconn
+            .execute_batch(
+                "CREATE TABLE events (
                 id TEXT PRIMARY KEY,
                 timestamp INTEGER NOT NULL,
                 source TEXT NOT NULL,
                 content TEXT NOT NULL,
                 meta TEXT
             )",
-        ).unwrap();
+            )
+            .unwrap();
 
         (kconn, mconn)
     }
@@ -156,11 +160,13 @@ mod tests {
             [],
         ).unwrap();
 
-        mconn.execute(
-            "INSERT INTO events (id, timestamp, source, content)
+        mconn
+            .execute(
+                "INSERT INTO events (id, timestamp, source, content)
              VALUES ('evt-1', 1000000, 'file', 'Updated Cargo.toml')",
-            [],
-        ).unwrap();
+                [],
+            )
+            .unwrap();
 
         let output_dir = dir.path().join("output");
         let weight_config = WeightConfig::default().tag_boost("rust", 1.5);
@@ -170,19 +176,17 @@ mod tests {
             dataset_name: "test-pipeline".to_string(),
         };
 
-        let (samples, manifest) = run_pipeline(
-            &kconn,
-            Some(&mconn),
-            weight_config,
-            export_config.clone(),
-        )
-        .unwrap();
+        let (samples, manifest) =
+            run_pipeline(&kconn, Some(&mconn), weight_config, export_config.clone()).unwrap();
 
         assert!(samples.len() >= 2);
         assert_eq!(manifest.entry_count, samples.len());
 
         // Verify rust-tagged samples got boosted
-        let rust_samples: Vec<_> = samples.iter().filter(|s| s.tags.contains(&"rust".to_string())).collect();
+        let rust_samples: Vec<_> = samples
+            .iter()
+            .filter(|s| s.tags.contains(&"rust".to_string()))
+            .collect();
         assert!(!rust_samples.is_empty());
     }
 }

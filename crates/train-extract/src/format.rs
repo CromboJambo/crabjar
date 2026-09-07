@@ -135,7 +135,10 @@ fn format_log_event(event: &LogEvent) -> Vec<Sample> {
     }
 
     let first_line = content.lines().next().unwrap_or(content);
-    let instruction = format!("What happened in the {source} event?\n\n{first_line}", source = event.source);
+    let instruction = format!(
+        "What happened in the {source} event?\n\n{first_line}",
+        source = event.source
+    );
 
     let response = content
         .lines()
@@ -146,7 +149,11 @@ fn format_log_event(event: &LogEvent) -> Vec<Sample> {
 
     vec![Sample {
         instruction,
-        response: if response.is_empty() { content.to_string() } else { response },
+        response: if response.is_empty() {
+            content.to_string()
+        } else {
+            response
+        },
         source: SampleSource::LogEvent {
             event_id: event.id.clone(),
             source: event.source.clone(),
@@ -165,7 +172,11 @@ fn format_chunk(chunk: &Chunk) -> Vec<Sample> {
         return Vec::new();
     }
 
-    let instruction = format!("What is the content of chunk {idx}?\n\n{first}", idx = chunk.chunk_index + 1, first = content.lines().next().unwrap_or(content));
+    let instruction = format!(
+        "What is the content of chunk {idx}?\n\n{first}",
+        idx = chunk.chunk_index + 1,
+        first = content.lines().next().unwrap_or(content)
+    );
 
     let response = content
         .lines()
@@ -176,7 +187,11 @@ fn format_chunk(chunk: &Chunk) -> Vec<Sample> {
 
     vec![Sample {
         instruction,
-        response: if response.is_empty() { content.to_string() } else { response },
+        response: if response.is_empty() {
+            content.to_string()
+        } else {
+            response
+        },
         source: SampleSource::Chunk {
             chunk_id: chunk.id.clone(),
             event_id: chunk.event_id.clone(),
@@ -322,16 +337,21 @@ mod tests {
         let data = make_sample_data();
         let samples = format_samples(&data);
         assert!(!samples.is_empty());
-        assert!(samples.iter().any(|s| s.provenance_id.starts_with("knowledge:")));
+        assert!(
+            samples
+                .iter()
+                .any(|s| s.provenance_id.starts_with("knowledge:"))
+        );
     }
 
     #[test]
     fn format_samples_includes_events() {
         let data = make_sample_data();
         let samples = format_samples(&data);
-        let event_samples: Vec<_> = samples.iter().filter(|s| {
-            matches!(s.source, SampleSource::LogEvent { .. })
-        }).collect();
+        let event_samples: Vec<_> = samples
+            .iter()
+            .filter(|s| matches!(s.source, SampleSource::LogEvent { .. }))
+            .collect();
         assert_eq!(event_samples.len(), 1);
     }
 
@@ -424,20 +444,18 @@ mod tests {
     #[test]
     fn apply_weighting_reduces_weight_with_decay() {
         let day_ago = chrono::Utc::now().timestamp() - 86400;
-        let samples = vec![
-            Sample {
-                instruction: "test".to_string(),
-                response: "test".to_string(),
-                source: SampleSource::KnowledgeEntry {
-                    entry_id: 1,
-                    kind: "Pattern".to_string(),
-                },
-                weight: 1.0,
-                tags: vec!["test".to_string()],
-                provenance_id: "test".to_string(),
-                created_at: day_ago,
+        let samples = vec![Sample {
+            instruction: "test".to_string(),
+            response: "test".to_string(),
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
             },
-        ];
+            weight: 1.0,
+            tags: vec!["test".to_string()],
+            provenance_id: "test".to_string(),
+            created_at: day_ago,
+        }];
 
         let decayed = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
         assert!(decayed[0].weight < 1.0);
@@ -446,20 +464,18 @@ mod tests {
 
     #[test]
     fn apply_weighting_no_decay_when_recent() {
-        let samples = vec![
-            Sample {
-                instruction: "test".to_string(),
-                response: "test".to_string(),
-                source: SampleSource::KnowledgeEntry {
-                    entry_id: 1,
-                    kind: "Pattern".to_string(),
-                },
-                weight: 0.5,
-                tags: vec!["test".to_string()],
-                provenance_id: "test".to_string(),
-                created_at: chrono::Utc::now().timestamp(),
+        let samples = vec![Sample {
+            instruction: "test".to_string(),
+            response: "test".to_string(),
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
             },
-        ];
+            weight: 0.5,
+            tags: vec!["test".to_string()],
+            provenance_id: "test".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        }];
 
         let result = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
         assert!((result[0].weight - 0.5).abs() < 1e-3);
@@ -467,20 +483,18 @@ mod tests {
 
     #[test]
     fn apply_weighting_unknown_timestamp_not_decayed() {
-        let samples = vec![
-            Sample {
-                instruction: "test".to_string(),
-                response: "test".to_string(),
-                source: SampleSource::KnowledgeEntry {
-                    entry_id: 1,
-                    kind: "Pattern".to_string(),
-                },
-                weight: 0.5,
-                tags: vec!["test".to_string()],
-                provenance_id: "test".to_string(),
-                created_at: 0,
+        let samples = vec![Sample {
+            instruction: "test".to_string(),
+            response: "test".to_string(),
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
             },
-        ];
+            weight: 0.5,
+            tags: vec!["test".to_string()],
+            provenance_id: "test".to_string(),
+            created_at: 0,
+        }];
 
         let result = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
         assert_eq!(result[0].weight, 0.5);
@@ -491,20 +505,18 @@ mod tests {
         let mut boost = std::collections::HashMap::new();
         boost.insert("boosted".to_string(), 2.0);
 
-        let samples = vec![
-            Sample {
-                instruction: "test".to_string(),
-                response: "test".to_string(),
-                source: SampleSource::KnowledgeEntry {
-                    entry_id: 1,
-                    kind: "Pattern".to_string(),
-                },
-                weight: 0.5,
-                tags: vec!["boosted".to_string()],
-                provenance_id: "test".to_string(),
-                created_at: chrono::Utc::now().timestamp(),
+        let samples = vec![Sample {
+            instruction: "test".to_string(),
+            response: "test".to_string(),
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
             },
-        ];
+            weight: 0.5,
+            tags: vec!["boosted".to_string()],
+            provenance_id: "test".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        }];
 
         let result = apply_weighting(samples, 86400.0, &boost);
         assert_eq!(result[0].weight, 1.0); // 0.5 * 2.0 = 1.0, capped at 1.0

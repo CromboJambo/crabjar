@@ -502,9 +502,8 @@ fn handle_habitat_command(
             let pending = crabjar_lib::habitat_contract::read_pending_actions(&guard_db);
             let theory_status =
                 crabjar_lib::habitat_contract::read_theory_status(&db_path, &theory);
-            let contract = crabjar_lib::habitat_contract::build_contract(
-                &queue, &pending, &theory_status,
-            );
+            let contract =
+                crabjar_lib::habitat_contract::build_contract(&queue, &pending, &theory_status);
 
             let mut message = format!(
                 "habitat contract: {} tasks ({} triage, {} guard, 1 theory)",

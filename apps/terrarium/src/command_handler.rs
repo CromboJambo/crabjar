@@ -65,14 +65,7 @@ pub fn execute_command(world: &mut GameWorld, command: AgentCommand) -> CommandO
             tile_y,
             structure_type,
             height,
-        } => execute_build(
-            world,
-            &entity_id,
-            tile_x,
-            tile_y,
-            structure_type,
-            height,
-        ),
+        } => execute_build(world, &entity_id, tile_x, tile_y, structure_type, height),
         GameAction::Interact {
             entity_id,
             target_id,
@@ -163,7 +156,11 @@ fn execute_build(
         StructureType::ResourceNode => TileType::Grass,
     };
 
-    if let Some(tile) = world.tiles.iter_mut().find(|t| t.x == tile_x && t.y == tile_y) {
+    if let Some(tile) = world
+        .tiles
+        .iter_mut()
+        .find(|t| t.x == tile_x && t.y == tile_y)
+    {
         tile.tile_type = new_type;
         tile.z = height;
     } else {

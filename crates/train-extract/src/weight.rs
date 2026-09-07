@@ -1,5 +1,5 @@
 use crate::extract::ExtractedData;
-use crate::format::{apply_weighting, format_samples, Sample};
+use crate::format::{Sample, apply_weighting, format_samples};
 use std::collections::HashMap;
 
 /// Configuration for the weighting phase.

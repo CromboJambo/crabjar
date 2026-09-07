@@ -17,7 +17,7 @@ pub use self::metrics::InferenceMetrics;
 #[async_trait::async_trait]
 pub trait InferenceBackend: Send + Sync {
     /// Send a chat request and return the response with inference metrics.
-    async fn chat(
+    async fn generate(
         &mut self,
         user_input: String,
     ) -> Result<(UnifiedChatResponse, InferenceMetrics), InferenceError>;
@@ -88,28 +88,38 @@ pub enum InferenceError {
 
 #[async_trait::async_trait]
 impl InferenceBackend for lm_studio_client::LmStudioClient {
-    async fn chat(
+    async fn generate(
         &mut self,
         user_input: String,
     ) -> Result<(UnifiedChatResponse, InferenceMetrics), InferenceError> {
         let start = std::time::Instant::now();
-        let response = self.chat(user_input).await.map_err(|e| {
-            InferenceError::RequestError(e.to_string())
-        })?;
+        let response = self
+            .chat(user_input)
+            .await
+            .map_err(|e| InferenceError::RequestError(e.to_string()))?;
         let latency_ms = start.elapsed().as_millis() as u64;
 
-        // Estimate tokens from response text (LM Studio API doesn't always
-        // return token counts in the OpenAI-compatible endpoint).
-        let content = self.extract_text(&response);
-        let tokens_in = 0; // Not tracked by LM Studio client currently
-        let tokens_out = estimate_tokens(&content);
+        // Use real token counts from LM Studio API stats when available,
+        // fall back to estimation otherwise.
+        let (tokens_in, tokens_out) = match response.stats {
+            Some(ref s) => (s.input_tokens as u32, s.total_output_tokens as u32),
+            None => {
+                let content = self.extract_text(&response);
+                (0, estimate_tokens(&content))
+            }
+        };
 
-        let metrics = InferenceMetrics::new(
-            tokens_in,
-            tokens_out,
-            "lm-studio".to_string(),
-            latency_ms,
-        );
+        // Use the model instance ID from the response if available.
+        let model_id = if response.model_instance_id.is_empty() {
+            "lm-studio".to_string()
+        } else {
+            response.model_instance_id.clone()
+        };
+
+        let metrics = InferenceMetrics::new(tokens_in, tokens_out, model_id, latency_ms);
+
+        // Calculate cost based on tokens and model (approximate)
+        let cost_cents = metrics.estimated_cost_cents();
 
         Ok((response, metrics))
     }

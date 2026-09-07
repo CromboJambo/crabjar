@@ -8,17 +8,17 @@
 //! - DAGR event production (dagr_feed) — emitted to stderr so stdout stays a
 //!   clean JSON-RPC channel
 
-mod render_isometric;
-mod dagr_feed;
 mod command_handler;
+mod dagr_feed;
+mod render_isometric;
 
-use crate::command_handler::{execute_command, CommandResult};
-use crate::dagr_feed::{build_event, emit_event, AgentCommand, EventSource, EventType};
-use crate::render_isometric::{generate_world, GameWorld, render_world};
+use crate::command_handler::{CommandResult, execute_command};
+use crate::dagr_feed::{AgentCommand, EventSource, EventType, build_event, emit_event};
+use crate::render_isometric::{GameWorld, generate_world, render_world};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Write};
+use tokio::sync::Mutex;
 
 // ============================================================================
 // Command params (control + agent gameplay)
@@ -206,7 +206,11 @@ fn handle_command(world: &mut GameWorld, request: &CommandRequest) -> serde_json
 
         // Emit each side-effect event to the DAGR feed (stderr).
         for event_type in &outcome.events {
-            emit_event(&build_event(event_type.clone(), EventSource::Agent, world.tick));
+            emit_event(&build_event(
+                event_type.clone(),
+                EventSource::Agent,
+                world.tick,
+            ));
         }
 
         // Also record the command itself as an AgentCommand event.
@@ -349,8 +353,11 @@ async fn run_isometric_world_with_state(state: std::sync::Arc<PluginState>) {
 
 /// Standalone render loop (demo mode) — no JSON-RPC, no shared state.
 async fn run_isometric_world(mut world: GameWorld) {
-    let mut last_reported: HashMap<String, (f32, f32)> =
-        world.entities.iter().map(|e| (e.id.clone(), (e.x, e.y))).collect();
+    let mut last_reported: HashMap<String, (f32, f32)> = world
+        .entities
+        .iter()
+        .map(|e| (e.id.clone(), (e.x, e.y)))
+        .collect();
 
     loop {
         if !world.paused {

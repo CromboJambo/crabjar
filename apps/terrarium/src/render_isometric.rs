@@ -9,8 +9,8 @@ use std::io::{self, Write};
 // Constants
 // ============================================================================
 
-const TILE_WIDTH: i32 = 8;   // Width of diamond in characters
-const TILE_HEIGHT: i32 = 4;  // Height of diamond in characters
+const TILE_WIDTH: i32 = 8; // Width of diamond in characters
+const TILE_HEIGHT: i32 = 4; // Height of diamond in characters
 const SCREEN_WIDTH: i32 = 80;
 const SCREEN_HEIGHT: i32 = 24;
 
@@ -31,11 +31,11 @@ pub enum TileType {
 impl TileType {
     fn color(&self) -> &'static str {
         match self {
-            TileType::Grass => "\x1b[32m",  // Green
-            TileType::Water => "\x1b[36m",  // Cyan
-            TileType::Sand => "\x1b[33m",   // Yellow
-            TileType::Stone => "\x1b[90m",  // Gray
-            TileType::Wood => "\x1b[95m",   // Purple
+            TileType::Grass => "\x1b[32m", // Green
+            TileType::Water => "\x1b[36m", // Cyan
+            TileType::Sand => "\x1b[33m",  // Yellow
+            TileType::Stone => "\x1b[90m", // Gray
+            TileType::Wood => "\x1b[95m",  // Purple
         }
     }
 
@@ -53,9 +53,9 @@ impl TileType {
 /// An isometric tile in the world
 #[derive(Debug, Clone)]
 pub struct IsometricTile {
-    pub x: i32,      // Grid X coordinate
-    pub y: i32,      // Grid Y coordinate
-    pub z: i32,      // Height (for 3D effect)
+    pub x: i32, // Grid X coordinate
+    pub y: i32, // Grid Y coordinate
+    pub z: i32, // Height (for 3D effect)
     pub tile_type: TileType,
 }
 
@@ -63,8 +63,8 @@ pub struct IsometricTile {
 #[derive(Debug, Clone)]
 pub struct Entity {
     pub id: String,
-    pub x: f32,      // Grid X coordinate (sub-cell, for smooth movement)
-    pub y: f32,      // Grid Y coordinate
+    pub x: f32, // Grid X coordinate (sub-cell, for smooth movement)
+    pub y: f32, // Grid Y coordinate
     pub z: f32,
     /// Wander velocity in grid cells per second (advanced by the sim loop).
     pub vx: f32,
@@ -100,7 +100,7 @@ impl GameWorld {
 // ============================================================================
 
 /// Convert isometric grid coordinates to screen (terminal) coordinates.
-/// 
+///
 /// Standard isometric projection formula:
 /// - screen_x = (grid_x - grid_y) * tile_width / 2
 /// - screen_y = (grid_x + grid_y) * tile_height / 4 - grid_z * tile_height / 2
@@ -134,12 +134,25 @@ fn draw_tile(tile: &IsometricTile, screen_x: i32, screen_y: i32) {
     // Draw diamond using box-drawing characters
     // Top point
     print!("{} {}{}", color, "▲", reset);
-    
+
     // Middle row (widest)
-    print!("\x1b[{};{}H{}═══{}", screen_y + 3, screen_x + 1, color, reset);
-    
+    print!(
+        "\x1b[{};{}H{}═══{}",
+        screen_y + 3,
+        screen_x + 1,
+        color,
+        reset
+    );
+
     // Bottom point
-    print!("\x1b[{};{}H{} {}{}", screen_y + 4, screen_x + 2, color, "▼", reset);
+    print!(
+        "\x1b[{};{}H{} {}{}",
+        screen_y + 4,
+        screen_x + 2,
+        color,
+        "▼",
+        reset
+    );
 
     // Add height indicator (for 3D effect)
     if tile.z > 0 {
@@ -152,8 +165,14 @@ fn draw_tile(tile: &IsometricTile, screen_x: i32, screen_y: i32) {
 /// Draw an entity (crab, snake, etc.) at its position
 fn draw_entity(entity: &Entity, screen_x: i32, screen_y: i32) {
     let reset = "\x1b[0m";
-    
-    print!("\x1b[{};{}H{}{}", screen_y + 2, screen_x + 2, entity.color, entity.symbol);
+
+    print!(
+        "\x1b[{};{}H{}{}",
+        screen_y + 2,
+        screen_x + 2,
+        entity.color,
+        entity.symbol
+    );
     print!("{}", reset);
 }
 
@@ -193,11 +212,17 @@ pub fn render_world(world: &GameWorld) {
 fn draw_hud(world: &GameWorld) {
     let reset = "\x1b[0m";
     let pos = SCREEN_WIDTH - 20;
-    
+
     print!("\x1b[{};{}H=== CRABJAR HABITAT ==={}", pos, 1, reset);
-    print!("\x1b[{};{}HTick: {} | Speed: {:.1}x", pos, 3, world.tick, world.speed);
+    print!(
+        "\x1b[{};{}HTick: {} | Speed: {:.1}x",
+        pos, 3, world.tick, world.speed
+    );
     print!("\x1b[{};{}HEntities: {}", pos, 4, world.entities.len());
-    print!("\x1b[{};{}HControls: q=quit, Space=pause, +=speed, -=slow{}", pos, 6, reset);
+    print!(
+        "\x1b[{};{}HControls: q=quit, Space=pause, +=speed, -=slow{}",
+        pos, 6, reset
+    );
 }
 
 // ============================================================================
@@ -207,7 +232,7 @@ fn draw_hud(world: &GameWorld) {
 /// Generate a simple isometric grid for the habitat
 pub fn generate_world(width: i32, height: i32) -> GameWorld {
     let mut tiles = Vec::new();
-    
+
     // Create a grid of grass tiles with some variety
     for x in 0..width {
         for y in 0..height {
@@ -218,7 +243,7 @@ pub fn generate_world(width: i32, height: i32) -> GameWorld {
                 3 => TileType::Stone,
                 _ => TileType::Wood,
             };
-            
+
             tiles.push(IsometricTile {
                 x,
                 y,
@@ -230,11 +255,26 @@ pub fn generate_world(width: i32, height: i32) -> GameWorld {
 
     // Add some elevated terrain (pyramids/structures)
     let mut elevated_tiles = vec![
-        IsometricTile { x: 5, y: 5, z: 3, tile_type: TileType::Stone },
-        IsometricTile { x: 10, y: 8, z: 2, tile_type: TileType::Wood },
-        IsometricTile { x: 15, y: 5, z: 4, tile_type: TileType::Stone },
+        IsometricTile {
+            x: 5,
+            y: 5,
+            z: 3,
+            tile_type: TileType::Stone,
+        },
+        IsometricTile {
+            x: 10,
+            y: 8,
+            z: 2,
+            tile_type: TileType::Wood,
+        },
+        IsometricTile {
+            x: 15,
+            y: 5,
+            z: 4,
+            tile_type: TileType::Stone,
+        },
     ];
-    
+
     tiles.append(&mut elevated_tiles);
 
     // Add entities (crabs) — each gets a small wander velocity.
@@ -247,7 +287,7 @@ pub fn generate_world(width: i32, height: i32) -> GameWorld {
             vx: 0.5,
             vy: 0.3,
             symbol: "🦀",
-            color: "\x1b[91m",  // Red
+            color: "\x1b[91m", // Red
         },
         Entity {
             id: "crab_002".to_string(),
@@ -257,7 +297,7 @@ pub fn generate_world(width: i32, height: i32) -> GameWorld {
             vx: -0.4,
             vy: 0.2,
             symbol: "🦀",
-            color: "\x1b[94m",  // Blue
+            color: "\x1b[94m", // Blue
         },
         Entity {
             id: "crab_003".to_string(),
@@ -267,7 +307,7 @@ pub fn generate_world(width: i32, height: i32) -> GameWorld {
             vx: 0.3,
             vy: -0.5,
             symbol: "🦀",
-            color: "\x1b[92m",  // Green
+            color: "\x1b[92m", // Green
         },
     ];
 
@@ -329,13 +369,13 @@ pub fn step_world(world: &mut GameWorld, delta: f32) -> bool {
 /// Main render loop for isometric terrarium
 pub async fn run_isometric_world(mut world: GameWorld) {
     eprintln!("DEBUG: isometric render loop STARTED");
-    
+
     let mut tick = 0u64;
     while world.tick > 0 || tick == 0 {
         if !world.paused {
             // Update world state
             world.tick += 1;
-            
+
             // Move entities smoothly (simple interpolation) with DAGR emission
             use crate::dagr_feed::{EventSource, EventType, GameEvent};
             use uuid::Uuid;
@@ -345,7 +385,7 @@ pub async fn run_isometric_world(mut world: GameWorld) {
                 // Simple wandering behavior
                 entity.x += 0.05_f32 * world.speed;
                 entity.y += 0.03_f32 * world.speed;
-                
+
                 // Wrap around screen edges
                 if entity.x > SCREEN_WIDTH as f32 {
                     entity.x = 0.0;
@@ -353,7 +393,7 @@ pub async fn run_isometric_world(mut world: GameWorld) {
                 if entity.y > (SCREEN_HEIGHT * 2) as f32 {
                     entity.y = 0.0;
                 }
-                
+
                 // Emit DAGR event if entity moved
                 if (entity.x - old_x).abs() > 0.001 || (entity.y - old_y).abs() > 0.001 {
                     let event = GameEvent {
@@ -366,7 +406,10 @@ pub async fn run_isometric_world(mut world: GameWorld) {
                             to_y: entity.y,
                             direction: None,
                         },
-                        timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs(),
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
                         tick: world.tick,
                         source: EventSource::Simulation,
                         payload: crate::dagr_feed::EventPayload::EntityMove {
@@ -378,10 +421,13 @@ pub async fn run_isometric_world(mut world: GameWorld) {
                             direction: None,
                         },
                     };
-                    eprintln!("DAGR EVENT: {}", serde_json::to_string(&event).unwrap_or_default());
+                    eprintln!(
+                        "DAGR EVENT: {}",
+                        serde_json::to_string(&event).unwrap_or_default()
+                    );
                 }
             }
-            
+
             // Render frame
             render_world(&world);
         }
@@ -389,7 +435,7 @@ pub async fn run_isometric_world(mut world: GameWorld) {
         let sleep_ms = (50.0 / world.speed).max(10.0) as u64;
         tokio::time::sleep(tokio::time::Duration::from_millis(sleep_ms)).await; // speed-adjusted
     }
-    
+
     eprintln!("DEBUG: isometric render loop EXITED");
 }
 
@@ -400,14 +446,14 @@ pub async fn run_isometric_world(mut world: GameWorld) {
 /// Run a standalone demo without JSON-RPC control
 pub fn run_demo() {
     let mut world = generate_world(20, 15);
-    
+
     // Start animation immediately
     world.tick = 1;
     world.paused = false;
-    
+
     eprintln!("🦀 CrabJar Isometric Habitat Demo");
     eprintln!("Press Ctrl+C to exit");
-    
+
     tokio::runtime::Runtime::new()
         .unwrap()
         .block_on(run_isometric_world(world));

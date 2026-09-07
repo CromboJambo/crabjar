@@ -8,8 +8,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, BufReader, Write};
-use tokio::sync::{mpsc, Mutex};
-use tokio::time::{sleep, Duration};
+use tokio::sync::{Mutex, mpsc};
+use tokio::time::{Duration, sleep};
 
 // ============================================================================
 // JSON-RPC Protocol
@@ -39,7 +39,7 @@ enum TerrariumAction {
     Pause,
     Resume,
     SetSpeed(String), // "0.5", "1.0", "10.0"
-    Step,            // single tick
+    Step,             // single tick
 }
 
 /// Response envelope for terrarium commands.
@@ -166,7 +166,10 @@ async fn handle_commands(state: &Mutex<TerrariumState>) -> io::Result<()> {
                         state_guard.speed_multiplier = val.parse().unwrap_or(1.0);
                         CommandResult {
                             status: "speed_set".to_string(),
-                            message: Some(format!("Speed set to {}x", state_guard.speed_multiplier)),
+                            message: Some(format!(
+                                "Speed set to {}x",
+                                state_guard.speed_multiplier
+                            )),
                             crabs_count: Some(state_guard.crabs_count),
                         }
                     } else {
@@ -218,23 +221,23 @@ async fn render_loop(state: &Mutex<TerrariumState>) {
     // 3. Respond to state changes from command handler
 
     eprintln!("DEBUG: render_loop STARTED");
-    
+
     let mut tick = 0u64;
     loop {
         let running = {
             let state_guard = state.lock().await;
             state_guard.running
         };
-        
+
         if !running {
             break; // Exit when running = false
         }
-        
+
         let paused = {
             let state_guard = state.lock().await;
             state_guard.paused
         };
-        
+
         let speed = {
             let state_guard = state.lock().await;
             state_guard.speed_multiplier
@@ -243,7 +246,7 @@ async fn render_loop(state: &Mutex<TerrariumState>) {
         if !paused {
             // Update world logic here
             tick += 1;
-            
+
             // Render frame (placeholder) - use eprintln for debugging
             eprintln!("DEBUG: render_loop tick={} speed={}", tick, speed);
             print!("\x1b[2J\x1b[H"); // Clear screen
@@ -257,7 +260,7 @@ async fn render_loop(state: &Mutex<TerrariumState>) {
 
         sleep(Duration::from_millis(50)).await; // 20 FPS
     }
-    
+
     eprintln!("DEBUG: render_loop EXITED");
 }
 
@@ -289,14 +292,11 @@ async fn main() {
     match mode {
         "stdio" => {
             println!("🦀 Terrarium plugin started (stdio mode)");
-            
+
             let state = Mutex::new(TerrariumState::default());
-            
+
             // Spawn command handler and render loop with shared state
-            tokio::join!(
-                handle_commands(&state),
-                render_loop(&state)
-            );
+            tokio::join!(handle_commands(&state), render_loop(&state));
         }
         "text" => {
             // Fallback to direct TUI (like the original app)

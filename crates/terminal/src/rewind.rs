@@ -26,8 +26,8 @@
 //! rewind is refused with [`RewindRefusalReason::CoarseTierNotLive`] — the
 //! decision is in the record, the execution is deferred to that layer.
 
-use crate::attempts::{Attempt, RewindTier};
 use crate::InferenceMetrics;
+use crate::attempts::{Attempt, RewindTier};
 use crate::git_repo::GitRepo;
 use std::path::Path;
 

@@ -19,7 +19,7 @@
 //! ran and passed would earn `verified`.
 
 use chrono::{DateTime, SecondsFormat, Utc};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crabjar_terminal::TriageQueue;
 
@@ -68,7 +68,11 @@ fn ts(dt: &DateTime<Utc>) -> String {
 
 /// Truncate a title so the DAG stays readable (the pane is a fixed width).
 fn short_title(primary: &str, fallback: &str) -> String {
-    let s = if primary.trim().is_empty() { fallback } else { primary };
+    let s = if primary.trim().is_empty() {
+        fallback
+    } else {
+        primary
+    };
     let s = s.trim();
     if s.chars().count() > 48 {
         let t: String = s.chars().take(45).collect();
@@ -81,7 +85,12 @@ fn short_title(primary: &str, fallback: &str) -> String {
 /// A terminal attempt for the theory doc task (avoids W203: a settled attempt
 /// needs timestamps; `started == ended` is legal — E181 only forbids ending
 /// *before* it starts).
-fn theory_attempt(state: &str, evidence: &str, receipt: Option<&str>, reason: Option<&str>) -> Value {
+fn theory_attempt(
+    state: &str,
+    evidence: &str,
+    receipt: Option<&str>,
+    reason: Option<&str>,
+) -> Value {
     let at = ts(&Utc::now());
     let mut outcome = json!({ "result": state, "evidence": evidence });
     if let Some(r) = receipt {
@@ -166,7 +175,10 @@ pub fn build_contract(
             let elapsed_secs = a.receipt.duration.as_secs_f64();
             (elapsed_secs * 5.0) as u32
         });
-        let model_id = im.model_id.clone();
+        let model_id_value = match &im.model_id {
+            Some(mid) => json!(mid),
+            None => json!(null),
+        };
         let cost_cents = if let Some(latency) = im.latency_ms {
             // Real latency captured; local inference is "free"
             0.0
@@ -194,7 +206,7 @@ pub fn build_contract(
                     "ended_at": ts(&ended),
                     "tokens_in": tokens_in,
                     "tokens_out": tokens_out,
-                    "model_id": null,
+                    "model_id": model_id_value,
                     "cost_cents": cost_cents,
                     "outcome": outcome,
                 }
@@ -254,12 +266,22 @@ pub fn build_contract(
         match theory.status.as_str() {
             "fresh" => (
                 "done",
-                vec![theory_attempt("done", "verified", Some("indexed · fresh"), None)],
+                vec![theory_attempt(
+                    "done",
+                    "verified",
+                    Some("indexed · fresh"),
+                    None,
+                )],
                 format!("fresh · {:.0}d", theory.days_old),
             ),
             "stale" => (
                 "review",
-                vec![theory_attempt("done", "reported", None, theory.warning.as_deref())],
+                vec![theory_attempt(
+                    "done",
+                    "reported",
+                    None,
+                    theory.warning.as_deref(),
+                )],
                 format!("stale · {:.0}d", theory.days_old),
             ),
             _ => (
@@ -363,8 +385,10 @@ pub fn read_theory_status(db_path: &str, theory: &str) -> TheoryStatus {
     let Ok(()) = agent_context::state_docs::migrate(&conn) else {
         return TheoryStatus::default();
     };
-    let querier =
-        agent_context::state_docs::StateDocQuerier::new(conn, std::path::PathBuf::from("state-docs"));
+    let querier = agent_context::state_docs::StateDocQuerier::new(
+        conn,
+        std::path::PathBuf::from("state-docs"),
+    );
     let status = querier.staleness_status(theory);
     let last_modified = status["last_modified"].as_str().unwrap_or("").to_string();
     if last_modified.is_empty() {
@@ -430,7 +454,10 @@ mod tests {
         let doc = build_contract(&q, &[], &TheoryStatus::default());
         assert_eq!(doc["dagr"], 3);
         assert_eq!(doc["run"]["id"], "crabjar-habitat");
-        assert!(!doc["tasks"].as_array().unwrap().is_empty(), "E102: tasks required");
+        assert!(
+            !doc["tasks"].as_array().unwrap().is_empty(),
+            "E102: tasks required"
+        );
         // The theory doc is always present, even when not indexed.
         assert_eq!(task_by_id(&doc, "THEORY")["state"], "queued");
     }

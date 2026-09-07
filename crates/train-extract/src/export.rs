@@ -46,31 +46,29 @@ impl Default for ExportConfig {
 }
 
 /// Export samples as a JSONL file and return manifest metadata.
-pub fn export_jsonl(samples: &[Sample], config: &ExportConfig) -> TrainExtractResult<DatasetManifest> {
+pub fn export_jsonl(
+    samples: &[Sample],
+    config: &ExportConfig,
+) -> TrainExtractResult<DatasetManifest> {
     let output_path = format!("{}/{}.jsonl", config.output_dir, config.dataset_name);
 
-    fs::create_dir_all(&config.output_dir).map_err(|e| {
-        TrainExtractError::Export(format!("failed to create output dir: {e}"))
-    })?;
+    fs::create_dir_all(&config.output_dir)
+        .map_err(|e| TrainExtractError::Export(format!("failed to create output dir: {e}")))?;
 
-    let mut file = fs::File::create(&output_path).map_err(|e| {
-        TrainExtractError::Export(format!("failed to create file: {e}"))
-    })?;
+    let mut file = fs::File::create(&output_path)
+        .map_err(|e| TrainExtractError::Export(format!("failed to create file: {e}")))?;
 
     // Write each sample as a JSON line
     for sample in samples {
-        let json_line = serde_json::to_string(sample).map_err(|e| {
-            TrainExtractError::Export(format!("failed to serialize sample: {e}"))
-        })?;
-        writeln!(file, "{json_line}").map_err(|e| {
-            TrainExtractError::Export(format!("failed to write line: {e}"))
-        })?;
+        let json_line = serde_json::to_string(sample)
+            .map_err(|e| TrainExtractError::Export(format!("failed to serialize sample: {e}")))?;
+        writeln!(file, "{json_line}")
+            .map_err(|e| TrainExtractError::Export(format!("failed to write line: {e}")))?;
     }
 
     // Compute checksum of the file content
-    let file_content = fs::read(&output_path).map_err(|e| {
-        TrainExtractError::Export(format!("failed to read output file: {e}"))
-    })?;
+    let file_content = fs::read(&output_path)
+        .map_err(|e| TrainExtractError::Export(format!("failed to read output file: {e}")))?;
     let checksum = hex::encode(Sha256::digest(&file_content));
 
     // Collect unique tags and tag weights
@@ -104,13 +102,14 @@ pub fn export_jsonl(samples: &[Sample], config: &ExportConfig) -> TrainExtractRe
     };
 
     // Write manifest alongside the data file
-    let manifest_path = format!("{}/{}.manifest.json", config.output_dir, config.dataset_name);
-    let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|e| {
-        TrainExtractError::Export(format!("failed to serialize manifest: {e}"))
-    })?;
-    fs::write(&manifest_path, manifest_json).map_err(|e| {
-        TrainExtractError::Export(format!("failed to write manifest: {e}"))
-    })?;
+    let manifest_path = format!(
+        "{}/{}.manifest.json",
+        config.output_dir, config.dataset_name
+    );
+    let manifest_json = serde_json::to_string_pretty(&manifest)
+        .map_err(|e| TrainExtractError::Export(format!("failed to serialize manifest: {e}")))?;
+    fs::write(&manifest_path, manifest_json)
+        .map_err(|e| TrainExtractError::Export(format!("failed to write manifest: {e}")))?;
 
     tracing::debug!(
         output_path = %output_path,
@@ -124,10 +123,7 @@ pub fn export_jsonl(samples: &[Sample], config: &ExportConfig) -> TrainExtractRe
 }
 
 /// Export the training dataset with the given config.
-pub fn export(
-    samples: &[Sample],
-    config: &ExportConfig,
-) -> TrainExtractResult<DatasetManifest> {
+pub fn export(samples: &[Sample], config: &ExportConfig) -> TrainExtractResult<DatasetManifest> {
     match config.format {
         ExportFormat::Jsonl => export_jsonl(samples, config),
     }
@@ -159,9 +155,8 @@ pub fn export_safetensors_manifest(
 ) -> TrainExtractResult<DatasetManifest> {
     let manifest = export_jsonl(samples, config)?;
 
-    fs::create_dir_all(&config.output_dir).map_err(|e| {
-        TrainExtractError::Export(format!("failed to create output dir: {e}"))
-    })?;
+    fs::create_dir_all(&config.output_dir)
+        .map_err(|e| TrainExtractError::Export(format!("failed to create output dir: {e}")))?;
 
     let weights: Vec<f32> = samples.iter().map(|s| s.weight as f32).collect();
     let entry_count = samples.len() as f32;
@@ -171,9 +166,8 @@ pub fn export_safetensors_manifest(
     ];
     let blob = safetensors_blob(&tensors);
     let path = format!("{}/{}.safetensors", config.output_dir, config.dataset_name);
-    fs::write(&path, &blob).map_err(|e| {
-        TrainExtractError::Export(format!("failed to write safetensors: {e}"))
-    })?;
+    fs::write(&path, &blob)
+        .map_err(|e| TrainExtractError::Export(format!("failed to write safetensors: {e}")))?;
 
     // Round-trip check: the blob must be parseable by the same crate.
     let (header_len, meta) = safetensors::SafeTensors::read_metadata(&blob)
