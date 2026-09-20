@@ -84,6 +84,14 @@ pub enum StateCommand {
         #[arg(long, default_value = "state-docs.db")]
         db_path: String,
     },
+    /// Check drift status of a state-doc (coasting vs resisting)
+    Drift {
+        /// State-doc name
+        doc_name: String,
+        /// SQLite database path
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]

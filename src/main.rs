@@ -347,6 +347,21 @@ fn handle_state_command(
                 "payload": result,
             }))
         }
+        StateCommand::Drift { doc_name, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            // Use state-docs/ as the docs directory (where actual .md files live)
+            let querier = agent_context::state_docs::StateDocQuerier::new(
+                conn,
+                std::path::PathBuf::from("state-docs"),
+            );
+            let result = querier.drift_status(&doc_name);
+            Ok(json!({
+                "success": true,
+                "message": format!("drift check for {}", doc_name),
+                "payload": result,
+            }))
+        }
     }
 }
 
