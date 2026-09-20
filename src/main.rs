@@ -67,7 +67,8 @@ async fn main() {
             cwd,
             reason,
             dry_run,
-        }) => handle_exec(&command, &args, &cwd, &reason, dry_run)
+            container,
+        }) => handle_exec(&command, &args, &cwd, &reason, dry_run, container)
             .await
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Bitwarden { command }) => handle_bitwarden_command(command)
@@ -601,6 +602,7 @@ async fn handle_exec(
     cwd: &str,
     reason: &str,
     dry_run: bool,
+    container: bool,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let project_root = std::env::current_dir()?;
 
@@ -807,6 +809,13 @@ async fn handle_exec(
                 Ok(exit_code)
             };
 
+            // Podman container execution: run command in isolated rootless container
+            let podman_result = if container {
+                execute_in_podman_container(command, args, &effective_cwd)
+            } else {
+                None
+            };
+
             let final_exit_code = match dinit_result {
                 Ok(code) => code,
                 Err(e) => {
@@ -838,6 +847,7 @@ async fn handle_exec(
                     "git_diff_hash": git_diff,
                     "outcome_id": outcome_id,
                     "flight_recorder": true,
+                    "container": podman_result.is_some(),
                     "receipt": if receipt.is_empty() {
                         None::<String>
                     } else {
@@ -899,6 +909,66 @@ fn execute_via_dinitctl(
     Ok(exit_code)
 }
 
+/// Execute command in isolated rootless Podman container.
+fn execute_in_podman_container(
+    command: &str,
+    args: &[String],
+    cwd: &str,
+) -> Option<serde_json::Value> {
+    let podman = match crabjar_podman::PodmanExecutor::new() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Warning: Podman not available: {}", e);
+            return None;
+        }
+    };
+
+    // Build sandbox config for isolated execution
+    let agent_name = format!("agent-{}", uuid::Uuid::new_v4().to_string()[..8].to_string());
+    let mut sandbox = crabjar_podman::SandboxConfig::new(&agent_name, vec![command.to_string()]);
+    sandbox.command.extend(args.iter().cloned());
+    sandbox.working_dir = cwd.to_string();
+
+    // Create container
+    match podman.create_container(&sandbox) {
+        Ok(container_id) => {
+            eprintln!("Created isolated Podman container: {}", container_id);
+
+            // Start and wait for completion
+            let result = podman.start_container(&container_id);
+
+            // Clean up: stop and remove container
+            if let Err(e) = podman.stop_container(&container_id) {
+                eprintln!("Failed to stop container: {}", e);
+            }
+            if let Err(e) = podman.remove_container(&container_id) {
+                eprintln!("Failed to remove container: {}", e);
+            }
+
+            match result {
+                Ok(_) => Some(json!({
+                    "container_id": container_id,
+                    "status": "completed",
+                    "exit_code": 0,
+                })),
+                Err(e) => Some(json!({
+                    "container_id": container_id,
+                    "status": "failed",
+                    "error": e.to_string(),
+                })),
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to create Podman container: {}", e);
+            Some(json!({
+                "container_id": null,
+                "status": "creation_failed",
+                "error": e.to_string(),
+            }))
+        }
+    }
+}
+
 /// Handle guard commands
 fn handle_guard_command(
     command: GuardCommand,
@@ -921,27 +991,31 @@ fn handle_guard_command(
             }))
         }
         GuardCommand::Approve { action_id } => {
-            guard_db
+            let resolved = guard_db
                 .update_action_status(&action_id, crabjar_guard::ActionStatus::TrustApproved)?;
+            // Non-existent IDs are no-ops (success:true with not_found status)
             Ok(json!({
                 "success": true,
                 "guard": {
                     "approve": {
                         "action_id": action_id,
-                        "status": "trust-approved",
+                        "status": if resolved { "trust-approved" } else { "not_found" },
+                        "resolved": resolved
                     },
                 },
             }))
         }
         GuardCommand::Reject { action_id, reason } => {
-            guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::Denied)?;
+            let resolved = guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::Denied)?;
+            // Non-existent IDs are no-ops (success:true with not_found status)
             Ok(json!({
                 "success": true,
                 "guard": {
                     "reject": {
                         "action_id": action_id,
                         "reason": reason,
-                        "status": "denied",
+                        "status": if resolved { "denied" } else { "not_found" },
+                        "resolved": resolved
                     },
                 },
             }))
