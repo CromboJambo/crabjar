@@ -193,3 +193,35 @@ fn smoke_doctor_check_returns_json() {
     // Should include doubt block per CLI output contract
     assert!(body["doctor"]["doubt"].is_object());
 }
+
+/// Smoke test 7: `crabjar habitat contract` — verifies DAGR v3 producer.
+#[test]
+fn smoke_habitat_contract_returns_json() {
+    let temp = tempfile::tempdir().unwrap();
+
+    // Create a minimal config so habitat commands work
+    fs::write(
+        temp.path().join(".crabjar_config.toml"),
+        r#"name = "habitat-smoke"
+"#,
+    )
+    .unwrap();
+
+    let output = run_in(&temp, &["habitat", "contract"]);
+    assert!(output.status.success());
+
+    let body = json_stdout(&output);
+    assert_eq!(body["success"], true);
+    
+    // Habitat contract has payload.contract with DAGR v3 structure
+    let contract = &body["payload"]["contract"];
+    assert_eq!(contract["dagr"], 3, "expected dagr version 3");
+    assert!(contract["generated_at"].is_string(), "missing generated_at timestamp");
+    assert!(contract["run"].is_object(), "missing run object");
+    assert!(contract["tasks"].is_array(), "missing tasks array");
+    
+    // Each task should have attempts array (even if empty)
+    for task in contract["tasks"].as_array().unwrap() {
+        assert!(task["attempts"].is_array(), "task missing attempts array");
+    }
+}
