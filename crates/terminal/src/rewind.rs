@@ -27,7 +27,7 @@
 //! decision is in the record, the execution is deferred to that layer.
 
 use crate::InferenceMetrics;
-use crate::attempts::{Attempt, RewindTier};
+use crate::attempts::{Attempt, RewindTier, TaskType};
 use crate::git_repo::GitRepo;
 use std::path::Path;
 
@@ -242,6 +242,7 @@ pub fn rewind_commit(commit: &str, workdir: &Path, trunk: &str) -> anyhow::Resul
         approach_warning: None,
         status: crate::attempts::AttemptStatus::Unjudged,
         inference_metrics: InferenceMetrics::default(),
+        task_type: TaskType::DriftCheck,
     };
     rewind(&attempt, workdir, trunk)
 }

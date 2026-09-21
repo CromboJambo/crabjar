@@ -51,6 +51,20 @@ pub enum RewindTier {
     Coarse,
 }
 
+/// Task type discrimination for attempts (ADR-012: subagent delegation).
+///
+/// Drift checks are the original workflow. Subagent tasks are delegated
+/// work items that don't fit the drift-check pattern — research questions,
+/// API lookups, background computations that should proceed without
+/// blocking the primary coding flow.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum TaskType {
+    /// Original drift-check attempt: command execution with git diff.
+    DriftCheck,
+    /// Delegated subagent task: research, lookup, background computation.
+    SubagentTask,
+}
+
 /// The attempt: `Receipt` + `diff` + `preconditions` + `invertible` +
 /// `parent` (trunk commit) + `intent` + judgment state.
 ///
@@ -61,6 +75,9 @@ pub enum RewindTier {
 pub struct Attempt {
     /// Monotonic id, assigned by the triage queue that recorded it.
     pub id: u64,
+    /// Task type: drift check or delegated subagent task.
+    #[serde(default = "default_task_type")]
+    pub task_type: TaskType,
     /// The ADR-005 receipt: command, output, exit_code, duration, cwd.
     pub receipt: Receipt,
     /// Trunk commit the branch is rooted at (precondition).
@@ -87,6 +104,10 @@ pub struct Attempt {
     /// Inference metrics from the LLM runner (Phase 6: real exhaust data).
     #[serde(default)]
     pub inference_metrics: InferenceMetrics,
+}
+
+fn default_task_type() -> TaskType {
+    TaskType::DriftCheck
 }
 
 /// Inference metrics captured from an LLM generation call.
@@ -299,6 +320,7 @@ mod tests {
     fn attempt() -> Attempt {
         Attempt {
             id: 7,
+            task_type: TaskType::DriftCheck,
             receipt: receipt("cargo test", "FAILED", 101),
             parent: "abc1234".to_string(),
             diff: "diff --git a/src/x.rs b/src/x.rs".to_string(),

@@ -419,4 +419,18 @@ pub enum AttemptsCommand {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Submit a delegated subagent task (ADR-012). Enqueues a non-blocking
+    /// background work item for an available worker. The primary coding flow
+    /// continues uninterrupted; results land in the triage queue.
+    Submit {
+        /// Task description / intent
+        #[arg(long)]
+        intent: String,
+        /// Command to execute (for command-based tasks)
+        #[arg(long)]
+        command: Option<String>,
+        /// Path to the triage queue record (JSONL)
+        #[arg(long, default_value = "attempts.jsonl")]
+        queue_path: String,
+    },
 }

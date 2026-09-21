@@ -1334,6 +1334,52 @@ fn handle_attempts_command(
                 })),
             }
         }
+        AttemptsCommand::Submit { intent, command, queue_path } => {
+            let path = std::path::Path::new(&queue_path);
+            let mut queue = crabjar_terminal::TriageQueue::load(path)
+                .unwrap_or_else(|_| crabjar_terminal::TriageQueue::new(10));
+
+            let now = chrono::Utc::now();
+            let id = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            let attempt = crabjar_terminal::Attempt {
+                id,
+                task_type: crabjar_terminal::TaskType::SubagentTask,
+                receipt: crabjar_terminal::stream::Receipt {
+                    command: command.clone().unwrap_or_default(),
+                    output: String::new(),
+                    exit_code: None,
+                    duration: std::time::Duration::ZERO,
+                    cwd: Some(".".to_string()),
+                },
+                parent: String::new(),
+                diff: String::new(),
+                preconditions: vec![],
+                invertible: false,
+                intent: intent.clone(),
+                recorded_at: now,
+                approach_warning: None,
+                status: crabjar_terminal::AttemptStatus::Unjudged,
+                inference_metrics: crabjar_terminal::InferenceMetrics::default(),
+            };
+
+            let outcome = queue.push(attempt);
+            queue.save(path)?;
+
+            Ok(json!({
+                "success": true,
+                "message": format!("subagent task queued ({} attempts in queue)", queue.len()),
+                "payload": {
+                    "intent": intent,
+                    "command": command,
+                    "queue_size": queue.len(),
+                    "outcome": format!("{:?}", outcome),
+                },
+            }))
+        }
     }
 }
 

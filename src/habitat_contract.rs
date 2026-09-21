@@ -146,6 +146,12 @@ pub fn build_contract(
             _ => ended,
         });
 
+        // Task type discrimination (ADR-012: subagent delegation).
+        let task_kind = match a.task_type {
+            crabjar_terminal::TaskType::DriftCheck => "review",
+            crabjar_terminal::TaskType::SubagentTask => "delegated",
+        };
+
         let mut outcome = json!({ "result": state, "evidence": "reported" });
         if failed {
             let names: Vec<String> = broken.iter().map(|c| c.name.clone()).collect();
@@ -189,7 +195,7 @@ pub fn build_contract(
         tasks.push(json!({
             "id": task_id,
             "title": short_title(&a.intent, &a.receipt.command),
-            "kind": "review",
+            "kind": task_kind,
             "owner": "maintainer",
             "project": "triage",
             "state": "review",
@@ -411,6 +417,7 @@ mod tests {
     fn mk_attempt(id: u64, exit: Option<i32>, broken: bool) -> Attempt {
         Attempt {
             id,
+            task_type: crabjar_terminal::TaskType::DriftCheck,
             receipt: Receipt {
                 command: "cargo test".to_string(),
                 output: String::new(),
