@@ -105,13 +105,13 @@ impl GuardDb {
         &self,
         action_id: &str,
         new_status: ActionStatus,
-    ) -> Result<(), GuardDbError> {
+    ) -> Result<bool, GuardDbError> {
         let conn = self.conn();
-        conn.execute(
+        let rows_affected = conn.execute(
             "UPDATE action_requests SET status = ?, resolved_at = unixepoch() WHERE id = ?",
             params![format!("{}", new_status), action_id],
         )?;
-        Ok(())
+        Ok(rows_affected > 0)
     }
 
     #[allow(clippy::too_many_arguments)]

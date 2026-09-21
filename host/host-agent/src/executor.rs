@@ -2,26 +2,69 @@ use crabjar_guard::Scope;
 /// TaskExecutor — runs individual tasks defined in a WorkItem's plan.
 ///
 /// Each task is independently executable. Results are captured and stored.
+/// Supports host execution or isolated Podman container execution.
 use crabjar_host_core::{WorkItem, work_item::TaskStatus};
+use crabjar_podman::{PodmanExecutor, SandboxConfig, SandboxProfile};
 
 pub struct TaskExecutor {
     /// Default scope for gate context (can be overridden per-call).
     scope: Option<Scope>,
+    /// Optional Podman executor for containerized task execution.
+    podman: Option<PodmanExecutor>,
 }
 
 impl TaskExecutor {
     pub fn new() -> Self {
-        Self { scope: None }
+        let podman = PodmanExecutor::new().ok();
+        Self { scope: None, podman }
     }
 
     /// Create a TaskExecutor with a default scope.
     pub fn with_scope(scope: Scope) -> Self {
-        Self { scope: Some(scope) }
+        let podman = PodmanExecutor::new().ok();
+        Self { scope: Some(scope), podman }
     }
 
     /// Get the default scope (if any).
     pub fn scope(&self) -> Option<&Scope> {
         self.scope.as_ref()
+    }
+
+    /// Execute a task in an isolated Podman container.
+    fn execute_in_container(&self, work_item: &WorkItem, task_id: usize) -> Result<String, String> {
+        let podman = self.podman.as_ref().ok_or_else(|| {
+            "Podman executor not available (binary not found)".to_string()
+        })?;
+
+        let task_desc = work_item.plan[task_id].description.clone();
+        let agent_name = format!("agent-{}", work_item.id);
+
+        // Build sandbox config from task description
+        let sandbox = SandboxConfig::new(&agent_name, vec!["/bin/sh".to_string(), "-c".to_string(), task_desc.clone()]);
+
+        // Create container
+        match podman.create_container(&sandbox) {
+            Ok(container_id) => {
+                tracing::info!(container_id, "Created isolated container for task");
+
+                // Start and wait for completion
+                let result = podman.start_container(&container_id).map_err(|e| e.to_string());
+
+                // Clean up
+                if let Err(e) = podman.stop_container(&container_id) {
+                    tracing::warn!("Failed to stop container: {}", e);
+                }
+                if let Err(e) = podman.remove_container(&container_id) {
+                    tracing::warn!("Failed to remove container: {}", e);
+                }
+
+                result.map(|_| format!("Task '{}' completed in isolated container", task_desc))
+            }
+            Err(e) => {
+                tracing::error!(?e, "Failed to create container for task");
+                Err(format!("Container creation failed: {}", e))
+            }
+        }
     }
 
     /// Execute a single task by index.

@@ -17,6 +17,7 @@ async-trait.workspace = true
 crabjar-host-core = { path = "../host-core" }
 crabjar-host-observe = { path = "../host-observe" }
 crabjar-guard = { path = "../../guard" }
+crabjar-podman = { path = "../../crates/podman" }
 crabjar-tool-registry = { path = "../../tool_registry" }
 rusqlite = { workspace = true, features = ["bundled"] }
 reqwest = { workspace = true, default-features = false, features = ["json", "rustls"] }

@@ -363,8 +363,35 @@ impl App {
                 })
                 .await?;
 
-                // Break out of the loop — wait for user input via keyboard shortcuts
-                break;
+                // Poll for CLI approval instead of blocking on keyboard input.
+                // This enables headless operation where the user approves via:
+                //   crabjar guard approve --action-id=<id>
+                let pending_id = entry.id.clone();
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+                    // Check if this specific pending entry has been resolved
+                    match db.read_pending_queue() {
+                        Ok(entries) => {
+                            // If the entry is no longer in the queue, it was resolved via CLI
+                            let still_pending = entries.iter().any(|e| e.id == pending_id);
+                            if !still_pending {
+                                self.messages.push(Message::Guard {
+                                    action: format!("{} (resolved via CLI)", action_desc),
+                                    pending: false,
+                                });
+                                tx.send(AppState::Idle).await?;
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to check pending queue: {}", e);
+                        }
+                    }
+                }
+
+                // Continue the agent loop after approval
+                continue;
             }
 
             // Small delay between iterations for readability

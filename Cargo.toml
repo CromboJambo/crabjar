@@ -9,6 +9,7 @@ members = [
     "tool_registry",
     "axum-mux",
     "crabjar-architecture",
+    "crates/podman",
     # Host runtime
     "host/host-core",
     "host/host-system",
@@ -209,6 +210,7 @@ thiserror.workspace = true
 # Knowledge store
 agent-context = { path = "memory" }
 crabjar-guard = { path = "guard" }
+crabjar-podman = { path = "crates/podman" }
 crabjar-telemetry = { path = "telemetry" }
 crabjar-tool-registry = { path = "tool_registry" }
 crabjar-terminal = { path = "crates/terminal" }

@@ -678,6 +678,7 @@ dependencies = [
  "crabjar-guard",
  "crabjar-host-agent",
  "crabjar-host-core",
+ "crabjar-podman",
  "crabjar-telemetry",
  "crabjar-terminal",
  "crabjar-tool-registry",
@@ -797,6 +798,7 @@ dependencies = [
  "crabjar-guard",
  "crabjar-host-core",
  "crabjar-host-observe",
+ "crabjar-podman",
  "crabjar-tool-registry",
  "reqwest",
  "rusqlite",
@@ -898,6 +900,17 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "crabjar-podman"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

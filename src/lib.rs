@@ -65,6 +65,10 @@ pub enum CliCommand {
 
         #[arg(short, long, default_value = "false")]
         dry_run: bool,
+
+        /// Run command in isolated Podman container (rootless)
+        #[arg(long, default_value = "false")]
+        container: bool,
     },
 
     /// Manage bitwarden credentials
