@@ -1,5 +1,6 @@
 //! Attempts CLI commands (ADR-006, record-only first cut)
 
+use serde_json::json;
 use crabjar_lib::AttemptsCommand;
 
 pub fn handle(command: AttemptsCommand) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
@@ -192,6 +193,52 @@ pub fn handle(command: AttemptsCommand) -> Result<serde_json::Value, Box<dyn std
                     },
                 })),
             }
+        }
+        AttemptsCommand::Submit { intent, command, queue_path } => {
+            let path = std::path::Path::new(&queue_path);
+            let mut queue = crabjar_terminal::TriageQueue::load(path)
+                .unwrap_or_else(|_| crabjar_terminal::TriageQueue::new(10));
+
+            // Build a subagent task attempt with proper fields.
+            // No Receipt yet (task hasn't executed), so use defaults.
+            let now = chrono::Utc::now();
+            let dummy_receipt = crabjar_terminal::Receipt {
+                command: command.clone().unwrap_or_default(),
+                output: String::new(),
+                exit_code: None,
+                duration: std::time::Duration::ZERO,
+                cwd: None,
+            };
+
+            let attempt = crabjar_terminal::Attempt {
+                id: 0, // queue assigns real id on push
+                task_type: crabjar_terminal::TaskType::SubagentTask,
+                receipt: dummy_receipt,
+                parent: String::new(), // not applicable for subagent tasks
+                diff: String::new(),
+                preconditions: Vec::new(),
+                invertible: true,
+                intent,
+                recorded_at: now.clone(),
+                approach_warning: None,
+                status: crabjar_terminal::AttemptStatus::Unjudged,
+                inference_metrics: crabjar_terminal::InferenceMetrics::default(),
+            };
+
+            let outcome = queue.push(attempt);
+
+            Ok(json!({
+                "success": true,
+                "message": "subagent task submitted",
+                "outcome": format!("{:?}", outcome),
+                "queue_path": queue_path,
+                "doubt": {
+                    "assumptions": ["the worker will pick up the queued task"],
+                    "blind_spots": ["no confirmation until worker processes and reports back"],
+                    "last_validation": "queue write at invocation time",
+                    "stale_after": "worker picks up or fails the attempt"
+                }
+            }))
         }
     }
 }

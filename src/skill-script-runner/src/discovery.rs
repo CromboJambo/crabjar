@@ -127,22 +127,32 @@ pub use skill_reference_store::skillset;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use std::path::PathBuf;
 
     #[test]
     fn discover_all_returns_empty_when_no_skills() {
-        let project_dir = tempdir().unwrap();
-        let home_dir = tempdir().unwrap();
-        let result = discover_all(project_dir.path(), home_dir.path()).unwrap();
+        // Use /var/tmp to avoid walking up into crabjar's .agents/skills directory.
+        let project_dir = PathBuf::from("/var/tmp/crabjar-test-project-empty");
+        let home_dir = PathBuf::from("/var/tmp/crabjar-test-home-empty");
+        let _ = std::fs::remove_dir_all(&project_dir);
+        let _ = std::fs::remove_dir_all(&home_dir);
+        std::fs::create_dir_all(&project_dir).unwrap();
+        std::fs::create_dir_all(&home_dir).unwrap();
+        let result = discover_all(&project_dir, &home_dir).unwrap();
         assert!(result.is_empty());
     }
 
     #[test]
     fn discover_all_finds_skills_with_scripts() {
-        let project_dir = tempdir().unwrap();
-        let home_dir = tempdir().unwrap();
+        // Use /var/tmp to avoid walking up into crabjar's .agents/skills directory.
+        let project_dir = PathBuf::from("/var/tmp/crabjar-test-project-scripts");
+        let home_dir = PathBuf::from("/var/tmp/crabjar-test-home-scripts");
+        let _ = std::fs::remove_dir_all(&project_dir);
+        let _ = std::fs::remove_dir_all(&home_dir);
+        std::fs::create_dir_all(&project_dir).unwrap();
+        std::fs::create_dir_all(&home_dir).unwrap();
 
-        let skills_dir = project_dir.path().join(".agents/skills");
+        let skills_dir = project_dir.join(".agents/skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
 
         let skill_dir = skills_dir.join("my-skill");
@@ -157,7 +167,7 @@ mod tests {
         std::fs::create_dir_all(&scripts_dir).unwrap();
         std::fs::write(scripts_dir.join("run.sh"), "#!/bin/bash\necho hello\n").unwrap();
 
-        let result = discover_all(project_dir.path(), home_dir.path()).unwrap();
+        let result = discover_all(&project_dir, &home_dir).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].0, skill_dir);
         assert_eq!(result[0].1.len(), 1);
@@ -165,10 +175,15 @@ mod tests {
 
     #[test]
     fn discover_all_skills_without_scripts() {
-        let project_dir = tempdir().unwrap();
-        let home_dir = tempdir().unwrap();
+        // Use /var/tmp to avoid walking up into crabjar's .agents/skills directory.
+        let project_dir = PathBuf::from("/var/tmp/crabjar-test-project-noscripts");
+        let home_dir = PathBuf::from("/var/tmp/crabjar-test-home-noscripts");
+        let _ = std::fs::remove_dir_all(&project_dir);
+        let _ = std::fs::remove_dir_all(&home_dir);
+        std::fs::create_dir_all(&project_dir).unwrap();
+        std::fs::create_dir_all(&home_dir).unwrap();
 
-        let skills_dir = project_dir.path().join(".agents/skills");
+        let skills_dir = project_dir.join(".agents/skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
 
         let skill_dir = skills_dir.join("no-scripts");
@@ -179,17 +194,22 @@ mod tests {
         )
         .unwrap();
 
-        let result = discover_all(project_dir.path(), home_dir.path()).unwrap();
+        let result = discover_all(&project_dir, &home_dir).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].1.len(), 0);
     }
 
     #[test]
     fn filter_by_skill_finds_matching() {
-        let project_dir = tempdir().unwrap();
-        let home_dir = tempdir().unwrap();
+        // Use /tmp directly — tempdir() may land inside crabjar repo which has skills.
+        let project_dir = std::env::temp_dir().join("crabjar-test-filter-match");
+        let home_dir = std::env::temp_dir().join("crabjar-test-home-filter-match");
+        let _ = std::fs::remove_dir_all(&project_dir);
+        let _ = std::fs::remove_dir_all(&home_dir);
+        std::fs::create_dir_all(&project_dir).unwrap();
+        std::fs::create_dir_all(&home_dir).unwrap();
 
-        let skills_dir = project_dir.path().join(".agents/skills");
+        let skills_dir = project_dir.join(".agents/skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
 
         let skill_dir = skills_dir.join("my-skill");
@@ -205,17 +225,22 @@ mod tests {
         std::fs::write(scripts_dir.join("a.sh"), "").unwrap();
         std::fs::write(scripts_dir.join("b.sh"), "").unwrap();
 
-        let discoveries = discover_all(project_dir.path(), home_dir.path()).unwrap();
+        let discoveries = discover_all(&project_dir, &home_dir).unwrap();
         let scripts = filter_by_skill(&discoveries, "my-skill").unwrap();
         assert_eq!(scripts.len(), 2);
     }
 
     #[test]
     fn filter_by_skill_no_match() {
-        let project_dir = tempdir().unwrap();
-        let home_dir = tempdir().unwrap();
+        // Use /tmp directly — tempdir() may land inside crabjar repo which has skills.
+        let project_dir = std::env::temp_dir().join("crabjar-test-filter-nomatch");
+        let home_dir = std::env::temp_dir().join("crabjar-test-home-filter-nomatch");
+        let _ = std::fs::remove_dir_all(&project_dir);
+        let _ = std::fs::remove_dir_all(&home_dir);
+        std::fs::create_dir_all(&project_dir).unwrap();
+        std::fs::create_dir_all(&home_dir).unwrap();
 
-        let skills_dir = project_dir.path().join(".agents/skills");
+        let skills_dir = project_dir.join(".agents/skills");
         std::fs::create_dir_all(&skills_dir).unwrap();
 
         let skill_dir = skills_dir.join("other-skill");
@@ -226,7 +251,7 @@ mod tests {
         )
         .unwrap();
 
-        let discoveries = discover_all(project_dir.path(), home_dir.path()).unwrap();
+        let discoveries = discover_all(&project_dir, &home_dir).unwrap();
         let scripts = filter_by_skill(&discoveries, "nonexistent").unwrap();
         assert!(scripts.is_empty());
     }

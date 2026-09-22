@@ -1,5 +1,6 @@
 //! Guard CLI commands (execution gate, trust layers)
 
+use serde_json::json;
 use crabjar_lib::GuardCommand;
 
 fn open_guard_db() -> crabjar_guard::GuardDb {

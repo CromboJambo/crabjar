@@ -233,5 +233,44 @@ pub fn handle(command: StateCommand) -> Result<serde_json::Value, Box<dyn std::e
                 "payload": result,
             }))
         }
+        StateCommand::Drift { doc_name, db_path } => {
+            let conn = rusqlite::Connection::open(&db_path)?;
+            agent_context::state_docs::migrate(&conn)?;
+            let querier = agent_context::state_docs::StateDocQuerier::new(
+                conn,
+                std::path::PathBuf::from(&db_path),
+            );
+            // Drift = coasting (stale) vs resisting (recent annotations added)
+            let staleness = querier.staleness_status(&doc_name);
+            let ann_result = querier.get_annotations(&doc_name);
+            let annotations = ann_result["annotations"].as_array().cloned().unwrap_or_default();
+            let is_resisting = annotations.iter().any(|a| {
+                // Annotations added after last doc modification = resisting
+                a.get("created_at")
+                    .and_then(|c| c.as_str())
+                    .map(|created| {
+                        staleness["last_modified"]
+                            .as_str()
+                            .map(|modified| created > modified)
+                            .unwrap_or(false)
+                    })
+                    .unwrap_or(false)
+            });
+            Ok(json!({
+                "success": true,
+                "message": format!("drift check for {}", doc_name),
+                "payload": {
+                    "doc": doc_name,
+                    "status": if is_resisting { "resisting" } else { "coasting" },
+                    "staleness": staleness,
+                    "annotation_count": annotations.len(),
+                    "note": if is_resisting {
+                        "annotations added since last modification — active maintenance"
+                    } else {
+                        "no recent annotations — doc is coasting toward moldy"
+                    }
+                },
+            }))
+        }
     }
 }

@@ -112,6 +112,14 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: AttemptsCommand,
     },
+
+    /// Semantic decision-making via embedding similarity (Jev/SemIf pattern)
+    Decide {
+        #[arg(default_value = "evaluate")]
+        subcmd: String,
+        observation: Option<String>,
+        criteria_file: Option<String>,
+    },
 }
 
 pub mod cli_commands;

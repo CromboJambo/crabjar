@@ -228,9 +228,13 @@ mod tests {
 
     #[test]
     fn open_rejects_non_repo() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        assert!(!GitRepo::is_repo(dir.path()));
-        assert!(GitRepo::open(dir.path()).is_err());
+        // Use /tmp directly — TMPDIR may point inside a git repo (Hermes scratch).
+        let dir = PathBuf::from("/tmp/crabjar-not-a-repo-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        assert!(!GitRepo::is_repo(&dir));
+        assert!(GitRepo::open(&dir).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

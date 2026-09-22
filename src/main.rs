@@ -12,6 +12,7 @@ mod project_loader;
 mod tool_registry_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
+mod commands;
 use crabjar_lib::{
     AttemptsCommand, BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
     HabitatCommand, KnowledgeCommand, MetricsCommand, ToolCommand,
@@ -87,6 +88,17 @@ async fn main() {
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Attempts { command }) => handle_attempts_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Decide { subcmd, observation, criteria_file }) => {
+            let result = commands::semantic::handle(
+                &subcmd,
+                observation.as_deref(),
+                criteria_file.as_deref()
+            );
+            match result {
+                Ok(json) => json,
+                Err(err) => error_response(&err.to_string(), true),
+            }
+        },
         None => {
             print_json(&error_response("missing command", true));
             std::process::exit(1);

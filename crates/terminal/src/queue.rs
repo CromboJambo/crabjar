@@ -305,6 +305,7 @@ mod tests {
     fn attempt(cmd: &str) -> Attempt {
         Attempt {
             id: 0,
+            task_type: crate::attempts::TaskType::DriftCheck,
             receipt: receipt(cmd),
             parent: "abc1234".to_string(),
             diff: "diff".to_string(),

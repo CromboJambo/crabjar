@@ -29,7 +29,7 @@
 use crate::InferenceMetrics;
 use crate::attempts::{Attempt, RewindTier, TaskType};
 use crate::git_repo::GitRepo;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Why a rewind was refused. A refusal is a value, not a panic — the
 /// caller (CLI, user) gets the reason in hand and the state is untouched.
@@ -303,6 +303,7 @@ mod tests {
     fn attempt(id: u64, parent: &str, invertible: bool) -> Attempt {
         Attempt {
             id,
+            task_type: TaskType::DriftCheck,
             receipt: Receipt {
                 command: "cargo test".to_string(),
                 output: String::new(),
@@ -428,14 +429,18 @@ mod tests {
 
     #[test]
     fn rewind_refuses_non_repo_workdir() {
-        let dir = tempfile::tempdir().expect("tempdir");
+        // Use /tmp directly — TMPDIR may point inside a git repo (Hermes scratch).
+        let dir = PathBuf::from("/tmp/crabjar-rewind-not-a-repo-test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
         let a = attempt(1, "abc1234", true);
-        match rewind(&a, dir.path(), "abc1234").unwrap() {
+        match rewind(&a, &dir, "abc1234").unwrap() {
             RewindOutcome::Refused(refusal) => {
                 assert_eq!(refusal.reason, RewindRefusalReason::NotAGitRepo);
             }
             other => panic!("expected Refused, got {other:?}"),
         }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
