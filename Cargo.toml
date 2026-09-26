@@ -31,11 +31,17 @@ members = [
     # Skill crates
     "src/skill-script-runner",
     "src/skill-reference-store",
+    "src/skill-process-management",
+    "src/skill-struct-tok-pipeline",
+    # Scheduler — cron jobs, workers, watchers with execution gating
+    "scheduler",
     # Zed ACP
     "zed-acp-bridge",
     "zed-acp-server",
     # Plugin system
     "crabjar-plugin",
+    # GPU-accelerated agent dashboard (proof-of-concept)
+    
 ]
 
 resolver = "2"
