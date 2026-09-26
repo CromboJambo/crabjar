@@ -1,0 +1,15 @@
+[package]
+name = "skill-structural-tokenizer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Middleware skill for structural tokenization of Rust source code"
+
+[[bin]]
+name = "hermes-struct-tok"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
