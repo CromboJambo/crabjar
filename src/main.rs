@@ -713,7 +713,7 @@ async fn handle_exec(
     })?;
 
     // Concierge layer: persist gate result to GuardDb
-    let mut concierge = crabjar_guard::GateConcierge::default();
+    let mut concierge = crabjar_guard::GateConcierge::default().with_db(guard_db.clone());
     let (status, pending_entry, interrupted_entry) = concierge.enforce(
         gate_result,
         "exec",

@@ -98,3 +98,28 @@ refresh-docs:
     @echo ""
     @echo "Update AGENTS.md with: sed -i 's/Last structural refresh: .*/Last structural refresh: $(date +%Y-%m-%d)/' AGENTS.md"
     @echo "=== Manual update required — see above for live data ==="
+
+# Dependency audit suite (optional, stricter layer)
+# Run locally before PR or on demand. Not part of default CI to avoid noise.
+dep-audit:
+    @echo "=== Dependency Audit Suite ==="
+    @echo ""
+    @echo "1. Declared vs Compiled:"
+    @cargo declared --path . 2>&1 || true
+    @echo ""
+    @echo "2. Vulnerability Scan (audit):"
+    @cargo audit --all-targets 2>&1 || true
+    @echo ""
+    @echo "3. License Compliance (deny):"
+    @cargo deny check licenses 2>&1 || true
+    @echo ""
+    @echo "=== Audit Complete ==="
+
+# Quick audit: just vulnerabilities and licenses, no declared analysis
+dep-audit-quick:
+    @echo "=== Quick Dependency Audit ==="
+    @echo "Vulnerabilities:"
+    @cargo audit --all-targets 2>&1 || true
+    @echo ""
+    @echo "Licenses:"
+    @cargo deny check licenses 2>&1 || true
