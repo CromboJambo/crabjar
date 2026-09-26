@@ -1,0 +1,24 @@
+[package]
+name = "crabjar-scheduler"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Cron jobs, workers, and watchers with execution gating"
+
+[dependencies]
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+rusqlite = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+# crabjar internal deps
+crabjar-guard = { path = "../guard" }
+crabjar-telemetry = { path = "../telemetry" }
+
+[dev-dependencies]
+tempfile = "3.20"

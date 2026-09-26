@@ -1,0 +1,29 @@
+# Cargo-deny configuration for crabjar
+# License compliance checking for AGPL-3.0 project
+
+[licenses]
+version = 2
+
+# Allow these licenses (AGPL-3.0 compatible or permissive)
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "ISC",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "MPL-2.0",
+    "Zlib",
+    "Unlicense",
+    "CC0-1.0",
+    "OpenSSL",
+    "AGPL-3.0",
+]
+
+# Deny these licenses (incompatible with AGPL-3.0 distribution)
+deny = [
+    "GPL-2.0",
+    "LGPL-2.1",
+]
+
+# Ignore crates that are dev-only or build-time only
+ignore-dev-dependencies = true
