@@ -101,13 +101,30 @@ impl GateConcierge {
                     reason: reason.clone(),
                     logged_at: chrono::Utc::now().timestamp(),
                 };
-                if let Some(db) = &self.db
-                    && let Err(e) = db.persist_interrupted_log_entry(&entry)
-                {
-                    error!(
-                        gate_result_id = %gate_result_id,
-                        "Failed to persist interrupted log entry: {}", e
-                    );
+                if let Some(db) = &self.db {
+                    if let Err(e) = db.persist_interrupted_log_entry(&entry) {
+                        error!(
+                            gate_result_id = %gate_result_id,
+                            "Failed to persist interrupted log entry: {}", e
+                        );
+                    }
+                    // Also create an action request so approve can find it
+                    if let Err(e) = db.persist_action_request_with_scope(
+                        &entry.id,
+                        Some(&entry.gate_result_id),
+                        None,
+                        &entry.action_type,
+                        &entry.command,
+                        entry.trust_layer,
+                        confidence,
+                        None,
+                        None,
+                    ) {
+                        error!(
+                            gate_result_id = %gate_result_id,
+                            "Failed to persist action request for interrupted entry: {}", e
+                        );
+                    }
                 }
                 error!(
                     gate_result_id = %gate_result_id,
