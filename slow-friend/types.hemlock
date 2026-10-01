@@ -1,0 +1,127 @@
+// Slow Friend Architecture - Hemlock Type Definitions
+// Mirrors the Rust traits/types from the slow-friend crate.
+
+// ===== Tier 1: Sensors =====
+
+// Result of a single sensor check
+type SensorResult = { kind: "quiet" } | { kind: "alert"; event: SensorEvent };
+
+// Raw event data from a sensor, before interpretation
+type SensorEvent = {
+    source: string;
+    event_type: string;
+    timestamp: i64;  // Unix epoch seconds
+    payload: object;
+};
+
+// Sensor trait (in Hemlock, traits become interfaces with fn fields)
+interface Sensor {
+    name(): string;
+    check(): SensorResult;
+}
+
+// ===== Tier 2: Interpretation =====
+
+// Structured interpretation of a sensor event
+type Interpretation = {
+    meaningful: bool;
+    severity: f64;      // [0.0, 1.0] - how serious is this?
+    novelty: f64;       // [0.0, 1.0] - how unusual is this?
+    summary: string;
+    source_event: SensorEvent;
+};
+
+// Interpretation engine trait
+interface InterpretationEngine {
+    interpret(event: SensorEvent): Interpretation;
+}
+
+// ===== Tier 3: Jev Decision Layer =====
+
+// The decision the Jev layer makes
+type JevDecision = 
+    { kind: "sleep" } | 
+    { kind: "execute"; action: Action };
+
+// A concrete action to execute
+type Action = {
+    class: ActionClass;
+    description: string;
+    parameters: object;
+};
+
+// Distinct classes of actions (enum-like via string tags)
+type ActionClass = 
+    { kind: "disk_cleanup" } |
+    { kind: "restart_service"; service_name: string } |
+    { kind: "send_notification"; channel: string } |
+    { kind: "archive_file"; path: string } |
+    { kind: "run_backup" } |
+    { kind: "custom"; name: string };
+
+// Jev decision engine trait
+interface JevEngine {
+    decide(interpretation: Interpretation): JevDecision;
+    explain(interpretation: Interpretation, decision: JevDecision): string;
+}
+
+// ===== Tier 4: Action Execution =====
+
+// Result of executing an action
+type ActionResult = 
+    { kind: "success"; details: string } |
+    { kind: "failure"; error: string } |
+    { kind: "rejected"; reason?: string };
+
+// Action executor trait
+interface ActionExecutor {
+    execute(action: Action): ActionResult;
+}
+
+// ===== Earned Autonomy System =====
+
+// Permission level for an action class
+type PermissionLevel = 
+    { kind: "ask" } |
+    { kind: "notify" } |
+    { kind: "autonomous" };
+
+// Per-action-class approval history record
+type ActionClassRecord = {
+    class: ActionClass;
+    total_attempts: u64;
+    approved: u64;
+    rejected: u64;
+    reversed: u64;
+    permission: PermissionLevel;
+};
+
+// Topological autonomy level derived from approval history
+type AutonomyLevel = 
+    { kind: "act" } |      // Known path (dense support)
+    { kind: "propose" } |  // Weak path (some support)
+    { kind: "ask" };       // New path (no prior experience)
+
+// ===== Sparse Lattice Memory Substrate =====
+
+// A node in the lattice with a value
+type LatticeNode = {
+    key: string;
+    value: object;
+    updated_at: i64;  // Unix epoch seconds
+};
+
+// ===== CrabJar Integration Bridge =====
+
+// Gate result from CrabJar's ExecutionGate
+type GateResult = 
+    { kind: "proceed" } |
+    { kind: "pending" } |
+    { kind: "interrupted"; reason: string } |
+    { kind: "revoked"; reason: string } |
+    { kind: "dry_run" };
+
+// CrabJar guard bridge interface
+interface CrabJarGuardBridge {
+    execute_through_guard(action: Action): ActionResult;
+}
