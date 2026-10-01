@@ -389,6 +389,28 @@ pub enum HabitatCommand {
     },
 }
 
+/// Slow Friend daemon subcommands (EXPL-005)
+#[derive(Debug, Subcommand, Clone)]
+pub enum SlowFriendCommand {
+    /// Start the Slow Friend daemon loop (tiered attention system)
+    Start {
+        /// Tick interval in seconds (default: 60)
+        #[arg(long, default_value_t = 60)]
+        tick_interval: u64,
+        /// Sleep duration after quiet period in seconds (default: 300)
+        #[arg(long, default_value_t = 300)]
+        sleep_after_quiet: u64,
+    },
+    /// Run a single sensor check and report (non-daemon mode)
+    Check,
+    /// Show autonomy tracker status for action classes
+    Autonomy {
+        /// Action class to query (disk-cleanup, restart-service, etc.)
+        #[arg(long)]
+        class: Option<String>,
+    },
+}
+
 /// Attempt graph subcommands (ADR-006)
 #[derive(Debug, Subcommand, Clone)]
 pub enum AttemptsCommand {

@@ -120,6 +120,12 @@ pub enum CliCommand {
         observation: Option<String>,
         criteria_file: Option<String>,
     },
+
+    /// Slow Friend daemon: tiered attention system (EXPL-005)
+    SlowFriend {
+        #[command(subcommand)]
+        command: SlowFriendCommand,
+    },
 }
 
 pub mod cli_commands;

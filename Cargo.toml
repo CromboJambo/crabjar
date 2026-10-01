@@ -220,6 +220,7 @@ crabjar-podman = { path = "crates/podman" }
 crabjar-telemetry = { path = "telemetry" }
 crabjar-tool-registry = { path = "tool_registry" }
 crabjar-terminal = { path = "crates/terminal" }
+crabjar-slow-friend = { path = "slow-friend", package = "slow-friend" }
 
 # Database
 rusqlite.workspace = true

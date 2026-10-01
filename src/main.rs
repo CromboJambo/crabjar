@@ -15,8 +15,10 @@ use bitwarden::commands::handle_bitwarden_command;
 mod commands;
 use crabjar_lib::{
     AttemptsCommand, BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
-    HabitatCommand, KnowledgeCommand, MetricsCommand, ToolCommand,
+    HabitatCommand, KnowledgeCommand, MetricsCommand, SlowFriendCommand, ToolCommand,
 };
+use crabjar_slow_friend::action::ActionClass;
+use crabjar_slow_friend::autonomy::{AutonomyLevel, AutonomyTracker};
 use doctor::handle_doctor_command;
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
@@ -99,6 +101,8 @@ async fn main() {
                 Err(err) => error_response(&err.to_string(), true),
             }
         },
+        Some(CliCommand::SlowFriend { command }) => handle_slow_friend_command(command)
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         None => {
             print_json(&error_response("missing command", true));
             std::process::exit(1);
@@ -1392,6 +1396,74 @@ fn handle_attempts_command(
                 },
             }))
         }
+    }
+}
+
+/// Handle slow friend daemon commands (EXPL-005)
+fn handle_slow_friend_command(command: SlowFriendCommand) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    match command {
+        SlowFriendCommand::Start { tick_interval, sleep_after_quiet } => {
+            // Daemon mode: report configuration and readiness
+            Ok(json!({
+                "success": true,
+                "slow_friend": {
+                    "mode": "daemon",
+                    "tick_interval_secs": tick_interval,
+                    "sleep_after_quiet_secs": sleep_after_quiet,
+                    "status": "configured",
+                    "architecture": "tiered-attention-expl-005",
+                    "tiers": [
+                        {"level": 1, "name": "sensors", "cost": "cheap", "description": "deterministic checks"},
+                        {"level": 2, "name": "interpretation", "cost": "medium", "description": "structural analysis"},
+                        {"level": 3, "name": "jev_decision", "cost": "expensive", "description": "semantic judgment"}
+                    ]
+                }
+            }))
+        },
+        SlowFriendCommand::Check => {
+            // Single sensor check and report
+            Ok(json!({
+                "success": true,
+                "slow_friend": {
+                    "mode": "check",
+                    "sensors_run": 0,
+                    "alerts": [],
+                    "status": "no_sensors_configured"
+                }
+            }))
+        },
+        SlowFriendCommand::Autonomy { class } => {
+            // Show autonomy tracker status
+            let tracker = crabjar_slow_friend::AutonomyTracker::new();
+            
+            if let Some(class_name) = class {
+                // Map string back to ActionClass enum (simplified for CLI)
+                let permission = match class_name.as_str() {
+                    "disk-cleanup" | "disk_cleanup" => tracker.autonomy_level(&ActionClass::DiskCleanup),
+                    "restart-service" | "restart_service" => tracker.autonomy_level(&ActionClass::RestartService),
+                    _ => AutonomyLevel::Ask,
+                };
+                Ok(json!({
+                    "success": true,
+                    "slow_friend": {
+                        "mode": "autonomy",
+                        "action_class": class_name,
+                        "autonomy_level": format!("{:?}", permission),
+                        "status": "reported"
+                    }
+                }))
+            } else {
+                // List all action classes
+                Ok(json!({
+                    "success": true,
+                    "slow_friend": {
+                        "mode": "autonomy",
+                        "action_classes": [],
+                        "status": "no_history"
+                    }
+                }))
+            }
+        },
     }
 }
 
