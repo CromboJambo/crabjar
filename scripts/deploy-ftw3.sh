@@ -21,7 +21,7 @@ cargo build --release -p crabjar 2>&1 | tail -5
 
 echo "==> SSH to ftw3, stopping crabjar service (dinit)..."
 ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
-    "dinitctl stop crabjar-agent || true"
+    "sudo dinitctl stop crabjar-agent || true"
 
 echo "==> rsync built artifact to ftw3: ${DEPLOY_DIR}/..."
 rsync -avz --delete \
@@ -30,6 +30,6 @@ rsync -avz --delete \
 
 echo "==> Restarting crabjar service on ftw3 (dinit)..."
 ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
-    "dinitctl start crabjar-agent && sleep 2 && dinitctl status crabjar-agent || true"
+    "sudo dinitctl start crabjar-agent && sleep 2 && ps aux | grep crabjar | head -5"
 
 echo "==> Deployment complete. Commit: $COMMIT"
