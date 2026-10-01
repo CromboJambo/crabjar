@@ -22,7 +22,7 @@ The agent's job isn't to occupy computation — it's to make useful decisions *w
 
 ## Tiered Attention Architecture
 
-```hemlock
+```pseudocode
 LOW COST
          │
   deterministic
@@ -54,7 +54,7 @@ Each tier is more expensive computationally but only triggered when cheaper chec
 ### 1. Deterministic Sensors (Cheapest)
 Simple rule-based checks that run constantly at low cost:
 
-```hemlock
+```pseudocode
 // Runs every minute, trivial CPU
 fn check_sensors() {
     if (disk_usage() > 90%) return ALERT;
@@ -67,7 +67,7 @@ fn check_sensors() {
 ### 2. Structural Interpretation (Medium Cost)
 When sensors detect something, parse it for meaning:
 
-```hemlock
+```pseudocode
 fn interpret_event(event) {
     // Is this email from my boss? About a deadline?
     // Is this disk usage from logs or actual data?
@@ -81,7 +81,7 @@ fn interpret_event(event) {
 ### 3. Jev Decision Layer (Expensive)
 Only invoked for genuinely ambiguous situations that require semantic judgment:
 
-```hemlock
+```pseudocode
 fn jev_decision(interpretation) {
     // This is where the LLM comes in
     // "Should I escalate this to the user?"
@@ -94,7 +94,7 @@ fn jev_decision(interpretation) {
 ### 4. CrabJar Execution (Most Expensive / Irreversible)
 The actual action with checkpointing and notification:
 
-```hemlock
+```pseudocode
 fn execute_with_guard(action) {
     let checkpoint = create_checkpoint();
     let result = action.execute();
@@ -109,7 +109,7 @@ fn execute_with_guard(action) {
 
 ## Implementation Sketch
 
-```hemlock
+```pseudocode
 // slow_friend.hml — main daemon loop
 
 let last_event_time = now();
@@ -155,7 +155,7 @@ The slow friend architecture naturally integrates with earned autonomy:
 2. **Repeated similar events** build up approval history in the action class registry
 3. **Eventually** the agent can handle certain event types autonomously (skip Jev decision, go straight to CrabJar execution)
 
-```hemlock
+```pseudocode
 // Example evolution
 // Week 1: Disk full → Jev decides → proposes cleanup to user
 // Week 2-4: User approves disk cleanup 5 times
@@ -171,7 +171,7 @@ The lattice provides the memory substrate for this architecture:
 - **Jev decision** is only needed when the lattice has no answer (sparse region)
 - **Learning** adds new edges to the lattice after each decision
 
-```hemlock
+```pseudocode
 // Lattice query during interpretation
 let similar_events = lattice.find_similar(current_event);
 
