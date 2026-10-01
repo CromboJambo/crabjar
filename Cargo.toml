@@ -39,7 +39,7 @@ members = [
     "zed-acp-bridge",
     "zed-acp-server",
     # Plugin system
-    "crabjar-plugin",
+    "crabjar-plugin", "slow-friend",
     # GPU-accelerated agent dashboard (proof-of-concept)
     
 ]
