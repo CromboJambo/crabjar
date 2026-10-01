@@ -19,17 +19,17 @@ REMOTE_HOST="ftw3"
 echo "==> Building release binary for commit $COMMIT..."
 cargo build --release -p crabjar 2>&1 | tail -5
 
-echo "==> SSH to ftw3, stopping crabjar service..."
+echo "==> SSH to ftw3, stopping crabjar service (dinit)..."
 ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
-    "systemctl --user stop crabjar-agent || true"
+    "dinitctl stop crabjar-agent || true"
 
 echo "==> rsync built artifact to ftw3: ${DEPLOY_DIR}/..."
 rsync -avz --delete \
     target/release/crabjar \
     "${REMOTE_USER}@${REMOTE_HOST}:${DEPLOY_DIR}/crabjar"
 
-echo "==> Restarting crabjar service on ftw3..."
+echo "==> Restarting crabjar service on ftw3 (dinit)..."
 ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
-    "systemctl --user start crabjar-agent && systemctl --user status crabjar-agent | head -20"
+    "dinitctl start crabjar-agent && sleep 2 && dinitctl status crabjar-agent || true"
 
 echo "==> Deployment complete. Commit: $COMMIT"
