@@ -35,6 +35,7 @@ pub mod action;
 pub mod autonomy;
 pub mod lattice;
 pub mod daemon;
+pub mod crabjar_bridge;
 pub mod testing;
 
 // Re-export key public types
