@@ -123,6 +123,7 @@ pub enum CliCommand {
 }
 
 pub mod cli_commands;
+pub mod skill_instrumentation;
 
 pub use cli_commands::*;
 

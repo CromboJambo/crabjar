@@ -684,6 +684,7 @@ dependencies = [
  "crabjar-tool-registry",
  "crossterm 0.28.1",
  "insta",
+ "lazy_static",
  "ratatui",
  "rusqlite",
  "serde",
