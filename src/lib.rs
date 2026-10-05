@@ -126,10 +126,46 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: SlowFriendCommand,
     },
+
+    /// Learning loop: analyze skill invocations and suggest improvements
+    Learn {
+        #[arg(default_value = "analyze")]
+        subcmd: String,
+        #[arg(long, default_value = "3")]
+        min_invocations: usize,
+    },
+
+    /// Session search: find past sessions by topic or error type
+    Session {
+        #[command(subcommand)]
+        command: SessionCommand,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum SessionCommand {
+    /// Search past sessions for relevant context
+    Search {
+        query: String,
+        #[arg(short, long, default_value = "5")]
+        limit: usize,
+    },
+    /// Find sessions related to a specific topic
+    Related {
+        topic: String,
+    },
+    /// Find past failures of a specific type
+    Failures {
+        error_type: String,
+    },
 }
 
 pub mod cli_commands;
 pub mod skill_instrumentation;
+pub mod learning_loop;
+pub mod session_search;
+pub mod feedback_integration;
+pub mod environment_awareness;
 
 pub use cli_commands::*;
 

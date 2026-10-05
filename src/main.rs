@@ -103,6 +103,81 @@ async fn main() {
         },
         Some(CliCommand::SlowFriend { command }) => handle_slow_friend_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Learn { subcmd, min_invocations }) => {
+            let analyzer = crabjar_lib::learning_loop::LearningAnalyzer::new();
+            match subcmd.as_str() {
+                "analyze" => {
+                    match analyzer.generate_recommendations() {
+                        Ok(recommendations) => recommendations,
+                        Err(err) => error_response(&err.to_string(), true),
+                    }
+                }
+                "training-candidates" => {
+                    match analyzer.export_training_candidates(min_invocations) {
+                        Ok(candidates) => json!({
+                            "success": true,
+                            "type": "training_candidates",
+                            "candidates": candidates,
+                            "count": candidates.len()
+                        }),
+                        Err(err) => error_response(&err.to_string(), true),
+                    }
+                }
+                "failure-patterns" => {
+                    match analyzer.identify_failure_patterns() {
+                        Ok(patterns) => json!({
+                            "success": true,
+                            "type": "failure_patterns",
+                            "patterns": patterns,
+                            "count": patterns.len()
+                        }),
+                        Err(err) => error_response(&err.to_string(), true),
+                    }
+                }
+                _ => error_response("Unknown learn subcommand. Use: analyze, training-candidates, failure-patterns", true),
+            }
+        }
+        Some(CliCommand::Session { command }) => {
+            let mut search = crabjar_lib::session_search::SessionSearchIndex::new();
+            match command {
+                crabjar_lib::SessionCommand::Search { query, limit } => {
+                    match search.search(&query, limit) {
+                        Ok(results) => json!({
+                            "success": true,
+                            "type": "session_search",
+                            "query": query,
+                            "results": results,
+                            "count": results.len()
+                        }),
+                        Err(err) => error_response(&err.to_string(), true),
+                    }
+                }
+                crabjar_lib::SessionCommand::Related { topic } => {
+                    match search.find_related(&topic) {
+                        Ok(results) => json!({
+                            "success": true,
+                            "type": "session_related",
+                            "topic": topic,
+                            "results": results,
+                            "count": results.len()
+                        }),
+                        Err(err) => error_response(&err.to_string(), true),
+                    }
+                }
+                crabjar_lib::SessionCommand::Failures { error_type } => {
+                    match search.find_past_failures(&error_type) {
+                        Ok(results) => json!({
+                            "success": true,
+                            "type": "session_failures",
+                            "error_type": error_type,
+                            "results": results,
+                            "count": results.len()
+                        }),
+                        Err(err) => error_response(&err.to_string(), true),
+                    }
+                }
+            }
+        }
         None => {
             print_json(&error_response("missing command", true));
             std::process::exit(1);

@@ -143,21 +143,6 @@ enum AcpResponse {
 /// Shared SSE event channel for live updates (e.g., terrarium entity positions).
 type EventChannel = Arc<tokio::sync::broadcast::Sender<String>>;
 
-/// AppState now includes the event broadcast channel.
-#[allow(dead_code)]
-#[derive(Clone)]
-struct AppState {
-    store: Arc<std::sync::Mutex<Store>>,
-    events_db_path: String,
-    guard_root: String,
-    backend: Arc<Mutex<Box<dyn InferenceBackend>>>,
-    /// Scope for this orchestrator instance (used for gate context).
-    actor_scope: crabjar_guard::Scope,
-    target_scope: crabjar_guard::Scope,
-    /// Broadcast channel for SSE event subscriptions.
-    event_channel: EventChannel,
-}
-
 /// Subscribe to live events via SSE — used by crabjar-gpui for terrarium entity updates.
 async fn subscribe_events(
     State(state): State<AppState>,

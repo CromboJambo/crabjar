@@ -1678,6 +1678,7 @@ dependencies = [
  "libc",
  "ratatui",
  "ratatui-ratty",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",
@@ -1703,7 +1704,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "futures-util",
  "gpui",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",
