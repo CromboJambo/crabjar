@@ -1,0 +1,28 @@
+[package]
+name = "crabjar-ssh-bastion"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SSH bastion host using russh — transparent proxy for home-lab SSH access"
+
+[dependencies]
+russh = { version = "0.63", features = ["des", "dsa", "rsa", "aws-lc-rs"], default-features = false }
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+sha2.workspace = true
+hex.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+rand = "0.10"
+anyhow = "1.0"
+toml = "0.8"
+
+[dev-dependencies]
+tempfile.workspace = true
