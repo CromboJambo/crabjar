@@ -20,7 +20,7 @@ use tokio::time::{Duration, sleep};
 struct CommandRequest {
     id: u64,
     method: String,
-    params: CommandParams,
+    params: Option<CommandParams>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -162,20 +162,28 @@ async fn handle_commands(state: &Mutex<TerrariumState>) -> io::Result<()> {
                     }
                 }
                 "terrarium/set_speed" => {
-                    if let Some(val) = request.params.value {
-                        state_guard.speed_multiplier = val.parse().unwrap_or(1.0);
-                        CommandResult {
-                            status: "speed_set".to_string(),
-                            message: Some(format!(
-                                "Speed set to {}x",
-                                state_guard.speed_multiplier
-                            )),
-                            crabs_count: Some(state_guard.crabs_count),
+                    if let Some(params) = request.params {
+                        if let Some(val) = params.value {
+                            state_guard.speed_multiplier = val.parse().unwrap_or(1.0);
+                            CommandResult {
+                                status: "speed_set".to_string(),
+                                message: Some(format!(
+                                    "Speed set to {}x",
+                                    state_guard.speed_multiplier
+                                )),
+                                crabs_count: Some(state_guard.crabs_count),
+                            }
+                        } else {
+                            CommandResult {
+                                status: "error".to_string(),
+                                message: Some("Missing speed value".to_string()),
+                                crabs_count: None,
+                            }
                         }
                     } else {
                         CommandResult {
                             status: "error".to_string(),
-                            message: Some("Missing speed value".to_string()),
+                            message: Some("Missing params".to_string()),
                             crabs_count: None,
                         }
                     }
@@ -185,6 +193,14 @@ async fn handle_commands(state: &Mutex<TerrariumState>) -> io::Result<()> {
                     CommandResult {
                         status: "stepped".to_string(),
                         message: Some("Advanced one tick".to_string()),
+                        crabs_count: Some(state_guard.crabs_count),
+                    }
+                }
+                "terrarium/query_state" => {
+                    // Query state - no action required, return current state
+                    CommandResult {
+                        status: "ok".to_string(),
+                        message: None,
                         crabs_count: Some(state_guard.crabs_count),
                     }
                 }
@@ -291,7 +307,7 @@ async fn main() {
 
     match mode {
         "stdio" => {
-            println!("🦀 Terrarium plugin started (stdio mode)");
+            eprintln!("🦀 Terrarium plugin started (stdio mode)");
 
             let state = Mutex::new(TerrariumState::default());
 

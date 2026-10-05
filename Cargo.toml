@@ -41,7 +41,7 @@ members = [
     # Plugin system
     "crabjar-plugin", "slow-friend",
     # GPU-accelerated agent dashboard (proof-of-concept)
-    
+    "crates/crabjar-gpui",
 ]
 
 resolver = "2"
