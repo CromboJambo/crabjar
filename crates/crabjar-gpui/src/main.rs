@@ -1,13 +1,21 @@
 //! Crabjar GPU Dashboard — connects to a real terrarium orchestrator via
-//! JSON-RPC over stdio, renders live entity state in a gpui dashboard.
+//! SSE event subscription and JSON-RPC over stdio, renders live entity state
+//! in a gpui dashboard.
+//!
+//! Architecture:
+//! - Orchestrator spawns terrarium plugin (stdio JSON-RPC)
+//! - Terrarium plugin publishes entity positions each tick to /acp/events/publish
+//! - crabjar-gpui subscribes via SSE at /acp/events/subscribe
+//! - Dashboard updates on live entity_state events
 
+use futures_util::stream::StreamExt;
 use gpui::{
     div, prelude::*, px, rgb, size, App, Application, Bounds, Context, IntoElement, ParentElement,
     Render, Window, WindowBounds, WindowOptions, FontWeight,
 };
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{ChildStdin, ChildStdout, Command, Stdio};
 
 // ============================================================================
 // JSON-RPC Protocol (matches apps/terrarium/src/plugin.rs)
@@ -71,7 +79,6 @@ struct EntityInfo {
 // ============================================================================
 
 struct OrchestratorConnection {
-    child: Child,
     stdin: ChildStdin,
     stdout_reader: BufReader<ChildStdout>,
     next_id: u64,
@@ -92,7 +99,6 @@ impl OrchestratorConnection {
         let stdout = child.stdout.take().ok_or(anyhow::anyhow!("No stdout"))?;
 
         Ok(Self {
-            child,
             stdin,
             stdout_reader: BufReader::new(stdout),
             next_id: 1,
@@ -152,8 +158,89 @@ impl OrchestratorConnection {
 }
 
 // ============================================================================
-// Dashboard View
+// SSE Event Subscription (live entity updates from orchestrator)
 // ============================================================================
+
+async fn subscribe_to_entity_events(
+    orchestrator_url: &str,
+    tx: tokio::sync::mpsc::Sender<Vec<EntityInfo>>,
+) {
+    let url = format!("{}/acp/events/subscribe", orchestrator_url);
+    
+    match reqwest::get(&url).await {
+        Ok(response) => {
+            if !response.status().is_success() {
+                eprintln!("SSE subscription failed: {}", response.status());
+                return;
+            }
+
+            let mut stream = response.bytes_stream();
+            
+            while let Some(chunk) = stream.next().await {
+                match chunk {
+                    Ok(bytes) => {
+                        let text = String::from_utf8_lossy(&bytes);
+                        
+                        // Parse SSE data lines
+                        for line in text.lines() {
+                            if line.starts_with("data: ") {
+                                let json_str = &line[6..];
+                                
+                                // Skip keepalive
+                                if json_str == "{\"type\":\"keepalive\"}" {
+                                    continue;
+                                }
+                                
+                                if let Ok(event) = serde_json::from_str::<Value>(json_str) {
+                                    if event.get("type").and_then(|v| v.as_str()) == Some("entity_state") {
+                                        // Send parsed entities to the channel
+                                        let entities = parse_entity_event(&event);
+                                        if tx.send(entities).await.is_err() {
+                                            return; // Channel closed
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("SSE stream error: {}", e);
+                        break;
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to connect to SSE endpoint: {}", e);
+        }
+    }
+}
+
+fn parse_entity_event(event: &Value) -> Vec<EntityInfo> {
+    let mut entities = Vec::new();
+    
+    if let Some(array) = event.get("entities").and_then(|v| v.as_array()) {
+        for item in array {
+            let id = item
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            let x = item.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+            let y = item.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+
+            entities.push(EntityInfo {
+                id,
+                x,
+                y,
+                last_action: "idle".to_string(),
+            });
+        }
+    }
+    
+    entities
+}
 
 struct DashboardView {
     entities: Vec<EntityInfo>,
@@ -242,36 +329,45 @@ fn main() {
         // Spawn orchestrator connection and update loop using cx.spawn (not std thread)
         let window_handle = window;
         let any_window: gpui::AnyWindowHandle = window_handle.into();
-        cx.spawn(async move |cx| {
-            let mut conn = match OrchestratorConnection::spawn() {
-                Ok(conn) => conn,
+        
+        // Start terrarium plugin via JSON-RPC
+        let spawn_task = cx.spawn(async move |cx| {
+            match OrchestratorConnection::spawn() {
+                Ok(mut conn) => {
+                    eprintln!("Terrarium plugin spawned successfully");
+                    
+                    // Send start command to begin simulation
+                    if let Err(e) = conn.request("terrarium/start", None) {
+                        eprintln!("Failed to start terrarium: {}", e);
+                    }
+                }
                 Err(e) => {
                     eprintln!("Failed to spawn terrarium: {}", e);
-                    return;
                 }
-            };
-
-            // Update status
-            window_handle.update(cx, |dash, _, _| {
-                dash.set_status("Connected");
-            })
-            .ok();
-
-            loop {
-                match conn.get_entities() {
-                    Ok(entities) => {
-                        window_handle.update(cx, move |dash, _, _| {
-                            dash.update_entities(entities);
-                        })
-                        .ok();
-                    }
-                    Err(e) => eprintln!("Failed to get entities: {}", e),
-                }
-
-                std::thread::sleep(std::time::Duration::from_secs(1));
             }
-        })
-        .detach();
+        }).detach();
+
+        // Subscribe to live entity events via SSE
+        let orchestrator_url = std::env::var("ORCHESTRATOR_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
+        
+        // Create channel for SSE events to communicate with the UI thread
+        let (entity_tx, mut entity_rx) = tokio::sync::mpsc::channel::<Vec<EntityInfo>>(100);
+        
+        cx.spawn(async move |cx| {
+            eprintln!("Subscribing to entity events at {}", orchestrator_url);
+            subscribe_to_entity_events(&orchestrator_url, entity_tx).await;
+        }).detach();
+
+        // Listen for entity updates on the UI thread
+        let window_handle = window;
+        cx.spawn(async move |cx| {
+            while let Some(entities) = entity_rx.recv().await {
+                window_handle.update(cx, move |dash: &mut DashboardView, _, _| {
+                    dash.set_status("Live");
+                    dash.update_entities(entities);
+                }).ok();
+            }
+        }).detach();
 
         cx.activate(true);
     });

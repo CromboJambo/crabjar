@@ -1,5 +1,6 @@
 //! Terrarium as a Hermes plugin — JSON-RPC over stdio.
 //! Self-contained world with actual entity positions updated each tick.
+//! Publishes live entity state to orchestrator SSE channel for crabjar-gpui.
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, BufReader, Write};
@@ -102,6 +103,7 @@ fn create_world() -> WorldState {
 struct PluginState {
     world: WorldState,
     running: bool,
+    orchestrator_url: String,
 }
 
 impl Default for PluginState {
@@ -109,7 +111,34 @@ impl Default for PluginState {
         Self {
             world: create_world(),
             running: false,
+            orchestrator_url: std::env::var("ORCHESTRATOR_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string()),
         }
+    }
+}
+
+/// Publish entity state to the orchestrator's SSE channel for crabjar-gpui subscribers.
+async fn publish_entity_state(state: &PluginState) {
+    let entities = state.world.entities.iter().map(|e| serde_json::json!({
+        "id": e.id,
+        "x": e.x,
+        "y": e.y,
+        "z": e.z,
+        "symbol": e.symbol,
+        "color": e.color
+    })).collect::<Vec<_>>();
+
+    let event = serde_json::json!({
+        "type": "entity_state",
+        "source": "terrarium",
+        "tick": state.world.tick,
+        "entities": entities
+    });
+
+    let payload = serde_json::json!({ "data": event });
+
+    if let Ok(client) = reqwest::Client::builder().build() {
+        let url = format!("{}/acp/events/publish", state.orchestrator_url);
+        let _ = client.post(&url).json(&payload).send().await;
     }
 }
 
@@ -263,12 +292,15 @@ async fn render_loop(state: &Mutex<PluginState>) {
             break;
         }
 
-        {
+        let tick_result = {
             let mut state_guard = state.lock().await;
             if !state_guard.world.paused {
                 step_world(&mut state_guard.world);
             }
-        }
+            // Publish entity positions to orchestrator SSE channel
+            publish_entity_state(&state_guard).await;
+            state_guard.world.tick
+        };
 
         sleep(Duration::from_millis(50)).await; // 20 FPS
     }

@@ -9,6 +9,7 @@ use axum::{
 };
 use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
 use futures_util::stream;
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -137,6 +138,65 @@ enum AcpResponse {
     Done { status: String },
     /// Report an error.
     Error { error: String },
+}
+
+/// Shared SSE event channel for live updates (e.g., terrarium entity positions).
+type EventChannel = Arc<tokio::sync::broadcast::Sender<String>>;
+
+/// AppState now includes the event broadcast channel.
+#[allow(dead_code)]
+#[derive(Clone)]
+struct AppState {
+    store: Arc<std::sync::Mutex<Store>>,
+    events_db_path: String,
+    guard_root: String,
+    backend: Arc<Mutex<Box<dyn InferenceBackend>>>,
+    /// Scope for this orchestrator instance (used for gate context).
+    actor_scope: crabjar_guard::Scope,
+    target_scope: crabjar_guard::Scope,
+    /// Broadcast channel for SSE event subscriptions.
+    event_channel: EventChannel,
+}
+
+/// Subscribe to live events via SSE — used by crabjar-gpui for terrarium entity updates.
+async fn subscribe_events(
+    State(state): State<AppState>,
+) -> Sse<impl stream::Stream<Item = Result<SseEvent, Infallible>>> {
+    let mut rx = state.event_channel.subscribe();
+
+    let event_stream = stream::unfold(rx, |mut rx| async move {
+        match tokio::time::timeout(tokio::time::Duration::from_secs(30), rx.recv()).await {
+            Ok(Ok(event_data)) => Some((Ok(SseEvent::default().data(event_data)), rx)),
+            Ok(Err(_)) => None, // Channel closed
+            Err(_) => {
+                // Timeout — send keepalive
+                Some((Ok(SseEvent::default().data("{\"type\":\"keepalive\"}")), rx))
+            }
+        }
+    });
+
+    Sse::new(event_stream)
+}
+
+/// Publish an event to all SSE subscribers.
+async fn publish_event(
+    State(state): State<AppState>,
+    Json(payload): Json<PublishRequest>,
+) -> Json<AcpResponse> {
+    let data = serde_json::to_string(&payload.data).unwrap_or_default();
+    if state.event_channel.send(data).is_err() {
+        return Json(AcpResponse::Error {
+            error: "No subscribers".to_string(),
+        });
+    }
+    Json(AcpResponse::Output {
+        data: "Event published".to_string(),
+    })
+}
+
+#[derive(Debug, Deserialize)]
+struct PublishRequest {
+    data: serde_json::Value,
 }
 
 // ---------------------------------------------------------------------------
@@ -1118,6 +1178,7 @@ struct AppState {
     /// Scope for this orchestrator instance (used for gate context).
     actor_scope: crabjar_guard::Scope,
     target_scope: crabjar_guard::Scope,
+    event_channel: EventChannel,
 }
 
 /// Handler for recent_events — queries the knowledge store.
@@ -1266,6 +1327,9 @@ async fn main() -> anyhow::Result<()> {
     let actor_scope = crabjar_guard::Scope::project("orchestrator");
     let target_scope = actor_scope.clone();
 
+    // SSE event broadcast channel (capacity 100, oldest dropped if full)
+    let (event_tx, _event_rx) = tokio::sync::broadcast::channel(100);
+
     // Shared state across request handlers
     let state = AppState {
         store: Arc::new(std::sync::Mutex::new(store)),
@@ -1274,6 +1338,7 @@ async fn main() -> anyhow::Result<()> {
         backend: Arc::new(Mutex::new(backend)),
         actor_scope,
         target_scope,
+        event_channel: Arc::new(event_tx),
     };
 
     // Define the Axum router with SSE and JSON endpoints.
@@ -1284,6 +1349,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/acp/search_logs", post(search_logs))
         .route("/acp/recent_events", post(recent_events))
         .route("/acp/by_source", post(by_source))
+        .route("/acp/events/subscribe", axum::routing::get(subscribe_events))
+        .route("/acp/events/publish", post(publish_event))
         .with_state(state)
         .layer(CorsLayer::permissive());
 

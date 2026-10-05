@@ -29,4 +29,5 @@ libc = "0.2"
 tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
 uuid = { version = "1.23", features = ["v4", "serde"] }
