@@ -1,21 +1,15 @@
-//! Terrarium as a Hermes plugin — text-mode TUI via stdio JSON-RPC.
-//!
-//! This module transforms the terrarium into a plugin that:
-//! - Runs in herdr panes (no terminal size queries, no raw mode requirements)
-//! - Accepts commands via JSON-RPC over stdin/stdout
-//! - Outputs ASCII art/emoji to stdout for display
-//! - Supports pause/resume/speed controls
+//! Terrarium as a Hermes plugin — JSON-RPC over stdio.
+//! Self-contained world with actual entity positions updated each tick.
 
 use serde::{Deserialize, Serialize};
 use std::io::{self, BufRead, BufReader, Write};
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
 
 // ============================================================================
 // JSON-RPC Protocol
 // ============================================================================
 
-/// Request envelope for terrarium commands.
 #[derive(Debug, Deserialize)]
 struct CommandRequest {
     id: u64,
@@ -27,10 +21,9 @@ struct CommandRequest {
 struct CommandParams {
     action: TerrariumAction,
     #[serde(default)]
-    value: Option<String>, // e.g., speed multiplier
+    value: Option<String>,
 }
 
-/// Available terrarium commands.
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "snake_case")]
 enum TerrariumAction {
@@ -38,78 +31,129 @@ enum TerrariumAction {
     Stop,
     Pause,
     Resume,
-    SetSpeed(String), // "0.5", "1.0", "10.0"
-    Step,             // single tick
+    SetSpeed(String),
+    Step,
 }
 
-/// Response envelope for terrarium commands.
 #[derive(Debug, Serialize)]
 struct CommandResponse {
     id: u64,
-    result: Option<CommandResult>,
+    result: Option<serde_json::Value>,
     error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct CommandResult {
-    status: String,
-    message: Option<String>,
-    crabs_count: Option<usize>,
+// ============================================================================
+// World State — actual entity positions that get updated each tick
+// ============================================================================
+
+#[derive(Debug, Clone)]
+struct Entity {
+    id: String,
+    x: f32,
+    y: f32,
+    z: f32,
+    vx: f32,
+    vy: f32,
+    symbol: &'static str,
+    color: &'static str,
 }
 
-// ============================================================================
-// Terrarium State (shared via Arc<Mutex>)
-// ============================================================================
-
-/// Running terrarium state (shared between command handler and render loop).
-struct TerrariumState {
-    running: bool,
+struct WorldState {
+    entities: Vec<Entity>,
+    tick: u64,
     paused: bool,
-    speed_multiplier: f64,
-    crabs_count: usize,
+    speed: f32,
+    width: i32,
+    height: i32,
 }
 
-impl Default for TerrariumState {
+fn create_world() -> WorldState {
+    let entities = vec![
+        Entity {
+            id: "crab_1".to_string(),
+            x: 2.0, y: 3.0, z: 0.0,
+            vx: 1.5, vy: 0.8,
+            symbol: "🦀", color: "#ff6b6b",
+        },
+        Entity {
+            id: "crab_2".to_string(),
+            x: 5.0, y: 1.0, z: 0.0,
+            vx: -0.8, vy: 1.2,
+            symbol: "🦀", color: "#4ecdc4",
+        },
+        Entity {
+            id: "crab_3".to_string(),
+            x: 1.0, y: 5.0, z: 0.0,
+            vx: 0.5, vy: -1.0,
+            symbol: "🦀", color: "#ffe66d",
+        },
+    ];
+
+    WorldState {
+        entities,
+        tick: 0,
+        paused: true,
+        speed: 1.0,
+        width: 8,
+        height: 6,
+    }
+}
+
+struct PluginState {
+    world: WorldState,
+    running: bool,
+}
+
+impl Default for PluginState {
     fn default() -> Self {
         Self {
+            world: create_world(),
             running: false,
-            paused: true,
-            speed_multiplier: 1.0,
-            crabs_count: 0,
+        }
+    }
+}
+
+// Simple physics step — move entities by velocity, bounce off walls
+fn step_world(world: &mut WorldState) {
+    world.tick += 1;
+    for entity in world.entities.iter_mut() {
+        let dx = entity.vx * 0.033 * world.speed;
+        let dy = entity.vy * 0.033 * world.speed;
+
+        entity.x += dx;
+        entity.y += dy;
+
+        // Bounce off walls
+        if entity.x < 0.0 || entity.x > world.width as f32 {
+            entity.vx = -entity.vx;
+            entity.x = entity.x.clamp(0.0, world.width as f32);
+        }
+        if entity.y < 0.0 || entity.y > world.height as f32 {
+            entity.vy = -entity.vy;
+            entity.y = entity.y.clamp(0.0, world.height as f32);
         }
     }
 }
 
 // ============================================================================
-// Command Handler (JSON-RPC server)
+// Command Handler
 // ============================================================================
 
-async fn handle_commands(state: &Mutex<TerrariumState>) -> io::Result<()> {
+async fn handle_commands(state: &Mutex<PluginState>) -> io::Result<()> {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut reader = BufReader::new(stdin.lock());
     let mut output = stdout.lock();
 
-    eprintln!("DEBUG: handle_commands STARTED");
-
     loop {
-        // Read JSON-RPC request
         let mut line = String::new();
         match reader.read_line(&mut line) {
-            Ok(0) => {
-                eprintln!("DEBUG: EOF received, breaking");
-                break; // EOF
-            }
+            Ok(0) => break, // EOF
             Ok(_) => {}
-            Err(e) => {
-                eprintln!("DEBUG: read error: {}", e);
-                continue;
-            }
+            Err(_) => continue,
         }
 
-        eprintln!("DEBUG: received command: {}", line.trim());
-
-        let request: CommandRequest = match serde_json::from_str(&line) {
+        let request: CommandRequest = match serde_json::from_str(&line.trim()) {
             Ok(r) => r,
             Err(e) => {
                 let resp = CommandResponse {
@@ -123,93 +167,9 @@ async fn handle_commands(state: &Mutex<TerrariumState>) -> io::Result<()> {
             }
         };
 
-        // Handle command - lock state mutably
         let result = {
             let mut state_guard = state.lock().await;
-            match request.method.as_str() {
-                "terrarium/start" => {
-                    state_guard.running = true;
-                    state_guard.paused = false;
-                    CommandResult {
-                        status: "started".to_string(),
-                        message: Some("Terrarium started".to_string()),
-                        crabs_count: Some(state_guard.crabs_count),
-                    }
-                }
-                "terrarium/stop" => {
-                    state_guard.running = false;
-                    state_guard.paused = true;
-                    CommandResult {
-                        status: "stopped".to_string(),
-                        message: Some("Terrarium stopped".to_string()),
-                        crabs_count: None,
-                    }
-                }
-                "terrarium/pause" => {
-                    state_guard.paused = true;
-                    CommandResult {
-                        status: "paused".to_string(),
-                        message: Some("Terrarium paused".to_string()),
-                        crabs_count: Some(state_guard.crabs_count),
-                    }
-                }
-                "terrarium/resume" => {
-                    state_guard.paused = false;
-                    CommandResult {
-                        status: "resumed".to_string(),
-                        message: Some("Terrarium resumed".to_string()),
-                        crabs_count: Some(state_guard.crabs_count),
-                    }
-                }
-                "terrarium/set_speed" => {
-                    if let Some(params) = request.params {
-                        if let Some(val) = params.value {
-                            state_guard.speed_multiplier = val.parse().unwrap_or(1.0);
-                            CommandResult {
-                                status: "speed_set".to_string(),
-                                message: Some(format!(
-                                    "Speed set to {}x",
-                                    state_guard.speed_multiplier
-                                )),
-                                crabs_count: Some(state_guard.crabs_count),
-                            }
-                        } else {
-                            CommandResult {
-                                status: "error".to_string(),
-                                message: Some("Missing speed value".to_string()),
-                                crabs_count: None,
-                            }
-                        }
-                    } else {
-                        CommandResult {
-                            status: "error".to_string(),
-                            message: Some("Missing params".to_string()),
-                            crabs_count: None,
-                        }
-                    }
-                }
-                "terrarium/step" => {
-                    // Trigger a single tick (would need to signal render loop)
-                    CommandResult {
-                        status: "stepped".to_string(),
-                        message: Some("Advanced one tick".to_string()),
-                        crabs_count: Some(state_guard.crabs_count),
-                    }
-                }
-                "terrarium/query_state" => {
-                    // Query state - no action required, return current state
-                    CommandResult {
-                        status: "ok".to_string(),
-                        message: None,
-                        crabs_count: Some(state_guard.crabs_count),
-                    }
-                }
-                _ => CommandResult {
-                    status: "error".to_string(),
-                    message: Some(format!("Unknown method: {}", request.method)),
-                    crabs_count: None,
-                },
-            }
+            handle_command(&mut state_guard, &request)
         };
 
         let response = CommandResponse {
@@ -222,102 +182,118 @@ async fn handle_commands(state: &Mutex<TerrariumState>) -> io::Result<()> {
         output.flush()?;
     }
 
-    eprintln!("DEBUG: handle_commands EXITED");
     Ok(())
 }
 
+fn handle_command(state: &mut PluginState, request: &CommandRequest) -> serde_json::Value {
+    match request.method.as_str() {
+        "terrarium/start" => {
+            state.running = true;
+            state.world.paused = false;
+            serde_json::json!({"status": "started"})
+        }
+        "terrarium/stop" => {
+            state.running = false;
+            state.world.paused = true;
+            serde_json::json!({"status": "stopped"})
+        }
+        "terrarium/pause" => {
+            state.world.paused = true;
+            serde_json::json!({"status": "paused"})
+        }
+        "terrarium/resume" => {
+            state.world.paused = false;
+            serde_json::json!({"status": "resumed"})
+        }
+        "terrarium/set_speed" => {
+            if let Some(params) = &request.params {
+                if let Some(val) = &params.value {
+                    state.world.speed = val.parse().unwrap_or(1.0);
+                    serde_json::json!({"status": "speed_set", "speed": state.world.speed})
+                } else {
+                    serde_json::json!({"status": "error", "message": "Missing speed value"})
+                }
+            } else {
+                serde_json::json!({"status": "error", "message": "Missing params"})
+            }
+        }
+        "terrarium/step" => {
+            if !state.world.paused {
+                step_world(&mut state.world);
+            }
+            serde_json::json!({"status": "stepped", "tick": state.world.tick})
+        }
+        "terrarium/query_state" => {
+            // Return ACTUAL entity positions from the world
+            let entities = state.world.entities.iter().map(|e| serde_json::json!({
+                "id": e.id,
+                "x": e.x,
+                "y": e.y,
+                "z": e.z,
+                "symbol": e.symbol,
+                "color": e.color
+            })).collect::<Vec<_>>();
+
+            serde_json::json!({
+                "status": "ok",
+                "entities": entities,
+                "tick": state.world.tick,
+                "paused": state.world.paused,
+                "speed": state.world.speed
+            })
+        }
+        other => {
+            serde_json::json!({"status": "error", "message": format!("Unknown method: {}", other)})
+        }
+    }
+}
+
 // ============================================================================
-// Render Loop (separate task)
+// Render Loop — updates entity positions over time
 // ============================================================================
 
-async fn render_loop(state: &Mutex<TerrariumState>) {
-    // Placeholder: in a real implementation, this would:
-    // 1. Spawn the terrarium world logic (from apps/terrarium/src/world.rs)
-    // 2. Render ASCII art/emoji to stdout every tick
-    // 3. Respond to state changes from command handler
-
-    eprintln!("DEBUG: render_loop STARTED");
-
-    let mut tick = 0u64;
+async fn render_loop(state: &Mutex<PluginState>) {
     loop {
-        let running = {
+        let should_run = {
             let state_guard = state.lock().await;
             state_guard.running
         };
 
-        if !running {
-            break; // Exit when running = false
+        if !should_run {
+            break;
         }
 
-        let paused = {
-            let state_guard = state.lock().await;
-            state_guard.paused
-        };
-
-        let speed = {
-            let state_guard = state.lock().await;
-            state_guard.speed_multiplier
-        };
-
-        if !paused {
-            // Update world logic here
-            tick += 1;
-
-            // Render frame (placeholder) - use eprintln for debugging
-            eprintln!("DEBUG: render_loop tick={} speed={}", tick, speed);
-            print!("\x1b[2J\x1b[H"); // Clear screen
-            print!("🦀 Terrarium - Tick: {} | Speed: {}x", tick, speed);
-            print!("─────────────────────────────────────");
-            print!("🐍 Snake moving... (placeholder)");
-            print!("─────────────────────────────────────");
-            print!("Controls: q=quit, Space=pause, +=speed, -=slow");
-            std::io::stdout().flush().unwrap(); // Force flush
+        {
+            let mut state_guard = state.lock().await;
+            if !state_guard.world.paused {
+                step_world(&mut state_guard.world);
+            }
         }
 
         sleep(Duration::from_millis(50)).await; // 20 FPS
     }
-
-    eprintln!("DEBUG: render_loop EXITED");
 }
 
 // ============================================================================
-// Main Entry Point (plugin mode)
+// Main Entry Point
 // ============================================================================
 
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = std::env::args().collect();
-
-    if args.len() > 1 && args[1] == "--help" {
-        println!(
-            "crabjar-terrarium-plugin — Text-mode TUI plugin for Hermes/Herdr\n\
-             \n\
-             Usage:\n\
-               crabjar-terrarium-plugin [mode]\n\
-             \n\
-             Modes:\n\
-               stdio   JSON-RPC over stdin/stdout (default in herdr)\n\
-               text    Direct TUI output (for testing)\n\
-         "
-        );
-        return;
-    }
-
     let mode = args.get(1).map(|s| s.as_str()).unwrap_or("stdio");
 
     match mode {
         "stdio" => {
             eprintln!("🦀 Terrarium plugin started (stdio mode)");
 
-            let state = Mutex::new(TerrariumState::default());
+            let state = Mutex::new(PluginState::default());
 
             // Spawn command handler and render loop with shared state
             tokio::join!(handle_commands(&state), render_loop(&state));
         }
         "text" => {
-            // Fallback to direct TUI (like the original app)
-            println!("🦀 Terrarium plugin started (text mode - fallback)");
-            // TODO: spawn original run_text_mode() here
+            println!("🦀 Terrarium plugin started (text mode)");
         }
         _ => {
             eprintln!("Unknown mode: {}", mode);
