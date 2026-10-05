@@ -179,12 +179,12 @@ async fn handle_json_rpc_commands(state: std::sync::Arc<PluginState>) -> io::Res
         // Handle the command — lock the world, mutate it, emit DAGR events.
         let result = {
             let mut world_guard = state.world.lock().await;
-            handle_command(&mut world_guard, &request)
+            handle_command(&mut world_guard, &request).to_string()
         };
 
         let response = CommandResponse {
             id: request.id,
-            result: Some(result),
+            result: Some(serde_json::Value::String(result)),
             error: None,
         };
 
@@ -268,6 +268,24 @@ fn handle_command(world: &mut GameWorld, request: &CommandRequest) -> serde_json
                 crate::render_isometric::step_world(world, 0.033);
             }
             CommandResult::success("Advanced one tick")
+        }
+        "terrarium/query_state" => {
+            // Return actual entities from the world, not mock data
+            let entities = world.entities.iter().map(|e| serde_json::json!({
+                "id": e.id,
+                "x": e.x,
+                "y": e.y,
+                "z": e.z,
+                "symbol": e.symbol,
+                "color": e.color
+            })).collect::<Vec<_>>();
+
+            let json = serde_json::json!({
+                "success": true,
+                "entities": entities,
+                "tick": world.tick
+            });
+            CommandResult { success: true, message: serde_json::to_string(&json).unwrap(), details: None }
         }
         other => CommandResult::failure(format!("Unknown method: {}", other)),
     };
