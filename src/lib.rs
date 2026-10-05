@@ -166,6 +166,7 @@ pub mod learning_loop;
 pub mod session_search;
 pub mod feedback_integration;
 pub mod environment_awareness;
+pub mod autonomy;
 
 pub use cli_commands::*;
 
