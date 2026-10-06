@@ -132,6 +132,10 @@ impl russh::server::Handler for Bastion {
                                 if let Err(e) = session.eof(channel) {
                                     warn!("Failed to send EOF: {:?}", e);
                                 }
+                                // Close the channel after sending exit status
+                                if let Err(e) = session.close(channel) {
+                                    warn!("Failed to close channel: {:?}", e);
+                                }
                                 break;
                             }
                             Some(russh::ChannelMsg::Eof) => {
@@ -191,6 +195,10 @@ impl russh::server::Handler for Bastion {
                                 info!("Target exited with status {}", exit_status);
                                 if let Err(e) = session.eof(channel) {
                                     warn!("Failed to send EOF: {:?}", e);
+                                }
+                                // Close the channel after sending exit status
+                                if let Err(e) = session.close(channel) {
+                                    warn!("Failed to close channel: {:?}", e);
                                 }
                                 break;
                             }
