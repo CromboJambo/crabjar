@@ -179,6 +179,7 @@ impl russh::server::Handler for BastionHandler {
 /// Handle an incoming SSH connection with event-driven architecture
 pub async fn handle_connection(
     stream: TcpStream,
+    server_config: Arc<russh::ServerConfig>,
     router: Arc<TargetRouter>,
 ) -> anyhow::Result<()> {
     // Create channels for event communication
@@ -187,10 +188,53 @@ pub async fn handle_connection(
     // Spawn handler task that processes russh callbacks
     let handler = BastionHandler::new(tx);
 
-    // TODO: Actually spawn the russh server session and wire up events
-    // For now, just demonstrate the architecture pattern
-
     info!("Connection handler started (event-driven pattern)");
 
+    // Run the russh server session with our event-driven handler
+    match stream.peer_addr() {
+        Ok(addr) => info!("Peer address: {}", addr),
+        Err(e) => warn!("Could not get peer address: {}", e),
+    }
+
+    let result = russh::server::run_stream(stream, server_config, handler).await;
+
+    match result {
+        Ok(()) => info!("SSH session completed"),
+        Err(e) => warn!("SSH session error: {}", e),
+    }
+
+    // Process any remaining events from the channel
+    while let Some(event) = rx.recv().await {
+        handle_event(&mut router, event).await;
+    }
+
     Ok(())
+}
+
+/// Process a single SSH event in the event loop
+async fn handle_event(router: &Arc<TargetRouter>, event: ServerHandlerEvent) {
+    match event {
+        ServerHandlerEvent::Authenticated(user) => {
+            info!("User authenticated: {}", user);
+        }
+        ServerHandlerEvent::ChannelOpenSession(channel) => {
+            info!("Session channel opened: {}", channel);
+        }
+        ServerHandlerEvent::ShellRequest(channel) => {
+            info!("Shell requested on channel {}", channel);
+        }
+        ServerHandlerEvent::ExecRequest(channel, command) => {
+            info!("Command requested on channel {}: {}", channel, String::from_utf8_lossy(&command));
+        }
+        ServerHandlerEvent::Data(channel, data) => {
+            // Forward data to target (routing logic would go here)
+        }
+        ServerHandlerEvent::ChannelClose(channel) => {
+            info!("Channel closed: {}", channel);
+        }
+        ServerHandlerEvent::Error(msg) => {
+            warn!("SSH error: {}", msg);
+        }
+        _ => {}
+    }
 }
