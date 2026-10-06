@@ -170,7 +170,7 @@ impl russh::server::Handler for Bastion {
         let user = "hermes".to_string();
 
         match connect_to_target(&host, 22, &user, &self.key_path).await {
-            Ok((target_session, outbound_channel)) => {
+            Ok((target_session, mut outbound_channel)) => {
                 info!("Outbound connection established to {} for exec", host);
 
                 // Execute the command (no PTY needed)
