@@ -170,46 +170,40 @@ impl russh::server::Handler for Bastion {
         let user = "hermes".to_string();
 
         match connect_to_target(&host, 22, &user, &self.key_path).await {
-            Ok((mut target_session, mut outbound_channel)) => {
+            Ok((target_session, outbound_channel)) => {
                 info!("Outbound connection established to {} for exec", host);
 
                 // Execute the command (no PTY needed)
                 if let Err(e) = outbound_channel.exec(true, cmd_str.as_bytes()).await {
                     warn!("Failed to exec on target: {}", e);
                 } else {
-                    // Spawn task to forward data from target to client
-                    let out_channel = outbound_channel.clone();
-                    let sess = session.clone();
-                    let ch = channel;
-
-                    tokio::spawn(async move {
-                        loop {
-                            match out_channel.wait().await {
-                                Some(russh::ChannelMsg::Data { ref data }) => {
-                                    info!("Received {} bytes from target", data.len());
-                                    if let Err(e) = sess.data(ch, (*data).to_vec()) {
-                                        warn!("Failed to send data to client: {:?}", e);
-                                        break;
-                                    }
-                                }
-                                Some(russh::ChannelMsg::ExitStatus { exit_status }) => {
-                                    info!("Target exited with status {}", exit_status);
-                                    if let Err(e) = sess.eof(ch) {
-                                        warn!("Failed to send EOF: {:?}", e);
-                                    }
+                    // Wait for data from target and forward to client
+                    loop {
+                        match outbound_channel.wait().await {
+                            Some(russh::ChannelMsg::Data { ref data }) => {
+                                info!("Received {} bytes from target", data.len());
+                                if let Err(e) = session.data(channel, (*data).to_vec()) {
+                                    warn!("Failed to send data to client: {:?}", e);
                                     break;
                                 }
-                                Some(russh::ChannelMsg::Eof) => {
-                                    info!("Target connection EOF");
-                                    if let Err(e) = sess.eof(ch) {
-                                        warn!("Failed to send EOF: {:?}", e);
-                                    }
-                                    break;
-                                }
-                                _ => {}
                             }
+                            Some(russh::ChannelMsg::ExitStatus { exit_status }) => {
+                                info!("Target exited with status {}", exit_status);
+                                if let Err(e) = session.eof(channel) {
+                                    warn!("Failed to send EOF: {:?}", e);
+                                }
+                                break;
+                            }
+                            Some(russh::ChannelMsg::Eof) => {
+                                info!("Target connection EOF");
+                                if let Err(e) = session.eof(channel) {
+                                    warn!("Failed to send EOF: {:?}", e);
+                                }
+                                break;
+                            }
+                            _ => {}
                         }
-                    });
+                    }
                 }
             }
             Err(e) => {
