@@ -177,6 +177,8 @@ impl russh::server::Handler for Bastion {
                 if let Err(e) = outbound_channel.exec(true, cmd_str.as_bytes()).await {
                     warn!("Failed to exec on target: {}", e);
                 } else {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    
                     // Wait for data from target and forward to client
                     loop {
                         match outbound_channel.wait().await {
