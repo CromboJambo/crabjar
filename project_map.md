@@ -506,67 +506,9 @@ The `handle_chat` handler uses the `InferenceBackend` trait — switches between
 
 ---
 
-## 7. Integration Roadmap
+## 7. Change History & Future Work
 
-> See `ROADMAP.md` for the full ironclaw-informed priority structure. This section summarizes completed work and maps old phases to the new framework.
-
-### Completed Phases
-
-**Phase 1 — Standardization ✅** (clippy clean, CI verified, 741 tests passing)
-→ Now maps to **Priority 2: Codex Quality Constraints** in ROADMAP.md
-
-**Phase 2 — Feature Integration ✅** (safetensors, tool_registry, codeburn optimize_engine, crabjar exec pipeline)
-→ Now maps to **Priority 1: EdgeCrab Architecture** + **Priority 3: Claw Code Patterns** in ROADMAP.md
-
-**Phase 3 — Consolidation** (move experiments to archive/)
-→ Deferred. Focus is on structural patterns from ironclaw.
-
-**Phase 4 — Inference Integration ✅** (unified InferenceBackend, mistral.rs, env-configurable endpoints)
-→ Completed. LLM runner remains in separate `llm-workspace/` repo.
-
-### Next Priorities (from ROADMAP.md)
-
-1. **Mechanical dependency boundary enforcement** (`crabjar-architecture` crate) — ✅ done, 8-layer model with CI gate candidate
-2. **Scope isolation model** — ✅ done (Scope type + CrossScopeAuth + wired into ExecutionGate)
-3. **Requested-vs-effective trust resolution** — ✅ done (with audit trail)
-4. **Exact-invocation fingerprint approvals** — ✅ done (InvocationFingerprint + ApprovalLease)
-5. **Prompt Envelope** (instruction-hijack defense) — ✅ done (40+ tests)
-6. **Product adapter pattern** — ✅ done (ProductAdapter trait + AdapterRegistry)
-7. **Per-crate AGENTS.md** — ✅ done (all 23 crates documented)
-8. **Dual-backend persistence** — PostgreSQL + SQLite abstraction layer
-9. **E2E slice testing** — smoke vs full test matrix
-10. **Replay snapshots** — LLM response trace fixtures
-
-**Completed from ROADMAP.md:** 2.5 Prompt Envelope (instruction-hijack defense) — `orchestrator/src/lm_studio_client/prompt_envelope.rs`, 40+ tests, integrated into `chat()` and `chat_with_system()`.
-
----
-
-### Phase 5: vm-bridge Integration
-
-**Goal:** Integrate vm-bridge as the display/screen sharing layer for crabjar's agent orchestration.
-
-- [x] vm-bridge existed at `src/vm_bridge/` — deleted 2026-08-30 (orphaned: never wired into the crate; `axum-mux/` is the live relay, ADR-005)
-- [ ] Wire into crabjar-host for Teams plugin integration
-- [ ] Add `crabjar-screen` crate for screen capture
-  - [ ] PipeWire integration for screen share sources
-  - [ ] XDG-Portal integration for Wayland screen capture
-  - [ ] Preview thumbnail generation (320x180 like Electron)
-  - [ ] Audio capture (microphone + system audio)
-- [ ] Add `crabjar-terminal` crate for shared terminal
-  - [ ] Terminal multiplexer integration (wezterm/zellij)
-  - [ ] Shared terminal protocol over websocket
-  - [ ] Terminal state sync across multiple clients
-
-**Why vm-bridge?**
-- Already has WebSocket relay for display protocols
-- Process-isolated per-VM architecture
-- Hardened (no protocol parsing, just byte transport)
-- Can be extended with screen sharing in future
-
-**Integration Points:**
-1. `crabjar` → vm-bridge (VM lifecycle management)
-2. `crabjar` → `crabjar-host` (screen sharing API)
-3. `crabjar-host` → Teams plugin (display protocol routing)
+Completed work is archived in [CHANGELOG.md](./CHANGELOG.md). Upcoming priorities are tracked in [ROADMAP.md](./ROADMAP.md). This section no longer duplicates that content — see those files for the authoritative state.
 
 ---
 
