@@ -122,7 +122,7 @@ tempfile = "3.24.0"
 
 # Networking
 reqwest = { version = "0.13.2", default-features = false, features = ["json", "stream"] }
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
 tower-http = { version = "0.5", features = ["cors"] }
 futures-util = "0.3"
 

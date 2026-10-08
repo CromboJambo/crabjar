@@ -5,7 +5,8 @@
 
 use anyhow::Result;
 use clap::Parser;
-use crabjar_conductor::{Conductor, ConductorConfig};
+use crabjar_conductor::{api, conductor};
+use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -33,19 +34,24 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let config = ConductorConfig {
-        listen_addr: args.addr,
+    let config = conductor::ConductorConfig {
+        listen_addr: args.addr.clone(),
         listen_port: args.port,
         pesti_server_url: args.pesti_url,
     };
 
-    let conductor = Conductor::new(config);
-
     tracing::info!("Starting crabjar-conductor");
-    tracing::info!("Listening on {}:{}", config.listen_addr, config.listen_port);
+    tracing::info!("Listening on {}:{} ", args.addr, args.port);
 
-    // TODO: Start HTTP server with API routes
-    // For now, just keep the process running to demonstrate the architecture
+    // Create conductor with in-memory state store for now
+    let conductor = Arc::new(conductor::Conductor::new(config)?);
+
+    // Build the HTTP API router
+    let app = api::routes();
+
+    // Start listening
+    let listener = tokio::net::TcpListener::bind(&format!("{}:{}", args.addr, args.port)).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }

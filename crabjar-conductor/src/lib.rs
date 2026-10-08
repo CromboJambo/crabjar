@@ -28,6 +28,7 @@ pub mod api;
 
 // Re-export core types for ergonomic use
 pub use conductor::{Conductor, ConductorConfig};
-pub use worker_registry::{Worker, WorkerRegistry};
+pub use worker_registry::WorkerRegistry;
+pub use state_store::Worker;
 pub use task_scheduler::TaskScheduler;
 pub use state_store::{StateStore, Goal, Task};
