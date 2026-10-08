@@ -14,6 +14,14 @@ All notable changes to crabjar, organized chronologically. Completed work moves 
 - Conductor core logic (`conductor.rs`) with ConductorConfig and submit_goal() workflow
 - Comprehensive spec at `specs/conductor-crate.md` covering 3-layer architecture (local → fleet → cross-environment)
 
+### SQLite Persistent State Store
+- Implemented durable SQLite-backed state store replacing in-memory HashMap implementation
+- Schema: goals, tasks, workers tables with foreign key constraints and proper indexing
+- Row deserialization helpers with DateTime parsing and serde_json for dependencies/capabilities fields
+- Persistent Connection architecture (not per-method reopen) to avoid :memory: isolation issues
+- CLI entry point with clap (--addr, --port, --pesti-url) and tracing initialization
+- 8 passing tests covering goal/task/worker lifecycle, persistence across instances, FK constraints
+
 ### vm-bridge Deployment to Home-Lab
 - Deployed vm-bridge to ftw3 home-lab node as dinit-managed service on port 8090
 - Created deployment script `scripts/deploy-vm-bridge-ftw3.sh` following pesti-server pattern

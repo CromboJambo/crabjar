@@ -29,12 +29,12 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 
 **Completed (October 2026):**
 - ✅ crabjar-conductor crate scaffolded with core orchestration types (Goal, Task, Worker), state store abstraction, HTTP API layer
+- ✅ SQLite-backed persistent state store for conductor (rusqlite, goals/tasks/workers tables with FK constraints)
 - ✅ vm-bridge deployed to ftw3 home-lab node as dinit service on port 8090
 - ✅ Orchestrator fine-tuning pipeline documented (docs/training/orchestrator-fine-tuning.md)
 
 **Upcoming:**
-- [ ] Implement persistent storage layer for conductor (SQLite-backed state store)
-- [ ] Build multi-agent coordination framework (conductor pattern on ftw3)
+- [ ] Build multi-agent coordination framework (deploy conductor to ftw3 as central node)
 - [ ] Develop security model with capability-based access control
 - [ ] Create observability stack (metrics, tracing, logging)
 
@@ -59,7 +59,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 
 ### Fleet Coordination Phase (Conductor Pattern)
 - ✅ Scaffolded `crabjar-conductor` crate with core orchestration types and HTTP API layer
-- [ ] Implement persistent storage layer for conductor (SQLite-backed state store)
+- ✅ Implemented SQLite-backed persistent state store (rusqlite, goals/tasks/workers tables, FK constraints)
 - [ ] Build multi-agent coordination framework (deploy conductor to ftw3 as central node)
 - [ ] Develop security model with capability-based access control
 - [ ] Create observability stack (metrics, tracing, logging)
