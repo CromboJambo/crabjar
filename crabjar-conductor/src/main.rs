@@ -23,6 +23,10 @@ struct Args {
     /// Pesti-server URL for LLM inference
     #[arg(long, default_value = "http://localhost:8000")]
     pesti_url: String,
+
+    /// SQLite database path (default: conductor-state.db in current directory)
+    #[arg(long, default_value = "conductor-state.db")]
+    db_path: String,
 }
 
 #[tokio::main]
@@ -44,8 +48,7 @@ async fn main() -> Result<()> {
     tracing::info!("Listening on {}:{} ", args.addr, args.port);
 
     // Create conductor with SQLite state store
-    let db_path = "/opt/crabjar/conductor/state.db";
-    let conductor = conductor::Conductor::with_db(config, db_path)?;
+    let conductor = conductor::Conductor::with_db(config, &args.db_path)?;
 
     // Wrap in Arc<Mutex<>> for shared state across API handlers
     use tokio::sync::Mutex;

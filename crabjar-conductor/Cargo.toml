@@ -46,6 +46,9 @@ tracing-subscriber = { workspace = true }
 # CLI parsing
 clap = { workspace = true }
 
+# HTTP client for pesti-server communication
+reqwest = { version = "0.12", features = ["json", "blocking"], default-features = false }
+
 # Crabjar dependencies
 crabjar-guard = { path = "../guard" }
 

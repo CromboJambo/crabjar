@@ -1,6 +1,6 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
-use crate::state_store::{Goal, GoalStatus, StateStore, Task, Worker};
+use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
 
 /// Configuration for the conductor service.
@@ -55,11 +55,92 @@ impl Conductor {
 
     /// Decompose a goal into executable tasks using LLM inference.
     fn decompose(&self, goal_id: String, description: &str) -> Result<Vec<Task>> {
-        // In production, this calls pesti-server to break the goal into steps.
-        // For now, create a placeholder task to demonstrate the flow.
-        let task = self.store.create_task(&goal_id, format!("Execute: {}", description))?;
+        // Call pesti-server to break the goal into steps via LLM inference.
+        let prompt = format!(
+            "You are a task planner that breaks goals into executable shell commands.\n\
+             \nGoal: {}\n\n\
+             Return ONLY a JSON array (no markdown, no explanation) with this exact format:\n\
+             [{{\"command\": \"shell command here\", \"description\": \"what it does\"}}]\n\
+             \nEach object must have exactly two fields: 'command' and 'description'.\n\
+             Do not include depends_on. Just the command and description.\n",
+            description
+        );
 
-        Ok(vec![task])
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/v1/chat/completions", self.config.pesti_server_url);
+
+        let body = serde_json::json!({
+            "model": "orchestrator_merged",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a task planner that outputs ONLY JSON arrays. No prose, no markdown formatting."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.1,
+            "max_tokens": 2048
+        });
+
+        let resp = client.post(&url)
+            .json(&body)
+            .send()
+            .map_err(|e| anyhow::anyhow!("pesti-server request failed: {}", e))?;
+
+        let status = resp.status();
+        let text = resp.text().map_err(|e| anyhow::anyhow!("failed to read response: {}", e))?;
+
+        if !status.is_success() {
+            return Err(anyhow::anyhow!("pesti-server error {}: {}", status, text));
+        }
+
+        // Parse the LLM response
+        let parsed: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| anyhow::anyhow!("failed to parse pesti response as JSON: {} - {}", e, &text[..std::cmp::min(200, text.len())]))?;
+
+        // Extract content from chat completion format
+        let content = parsed["choices"][0]["message"]["content"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("no content in response"))?
+            .trim();
+
+        // Strip markdown code fences if present
+        let json_content = if content.starts_with("```") {
+            // Remove leading ```json or ``` and trailing ```
+            let mut lines: Vec<&str> = content.lines().collect();
+            // Skip opening fence
+            while !lines.is_empty() && lines[0].trim().starts_with("```") {
+                lines.remove(0);
+            }
+            // Skip closing fence
+            while !lines.is_empty() && lines.last().unwrap().trim().starts_with("```") {
+                lines.pop();
+            }
+            lines.join("\n").trim().to_string()
+        } else {
+            content.to_string()
+        };
+
+        // Try to parse the content as JSON array of tasks
+        let task_specs: Vec<serde_json::Value> = serde_json::from_str(&json_content)
+            .map_err(|e| anyhow::anyhow!("failed to parse task specs from LLM: {} - {}", e, &json_content[..std::cmp::min(200, json_content.len())]))?;
+
+        // Create tasks in the store
+        let mut tasks = Vec::new();
+        for spec in task_specs {
+            let command = spec["command"].as_str()
+                .ok_or_else(|| anyhow::anyhow!("task spec missing 'command'"))?
+                .to_string();
+            let description = spec["description"].as_str().unwrap_or(&command).to_string();
+
+            let task = self.store.create_task(&goal_id, format!("[{}] {}", description, command))?;
+            tasks.push(task);
+        }
+
+        Ok(tasks)
     }
 
     /// Get status of a goal and its tasks.
@@ -75,20 +156,59 @@ impl Conductor {
 
     /// List all registered workers.
     pub fn list_workers(&self) -> Vec<Worker> {
-        // Workers are managed separately; for now return empty list
-        vec![]
+        self.store.list_workers().unwrap_or_default()
+    }
+
+    /// Register a new worker in the fleet.
+    pub fn register_worker(&self, name: String, capabilities: Vec<String>) -> Result<Worker> {
+        let worker = self.store.register_worker(name, capabilities)?;
+        Ok(worker)
     }
 
     /// Poll for tasks assigned to a specific worker.
     pub fn tasks_for_worker(&self, _worker_id: &str) -> Result<Vec<Task>> {
-        // In production, iterate over all tasks and filter by worker_id
-        // This is a simplified version for the initial implementation
+        // Get all pending tasks that are ready (dependencies met)
+        let ready_tasks = self.store.get_ready_tasks()?;
+        
+        // In production, filter by worker capabilities and assign
+        // For now, return the first unassigned task if any
+        for task in ready_tasks.iter() {
+            if task.worker_id.is_none() {
+                // Assign this task to the requesting worker
+                self.store.assign_task(&task.id, _worker_id)?;
+                let updated = self.store.get_task(&task.id)?.unwrap();
+                return Ok(vec![updated]);
+            }
+        }
+        
         Ok(vec![])
     }
 
     /// Report completion of a task.
     pub fn report_task_complete(&self, task_id: &str, result: Option<String>) -> Result<()> {
         self.store.complete_task(task_id, result)?;
+        
+        // Check if all tasks for the goal are complete
+        let task = self.store.get_task(task_id)?.ok_or_else(|| anyhow::anyhow!("task not found"))?;
+        let goal_tasks = self.store.list_tasks_for_goal(&task.goal_id)?;
+        let all_complete = goal_tasks.iter().all(|t| t.status == TaskStatus::Completed);
+        
+        if all_complete {
+            self.store.update_goal_status(&task.goal_id, GoalStatus::Completed)?;
+        }
+        
+        Ok(())
+    }
+
+    /// Report task failure.
+    pub fn report_task_failed(&self, task_id: &str, error: String) -> Result<()> {
+        self.store.fail_task(task_id, error)?;
+        Ok(())
+    }
+
+    /// Update worker status via heartbeat.
+    pub fn worker_heartbeat(&self, worker_id: &str) -> Result<()> {
+        self.store.heartbeat(worker_id)?;
         Ok(())
     }
 

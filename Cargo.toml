@@ -43,7 +43,7 @@ members = [
     # GPU-accelerated agent dashboard (proof-of-concept)
     "crates/crabjar-gpui",
     # SSH bastion host using russh (transparent proxy, no client app needed)
-    "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor",
+    "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker",
 ]
 
 resolver = "2"
