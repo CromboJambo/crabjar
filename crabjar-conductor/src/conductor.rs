@@ -107,26 +107,49 @@ impl Conductor {
             .ok_or_else(|| anyhow::anyhow!("no content in response"))?
             .trim();
 
-        // Strip markdown code fences if present
-        let json_content = if content.starts_with("```") {
-            // Remove leading ```json or ``` and trailing ```
-            let mut lines: Vec<&str> = content.lines().collect();
-            // Skip opening fence
-            while !lines.is_empty() && lines[0].trim().starts_with("```") {
-                lines.remove(0);
+        // Extract JSON array from LLM response. The LLM may wrap it in prose,
+        // markdown code fences, or [RESPONSE] tags. Find the actual JSON array.
+        let json_to_parse: String = if let Some(fence_start) = content.find("```") {
+            // Has code fences - extract content between them
+            let after_open = &content[fence_start + 3..];
+            // Skip optional language tag on first line (e.g., "json\n")
+            let actual_content = if let Some(newline) = after_open.find('\n') {
+                &after_open[newline + 1..]
+            } else {
+                after_open
+            };
+            if let Some(fence_end) = actual_content.rfind("```") {
+                actual_content[..fence_end].trim().to_string()
+            } else {
+                actual_content.trim().to_string()
             }
-            // Skip closing fence
-            while !lines.is_empty() && lines.last().unwrap().trim().starts_with("```") {
-                lines.pop();
-            }
-            lines.join("\n").trim().to_string()
         } else {
-            content.to_string()
+            // No code fences - find the JSON array directly
+            // Look for first '[' that starts an object array (skip "[RESPONSE]")
+            let mut found = None;
+            let chars: Vec<char> = content.chars().collect();
+            let mut i = 0;
+            while i < chars.len() {
+                if chars[i] == '[' {
+                    // Check if this looks like a JSON array (next non-whitespace is '{' or '[')
+                    let rest: String = chars[i..].iter().collect();
+                    let trimmed = rest.trim_start();
+                    if trimmed.starts_with("[") || trimmed.starts_with("{") {
+                        found = Some(i);
+                        break;
+                    }
+                }
+                i += 1;
+            }
+            match found {
+                Some(pos) => content[pos..].trim().to_string(),
+                None => content.to_string(),
+            }
         };
 
         // Try to parse the content as JSON array of tasks
-        let task_specs: Vec<serde_json::Value> = serde_json::from_str(&json_content)
-            .map_err(|e| anyhow::anyhow!("failed to parse task specs from LLM: {} - {}", e, &json_content[..std::cmp::min(200, json_content.len())]))?;
+        let task_specs: Vec<serde_json::Value> = serde_json::from_str(&json_to_parse)
+            .map_err(|e| anyhow::anyhow!("failed to parse task specs from LLM: {} - {}", e, &json_to_parse[..std::cmp::min(200, json_to_parse.len())]))?;
 
         // Create tasks in the store
         let mut tasks = Vec::new();
