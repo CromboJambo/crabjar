@@ -2,6 +2,29 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## October 8, 2026 — Fleet Orchestration Infrastructure
+
+### crabjar-conductor Crate (Fleet Coordination Layer)
+- Scaffolded `crabjar-conductor` crate implementing the conductor pattern for cross-machine agent coordination
+- Core types: Goal, Task, Worker with status enums and relationships
+- State store abstraction layer (`state_store.rs`) for goals, tasks, workers — in-memory HashMap implementation with SQLite persistence planned
+- Worker registry (`worker_registry.rs`) with capability-based lookup (register, get, list, find_by_capability, find_available)
+- Task scheduler (`task_scheduler.rs`) with schedule() method for capability-based task-to-worker assignment
+- HTTP API layer (`api.rs`) using axum: POST /goals, GET /goals/{id}, GET /workers endpoints
+- Conductor core logic (`conductor.rs`) with ConductorConfig and submit_goal() workflow
+- Comprehensive spec at `specs/conductor-crate.md` covering 3-layer architecture (local → fleet → cross-environment)
+
+### vm-bridge Deployment to Home-Lab
+- Deployed vm-bridge to ftw3 home-lab node as dinit-managed service on port 8090
+- Created deployment script `scripts/deploy-vm-bridge-ftw3.sh` following pesti-server pattern
+- Service configuration: manifest.toml with listen_addr, listen_port, libvirt_uri, default_timeout_secs
+- Fixed working directory issue in dinit service command for manifest.toml loading
+
+### Orchestrator Fine-Tuning Pipeline Documentation
+- Documented QLoRA fine-tuning workflow at `docs/training/orchestrator-fine-tuning.md`
+- Moved training scripts to `scripts/training/` (generate, train, evaluate, baseline eval)
+- Baseline evaluation shows 100% task decomposition, 0% skill boundary recognition, 0% dependency understanding
+
 ## August 23, 2026 — Spatial Habitat & Herdr Integration
 
 - **Spatial Habitat ADR (ADR-003)** — Defined crabjar's persistent spatial habitat model: a representation of the user's lived environment over which computational state (agents, artifacts, pending guard actions) is laid out. Physical truth source remains Home Assistant; crabjar owns the virtual world. Divergence is surfaced to humans, never auto-corrected.

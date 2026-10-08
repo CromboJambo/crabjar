@@ -27,8 +27,16 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ Context budgeting (`context_budget.rs`) — ContextBudget + MAX_TOKENS_PER_FRAGMENT enforcement in ExecutionGate step 10
 - ✅ Static policy engine (`policy.rs`, `policy_types.rs`) — TOML-based declarative policies for pre-execution checks
 
+**Completed (October 2026):**
+- ✅ crabjar-conductor crate scaffolded with core orchestration types (Goal, Task, Worker), state store abstraction, HTTP API layer
+- ✅ vm-bridge deployed to ftw3 home-lab node as dinit service on port 8090
+- ✅ Orchestrator fine-tuning pipeline documented (docs/training/orchestrator-fine-tuning.md)
+
 **Upcoming:**
-- [ ] vm-bridge integration with actual VM lifecycle management (see Upcoming Phases)
+- [ ] Implement persistent storage layer for conductor (SQLite-backed state store)
+- [ ] Build multi-agent coordination framework (conductor pattern on ftw3)
+- [ ] Develop security model with capability-based access control
+- [ ] Create observability stack (metrics, tracing, logging)
 
 **Deliverables:** Release-ready binary, ADR process established, proper testing infrastructure, documented agent loop with model routing/compression/decision-gate capabilities.
 
@@ -47,8 +55,12 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ Built VmManager high-level API with policy integration hooks and state caching
 - ✅ Unit tests for domain types pass (5/5)
 - ✅ Integrate vm-core with axum-mux bridge for HTTP/WebSocket control plane (lifecycle.rs: /vms endpoints, LifecycleState, mounted in supervisor)
-- [ ] Implement persistent storage layer for long-term memory retention
-- [ ] Build multi-agent coordination framework
+- ✅ Deployed to ftw3 home-lab node as dinit service on port 8090
+
+### Fleet Coordination Phase (Conductor Pattern)
+- ✅ Scaffolded `crabjar-conductor` crate with core orchestration types and HTTP API layer
+- [ ] Implement persistent storage layer for conductor (SQLite-backed state store)
+- [ ] Build multi-agent coordination framework (deploy conductor to ftw3 as central node)
 - [ ] Develop security model with capability-based access control
 - [ ] Create observability stack (metrics, tracing, logging)
 
