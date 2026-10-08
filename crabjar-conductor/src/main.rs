@@ -43,11 +43,16 @@ async fn main() -> Result<()> {
     tracing::info!("Starting crabjar-conductor");
     tracing::info!("Listening on {}:{} ", args.addr, args.port);
 
-    // Create conductor with in-memory state store for now
-    let conductor = Arc::new(conductor::Conductor::new(config)?);
+    // Create conductor with SQLite state store
+    let db_path = "/opt/crabjar/conductor/state.db";
+    let conductor = conductor::Conductor::with_db(config, db_path)?;
+
+    // Wrap in Arc<Mutex<>> for shared state across API handlers
+    use tokio::sync::Mutex;
+    let conductor_state: api::ConductorState = Arc::new(Mutex::new(conductor));
 
     // Build the HTTP API router
-    let app = api::routes();
+    let app = api::routes(conductor_state);
 
     // Start listening
     let listener = tokio::net::TcpListener::bind(&format!("{}:{}", args.addr, args.port)).await?;

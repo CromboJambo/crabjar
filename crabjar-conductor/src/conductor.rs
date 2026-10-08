@@ -1,6 +1,6 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
-use crate::state_store::{Goal, GoalStatus, StateStore, Task};
+use crate::state_store::{Goal, GoalStatus, StateStore, Task, Worker};
 use anyhow::Result;
 
 /// Configuration for the conductor service.
@@ -40,12 +40,12 @@ impl Conductor {
     }
 
     /// Submit a new goal for decomposition and execution.
-    pub async fn submit_goal(&self, description: String) -> Result<Goal> {
+    pub fn submit_goal(&self, description: String) -> Result<Goal> {
         // Create the goal record
         let goal = self.store.create_goal(description.clone())?;
 
         // Decompose into tasks using pesti-server (LLM inference)
-        let _tasks = self.decompose(goal.id.clone(), &description).await?;
+        let _tasks = self.decompose(goal.id.clone(), &description)?;
 
         // Mark as running once decomposition is complete
         self.store.update_goal_status(&goal.id, GoalStatus::Running)?;
@@ -54,7 +54,7 @@ impl Conductor {
     }
 
     /// Decompose a goal into executable tasks using LLM inference.
-    async fn decompose(&self, goal_id: String, description: &str) -> Result<Vec<Task>> {
+    fn decompose(&self, goal_id: String, description: &str) -> Result<Vec<Task>> {
         // In production, this calls pesti-server to break the goal into steps.
         // For now, create a placeholder task to demonstrate the flow.
         let task = self.store.create_task(&goal_id, format!("Execute: {}", description))?;
@@ -66,6 +66,17 @@ impl Conductor {
     pub fn goal_status(&self, goal_id: &str) -> Result<Option<GoalStatus>> {
         let goal = self.store.get_goal(goal_id)?;
         Ok(goal.map(|g| g.status))
+    }
+
+    /// Get full goal details.
+    pub fn get_goal(&self, goal_id: &str) -> Result<Option<Goal>> {
+        self.store.get_goal(goal_id).map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    /// List all registered workers.
+    pub fn list_workers(&self) -> Vec<Worker> {
+        // Workers are managed separately; for now return empty list
+        vec![]
     }
 
     /// Poll for tasks assigned to a specific worker.
@@ -102,7 +113,7 @@ mod tests {
             config: ConductorConfig::default(),
         };
 
-        let goal = conductor.submit_goal("Test goal".to_string()).await.unwrap();
+        let goal = conductor.submit_goal("Test goal".to_string()).unwrap();
         let status = conductor.goal_status(&goal.id).unwrap().unwrap();
         assert_eq!(status, GoalStatus::Running);
     }
