@@ -2,8 +2,6 @@
 
 This document tracks **upcoming** crabjar development priorities. Completed work moves to [CHANGELOG.md](./CHANGELOG.md).
 
-## Current Active Work (July 2026)
-
 ### Pre-Release Hardening & Agent Loop Expansion
 
 Final cleanup phase before first public release. Focus: eliminate all remaining technical debt, expand the agent loop with production-grade capabilities, and establish proper documentation processes.
@@ -16,32 +14,39 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ No secrets in binary (verified via strings analysis)
 - ✅ ADR process established (specs/ADR-001)
 
-**In Progress:**
-- [ ] **Conversational TUI** — ratatui-based interactive chat interface with session persistence, message history, scrollback, and guard approval display. SQLite-backed session store (`host-binary/tui/session.rs`). Terminal panel wrapping crabjar-terminal for live terminal view within TUI.
-- [ ] **Model routing** (Phase 1) — `model_routing.rs` implements ModelRouter with phase-specific backend routing via `LoopPhase` enum (plan/reflect → HTTP, others → heuristic). Per-phase configuration in agent_config.json.
-- [ ] **Context compression** (Phase 2) — `context_compression.rs` implements ContextCompressor for token-budgeted context management. Groups older observations by stage/kind to preserve decision-relevant history while shrinking prompt size.
-- [ ] **Decision gate** (Phase 3) — `decision_gate.rs` implements DecisionGate for tool call vs direct response decisions. Auto-decide threshold and max tool calls per turn configurable via agent_config.json.
+**Completed (September 2026):**
+- ✅ Conversational TUI — ratatui-based interactive chat with session persistence, scrollback, guard approval display, habitat panel
+- ✅ Model routing (`model_routing.rs`, 438 LoC) — phase-specific backend routing via `LoopPhase` enum
+- ✅ Context compression (`context_compression.rs`, 385 LoC) — token-budgeted context management with observation grouping
+- ✅ Decision gate (`decision_gate.rs`, 469 LoC) — tool call vs direct response decisions with auto-decide threshold
+
+**Completed (July 2026):**
+- ✅ Domain allowlist enforcement in ExecutionGate step 9 with per-trust-layer configuration
+- ✅ Command risk catalog (`command_risk.rs`) — static classification of HIGH/MEDIUM_RISK_COMMANDS
+- ✅ Risk config system (`risk_config.rs`) — configurable risk levels and thresholds
+- ✅ Context budgeting (`context_budget.rs`) — ContextBudget + MAX_TOKENS_PER_FRAGMENT enforcement in ExecutionGate step 10
+- ✅ Static policy engine (`policy.rs`, `policy_types.rs`) — TOML-based declarative policies for pre-execution checks
 
 **Upcoming:**
-- [ ] Domain allowlist enforcement in ExecutionGate step 10 with per-trust-layer configuration
-- [ ] Command risk catalog (`command_risk.rs`) — static classification of HIGH/MEDIUM_RISK_COMMANDS (rm -rf, chmod 777, etc.)
-- [ ] Risk config system (`risk_config.rs`) — configurable risk levels and thresholds
-- [ ] Context budgeting (`context_budget.rs`) — ContextBudget + MAX_TOKENS_PER_FRAGMENT enforcement in ExecutionGate step 10
-- [ ] Static policy engine (`policy.rs`, `policy_types.rs`) — TOML-based declarative policies for pre-execution checks
+- [ ] vm-bridge integration with actual VM lifecycle management (see Upcoming Phases)
 
 **Deliverables:** Release-ready binary, ADR process established, proper testing infrastructure, documented agent loop with model routing/compression/decision-gate capabilities.
 
 ### Memory Crate Refactoring
-- [ ] Split `indexer.rs` (705 LoC) into `extract.rs` (~400 LoC: markdown parsing) and `insert.rs` (~144 LoC: SQLite writes) to satisfy 500 LoC rule
-- Fix pre-existing schema/insert column mismatches (`doc_metadata` vs `documents`, `doc_id` vs `doc_path`)
+- ✅ Split `indexer.rs` into `extract.rs` (400 LoC) and `insert.rs` (152 LoC) to satisfy 500 LoC rule
+- ✅ Fixed pre-existing schema/insert column mismatches (`doc_metadata` vs `documents`, `doc_id` vs `doc_path`)
 
 ### crabjar-plugin Crate
-- [ ] Scaffold WASM plugin runtime crate in `crabjar-plugin/` (deferred until concrete use case)
+- ✅ Scaffolded WASM plugin runtime crate in `crabjar-plugin/` (stub, deferred pending concrete use case)
 
 ## Upcoming Phases
 
 ### vm-bridge Integration Phase
-- [ ] Complete vm-bridge integration with actual VM lifecycle management
+- ✅ Scaffolded `vm/vm-core` crate with domain types (VmId, VmState, VmSpec), lifecycle events, typed error hierarchy
+- ✅ Implemented LibvirtBackend stub with libvirt FFI bindings for VM lifecycle operations
+- ✅ Built VmManager high-level API with policy integration hooks and state caching
+- ✅ Unit tests for domain types pass (5/5)
+- ✅ Integrate vm-core with axum-mux bridge for HTTP/WebSocket control plane (lifecycle.rs: /vms endpoints, LifecycleState, mounted in supervisor)
 - [ ] Implement persistent storage layer for long-term memory retention
 - [ ] Build multi-agent coordination framework
 - [ ] Develop security model with capability-based access control

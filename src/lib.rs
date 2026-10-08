@@ -174,6 +174,7 @@ pub mod bitwarden;
 pub mod crabjar_config;
 pub mod doctor;
 pub mod habitat_contract;
+pub mod kanban_source;
 pub mod knowledge_store;
 pub mod metrics;
 pub mod project_loader;

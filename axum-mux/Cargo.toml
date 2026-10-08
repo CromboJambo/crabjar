@@ -17,6 +17,12 @@ chrono = { workspace = true }
 # Typed terminal event stream (ADR-005 substrate) — the relay forwards
 # TerminalEvent frames; it owns no session state.
 crabjar-terminal = { path = "../crates/terminal" }
+# VM lifecycle management substrate
+vm-core = { path = "../vm/vm-core" }
+
+[[bin]]
+name = "vm-bridge"
+path = "src/main.rs"
 
 [dev-dependencies]
 # WebSocket client for the relay's live round-trip tests (same 0.24

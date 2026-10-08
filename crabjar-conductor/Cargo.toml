@@ -1,0 +1,53 @@
+[package]
+name = "crabjar-conductor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Fleet orchestration service for crabjar agent coordination"
+
+[[bin]]
+name = "crabjar-conductor"
+path = "src/main.rs"
+
+[lib]
+name = "crabjar_conductor"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# HTTP server
+axum = { workspace = true }
+tower-http = { workspace = true }
+
+# Database (embedded SQLite for conductor state)
+rusqlite = { workspace = true }
+
+# UUIDs and timestamps
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Tracing/logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# CLI parsing
+clap = { workspace = true }
+
+# Crabjar dependencies
+crabjar-guard = { path = "../guard" }
+
+[lints]
+workspace = true

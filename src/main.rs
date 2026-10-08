@@ -609,14 +609,27 @@ fn handle_habitat_command(
             let pending = crabjar_lib::habitat_contract::read_pending_actions(&guard_db);
             let theory_status =
                 crabjar_lib::habitat_contract::read_theory_status(&db_path, &theory);
-            let contract =
-                crabjar_lib::habitat_contract::build_contract(&queue, &pending, &theory_status);
+
+            // Read real Hermes kanban tasks from all boards
+            let kanban_tasks = crabjar_lib::kanban_source::read_all_tasks()
+                .unwrap_or_else(|err| {
+                    eprintln!("Warning: failed to read kanban tasks: {}", err);
+                    vec![]
+                });
+
+            let contract = crabjar_lib::habitat_contract::build_contract(
+                &queue,
+                &pending,
+                &theory_status,
+                &kanban_tasks,
+            );
 
             let mut message = format!(
-                "habitat contract: {} tasks ({} triage, {} guard, 1 theory)",
+                "habitat contract: {} tasks ({} triage, {} guard, 1 theory, {} kanban)",
                 contract["tasks"].as_array().unwrap().len(),
                 queue.len(),
                 pending.len(),
+                kanban_tasks.len(),
             );
             if let Some(path) = &out {
                 std::fs::write(path, serde_json::to_string_pretty(&contract)?)?;

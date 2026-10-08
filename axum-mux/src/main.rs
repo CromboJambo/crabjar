@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
 use std::env;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
 
+mod lifecycle;
 mod manifest;
 mod proxy;
 mod review;
@@ -11,6 +13,7 @@ mod terminal_relay;
 #[cfg(test)]
 mod terminal_relay_tests;
 
+use lifecycle::{LifecycleState, routes};
 use manifest::Manifest;
 
 const MANIFEST_PATH: &str = "manifest.toml";
@@ -70,6 +73,23 @@ async fn main() -> Result<()> {
 async fn run_supervisor() -> Result<()> {
     let manifest = Manifest::load(MANIFEST_PATH)?;
     let exe = env::current_exe()?;
+
+    // Start lifecycle API server on a separate port.
+    let config = vm_core::manager::ManagerConfig {
+        libvirt_uri: "qemu:///system".to_string(),
+        default_timeout: std::time::Duration::from_secs(60),
+    };
+    let manager = vm_core::manager::VmManager::new(config)?;
+    let lifecycle_state = LifecycleState::new(Arc::new(manager));
+    let lifecycle_app = routes(lifecycle_state.clone());
+
+    tokio::spawn(async move {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:8090")
+            .await
+            .expect("bind lifecycle port");
+        tracing::info!("lifecycle API listening on 127.0.0.1:8090");
+        axum::serve(listener, lifecycle_app).await.unwrap();
+    });
 
     let mut handles = Vec::new();
     for vm in manifest.vms {
