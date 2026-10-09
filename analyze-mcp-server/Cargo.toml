@@ -1,0 +1,19 @@
+[package]
+name = "analyze-mcp-server"
+version = "0.12.0"
+edition = "2024"
+description = "MCP server exposing crabjar-analyze reverse engineering toolkit"
+license = "AGPL-3.0-or-later"
+
+[[bin]]
+name = "analyze-mcp"
+path = "src/main.rs"
+
+[dependencies]
+analyze-common = { path = "../analyze-common", version = "0.12.0" }
+analyze-native = { path = "../analyze-native", version = "0.12.0" }
+rmcp = { version = "3.5", features = ["server"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }

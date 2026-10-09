@@ -10,6 +10,10 @@ members = [
     "axum-mux",
     "crabjar-architecture",
     "crates/podman",
+    # Analysis toolkit
+    "analyze-common",
+    "analyze-native",
+    "analyze-mcp-server",
     # Host runtime
     "host/host-core",
     "host/host-system",
@@ -44,7 +48,8 @@ members = [
     "crates/crabjar-gpui",
     # SSH bastion host using russh (transparent proxy, no client app needed)
     "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker",
-]
+ "crabjar-analyze",
+ ]
 
 resolver = "2"
 
