@@ -2,6 +2,7 @@
 
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
+use tracing::{info, debug, warn, error};
 
 /// Configuration for the conductor service.
 pub struct ConductorConfig {
@@ -41,11 +42,15 @@ impl Conductor {
 
     /// Submit a new goal for decomposition and execution.
     pub fn submit_goal(&self, description: String) -> Result<Goal> {
+        info!(description = %description, "Submitting new goal");
+        
         // Create the goal record
         let goal = self.store.create_goal(description.clone())?;
+        info!(goal_id = %goal.id, "Goal created");
 
         // Decompose into tasks using pesti-server (LLM inference)
-        let _tasks = self.decompose(goal.id.clone(), &description)?;
+        let tasks = self.decompose(goal.id.clone(), &description)?;
+        info!(goal_id = %goal.id, task_count = tasks.len(), "Goal decomposed into tasks");
 
         // Mark as running once decomposition is complete
         self.store.update_goal_status(&goal.id, GoalStatus::Running)?;
@@ -55,6 +60,8 @@ impl Conductor {
 
     /// Decompose a goal into executable tasks using LLM inference.
     fn decompose(&self, goal_id: String, description: &str) -> Result<Vec<Task>> {
+        info!(goal_id = %goal_id, pesti_url = %self.config.pesti_server_url, "Decomposing goal via pesti-server");
+        
         // Call pesti-server to break the goal into steps via LLM inference.
         let prompt = format!(
             "You are a task planner that breaks goals into executable shell commands.\n\
@@ -66,8 +73,32 @@ impl Conductor {
             description
         );
 
-        let client = reqwest::blocking::Client::new();
+        // Configure HTTP client with explicit timeout and DNS resolution
         let url = format!("{}/v1/chat/completions", self.config.pesti_server_url);
+        info!(goal_id = %goal_id, url = %url, "Connecting to pesti-server");
+        
+        // Debug: resolve the hostname ourselves to see what IP we get
+        let parsed = reqwest::Url::parse(&url).map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
+        let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("no host in URL"))?;
+        info!(goal_id = %goal_id, host = %host, "Resolved hostname");
+        
+        // Try resolving manually to see what we get
+        match std::net::ToSocketAddrs::to_socket_addrs(&format!("{}:8081", host)) {
+            Ok(addrs) => {
+                for addr in addrs {
+                    info!(goal_id = %goal_id, addr = ?addr, "DNS resolution result");
+                }
+            },
+            Err(e) => {
+                error!(goal_id = %goal_id, err = %e, host = %host, "Manual DNS resolution failed");
+            }
+        }
+        
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(|e| anyhow::anyhow!("failed to build HTTP client: {}", e))?;
 
         let body = serde_json::json!({
             "model": "orchestrator_merged",
@@ -91,6 +122,8 @@ impl Conductor {
             .map_err(|e| anyhow::anyhow!("pesti-server request failed: {}", e))?;
 
         let status = resp.status();
+        info!(goal_id = %goal_id, status = status.as_u16(), "Received response from pesti-server");
+        
         let text = resp.text().map_err(|e| anyhow::anyhow!("failed to read response: {}", e))?;
 
         if !status.is_success() {
@@ -159,9 +192,12 @@ impl Conductor {
                 .to_string();
             let description = spec["description"].as_str().unwrap_or(&command).to_string();
 
+            debug!(goal_id = %goal_id, command = %command, "Creating task from LLM spec");
             let task = self.store.create_task(&goal_id, format!("[{}] {}", description, command))?;
             tasks.push(task);
         }
+        
+        info!(goal_id = %goal_id, task_count = tasks.len(), "Created tasks from decomposition");
 
         Ok(tasks)
     }

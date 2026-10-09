@@ -8,6 +8,7 @@ use clap::Parser;
 use crabjar_conductor::{api, conductor};
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
+use tracing::info;
 
 #[derive(Parser)]
 #[command(name = "crabjar-conductor", version, about = "Fleet orchestration service")]
@@ -31,10 +32,15 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing
+    // Initialize tracing with default filter if RUST_LOG not set
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+    
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(env_filter)
         .init();
+
+    info!("Starting crabjar-conductor");
 
     let args = Args::parse();
 
@@ -54,10 +60,10 @@ async fn main() -> Result<()> {
     use tokio::sync::Mutex;
     let conductor_state: api::ConductorState = Arc::new(Mutex::new(conductor));
 
-    // Build the HTTP API router
     let app = api::routes(conductor_state);
 
     // Start listening
+    info!(addr = %args.addr, port = args.port, "Starting HTTP server");
     let listener = tokio::net::TcpListener::bind(&format!("{}:{}", args.addr, args.port)).await?;
     axum::serve(listener, app).await?;
 

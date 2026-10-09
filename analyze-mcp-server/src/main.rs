@@ -1,3 +1,8 @@
+use analyze_apk::ApkParser;
+use analyze_common::AnalysisResult;
+use analyze_har::analyze_har;
+use analyze_js::analyze_js;
+use analyze_native::ElfParser;
 use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
@@ -22,36 +27,27 @@ impl AnalyzeMcpServer {
     #[tool(description = "Analyze HTTP Archive (HAR) network capture file")]
     fn analyze_har(&self, params: Parameters<BinaryRequest>) -> String {
         let path = &params.0.path;
-        match std::fs::read(path) {
-            Ok(_data) => {
-                // HAR analysis not yet implemented
-                format!("HAR analysis for {} not yet implemented", path)
-            }
-            Err(e) => format!("Error reading {}: {}", path, e),
+        match analyze_har(path) {
+            Ok(result) => serde_json::to_string_pretty(&result).unwrap_or_default(),
+            Err(e) => format!("Analysis error: {}", e),
         }
     }
 
     #[tool(description = "Analyze JavaScript source: imports, exports, functions, globals")]
     fn analyze_js(&self, params: Parameters<BinaryRequest>) -> String {
         let path = &params.0.path;
-        match std::fs::read(path) {
-            Ok(_data) => {
-                // JS analysis not yet implemented
-                format!("JavaScript analysis for {} not yet implemented", path)
-            }
-            Err(e) => format!("Error reading {}: {}", path, e),
+        match analyze_js(path) {
+            Ok(result) => serde_json::to_string_pretty(&result).unwrap_or_default(),
+            Err(e) => format!("Analysis error: {}", e),
         }
     }
 
     #[tool(description = "Analyze Android APK package structure and manifest")]
     fn analyze_apk(&self, params: Parameters<BinaryRequest>) -> String {
         let path = &params.0.path;
-        match std::fs::read(path) {
-            Ok(_data) => {
-                // APK analysis not yet implemented
-                format!("APK analysis for {} not yet implemented", path)
-            }
-            Err(e) => format!("Error reading {}: {}", path, e),
+        match ApkParser::analyze(path) {
+            Ok(result) => serde_json::to_string_pretty(&result).unwrap_or_default(),
+            Err(e) => format!("Analysis error: {}", e),
         }
     }
 

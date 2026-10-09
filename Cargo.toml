@@ -12,6 +12,9 @@ members = [
     "crates/podman",
     # Analysis toolkit
     "analyze-common",
+    "analyze-apk",
+    "analyze-har",
+    "analyze-js",
     "analyze-native",
     "analyze-mcp-server",
     # Host runtime

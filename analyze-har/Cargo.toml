@@ -1,0 +1,16 @@
+[package]
+name = "analyze-har"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "HTTP Archive (HAR) network capture analysis — request/response pairs, timing, resource types, suspicious patterns"
+repository.workspace = true
+
+[dependencies]
+analyze-common = { path = "../analyze-common" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+regex.workspace = true

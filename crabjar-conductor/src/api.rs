@@ -5,11 +5,12 @@ use serde_json::json;
 use crate::conductor::Conductor;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::{info, debug, warn, error};
 
 pub type ConductorState = Arc<Mutex<Conductor>>;
 
 pub fn routes(conductor: ConductorState) -> Router {
-    Router::new()
+    let app = Router::new()
         // Goals
         .route("/goals", post(submit_goal))
         .route("/goals/{id}", get(get_goal))
@@ -20,7 +21,25 @@ pub fn routes(conductor: ConductorState) -> Router {
         // Tasks
         .route("/tasks/for-worker/{worker_id}", get(tasks_for_worker))
         .route("/tasks/{id}/result", post(report_task_result))
-        .with_state(Arc::clone(&conductor))
+        .with_state(Arc::clone(&conductor));
+    
+    // Add request logging middleware
+    app.layer(axum::middleware::from_fn(log_requests))
+}
+
+async fn log_requests(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
+    let method = req.method().clone();
+    let path = req.uri().path().to_string();
+    let start = std::time::Instant::now();
+    
+    debug!(method = %method, path = %path, "Incoming request");
+    
+    let resp = next.run(req).await;
+    
+    let elapsed = start.elapsed();
+    info!(method = %method, path = %path, status = resp.status().as_u16(), elapsed_ms = elapsed.as_millis(), "Request completed");
+    
+    resp
 }
 
 async fn submit_goal(

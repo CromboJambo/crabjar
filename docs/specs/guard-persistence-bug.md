@@ -1,7 +1,11 @@
 # Crabjar Guard Persistence Bug — Storage Fixed, Approval Lookup Broken
 
 ## Status
-Storage fix applied (interrupted entries now persist). Approval lookup still broken (looks in wrong table).
+**FIXED AND VERIFIED** — Both storage and approval lookup issues resolved.
+
+Test results (2026-10-09, ftw3):
+- exec → interrupted: ✓ Returns `interrupted_id` as expected
+- approve finds entry: ✓ Returns `"status": "trust-approved"` (previously `"not_found"`)
 
 ## Problem
 When an agent action is interrupted by the guard system, `crabjar exec` generates an `interrupted_id`. The entry is now persisted to `interrupted_log`, but `crabjar guard approve --action-id <id>` fails with "not_found".

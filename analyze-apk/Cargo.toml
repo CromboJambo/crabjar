@@ -1,0 +1,16 @@
+[package]
+name = "analyze-apk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Android APK package analysis — manifest parsing, permissions, components"
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+zip = { version = "2.0", features = ["deflate"] }
+analyze-common = { path = "../analyze-common" }
