@@ -33,6 +33,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ vm-bridge deployed to ftw3 home-lab node as dinit service on port 8090
 - ✅ Orchestrator fine-tuning pipeline documented (docs/training/orchestrator-fine-tuning.md)
 - ✅ crabjar-conductor deployed to ftw3:8091 with pesti-server orchestrator integration (dinit service, SQLite state store)
+- ✅ 27B post-trained model integrated as default provider (DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF)
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control

@@ -23,6 +23,10 @@ All notable changes to crabjar, organized chronologically. Completed work moves 
 ### MCP Server Integration
 - All analyzers exposed via `crabjar-analyze` CLI tool and `analyze-mcp-server` for remote access
 
+### Model Provider Update
+- Integrated 27B post-trained model as default provider: DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF
+- Model heavily influenced by hermes-agent and unsloth training methodologies
+
 ### crabjar-conductor Crate (Fleet Coordination Layer)
 - Scaffolded `crabjar-conductor` crate implementing the conductor pattern for cross-machine agent coordination
 - Core types: Goal, Task, Worker with status enums and relationships
