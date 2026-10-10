@@ -32,9 +32,9 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ SQLite-backed persistent state store for conductor (rusqlite, goals/tasks/workers tables with FK constraints)
 - ✅ vm-bridge deployed to ftw3 home-lab node as dinit service on port 8090
 - ✅ Orchestrator fine-tuning pipeline documented (docs/training/orchestrator-fine-tuning.md)
+- ✅ crabjar-conductor deployed to ftw3:8091 with pesti-server orchestrator integration (dinit service, SQLite state store)
 
 **Upcoming:**
-- [ ] Build multi-agent coordination framework (deploy conductor to ftw3 as central node)
 - [ ] Develop security model with capability-based access control
 - [ ] Create observability stack (metrics, tracing, logging)
 
@@ -60,7 +60,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 ### Fleet Coordination Phase (Conductor Pattern)
 - ✅ Scaffolded `crabjar-conductor` crate with core orchestration types and HTTP API layer
 - ✅ Implemented SQLite-backed persistent state store (rusqlite, goals/tasks/workers tables, FK constraints)
-- [ ] Build multi-agent coordination framework (deploy conductor to ftw3 as central node)
+- ✅ Deployed conductor to ftw3:8091 as dinit service with pesti-server orchestrator integration
 - [ ] Develop security model with capability-based access control
 - [ ] Create observability stack (metrics, tracing, logging)
 

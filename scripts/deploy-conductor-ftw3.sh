@@ -25,9 +25,24 @@ rsync -avz --delete \
     target/release/crabjar-conductor \
     "${REMOTE_USER}@${REMOTE_HOST}:${DEPLOY_DIR}/crabjar-conductor"
 
-echo "==> Restarting conductor service on ftw3 (dinit)..."
-ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
-    "sudo dinitctl start crabjar-conductor && sleep 2 && ps aux | grep crabjar-conductor | head -5"
+echo "==> Deploying dinit service config with pesti-url..."
+ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} "cat > /tmp/conductor-service << 'EOF'
+type     = process
+command  = /opt/crabjar/conductor/crabjar-conductor --port 8091 --pesti-url http://localhost:8081 --db-path /opt/crabjar/conductor/conductor-state.db
+logfile  = /var/log/dinit/crabjar-conductor.log
+depends-on: network.target
+EOF
+sudo cp /tmp/conductor-service /etc/dinit.d/crabjar-conductor"
 
+echo "==> Reloading and starting conductor service on ftw3 (dinit)..."
+ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
+    "sudo dinitctl reload crabjar-conductor && sudo dinitctl start crabjar-conductor"
+
+echo "==> Verifying deployment..."
+sleep 2
+ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
+    "curl -s http://localhost:8091/workers | head -c 200"
+
+echo ""
 echo "==> Deployment complete. Commit: $COMMIT"
 echo "==> Conductor API available at http://ftw3:8091 (via SSH tunnel)"

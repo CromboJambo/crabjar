@@ -2,7 +2,26 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
-## October 8, 2026 — Fleet Orchestration Infrastructure
+## October 10, 2026 — Conductor Deployment & Analyzer Toolkit
+
+### crabjar-conductor Deployment to ftw3
+- Deployed conductor as dinit service on ftw3:8091 with pesti-server orchestrator integration
+- SQLite-backed persistent state store (goals/tasks/workers tables with FK constraints)
+- HTTP API endpoints: POST /goals, GET /goals/{id}, GET /workers
+- Orchestrator model called via pesti-server at http://localhost:8081 for goal decomposition and task assignment
+- Deployment script `scripts/deploy-conductor-ftw3.sh` handles build, transfer, service config, verification
+
+### Reverse Engineering Analyzer Toolkit (7 analyzers)
+- **analyze-har**: HAR file parsing with credential detection, timing analysis, endpoint classification
+- **analyze-js**: JavaScript dependency graph, API call extraction, obfuscation detection, minification ratio
+- **analyze-native**: ELF/PE/Mach-O binary parsing with section analysis, symbol inspection, entropy scoring
+- **analyze-dotnet**: .NET assembly IL bytecode inspection with method body analysis
+- **analyze-firmware**: Firmware image format detection and section parsing
+- **analyze-apk**: Android APK manifest parsing, permission extraction, DEX inspection
+- **analyze-common**: Shared utilities (entropy calculation, base64/hex helpers)
+
+### MCP Server Integration
+- All analyzers exposed via `crabjar-analyze` CLI tool and `analyze-mcp-server` for remote access
 
 ### crabjar-conductor Crate (Fleet Coordination Layer)
 - Scaffolded `crabjar-conductor` crate implementing the conductor pattern for cross-machine agent coordination
