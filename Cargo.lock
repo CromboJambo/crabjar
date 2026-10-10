@@ -139,6 +139,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "analyze-dotnet"
+version = "0.12.0"
+dependencies = [
+ "analyze-common",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "analyze-firmware"
+version = "0.12.0"
+dependencies = [
+ "analyze-common",
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "analyze-har"
 version = "0.12.0"
 dependencies = [
@@ -1952,6 +1977,8 @@ version = "0.12.0"
 dependencies = [
  "analyze-apk",
  "analyze-common",
+ "analyze-dotnet",
+ "analyze-firmware",
  "analyze-har",
  "analyze-js",
  "analyze-native",

@@ -1,0 +1,15 @@
+[package]
+name = "analyze-native"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "ELF binary analysis — header parsing, symbol extraction, string enumeration"
+repository.workspace = true
+
+[dependencies]
+analyze-common = { path = "../analyze-common" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+regex.workspace = true

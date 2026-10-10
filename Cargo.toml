@@ -13,6 +13,8 @@ members = [
     # Analysis toolkit
     "analyze-common",
     "analyze-apk",
+    "analyze-dotnet",
+    "analyze-firmware",
     "analyze-har",
     "analyze-js",
     "analyze-native",

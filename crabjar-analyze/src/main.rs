@@ -1,8 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use analyze_common::{
     AnalysisProvenance, AnalysisResult, AnalyzeError, DoubtBlock, ANALYZE_COMMON_VERSION,
 };
 use analyze_apk::ApkParser;
+use analyze_dotnet::analyze_dotnet;
+use analyze_firmware::analyze_firmware;
 use analyze_har::analyze_har;
 use analyze_js::analyze_js;
 use analyze_native::ElfParser;
@@ -159,8 +161,18 @@ fn main() -> Result<()> {
                 "analysis": analysis,
             }))
         }
-        Commands::Firmware { .. } => Err(anyhow!("firmware analysis not yet implemented")),
-        Commands::Dotnet { .. } => Err(anyhow!(".NET analysis not yet implemented")),
+        Commands::Firmware { path } => {
+            let analysis = analyze_firmware(&path)?;
+            Ok(json!({
+                "analysis": analysis,
+            }))
+        }
+        Commands::Dotnet { path } => {
+            let analysis = analyze_dotnet(&path)?;
+            Ok(json!({
+                "analysis": analysis,
+            }))
+        }
     };
 
     let elapsed = start.elapsed();
