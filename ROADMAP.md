@@ -65,6 +65,19 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - [ ] Develop security model with capability-based access control
 - [ ] Create observability stack (metrics, tracing, logging)
 
+### Code Review Pipeline (Deterministic Hybrid Architecture)
+- ✅ Spec finalized with all consistency issues resolved (specs/code-review-pipeline.md)
+- ✅ Phase 1: Deterministic pre-processor crate scaffolded (crabjar-review/)
+  - File selection with type classification and generated/binary filtering
+  - Smart bundling with source+test pairing and monorepo/crate boundary awareness
+  - TOML-based rule matching engine
+  - 13 unit tests passing
+- [ ] Phase 2: Agent review units with context retrieval tools and structured output
+- [ ] Phase 3: Post-processor for position validation and content reflection
+- [ ] Phase 4: GitHub PR integration via crabjar-conductor HTTP API
+- [ ] Phase 5: Benchmarking against home-lab PRs (precision, recall, F1, token consumption)
+- See: specs/code-review-pipeline.md
+
 ### Production Readiness Phase
 - [ ] Performance optimization and benchmarking suite
 - [ ] Comprehensive integration test matrix

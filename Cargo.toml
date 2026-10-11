@@ -53,7 +53,7 @@ members = [
     "crates/crabjar-gpui",
     # SSH bastion host using russh (transparent proxy, no client app needed)
     "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker",
- "crabjar-analyze",
+ "crabjar-analyze", "crabjar-review",
  ]
 
 resolver = "2"
