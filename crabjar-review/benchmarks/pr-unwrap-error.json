@@ -1,0 +1,14 @@
+{
+    "name": "test-unwrapped-error",
+    "findings": [
+        {
+            "file": "src/handler.rs",
+            "line": 10,
+            "severity": "high",
+            "type": "bug",
+            "rule_id": "check_errors",
+            "description": "unwrap() called without error handling"
+        }
+    ],
+    "expected_rule_ids": ["check_errors"]
+}

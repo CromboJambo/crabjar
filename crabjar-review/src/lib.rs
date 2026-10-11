@@ -18,6 +18,7 @@ pub mod review_agent;
 pub mod positioning_validation;
 pub mod reflection;
 pub mod github;
+pub mod benchmark;
 
 #[cfg(test)]
 mod integration_tests {
