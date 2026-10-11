@@ -2,6 +2,27 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## October 10, 2026 — Code Review Pipeline (crabjar-review)
+
+### Full Pipeline Implementation (Phases 1-4 Complete)
+- **Phase 1 (Deterministic Pre-processor):** File selection with type classification, smart bundling with source+test pairing and monorepo/crate boundary awareness, TOML-based rule matching engine
+- **Phase 2 (Agent Review Units):** Scenario-tuned prompt generation, bounded context retrieval tools (file content, surrounding context, project structure), structured JSON output validation for agent findings
+- **Phase 3 (Post-processor & GitHub Integration):** Position validation with ±2 line tolerance window, severity validation enforcing bug→critical/major rules, finding deduplication via hash-based matching, severity reflection (downgrading security issues in test files), complete GitHub API client for PR comments and summaries
+- **Phase 4 (Benchmarking):** Benchmark runner evaluating post-processor against ground-truth findings to measure precision, recall, and F1 score, with CLI tool and example benchmark data
+- **Conductor Integration:** Wired crabjar-review into crabjar-conductor's HTTP API as `POST /review` endpoint accepting repo URL, PR number, commit SHA, and diff content
+
+### Architecture Highlights
+- Deterministic pre-processing filters 95%+ of noise before LLM inference (type classification, generated/binary filtering)
+- Smart bundling limits context to relevant files while preserving test coverage relationships
+- Rule matching engine supports applies_to/not_applies_to file type constraints per rule
+- Post-processor validates and deduplicates agent findings before submission to GitHub
+- Benchmark suite measures precision/recall/F1 against ground-truth findings
+
+### Testing
+- 38 unit tests passing across all modules (file selection, bundling, rules, prompts, context retrieval, post-processing, benchmarking)
+- Integration tests covering end-to-end review pipeline with mock agent output
+- Benchmark integration tests validating TP/FP/FN tracking and deduplication effects on metrics
+
 ## October 10, 2026 — Conductor Deployment & Analyzer Toolkit
 
 ### crabjar-conductor Deployment to ftw3

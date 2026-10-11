@@ -25,6 +25,7 @@ Declared in `Cargo.toml` `[workspace.members]`:
 - `host/host-graph` — graph utilities
 - `host/host-screen` — screen capture
 - `crabjar-conductor` — fleet coordination layer (orchestrates workers across machines)
+- `crabjar-review` — code review pipeline with deterministic pre-processing, agent review units, post-processor, and GitHub integration
 - `analyze-har` — HAR file analyzer (network traffic, credential detection)
 - `analyze-js` — JavaScript analyzer (dependency graph, API calls, obfuscation)
 - `analyze-native` — native binary analyzer (ELF/PE/Mach-O parsing)
@@ -63,8 +64,9 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 | `host/host-mqtt` | MQTT host |
 | `host/host-graph` | Graph utilities |
 | `host/host-screen` | Screen capture |
-| `crabjar-conductor` | Fleet coordination layer (orchestrates workers across machines) |
-| `analyze-har` | HAR file analyzer (network traffic, credential detection) |
+|| `crabjar-conductor` | Fleet coordination layer (orchestrates workers across machines) |
+|| `crabjar-review` | Code review pipeline with deterministic pre-processing, agent review units, post-processor, and GitHub integration |
+|| `analyze-har` | HAR file analyzer (network traffic, credential detection) |
 | `analyze-js` | JavaScript analyzer (dependency graph, API calls, obfuscation) |
 | `analyze-native` | Native binary analyzer (ELF/PE/Mach-O parsing) |
 | `analyze-dotnet` | .NET assembly analyzer (IL bytecode inspection) |

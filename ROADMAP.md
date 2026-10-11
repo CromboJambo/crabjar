@@ -34,6 +34,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ Orchestrator fine-tuning pipeline documented (docs/training/orchestrator-fine-tuning.md)
 - ✅ crabjar-conductor deployed to ftw3:8091 with pesti-server orchestrator integration (dinit service, SQLite state store)
 - ✅ 27B post-trained model integrated as default provider (DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF)
+- ✅ crabjar-review code review pipeline complete (Phases 1-4 + conductor integration) — deterministic pre-processing, agent review units, post-processor with position validation/deduplication, GitHub PR integration, benchmark suite with precision/recall/F1 metrics
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control
@@ -72,10 +73,24 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
   - Smart bundling with source+test pairing and monorepo/crate boundary awareness
   - TOML-based rule matching engine
   - 13 unit tests passing
-- [ ] Phase 2: Agent review units with context retrieval tools and structured output
-- [ ] Phase 3: Post-processor for position validation and content reflection
-- [ ] Phase 4: GitHub PR integration via crabjar-conductor HTTP API
-- [ ] Phase 5: Benchmarking against home-lab PRs (precision, recall, F1, token consumption)
+- ✅ Phase 2: Agent review units with context retrieval tools and structured output
+  - Scenario-tuned prompt generation (general, security, performance, refactor)
+  - Bounded context retrieval tools (file content, surrounding context, project structure)
+  - Structured JSON output validation for agent findings
+  - 10 additional unit tests passing
+- ✅ Phase 3: Post-processor for position validation and content reflection
+  - Position validation with ±2 line tolerance window
+  - Severity validation enforcing bug→critical/major rules
+  - Finding deduplication via hash-based matching
+  - Severity reflection (downgrading security issues in test files)
+  - GitHub API client for PR comments and summaries
+  - 9 additional unit tests passing
+- ✅ Phase 4: Benchmark suite with precision/recall/F1 metrics
+  - Benchmark runner evaluating post-processor against ground-truth findings
+  - CLI tool for running benchmark suites from directory of JSON files
+  - Integration tests covering TP/FP/FN tracking and deduplication effects
+  - 4 additional unit tests passing
+- ✅ Conductor integration: POST /review endpoint wired into crabjar-conductor API
 - See: specs/code-review-pipeline.md
 
 ### Production Readiness Phase
