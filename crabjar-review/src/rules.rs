@@ -2,17 +2,14 @@ use crate::types::{ChangedFile, ReviewRule};
 use std::path::Path;
 use std::fs;
 
-/// Load review rules from a TOML file.
-pub fn load_rules(path: &Path) -> Result<Vec<ReviewRule>, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read rules file {:?}: {}", path, e))?;
-
+/// Load review rules from a TOML string.
+pub fn load_rules_from_str(content: &str) -> Result<Vec<ReviewRule>, String> {
     let parsed: toml::Value = content.parse()
-        .map_err(|e| format!("Failed to parse TOML in {:?}: {}", path, e))?;
+        .map_err(|e| format!("Failed to parse TOML: {}", e))?;
 
     let rules_array = parsed.get("rules")
         .and_then(|r| r.as_array())
-        .ok_or_else(|| "Rules file must contain a 'rules' array".to_string())?;
+        .ok_or_else(|| "Rules must contain a 'rules' array".to_string())?;
 
     let mut rules = Vec::new();
     for (i, rule_value) in rules_array.iter().enumerate() {
@@ -22,6 +19,14 @@ pub fn load_rules(path: &Path) -> Result<Vec<ReviewRule>, String> {
     }
 
     Ok(rules)
+}
+
+/// Load review rules from a TOML file.
+pub fn load_rules(path: &Path) -> Result<Vec<ReviewRule>, String> {
+    let content = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read rules file {:?}: {}", path, e))?;
+
+    load_rules_from_str(&content)
 }
 
 /// Match review rules against a file based on its type.

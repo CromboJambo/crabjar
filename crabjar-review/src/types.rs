@@ -116,6 +116,7 @@ impl Severity {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewConfig {
     pub model: String,
+    pub model_endpoint: String,
     pub max_bundles_parallel: u32,
     pub bundle_size_limit_kb: u32,
     pub context_retrieval_limit: u32,
@@ -126,6 +127,7 @@ impl Default for ReviewConfig {
     fn default() -> Self {
         Self {
             model: "Qwen3.8-27B-TURBO-Fable".to_string(),
+            model_endpoint: "http://localhost:8091".to_string(),
             max_bundles_parallel: 4,
             bundle_size_limit_kb: 500,
             context_retrieval_limit: 10,

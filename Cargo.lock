@@ -2252,8 +2252,10 @@ dependencies = [
 name = "crabjar-review"
 version = "0.12.0"
 dependencies = [
+ "anyhow",
  "git2",
  "regex",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tempfile",

@@ -158,6 +158,56 @@ pub fn get_changed_files(
     Ok(changed_files)
 }
 
+/// Parse a unified diff text into ChangedFile objects.
+pub fn parse_diff(repo_path: &Path, diff_text: &str) -> Result<Vec<ChangedFile>, String> {
+    let mut changed_files = Vec::new();
+    let lines = diff_text.lines().collect::<Vec<_>>();
+
+    let mut i = 0;
+    while i < lines.len() {
+        let line = lines[i];
+
+        if line.starts_with("diff --git") {
+            // Extract path from "diff --git a/path b/path"
+            if let Some(a_part) = line.strip_prefix("diff --git a/") {
+                let b_start = a_part.find(" b/");
+                if let Some(idx) = b_start {
+                    let path_str = &a_part[..idx];
+                    let path_buf = repo_path.join(path_str);
+                    let file_type = classify_file(&path_buf, None);
+
+                    // Count additions/deletions for this file
+                    let mut additions = 0;
+                    let mut deletions = 0;
+                    let mut j = i + 1;
+                    while j < lines.len() && !lines[j].starts_with("diff --git") {
+                        if lines[j].starts_with("+") && !lines[j].starts_with("+++") {
+                            additions += 1;
+                        } else if lines[j].starts_with("-") && !lines[j].starts_with("---") {
+                            deletions += 1;
+                        }
+                        j += 1;
+                    }
+
+                    changed_files.push(ChangedFile {
+                        path: path_buf,
+                        file_type,
+                        status: FileStatus::Modified,
+                        additions,
+                        deletions,
+                    });
+
+                    i = j - 1; // Continue from next diff header
+                }
+            }
+        }
+
+        i += 1;
+    }
+
+    Ok(changed_files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
