@@ -15,6 +15,9 @@ pub mod file_selection;
 pub mod prompts;
 pub mod context_retrieval;
 pub mod review_agent;
+pub mod positioning_validation;
+pub mod reflection;
+pub mod github;
 
 #[cfg(test)]
 mod integration_tests {
