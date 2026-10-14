@@ -83,7 +83,10 @@ pub struct ServiceDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SshConfig {
     pub user: String,
-    pub key_path: String,
+    #[serde(default)]
+    pub key_path: Option<String>,
+    #[serde(default)]
+    pub password_auth: bool,
     #[serde(default)]
     pub port: u16,
 }
@@ -132,7 +135,8 @@ impl LabTopology {
             Some(config) => Ok(config.clone()),
             None => Ok(SshConfig {
                 user: "crombo".to_string(),
-                key_path: "~/.ssh/id_lab".to_string(),
+                key_path: Some("~/.ssh/id_lab".to_string()),
+                password_auth: false,
                 port: 22,
             }),
         }
@@ -155,7 +159,8 @@ impl LabTopology {
             if !ip.is_empty() {
                 let ssh_config = self.get_ssh_config(name).unwrap_or(SshConfig {
                     user: "crombo".to_string(),
-                    key_path: "~/.ssh/id_lab".to_string(),
+                    key_path: Some("~/.ssh/id_lab".to_string()),
+                    password_auth: false,
                     port: 22,
                 });
                 targets.insert(name.clone(), (ip, ssh_config));
@@ -195,7 +200,8 @@ pub fn default_topology() -> LabTopology {
             },
             ssh: Some(SshConfig {
                 user: "crombo".to_string(),
-                key_path: "~/.ssh/id_lab".to_string(),
+                key_path: Some("~/.ssh/id_lab".to_string()),
+                password_auth: false,
                 port: 22,
             }),
             services: vec![
@@ -243,7 +249,8 @@ pub fn default_topology() -> LabTopology {
             },
             ssh: Some(SshConfig {
                 user: "crombo".to_string(),
-                key_path: "~/.ssh/id_lab".to_string(),
+                key_path: Some("~/.ssh/id_lab".to_string()),
+                password_auth: false,
                 port: 22,
             }),
             services: vec![ServiceDef {
@@ -279,7 +286,8 @@ pub fn default_topology() -> LabTopology {
             },
             ssh: Some(SshConfig {
                 user: "root".to_string(),
-                key_path: "~/.ssh/id_lab".to_string(),
+                key_path: Some("~/.ssh/id_lab".to_string()),
+                password_auth: false,
                 port: 8822,
             }),
             services: vec![
@@ -327,7 +335,8 @@ pub fn default_topology() -> LabTopology {
             },
             ssh: Some(SshConfig {
                 user: "crombo".to_string(),
-                key_path: "~/.ssh/id_lab".to_string(),
+                key_path: Some("~/.ssh/id_lab".to_string()),
+                password_auth: false,
                 port: 22,
             }),
             services: vec![
@@ -361,7 +370,8 @@ pub fn default_topology() -> LabTopology {
             },
             ssh: Some(SshConfig {
                 user: "crombo".to_string(),
-                key_path: "~/.ssh/id_lab".to_string(),
+                key_path: None,
+                password_auth: true,
                 port: 8022,
             }),
             services: vec![
@@ -399,7 +409,8 @@ pub fn default_topology() -> LabTopology {
             },
             ssh: Some(SshConfig {
                 user: "crombo".to_string(),
-                key_path: "~/.ssh/id_lab".to_string(),
+                key_path: Some("~/.ssh/id_lab".to_string()),
+                password_auth: false,
                 port: 22,
             }),
             services: vec![

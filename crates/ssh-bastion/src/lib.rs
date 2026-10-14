@@ -101,44 +101,103 @@ pub async fn execute_remote(
         }
     }
     
-    // Execute via system ssh binary
-    let key_path = expand_tilde(&ssh_config.key_path);
+    // Build SSH options common to both auth methods
+    let mut ssh_options = vec![
+        "-o".to_string(),
+        "StrictHostKeyChecking=accept-new".to_string(),
+        "-o".to_string(),
+        "ConnectTimeout=10".to_string(),
+    ];
     
-    let mut ssh_cmd = tokio::process::Command::new("ssh");
-    ssh_cmd
-        .arg("-i")
-        .arg(&key_path)
-        .arg("-o")
-        .arg("StrictHostKeyChecking=accept-new")
-        .arg("-o")
-        .arg("ConnectTimeout=10")
-        .arg("-o")
-        .arg("BatchMode=yes");
-    
-    // Add port flag if non-standard
-    if ssh_config.port != 22 {
-        ssh_cmd.arg("-p").arg(ssh_config.port.to_string());
+    if ssh_config.password_auth {
+        // Password auth — use sshpass for non-interactive password input
+        let env_var = format!(
+            "{}_SSH_PASSWORD",
+            target.to_uppercase().replace('-', "_")
+        );
+        let password = match env::var(&env_var) {
+            Ok(pw) => pw,
+            Err(_) => return Err(format!("password auth required but {} not set", env_var).into()),
+        };
+        
+        // Build sshpass command string
+        let port_flag = if ssh_config.port != 22 {
+            format!("-p {}", ssh_config.port)
+        } else {
+            String::new()
+        };
+        
+        let ssh_cmd_str = format!(
+            "sshpass -p '{}' ssh {} {} {}@{} {}",
+            password,
+            port_flag,
+            ssh_options.join(" "),
+            ssh_config.user,
+            host,
+            full_cmd
+        );
+        
+        let output = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg(&ssh_cmd_str)
+            .output()
+            .await?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        
+        if !output.status.success() {
+            return Err(format!(
+                "remote command failed (exit {}): {}",
+                output.status.code().unwrap_or(-1),
+                stderr.trim()
+            )
+            .into());
+        }
+        
+        Ok(stdout)
+    } else {
+        // Key-based auth
+        let key_path = match &ssh_config.key_path {
+            Some(path) => expand_tilde(path),
+            None => expand_tilde("~/.ssh/id_lab"), // default lab key
+        };
+        
+        ssh_options.push("-i".to_string());
+        ssh_options.push(key_path);
+        ssh_options.push("-o".to_string());
+        ssh_options.push("BatchMode=yes".to_string());
+        
+        let mut ssh_cmd = tokio::process::Command::new("ssh");
+        for opt in &ssh_options {
+            ssh_cmd.arg(opt);
+        }
+        
+        // Add port flag if non-standard
+        if ssh_config.port != 22 {
+            ssh_cmd.arg("-p").arg(ssh_config.port.to_string());
+        }
+        
+        let output = ssh_cmd
+            .arg(format!("{}@{}", ssh_config.user, host))
+            .arg(&full_cmd)
+            .output()
+            .await?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        
+        if !output.status.success() {
+            return Err(format!(
+                "remote command failed (exit {}): {}",
+                output.status.code().unwrap_or(-1),
+                stderr.trim()
+            )
+            .into());
+        }
+        
+        Ok(stdout)
     }
-    
-    let output = ssh_cmd
-        .arg(format!("{}@{}", ssh_config.user, host))
-        .arg(&full_cmd)
-        .output()
-        .await?;
-    
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    
-    if !output.status.success() {
-        return Err(format!(
-            "remote command failed (exit {}): {}",
-            output.status.code().unwrap_or(-1),
-            stderr.trim()
-        )
-        .into());
-    }
-    
-    Ok(stdout)
 }
 
 /// List all available targets from topology.
