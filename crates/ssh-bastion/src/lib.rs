@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_expand_tilde() {
-        env::set_var("HOME", "/home/testuser");
+        unsafe { env::set_var("HOME", "/home/testuser"); }
         assert_eq!(expand_tilde("~/file"), "/home/testuser/file");
         assert_eq!(expand_tilde("/absolute/path"), "/absolute/path");
     }
