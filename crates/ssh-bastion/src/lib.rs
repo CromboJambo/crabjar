@@ -138,10 +138,24 @@ pub async fn execute_remote(
             "{}_SSH_PASSWORD",
             target.to_uppercase().replace('-', "_")
         );
+
+        // Try environment variable first, then fall back to file
         let password = match env::var(&env_var) {
             Ok(pw) => pw,
             Err(_) => {
-                return Err(format!("password auth required but {} not set", env_var).into())
+                // Try reading from ~/.crabjar/<target>_password file
+                let home = env::var("HOME").unwrap_or_else(|_| "/home/crombo".to_string());
+                let pw_file = format!("{}/.crabjar/{}_password", home, target);
+                match std::fs::read_to_string(&pw_file) {
+                    Ok(content) => content.trim().to_string(),
+                    Err(_) => {
+                        return Err(format!(
+                            "password auth required but {} not set and {} not found",
+                            env_var, pw_file
+                        )
+                        .into())
+                    }
+                }
             }
         };
 
