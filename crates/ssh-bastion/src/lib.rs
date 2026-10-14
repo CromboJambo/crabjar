@@ -98,7 +98,8 @@ pub async fn execute_remote(
     // Execute via system ssh binary
     let key_path = expand_tilde(&ssh_config.key_path);
     
-    let output = tokio::process::Command::new("ssh")
+    let mut ssh_cmd = tokio::process::Command::new("ssh");
+    ssh_cmd
         .arg("-i")
         .arg(&key_path)
         .arg("-o")
@@ -106,7 +107,14 @@ pub async fn execute_remote(
         .arg("-o")
         .arg("ConnectTimeout=10")
         .arg("-o")
-        .arg("BatchMode=yes")
+        .arg("BatchMode=yes");
+    
+    // Add port flag if non-standard
+    if ssh_config.port != 22 {
+        ssh_cmd.arg("-p").arg(ssh_config.port.to_string());
+    }
+    
+    let output = ssh_cmd
         .arg(format!("{}@{}", ssh_config.user, host))
         .arg(&full_cmd)
         .output()

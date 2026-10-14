@@ -260,6 +260,54 @@ pub fn default_topology() -> LabTopology {
         },
     );
 
+    // sovnode - ARM index node
+    machines.insert(
+        "sovnode".to_string(),
+        MachineDef {
+            name: "sovnode".to_string(),
+            label: "ARM Index Node (Pi5)".to_string(),
+            architecture: Architecture::AArch64,
+            os: "Arch Linux ARM".to_string(),
+            init_system: InitSystem::Systemd,
+            network: NetworkConfig {
+                interfaces: vec![NetworkInterface {
+                    name: "eth0".to_string(),
+                    ip: "${SOVNODE_LAN_IP}".to_string(),
+                    mac: Some("88:a2:9e:03:89:43".to_string()),
+                }],
+                tailscale_ip: Some("${SOVNODE_TAILSCALE_IP}".to_string()),
+            },
+            ssh: Some(SshConfig {
+                user: "root".to_string(),
+                key_path: "~/.ssh/id_lab".to_string(),
+                port: 8822,
+            }),
+            services: vec![
+                ServiceDef {
+                    name: "ssh".to_string(),
+                    ports: vec![ServicePort {
+                        port: 8822,
+                        protocol: "tcp".to_string(),
+                        description: Some("OpenSSH Server".to_string()),
+                    }],
+                    enabled: true,
+                    description: None,
+                },
+                ServiceDef {
+                    name: "unbound".to_string(),
+                    ports: vec![ServicePort {
+                        port: 53,
+                        protocol: "udp".to_string(),
+                        description: Some("DNS Resolver".to_string()),
+                    }],
+                    enabled: true,
+                    description: None,
+                },
+            ],
+            notes: Some("Index node for lab. Runs unbound DNS and other infrastructure services.".to_string()),
+        },
+    );
+
     LabTopology {
         name: "crombo-home-lab".to_string(),
         version: 1,
