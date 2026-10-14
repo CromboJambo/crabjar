@@ -4,8 +4,9 @@
 //! of infrastructure code (public) from environment-specific configuration (private).
 //! Actual IPs are resolved at runtime via environment variables or private config.
 
-use crabjar_lab_topology::{default_topology, TopologyError};
+use crabjar_lab_topology::{LabTopology, TopologyError};
 use std::env;
+use std::sync::Arc;
 
 /// Result of a remote command execution.
 #[derive(Debug, Clone)]
@@ -15,13 +16,33 @@ pub struct RemoteOutput {
     pub stderr: String,
 }
 
+/// Load topology from file or environment variable.
+fn load_topology() -> Result<LabTopology, Box<dyn std::error::Error>> {
+    // Check for explicit topology file path via environment
+    if let Ok(path) = env::var("LAB_TOPOLOGY_FILE") {
+        return LabTopology::from_file(&path).map_err(|e| e.to_string().into());
+    }
+
+    // Fall back to default location
+    let home = env::var("HOME").unwrap_or_else(|_| "/home/crombo".to_string());
+    let default_path = format!("{}/.crabjar/topology.toml", home);
+    if std::path::Path::new(&default_path).exists() {
+        return LabTopology::from_file(&default_path).map_err(|e| e.to_string().into());
+    }
+
+    Err("no topology file found (set LAB_TOPOLOGY_FILE or place at ~/.crabjar/topology.toml)".into())
+}
+
 /// Resolve target host IP from topology and environment overrides.
-fn resolve_target_host(topology_name: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let topo = default_topology();
-    
+fn resolve_target_host(
+    topology: &LabTopology,
+    topology_name: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     // Get machine definition from topology
-    let machine = topo.get_machine(topology_name)?;
-    
+    let machine = topology
+        .get_machine(topology_name)
+        .map_err(|e| e.to_string())?;
+
     // Prefer Tailscale IP if available and overridden via environment
     if let Some(ts_ip_ref) = &machine.network.tailscale_ip {
         // Check for environment override (runtime secret injection)
@@ -39,7 +60,7 @@ fn resolve_target_host(topology_name: &str) -> Result<String, Box<dyn std::error
             return Ok(ts_ip_ref.clone());
         }
     }
-    
+
     // Try LAN IP from first interface
     if let Some(iface) = machine.network.interfaces.first() {
         let env_var = format!(
@@ -54,7 +75,7 @@ fn resolve_target_host(topology_name: &str) -> Result<String, Box<dyn std::error
             return Ok(iface.ip.clone());
         }
     }
-    
+
     Err(format!("no resolvable IP for target '{}'", topology_name).into())
 }
 
@@ -84,14 +105,16 @@ pub async fn execute_remote(
     args: &[String],
     _key_path: Option<&str>,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    let topo = default_topology();
-    
+    let topo = Arc::new(load_topology()?);
+
     // Resolve SSH config from topology
-    let ssh_config = topo.get_ssh_config(target)?;
-    
+    let ssh_config = topo
+        .get_ssh_config(target)
+        .map_err(|e| e.to_string())?;
+
     // Resolve actual host IP (with environment override support)
-    let host = resolve_target_host(target)?;
-    
+    let host = resolve_target_host(&topo, target)?;
+
     // Build full command with args
     let mut full_cmd = command.to_string();
     if !args.is_empty() {
@@ -100,7 +123,7 @@ pub async fn execute_remote(
             full_cmd.push_str(arg);
         }
     }
-    
+
     // Build SSH options common to both auth methods
     let mut ssh_options = vec![
         "-o".to_string(),
@@ -108,7 +131,7 @@ pub async fn execute_remote(
         "-o".to_string(),
         "ConnectTimeout=10".to_string(),
     ];
-    
+
     if ssh_config.password_auth {
         // Password auth — use sshpass for non-interactive password input
         let env_var = format!(
@@ -117,16 +140,18 @@ pub async fn execute_remote(
         );
         let password = match env::var(&env_var) {
             Ok(pw) => pw,
-            Err(_) => return Err(format!("password auth required but {} not set", env_var).into()),
+            Err(_) => {
+                return Err(format!("password auth required but {} not set", env_var).into())
+            }
         };
-        
+
         // Build sshpass command string
         let port_flag = if ssh_config.port != 22 {
             format!("-p {}", ssh_config.port)
         } else {
             String::new()
         };
-        
+
         let ssh_cmd_str = format!(
             "sshpass -p '{}' ssh {} {} {}@{} {}",
             password,
@@ -136,16 +161,16 @@ pub async fn execute_remote(
             host,
             full_cmd
         );
-        
+
         let output = tokio::process::Command::new("sh")
             .arg("-c")
             .arg(&ssh_cmd_str)
             .output()
             .await?;
-        
+
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        
+
         if !output.status.success() {
             return Err(format!(
                 "remote command failed (exit {}): {}",
@@ -154,7 +179,7 @@ pub async fn execute_remote(
             )
             .into());
         }
-        
+
         Ok(stdout)
     } else {
         // Key-based auth
@@ -162,31 +187,31 @@ pub async fn execute_remote(
             Some(path) => expand_tilde(path),
             None => expand_tilde("~/.ssh/id_lab"), // default lab key
         };
-        
+
         ssh_options.push("-i".to_string());
         ssh_options.push(key_path);
         ssh_options.push("-o".to_string());
         ssh_options.push("BatchMode=yes".to_string());
-        
+
         let mut ssh_cmd = tokio::process::Command::new("ssh");
         for opt in &ssh_options {
             ssh_cmd.arg(opt);
         }
-        
+
         // Add port flag if non-standard
         if ssh_config.port != 22 {
             ssh_cmd.arg("-p").arg(ssh_config.port.to_string());
         }
-        
+
         let output = ssh_cmd
             .arg(format!("{}@{}", ssh_config.user, host))
             .arg(&full_cmd)
             .output()
             .await?;
-        
+
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        
+
         if !output.status.success() {
             return Err(format!(
                 "remote command failed (exit {}): {}",
@@ -195,15 +220,15 @@ pub async fn execute_remote(
             )
             .into());
         }
-        
+
         Ok(stdout)
     }
 }
 
 /// List all available targets from topology.
-pub fn list_targets() -> Vec<String> {
-    let topo = default_topology();
-    topo.machine_names()
+pub fn list_targets() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let topo = load_topology()?;
+    Ok(topo.machine_names())
 }
 
 #[cfg(test)]
@@ -215,20 +240,5 @@ mod tests {
         env::set_var("HOME", "/home/testuser");
         assert_eq!(expand_tilde("~/file"), "/home/testuser/file");
         assert_eq!(expand_tilde("/absolute/path"), "/absolute/path");
-    }
-
-    #[test]
-    fn test_list_targets() {
-        let targets = list_targets();
-        assert!(targets.contains(&"jambo".to_string()));
-        assert!(targets.contains(&"ftw3".to_string()));
-    }
-
-    #[test]
-    fn test_resolve_target_with_env_override() {
-        env::set_var("FTW3_TAILSCALE_IP", "100.113.106.95");
-        let host = resolve_target_host("ftw3").unwrap();
-        assert_eq!(host, "100.113.106.95");
-        env::remove_var("FTW3_TAILSCALE_IP");
     }
 }

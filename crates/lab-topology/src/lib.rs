@@ -3,6 +3,8 @@
 //! Defines home-lab infrastructure as Rust data structures with target resolution
 //! for SSH bastion and remote execution. Separates topology definitions (public)
 //! from environment-specific configuration (private).
+//!
+//! Topology is loaded from an external TOML file at runtime, not hardcoded.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,6 +21,8 @@ pub enum TopologyError {
     ParseError(#[from] toml::de::Error),
     #[error("missing required field: {0}")]
     MissingField(String),
+    #[error("failed to read topology file '{0}': {1}")]
+    FileReadError(String, String),
 }
 
 /// Machine architecture
@@ -87,8 +91,12 @@ pub struct SshConfig {
     pub key_path: Option<String>,
     #[serde(default)]
     pub password_auth: bool,
-    #[serde(default)]
+    #[serde(default = "default_ssh_port")]
     pub port: u16,
+}
+
+fn default_ssh_port() -> u16 {
+    22
 }
 
 /// A single machine in the lab topology
@@ -121,6 +129,13 @@ impl LabTopology {
     pub fn from_toml(content: &str) -> Result<Self, TopologyError> {
         let topo: LabTopology = toml::from_str(content)?;
         Ok(topo)
+    }
+
+    /// Load topology from a file path
+    pub fn from_file(path: &str) -> Result<Self, TopologyError> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| TopologyError::FileReadError(path.to_string(), e.to_string()))?;
+        Self::from_toml(&content)
     }
 
     /// Get machine by name
@@ -175,294 +190,44 @@ impl LabTopology {
     }
 }
 
-/// Default topology for the Crombo home-lab
-/// This is the public-safe version with named references instead of actual IPs.
-/// Actual IPs are resolved at runtime via environment or private config.
-pub fn default_topology() -> LabTopology {
-    let mut machines = HashMap::new();
-
-    // jambo - main desktop workstation
-    machines.insert(
-        "jambo".to_string(),
-        MachineDef {
-            name: "jambo".to_string(),
-            label: "Main Desktop Workstation".to_string(),
-            architecture: Architecture::X86_64,
-            os: "Artix Linux".to_string(),
-            init_system: InitSystem::Dinit,
-            network: NetworkConfig {
-                interfaces: vec![NetworkInterface {
-                    name: "enp3s0".to_string(),
-                    ip: "${JAMBO_LAN_IP}".to_string(), // Resolved at runtime
-                    mac: Some("4c:c7:8f:5e:2a:1b".to_string()),
-                }],
-                tailscale_ip: Some("${JAMBO_TAILSCALE_IP}".to_string()),
-            },
-            ssh: Some(SshConfig {
-                user: "crombo".to_string(),
-                key_path: Some("~/.ssh/id_lab".to_string()),
-                password_auth: false,
-                port: 22,
-            }),
-            services: vec![
-                ServiceDef {
-                    name: "ssh".to_string(),
-                    ports: vec![ServicePort {
-                        port: 22,
-                        protocol: "tcp".to_string(),
-                        description: Some("OpenSSH Server".to_string()),
-                    }],
-                    enabled: true,
-                    description: None,
-                },
-                ServiceDef {
-                    name: "vm-bridge".to_string(),
-                    ports: vec![ServicePort {
-                        port: 7001,
-                        protocol: "tcp".to_string(),
-                        description: Some("VM Bridge API".to_string()),
-                    }],
-                    enabled: true,
-                    description: None,
-                },
-            ],
-            notes: Some("Primary development workstation. SSH-only access (no display server).".to_string()),
-        },
-    );
-
-    // ftw3 - GPU compute node
-    machines.insert(
-        "ftw3".to_string(),
-        MachineDef {
-            name: "ftw3".to_string(),
-            label: "GPU Compute Node (RTX 3070 Ti)".to_string(),
-            architecture: Architecture::X86_64,
-            os: "Artix Linux".to_string(),
-            init_system: InitSystem::Dinit,
-            network: NetworkConfig {
-                interfaces: vec![NetworkInterface {
-                    name: "enp2s0".to_string(),
-                    ip: "${FTW3_LAN_IP}".to_string(),
-                    mac: Some("4c:c7:8f:5e:2a:1c".to_string()),
-                }],
-                tailscale_ip: Some("${FTW3_TAILSCALE_IP}".to_string()),
-            },
-            ssh: Some(SshConfig {
-                user: "crombo".to_string(),
-                key_path: Some("~/.ssh/id_lab".to_string()),
-                password_auth: false,
-                port: 22,
-            }),
-            services: vec![ServiceDef {
-                name: "ssh".to_string(),
-                ports: vec![ServicePort {
-                    port: 22,
-                    protocol: "tcp".to_string(),
-                    description: Some("OpenSSH Server".to_string()),
-                }],
-                enabled: true,
-                description: None,
-            }],
-            notes: Some("RTX 3070 Ti GPU node for LLM inference and compute tasks.".to_string()),
-        },
-    );
-
-    // sovnode - ARM index node
-    machines.insert(
-        "sovnode".to_string(),
-        MachineDef {
-            name: "sovnode".to_string(),
-            label: "ARM Index Node (Pi5)".to_string(),
-            architecture: Architecture::AArch64,
-            os: "Arch Linux ARM".to_string(),
-            init_system: InitSystem::Systemd,
-            network: NetworkConfig {
-                interfaces: vec![NetworkInterface {
-                    name: "eth0".to_string(),
-                    ip: "${SOVNODE_LAN_IP}".to_string(),
-                    mac: Some("88:a2:9e:03:89:43".to_string()),
-                }],
-                tailscale_ip: Some("${SOVNODE_TAILSCALE_IP}".to_string()),
-            },
-            ssh: Some(SshConfig {
-                user: "root".to_string(),
-                key_path: Some("~/.ssh/id_lab".to_string()),
-                password_auth: false,
-                port: 8822,
-            }),
-            services: vec![
-                ServiceDef {
-                    name: "ssh".to_string(),
-                    ports: vec![ServicePort {
-                        port: 8822,
-                        protocol: "tcp".to_string(),
-                        description: Some("OpenSSH Server".to_string()),
-                    }],
-                    enabled: true,
-                    description: None,
-                },
-                ServiceDef {
-                    name: "unbound".to_string(),
-                    ports: vec![ServicePort {
-                        port: 53,
-                        protocol: "udp".to_string(),
-                        description: Some("DNS Resolver".to_string()),
-                    }],
-                    enabled: true,
-                    description: None,
-                },
-            ],
-            notes: Some("Index node for lab. Runs unbound DNS and other infrastructure services.".to_string()),
-        },
-    );
-
-    // lappy - laptop workstation
-    machines.insert(
-        "lappy".to_string(),
-        MachineDef {
-            name: "lappy".to_string(),
-            label: "Laptop Workstation".to_string(),
-            architecture: Architecture::X86_64,
-            os: "Arch Linux".to_string(),
-            init_system: InitSystem::Systemd,
-            network: NetworkConfig {
-                interfaces: vec![NetworkInterface {
-                    name: "wlan0".to_string(),
-                    ip: "${LAPPY_LAN_IP}".to_string(),
-                    mac: None,
-                }],
-                tailscale_ip: Some("${LAPPY_TAILSCALE_IP}".to_string()),
-            },
-            ssh: Some(SshConfig {
-                user: "crombo".to_string(),
-                key_path: Some("~/.ssh/id_lab".to_string()),
-                password_auth: false,
-                port: 22,
-            }),
-            services: vec![
-                ServiceDef {
-                    name: "ssh".to_string(),
-                    ports: vec![ServicePort {
-                        port: 22,
-                        protocol: "tcp".to_string(),
-                        description: Some("OpenSSH Server".to_string()),
-                    }],
-                    enabled: true,
-                    description: None,
-                },
-            ],
-            notes: Some("Mobile workstation. Primarily accessed via Tailscale.".to_string()),
-        },
-    );
-
-    // pixel9 - Android phone (Termux)
-    machines.insert(
-        "pixel9".to_string(),
-        MachineDef {
-            name: "pixel9".to_string(),
-            label: "Pixel 9a Mobile".to_string(),
-            architecture: Architecture::AArch64,
-            os: "Termux (Android)".to_string(),
-            init_system: InitSystem::Systemd,
-            network: NetworkConfig {
-                interfaces: vec![],
-                tailscale_ip: Some("${PIXEL9_TAILSCALE_IP}".to_string()),
-            },
-            ssh: Some(SshConfig {
-                user: "crombo".to_string(),
-                key_path: None,
-                password_auth: true,
-                port: 8022,
-            }),
-            services: vec![
-                ServiceDef {
-                    name: "sshd".to_string(),
-                    ports: vec![ServicePort {
-                        port: 8022,
-                        protocol: "tcp".to_string(),
-                        description: Some("Termux OpenSSH Server".to_string()),
-                    }],
-                    enabled: true,
-                    description: None,
-                },
-            ],
-            notes: Some("Pixel 9a running Termux. SSH via password auth on port 8022. No built-in Tailscale SSH for Android — uses regular SSH through tailnet IP.".to_string()),
-        },
-    );
-
-    // artix-box - media server / compute node
-    machines.insert(
-        "artix-box".to_string(),
-        MachineDef {
-            name: "artix-box".to_string(),
-            label: "Artix Media Server".to_string(),
-            architecture: Architecture::X86_64,
-            os: "Artix Linux".to_string(),
-            init_system: InitSystem::Dinit,
-            network: NetworkConfig {
-                interfaces: vec![NetworkInterface {
-                    name: "eth0".to_string(),
-                    ip: "${ARTIX_BOX_LAN_IP}".to_string(),
-                    mac: None,
-                }],
-                tailscale_ip: Some("${ARTIX_BOX_TAILSCALE_IP}".to_string()),
-            },
-            ssh: Some(SshConfig {
-                user: "crombo".to_string(),
-                key_path: Some("~/.ssh/id_lab".to_string()),
-                password_auth: false,
-                port: 22,
-            }),
-            services: vec![
-                ServiceDef {
-                    name: "jellyfin".to_string(),
-                    ports: vec![ServicePort {
-                        port: 8096,
-                        protocol: "tcp".to_string(),
-                        description: Some("Jellyfin Media Server".to_string()),
-                    }],
-                    enabled: true,
-                    description: None,
-                },
-            ],
-            notes: Some("Fresh Artix install. Connected to TV, runs Jellyfin server + extra compute node. No GPU — CPU transcoding only.".to_string()),
-        },
-    );
-
-    LabTopology {
-        name: "crombo-home-lab".to_string(),
-        version: 1,
-        machines,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_default_topology_has_machines() {
-        let topo = default_topology();
-        assert_eq!(topo.machines.len(), 2);
-        assert!(topo.get_machine("jambo").is_ok());
-        assert!(topo.get_machine("ftw3").is_ok());
+    fn test_parse_simple_topology() {
+        let toml_str = r#"
+            name = "test-lab"
+            version = 1
+            [machines.test-machine]
+            name = "test-machine"
+            label = "Test"
+            architecture = "x86_64"
+            os = "Linux"
+            init_system = "systemd"
+            network = { tailscale_ip = "100.100.100.100" }
+        "#;
+        let topo = LabTopology::from_toml(toml_str).unwrap();
+        assert_eq!(topo.name, "test-lab");
+        assert!(topo.get_machine("test-machine").is_ok());
     }
 
     #[test]
-    fn test_ssh_config_resolution() {
-        let topo = default_topology();
-        let ssh = topo.get_ssh_config("jambo").unwrap();
+    fn test_ssh_config_fallback() {
+        let toml_str = r#"
+            name = "test"
+            version = 1
+            [machines.m1]
+            name = "m1"
+            label = "M1"
+            architecture = "x86_64"
+            os = "Linux"
+            init_system = "systemd"
+            network = { tailscale_ip = "1.2.3.4" }
+        "#;
+        let topo = LabTopology::from_toml(toml_str).unwrap();
+        let ssh = topo.get_ssh_config("m1").unwrap();
         assert_eq!(ssh.user, "crombo");
-        assert_eq!(ssh.key_path, "~/.ssh/id_lab");
-    }
-
-    #[test]
-    fn test_ssh_targets_generation() {
-        let topo = default_topology();
-        let targets = topo.ssh_targets();
-        assert_eq!(targets.len(), 2);
-        // IPs are placeholders that would be resolved at runtime
-        let (jambo_ip, _) = targets.get("jambo").unwrap();
-        assert!(jambo_ip.contains("${JAMBO_TAILSCALE_IP}"));
+        assert_eq!(ssh.port, 22);
     }
 }

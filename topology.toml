@@ -1,0 +1,52 @@
+name = "crombo-home-lab"
+version = 1
+
+[machines.jambo]
+name = "jambo"
+label = "Main Desktop Workstation"
+architecture = "x86_64"
+os = "Artix Linux"
+init_system = "dinit"
+network = { tailscale_ip = "${JAMBO_TAILSCALE_IP}" }
+
+[machines.ftw3]
+name = "ftw3"
+label = "GPU Compute Node (RTX 3070 Ti)"
+architecture = "x86_64"
+os = "Artix Linux"
+init_system = "dinit"
+network = { tailscale_ip = "${FTW3_TAILSCALE_IP}" }
+
+[machines.sovnode]
+name = "sovnode"
+label = "ARM Index Node (Pi5)"
+architecture = "aarch64"
+os = "Arch Linux ARM"
+init_system = "systemd"
+network = { tailscale_ip = "${SOVNODE_TAILSCALE_IP}", interfaces = [{ name = "eth0", ip = "${SOVNODE_LAN_IP}" }] }
+ssh = { user = "root", port = 8822, key_path = "~/.ssh/id_lab" }
+
+[machines.lappy]
+name = "lappy"
+label = "Laptop Workstation"
+architecture = "x86_64"
+os = "Arch Linux"
+init_system = "systemd"
+network = { tailscale_ip = "${LAPPY_TAILSCALE_IP}" }
+
+[machines.pixel9]
+name = "pixel9"
+label = "Pixel 9a Mobile"
+architecture = "aarch64"
+os = "Termux (Android)"
+init_system = "systemd"
+network = { tailscale_ip = "${PIXEL9_TAILSCALE_IP}", interfaces = [{ name = "wlan0", ip = "${PIXEL9_LAN_IP}" }] }
+ssh = { user = "crombo", port = 8022, password_auth = true }
+
+[machines.artix-box]
+name = "artix-box"
+label = "Artix Media Server"
+architecture = "x86_64"
+os = "Artix Linux"
+init_system = "dinit"
+network = { tailscale_ip = "${ARTIX_BOX_TAILSCALE_IP}" }
