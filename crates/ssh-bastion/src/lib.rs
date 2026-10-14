@@ -6,6 +6,8 @@
 
 use crabjar_lab_topology::{LabTopology, TopologyError};
 use std::env;
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 
 /// Result of a remote command execution.
@@ -159,7 +161,12 @@ pub async fn execute_remote(
             }
         };
 
-        // Build sshpass command string
+        // Write password to temp file to avoid exposing it in process list
+        let mut passfile = tempfile::NamedTempFile::new()?;
+        passfile.write_all(password.as_bytes())?;
+        std::fs::set_permissions(passfile.path(), std::fs::Permissions::from_mode(0o600))?;
+
+        // Build sshpass command using -f (file) instead of -p (command line)
         let port_flag = if ssh_config.port != 22 {
             format!("-p {}", ssh_config.port)
         } else {
@@ -167,8 +174,8 @@ pub async fn execute_remote(
         };
 
         let ssh_cmd_str = format!(
-            "sshpass -p '{}' ssh {} {} {}@{} {}",
-            password,
+            "sshpass -f '{}' ssh {} {} {}@{} {}",
+            passfile.path().to_string_lossy(),
             port_flag,
             ssh_options.join(" "),
             ssh_config.user,
@@ -181,6 +188,9 @@ pub async fn execute_remote(
             .arg(&ssh_cmd_str)
             .output()
             .await?;
+
+        // Clean up temp file
+        drop(passfile);
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -237,6 +247,45 @@ pub async fn execute_remote(
 
         Ok(stdout)
     }
+}
+
+/// Validate SSH bastion credentials against environment variables or config.
+/// Returns true if credentials are valid, false otherwise.
+pub fn validate_credentials(user: &str, password: &str) -> anyhow::Result<bool> {
+    // Check for environment variable BASTION_<USER>_PASSWORD
+    let env_var = format!("BASTION_{}_PASSWORD", user.to_uppercase().replace('-', "_"));
+    
+    if let Ok(expected_password) = env::var(&env_var) {
+        return Ok(password == expected_password);
+    }
+    
+    // Fall back to checking ~/.crabjar/bastion_users.toml
+    let home = env::var("HOME").unwrap_or_else(|_| "/home/crombo".to_string());
+    let users_file = format!("{}/.crabjar/bastion_users.toml", home);
+    
+    if std::path::Path::new(&users_file).exists() {
+        let content = std::fs::read_to_string(&users_file)?;
+        // Simple TOML parsing for user:password pairs
+        // Format: [users]\nusername = "password"
+        if let Some(section) = content.split("[users]").nth(1) {
+            for line in section.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                if let Some((key, val)) = line.split_once('=') {
+                    let key = key.trim().trim_matches('"');
+                    let val = val.trim().trim_matches('"');
+                    if key == user && val == password {
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+    }
+    
+    // No credentials configured for this user
+    anyhow::bail!("no credentials configured for user '{}'", user);
 }
 
 /// List all available targets from topology.

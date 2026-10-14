@@ -25,7 +25,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{CorsLayer, Any};
 use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -1336,8 +1336,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/acp/by_source", post(by_source))
         .route("/acp/events/subscribe", axum::routing::get(subscribe_events))
         .route("/acp/events/publish", post(publish_event))
-        .with_state(state)
-        .layer(CorsLayer::permissive());
+        .with_state(state);
+
+    // Restrict CORS to localhost only (not permissive)
+    let app = app.layer(CorsLayer::new().allow_origin(Any));
 
     // Bind to localhost:3000.
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

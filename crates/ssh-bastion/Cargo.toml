@@ -6,6 +6,7 @@ license.workspace = true
 description = "SSH bastion host using russh — transparent proxy for home-lab SSH access"
 
 [dependencies]
+crabjar-lab-topology = { path = "../lab-topology" }
 russh = { version = "0.63", features = ["des", "dsa", "rsa", "aws-lc-rs"], default-features = false }
 tokio.workspace = true
 serde.workspace = true
@@ -23,6 +24,6 @@ futures.workspace = true
 rand = "0.10"
 anyhow = "1.0"
 toml = "0.8"
+tempfile.workspace = true
 
 [dev-dependencies]
-tempfile.workspace = true

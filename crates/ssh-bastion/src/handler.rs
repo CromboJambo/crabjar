@@ -44,16 +44,24 @@ impl russh::server::Handler for BastionHandler {
     async fn auth_password(
         &mut self,
         user: &str,
-        _password: &str,
+        password: &str,
     ) -> Result<russh::Auth, Self::Error> {
         info!("Password auth attempt for user: {}", user);
-        // For now, accept any password (SSH key auth at target handles security)
-        self.authenticated_user = Some(user.to_string());
-        let _ = self
-            .sender
-            .send(ServerHandlerEvent::Authenticated(user.to_string()))
-            .await;
-        Ok(russh::Auth::Accept)
+        
+        // Validate credentials against environment variables or config
+        let valid = crate::validate_credentials(user, password)?;
+        
+        if valid {
+            self.authenticated_user = Some(user.to_string());
+            let _ = self
+                .sender
+                .send(ServerHandlerEvent::Authenticated(user.to_string()))
+                .await;
+            Ok(russh::Auth::Accept)
+        } else {
+            info!("Password auth failed for user: {}", user);
+            Ok(russh::Auth::Reject)
+        }
     }
 
     async fn channel_open_session(
