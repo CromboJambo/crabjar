@@ -229,7 +229,8 @@ thiserror.workspace = true
 agent-context = { path = "memory" }
 crabjar-guard = { path = "guard" }
 crabjar-podman = { path = "crates/podman" }
-crabjar-telemetry = { path = "telemetry" }
+crabjar-ssh-bastion = { path = "crates/ssh-bastion" }
+crabjar-telemetry = { path = "telemetry", features = ["otel"] }
 crabjar-tool-registry = { path = "tool_registry" }
 crabjar-terminal = { path = "crates/terminal" }
 crabjar-slow-friend = { path = "slow-friend", package = "slow-friend" }

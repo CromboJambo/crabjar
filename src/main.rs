@@ -71,9 +71,34 @@ async fn main() {
             reason,
             dry_run,
             container,
-        }) => handle_exec(&command, &args, &cwd, &reason, dry_run, container)
-            .await
-            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+            otel_endpoint,
+            target,
+        }) => {
+            if let Some(t) = &target {
+                // Remote execution via SSH bastion (Phase 1 MVP)
+                match crabjar_ssh_bastion::execute_remote(
+                    t,
+                    &command,
+                    &args,
+                    None,
+                ).await {
+                    Ok(output) => serde_json::json!({
+                        "success": true,
+                        "target": t,
+                        "output": output.trim()
+                    }),
+                    Err(err) => error_response(
+                        &format!("remote execution failed on {}: {}", t, err),
+                        false,
+                    ),
+                }
+            } else {
+                // Local execution (existing behavior)
+                handle_exec(&command, &args, &cwd, &reason, dry_run, container, &otel_endpoint)
+                    .await
+                    .unwrap_or_else(|err| error_response(&err.to_string(), true))
+            }
+        }
         Some(CliCommand::Bitwarden { command }) => handle_bitwarden_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Doctor { command }) => handle_doctor_command(command)
@@ -722,6 +747,7 @@ async fn handle_exec(
     reason: &str,
     dry_run: bool,
     container: bool,
+    otel_endpoint: &str,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let project_root = std::env::current_dir()?;
 
@@ -855,6 +881,17 @@ async fn handle_exec(
                 "exec-session",
             );
             flight_recorder.init()?;
+
+            // Enable OTel export if endpoint provided (CLI flag or env var)
+            let otel_endpoint = std::env::var("CRABJAR_OTEL_ENDPOINT").unwrap_or_else(|_| String::new());
+            let effective_otel = if !otel_endpoint.is_empty() {
+                otel_endpoint
+            } else {
+                otel_endpoint.to_string()
+            };
+            if !effective_otel.is_empty() {
+                flight_recorder = flight_recorder.with_otel(&effective_otel)?;
+            }
 
             // Tool registry: discover and validate tools before execution
             let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
