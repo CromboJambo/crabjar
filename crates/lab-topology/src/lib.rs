@@ -380,6 +380,44 @@ pub fn default_topology() -> LabTopology {
         },
     );
 
+    // artix-box - media server / compute node
+    machines.insert(
+        "artix-box".to_string(),
+        MachineDef {
+            name: "artix-box".to_string(),
+            label: "Artix Media Server".to_string(),
+            architecture: Architecture::X86_64,
+            os: "Artix Linux".to_string(),
+            init_system: InitSystem::Dinit,
+            network: NetworkConfig {
+                interfaces: vec![NetworkInterface {
+                    name: "eth0".to_string(),
+                    ip: "${ARTIX_BOX_LAN_IP}".to_string(),
+                    mac: None,
+                }],
+                tailscale_ip: Some("${ARTIX_BOX_TAILSCALE_IP}".to_string()),
+            },
+            ssh: Some(SshConfig {
+                user: "crombo".to_string(),
+                key_path: "~/.ssh/id_lab".to_string(),
+                port: 22,
+            }),
+            services: vec![
+                ServiceDef {
+                    name: "jellyfin".to_string(),
+                    ports: vec![ServicePort {
+                        port: 8096,
+                        protocol: "tcp".to_string(),
+                        description: Some("Jellyfin Media Server".to_string()),
+                    }],
+                    enabled: true,
+                    description: None,
+                },
+            ],
+            notes: Some("Fresh Artix install. Connected to TV, runs Jellyfin server + extra compute node. No GPU — CPU transcoding only.".to_string()),
+        },
+    );
+
     LabTopology {
         name: "crombo-home-lab".to_string(),
         version: 1,

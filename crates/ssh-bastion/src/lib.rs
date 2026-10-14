@@ -25,7 +25,10 @@ fn resolve_target_host(topology_name: &str) -> Result<String, Box<dyn std::error
     // Prefer Tailscale IP if available and overridden via environment
     if let Some(ts_ip_ref) = &machine.network.tailscale_ip {
         // Check for environment override (runtime secret injection)
-        let env_var = format!("{}_TAILSCALE_IP", topology_name.to_uppercase());
+        let env_var = format!(
+            "{}_TAILSCALE_IP",
+            topology_name.to_uppercase().replace('-', "_")
+        );
         if let Ok(env_ip) = env::var(&env_var) {
             return Ok(env_ip);
         }
@@ -39,7 +42,10 @@ fn resolve_target_host(topology_name: &str) -> Result<String, Box<dyn std::error
     
     // Try LAN IP from first interface
     if let Some(iface) = machine.network.interfaces.first() {
-        let env_var = format!("{}_LAN_IP", topology_name.to_uppercase());
+        let env_var = format!(
+            "{}_LAN_IP",
+            topology_name.to_uppercase().replace('-', "_")
+        );
         if let Ok(env_ip) = env::var(&env_var) {
             return Ok(env_ip);
         }
