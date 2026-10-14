@@ -26,6 +26,11 @@ fn get_target_config(name: &str) -> Option<TargetConfig> {
             user: "crombo",
             key_path: "~/.ssh/id_lab",
         }),
+        "ftw3" => Some(TargetConfig {
+            host: "100.113.106.95",
+            user: "crombo",
+            key_path: "~/.ssh/id_lab",
+        }),
         _ => None,
     }
 }
