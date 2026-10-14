@@ -809,9 +809,7 @@ async fn handle_exec(
             .unwrap_or_else(|| "default".to_string()),
     );
 
-    // Auto-construct CrossScopeAuth if scopes differ (same-scope → None, no-op)
-    let cross_scope_auth =
-        crabjar_guard::CrossScopeAuth::auto_for_scopes(&project_scope, &project_scope);
+    let cross_scope_auth = None;
 
     let gate_result = gate.check(crabjar_guard::GateContext {
         action_type: "exec",

@@ -381,8 +381,7 @@ async fn execute_with_guard(
     // Construct scope for this orchestrator instance
     let actor_scope = crabjar_guard::Scope::project("orchestrator");
     let target_scope = actor_scope.clone();
-    let cross_scope_auth =
-        crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+    let cross_scope_auth = None;
 
     let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
@@ -623,8 +622,7 @@ async fn execute_tool_call(
             // Construct scope for this orchestrator instance
             let actor_scope = crabjar_guard::Scope::project("orchestrator");
             let target_scope = actor_scope.clone();
-            let cross_scope_auth =
-                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+            let cross_scope_auth = None;
 
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
@@ -792,8 +790,7 @@ async fn execute_tool_call(
             // Construct scope for this orchestrator instance
             let actor_scope = crabjar_guard::Scope::project("orchestrator");
             let target_scope = actor_scope.clone();
-            let cross_scope_auth =
-                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+            let cross_scope_auth = None;
 
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
@@ -920,8 +917,7 @@ async fn execute_tool_call(
             // Construct scope for this orchestrator instance
             let actor_scope = crabjar_guard::Scope::project("orchestrator");
             let target_scope = actor_scope.clone();
-            let cross_scope_auth =
-                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+            let cross_scope_auth = None;
 
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
@@ -1041,8 +1037,7 @@ async fn execute_tool_call(
             // Construct scope for this orchestrator instance
             let actor_scope = crabjar_guard::Scope::project("orchestrator");
             let target_scope = actor_scope.clone();
-            let cross_scope_auth =
-                crabjar_guard::CrossScopeAuth::auto_for_scopes(&actor_scope, &target_scope);
+            let cross_scope_auth = None;
 
             let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 

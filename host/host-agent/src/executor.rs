@@ -162,12 +162,7 @@ impl TaskExecutor {
                     let gate = crabjar_guard::ExecutionGate::new(&guard_db, false, &guard_root);
 
                     // Construct CrossScopeAuth from the executor's scope (if set)
-                    let cross_scope_auth = if let Some(ref actor_scope) = self.scope {
-                        let target_scope = actor_scope.clone();
-                        crabjar_guard::CrossScopeAuth::auto_for_scopes(actor_scope, &target_scope)
-                    } else {
-                        None
-                    };
+                    let cross_scope_auth = None;
 
                     // Use the executor's scope if available, otherwise None
                     let gate_result = match gate.check(crabjar_guard::GateContext {

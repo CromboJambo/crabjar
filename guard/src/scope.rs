@@ -164,24 +164,6 @@ impl CrossScopeAuth {
         chrono::Utc::now().timestamp() - self.authorized_at < ttl_seconds
     }
 
-    /// Auto-construct CrossScopeAuth when actor and target scopes differ.
-    /// Returns None if the scopes are identical (no cross-scope needed).
-    /// This is a convenience helper for callers that have both scopes but
-    /// don't yet have an explicit approval workflow.
-    pub fn auto_for_scopes(actor: &Scope, target: &Scope) -> Option<Self> {
-        if actor == target {
-            return None; // Same scope — no cross-scope auth needed
-        }
-        if actor.can_access(target) {
-            return None; // Already allowed (same project/tenant/system)
-        }
-        Some(Self::new(
-            target.clone(),
-            actor.clone(),
-            "auto-cross-scope",
-            "system-default-policy",
-        ))
-    }
 
     /// Create a CrossScopeAuth for a specific user's cross-project access.
     pub fn for_user_cross_project(

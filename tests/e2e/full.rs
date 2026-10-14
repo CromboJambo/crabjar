@@ -242,23 +242,22 @@ fn full_scope_isolation_same_user_and_project() {
     assert!(scope_2.can_access(&scope_1));
 }
 
-/// Direct library test: CrossScopeAuth auto-construction.
+/// Direct library test: CrossScopeAuth explicit construction.
 #[test]
-fn full_cross_scope_auth_auto() {
+fn full_cross_scope_auth_explicit() {
     let scope_a = crabjar_guard::Scope::user_project("alice", "project-a");
     let scope_b = crabjar_guard::Scope::user_project("alice", "project-b");
 
-    // Same user, different projects → should auto-construct CrossScopeAuth
-    let auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(&scope_a, &scope_b);
-    assert!(auth.is_some());
-    if let Some(ref a) = auth {
-        assert_eq!(a.actor_scope, scope_a);
-        assert_eq!(a.target_scope, scope_b);
-    }
-
-    // Same scope → should return None (no-op)
-    let no_auth = crabjar_guard::CrossScopeAuth::auto_for_scopes(&scope_a, &scope_a);
-    assert!(no_auth.is_none());
+    // Explicit cross-scope authorization for different scopes
+    let auth = crabjar_guard::CrossScopeAuth::new(
+        scope_b.clone(),
+        scope_a.clone(),
+        "test-approval",
+        "system-default-policy",
+    );
+    assert_eq!(auth.actor_scope, scope_a);
+    assert_eq!(auth.target_scope, scope_b);
+    assert_eq!(auth.authorized_by, "system-default-policy");
 }
 
 // ──────────────────────────────────────────────
