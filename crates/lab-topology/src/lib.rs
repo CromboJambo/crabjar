@@ -308,6 +308,44 @@ pub fn default_topology() -> LabTopology {
         },
     );
 
+    // lappy - laptop workstation
+    machines.insert(
+        "lappy".to_string(),
+        MachineDef {
+            name: "lappy".to_string(),
+            label: "Laptop Workstation".to_string(),
+            architecture: Architecture::X86_64,
+            os: "Arch Linux".to_string(),
+            init_system: InitSystem::Systemd,
+            network: NetworkConfig {
+                interfaces: vec![NetworkInterface {
+                    name: "wlan0".to_string(),
+                    ip: "${LAPPY_LAN_IP}".to_string(),
+                    mac: None,
+                }],
+                tailscale_ip: Some("${LAPPY_TAILSCALE_IP}".to_string()),
+            },
+            ssh: Some(SshConfig {
+                user: "crombo".to_string(),
+                key_path: "~/.ssh/id_lab".to_string(),
+                port: 22,
+            }),
+            services: vec![
+                ServiceDef {
+                    name: "ssh".to_string(),
+                    ports: vec![ServicePort {
+                        port: 22,
+                        protocol: "tcp".to_string(),
+                        description: Some("OpenSSH Server".to_string()),
+                    }],
+                    enabled: true,
+                    description: None,
+                },
+            ],
+            notes: Some("Mobile workstation. Primarily accessed via Tailscale.".to_string()),
+        },
+    );
+
     LabTopology {
         name: "crombo-home-lab".to_string(),
         version: 1,
