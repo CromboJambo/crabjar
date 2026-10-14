@@ -346,6 +346,40 @@ pub fn default_topology() -> LabTopology {
         },
     );
 
+    // pixel9 - Android phone (Termux)
+    machines.insert(
+        "pixel9".to_string(),
+        MachineDef {
+            name: "pixel9".to_string(),
+            label: "Pixel 9a Mobile".to_string(),
+            architecture: Architecture::AArch64,
+            os: "Termux (Android)".to_string(),
+            init_system: InitSystem::Systemd,
+            network: NetworkConfig {
+                interfaces: vec![],
+                tailscale_ip: Some("${PIXEL9_TAILSCALE_IP}".to_string()),
+            },
+            ssh: Some(SshConfig {
+                user: "crombo".to_string(),
+                key_path: "~/.ssh/id_lab".to_string(),
+                port: 8022,
+            }),
+            services: vec![
+                ServiceDef {
+                    name: "sshd".to_string(),
+                    ports: vec![ServicePort {
+                        port: 8022,
+                        protocol: "tcp".to_string(),
+                        description: Some("Termux OpenSSH Server".to_string()),
+                    }],
+                    enabled: true,
+                    description: None,
+                },
+            ],
+            notes: Some("Pixel 9a running Termux. SSH via password auth on port 8022. No built-in Tailscale SSH for Android — uses regular SSH through tailnet IP.".to_string()),
+        },
+    );
+
     LabTopology {
         name: "crombo-home-lab".to_string(),
         version: 1,
