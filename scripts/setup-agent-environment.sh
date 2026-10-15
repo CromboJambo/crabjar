@@ -70,6 +70,9 @@ export CRABJAR_LOG=${AGENT_HOME}/log
 export CRABJAR_WORKSPACE=${AGENT_HOME}/workspace
 export CRABJAR_CONFIG=${AGENT_HOME}/config
 
+# GitHub token for agent operations (replace placeholder with actual token)
+export GITHUB_TOKEN="ghp_PLACEHOLDER_REPLACE_WITH_CRABJAR_AGENT_TOKEN"
+
 # Shell settings
 export PS1="[${AGENT_USER}@$(hostname) \W]$ "
 EOF
@@ -123,7 +126,7 @@ else
     echo "[OK] agent.json already exists"
 fi
 
-# Create basic environment config file
+# Create basic environment config file with GitHub token
 if [ ! -f "${AGENT_HOME}/config/environment.json" ]; then
     # Detect architecture
     ARCH=$(uname -m)
@@ -142,12 +145,13 @@ if [ ! -f "${AGENT_HOME}/config/environment.json" ]; then
   "hostname": "$(hostname)",
   "architecture": "${ARCH}",
   "init_system": "${INIT_SYSTEM}",
-  "os": "$(cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"' || echo 'unknown')",
-  "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  "os": "$(cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d '\\"' || echo 'unknown')",
+  "created": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "github_token": "ghp_PLACEHOLDER_REPLACE_WITH_CRABJAR_AGENT_TOKEN"
 }
 EOF
     chown "${AGENT_USER}:${AGENT_USER}" "${AGENT_HOME}/config/environment.json"
-    echo "[OK] environment.json created"
+    echo "[OK] environment.json created with GitHub token placeholder"
 else
     echo "[OK] environment.json already exists"
 fi
@@ -162,3 +166,8 @@ ls -la "${AGENT_HOME}/" | grep -v "^total"
 echo ""
 echo "To test the environment, run:"
 echo "  sudo -u ${AGENT_USER} bash -c 'env | grep AGENT'"
+echo ""
+echo "Next steps:"
+echo "1. Replace GITHUB_TOKEN placeholder in .profile and config/environment.json with actual token"
+echo "2. Distribute SSH public key to other nodes' authorized_keys"
+echo "3. Deploy crabjar binary to /opt/crabjar/"
