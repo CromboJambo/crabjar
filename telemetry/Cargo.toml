@@ -26,5 +26,14 @@ hmac = "0.12"
 getrandom = "0.3"
 base64 = "0.22"
 
+# OpenTelemetry (optional)
+opentelemetry = { version = "0.27", features = ["trace"], optional = true }
+opentelemetry_sdk = { version = "0.27", features = ["trace", "rt-tokio"], optional = true }
+opentelemetry-otlp = { version = "0.27", features = ["grpc-tonic"], optional = true }
+
+[features]
+default = []
+otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
+
 [dev-dependencies]
 tempfile.workspace = true

@@ -14,18 +14,18 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ No secrets in binary (verified via strings analysis)
 - ✅ ADR process established (specs/ADR-001)
 
-**Completed (September 2026):**
-- ✅ Conversational TUI — ratatui-based interactive chat with session persistence, scrollback, guard approval display, habitat panel
-- ✅ Model routing (`model_routing.rs`, 438 LoC) — phase-specific backend routing via `LoopPhase` enum
-- ✅ Context compression (`context_compression.rs`, 385 LoC) — token-budgeted context management with observation grouping
-- ✅ Decision gate (`decision_gate.rs`, 469 LoC) — tool call vs direct response decisions with auto-decide threshold
-
 **Completed (July 2026):**
 - ✅ Domain allowlist enforcement in ExecutionGate step 9 with per-trust-layer configuration
 - ✅ Command risk catalog (`command_risk.rs`) — static classification of HIGH/MEDIUM_RISK_COMMANDS
 - ✅ Risk config system (`risk_config.rs`) — configurable risk levels and thresholds
 - ✅ Context budgeting (`context_budget.rs`) — ContextBudget + MAX_TOKENS_PER_FRAGMENT enforcement in ExecutionGate step 10
 - ✅ Static policy engine (`policy.rs`, `policy_types.rs`) — TOML-based declarative policies for pre-execution checks
+
+**Completed (September 2026):**
+- ✅ Conversational TUI — ratatui-based interactive chat with session persistence, scrollback, guard approval display, habitat panel
+- ✅ Model routing (`model_routing.rs`, 438 LoC) — phase-specific backend routing via `LoopPhase` enum
+- ✅ Context compression (`context_compression.rs`, 385 LoC) — token-budgeted context management with observation grouping
+- ✅ Decision gate (`decision_gate.rs`, 469 LoC) — tool call vs direct response decisions with auto-decide threshold
 
 **Completed (October 2026):**
 - ✅ crabjar-conductor crate scaffolded with core orchestration types (Goal, Task, Worker), state store abstraction, HTTP API layer

@@ -80,7 +80,10 @@ impl AnalyzeMcpServer {
 async fn main() -> anyhow::Result<()> {
     let server = AnalyzeMcpServer;
 
-    rmcp::serve_server(server, (tokio::io::stdin(), tokio::io::stdout())).await?;
+    let running = rmcp::serve_server(server, (tokio::io::stdin(), tokio::io::stdout())).await?;
+
+    // Wait for the service loop to terminate (e.g. when stdin closes)
+    running.waiting().await?;
 
     Ok(())
 }

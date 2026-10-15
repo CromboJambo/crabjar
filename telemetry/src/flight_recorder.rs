@@ -3,6 +3,8 @@ use crate::schema::{
     CheckpointRow, FlightRecordRow, checkpoint_session, init_db, query_flight_records,
     query_session_checkpoints, query_transcript, record_command, record_transcript_line,
 };
+#[cfg(feature = "otel")]
+use crate::otel_export::{OtelConfig, OtelExporter};
 use base64::Engine;
 use hmac::{Hmac, Mac};
 use rusqlite::Connection;
@@ -23,6 +25,8 @@ pub struct FlightRecorder<'a> {
     pub session_id: String,
     /// Ephemeral HMAC key for tool receipts — generated once per session, never persisted.
     hmac_key: Option<Vec<u8>>,
+    #[cfg(feature = "otel")]
+    otel: Option<std::sync::Arc<OtelExporter>>,
 }
 
 impl<'a> FlightRecorder<'a> {
@@ -31,7 +35,23 @@ impl<'a> FlightRecorder<'a> {
             conn,
             session_id: session_id.into(),
             hmac_key: None,
+            #[cfg(feature = "otel")]
+            otel: None,
         }
+    }
+
+    /// Enable OpenTelemetry export to the given OTLP endpoint.
+    #[cfg(feature = "otel")]
+    pub fn with_otel(mut self, endpoint: &str) -> Result<Self, FlightRecorderError> {
+        let config = OtelConfig {
+            endpoint: endpoint.to_string(),
+            service_name: "crabjar".to_string(),
+        };
+        let exporter = OtelExporter::from_config(&config).map_err(|e| {
+            FlightRecorderError::Internal(format!("Failed to create OTel exporter: {}", e))
+        })?;
+        self.otel = Some(std::sync::Arc::new(exporter));
+        Ok(self)
     }
 
     /// Initialize the flight recorder database.
@@ -167,6 +187,21 @@ impl<'a> FlightRecorder<'a> {
                         "agent",
                         &receipt,
                     )?;
+
+                    // Export to OpenTelemetry if enabled
+                    #[cfg(feature = "otel")]
+                    if let Some(otel) = &self.otel {
+                        otel.record_execution(
+                            &self.session_id,
+                            &cmd_id,
+                            command,
+                            args,
+                            cwd,
+                            exit_code,
+                            0, // duration not tracked yet
+                            reason,
+                        );
+                    }
 
                     info!(
                         session_id = %self.session_id,

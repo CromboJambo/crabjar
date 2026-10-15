@@ -69,6 +69,14 @@ pub enum CliCommand {
         /// Run command in isolated Podman container (rootless)
         #[arg(long, default_value = "false")]
         container: bool,
+
+        /// Execute on remote machine via SSH bastion
+        #[arg(long)]
+        target: Option<String>,
+
+        /// OpenTelemetry endpoint for fleet-scale observability (optional)
+        #[arg(long, default_value = "")]
+        otel_endpoint: String,
     },
 
     /// Manage bitwarden credentials
