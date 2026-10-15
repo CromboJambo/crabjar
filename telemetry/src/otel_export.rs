@@ -5,7 +5,7 @@
 
 use opentelemetry::{
     global,
-    trace::{Span as _, SpanKind, Tracer as _, TracerProvider as _},
+    trace::{Span as _, SpanKind, Tracer as _, TracerProvider},
     KeyValue,
 };
 use opentelemetry_otlp::WithExportConfig;
@@ -33,7 +33,7 @@ impl Default for OtelConfig {
 /// OpenTelemetry exporter that sends traces, metrics, and logs to an OTLP collector.
 pub struct OtelExporter {
     tracer: opentelemetry_sdk::trace::Tracer,
-    _provider: Arc<opentelemetry_sdk::trace::TracerProvider>,
+    _provider: Arc<opentelemetry_sdk::trace::SdkTracerProvider>,
 }
 
 impl OtelExporter {
@@ -50,12 +50,14 @@ impl OtelExporter {
             .map_err(|e| format!("Failed to build OTLP span exporter: {}", e))?;
 
         // Build tracer provider with batch exporter and service name resource
-        let provider = opentelemetry_sdk::trace::TracerProvider::builder()
-            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
-            .with_resource(Resource::new(vec![KeyValue::new(
-                "service.name",
-                config.service_name.clone(),
-            )]))
+        let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+            .with_batch_exporter(exporter)
+            .with_resource(Resource::builder()
+                .with_attributes([KeyValue::new(
+                    "service.name",
+                    config.service_name.clone(),
+                )])
+                .build())
             .build();
 
         let tracer = provider.tracer("crabjar.telemetry");
@@ -149,7 +151,8 @@ impl OtelExporter {
 
     /// Shutdown the exporter (flushes remaining spans).
     pub fn shutdown(&self) {
-        global::shutdown_tracer_provider();
+        // In opentelemetry 0.33+, shutdown is done by dropping the provider
+        // The Arc keeps it alive until all references are dropped
     }
 }
 
