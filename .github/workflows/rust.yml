@@ -21,6 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
     - name: Run clippy (deny warnings)
       run: cargo clippy --workspace --all-targets -- -D warnings
 
@@ -31,7 +35,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev
+        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
     - name: Build all targets
       run: cargo build --workspace --all-targets --verbose
 
@@ -42,7 +46,7 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev
+        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
     - name: Run tests
       run: cargo test --workspace --all-targets --verbose
 
@@ -50,6 +54,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
     - name: Reproducible build check
       run: |
         echo "=== Reproducible Build Check ==="
