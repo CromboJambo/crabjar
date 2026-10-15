@@ -7,11 +7,15 @@ use anyhow::Result;
 use clap::Parser;
 use crabjar_conductor::{api, conductor};
 use std::sync::Arc;
-use tracing_subscriber::EnvFilter;
 use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "crabjar-conductor", version, about = "Fleet orchestration service")]
+#[command(
+    name = "crabjar-conductor",
+    version,
+    about = "Fleet orchestration service"
+)]
 struct Args {
     /// Listen address
     #[arg(long, default_value = "0.0.0.0")]
@@ -33,12 +37,9 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing with default filter if RUST_LOG not set
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
-    
-    tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
-        .init();
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+    tracing_subscriber::fmt().with_env_filter(env_filter).init();
 
     info!("Starting crabjar-conductor");
 

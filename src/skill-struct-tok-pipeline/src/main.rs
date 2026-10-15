@@ -1,7 +1,7 @@
+use serde_json::json;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use serde_json::json;
 
 fn main() {
     let args = env::args().collect::<Vec<_>>();
@@ -46,7 +46,7 @@ fn process_file(file: &str) {
         .args(["encode", "--file"])
         .arg(file)
         .output();
-    
+
     match output {
         Ok(o) if o.status.success() => {
             let tokens = String::from_utf8_lossy(&o.stdout);

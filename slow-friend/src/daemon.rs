@@ -140,7 +140,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::action::{TestExecutor, ActionClass};
+    use crate::action::{ActionClass, TestExecutor};
     use crate::decision::RuleBasedJevEngine;
     use crate::interpretation::HeuristicInterpreter;
     use crate::sensor::DiskUsageSensor;

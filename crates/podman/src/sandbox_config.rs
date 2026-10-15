@@ -85,7 +85,8 @@ impl SandboxConfig {
     }
 
     pub fn with_mount(mut self, host_path: &str, container_path: &str) -> Self {
-        self.mounts.push((host_path.to_string(), container_path.to_string()));
+        self.mounts
+            .push((host_path.to_string(), container_path.to_string()));
         self
     }
 }

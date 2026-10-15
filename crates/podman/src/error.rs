@@ -29,7 +29,10 @@ pub enum PodmanError {
     ContainerRemove(String),
 
     #[error("failed to parse podman JSON output: {source}\nraw: {raw}")]
-    JsonParse { source: serde_json::Error, raw: String },
+    JsonParse {
+        source: serde_json::Error,
+        raw: String,
+    },
 
     #[error("container not found: {0}")]
     ContainerNotFound(String),

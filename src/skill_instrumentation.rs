@@ -13,7 +13,6 @@
 /// Training pipeline reads these logs, ranks skills by value (frequency ×
 /// success rate × complexity), and generates QLoRA training examples from
 /// high-value successful invocations.
-
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -21,7 +20,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 /// Tracks a single in-progress skill invocation.
@@ -74,7 +73,13 @@ impl SkillInvocationLogger {
     }
 
     /// Finish tracking and emit the JSON event.
-    pub fn finish(&self, inv_id: &str, success: bool, steps_taken: usize, error_type: Option<&str>) {
+    pub fn finish(
+        &self,
+        inv_id: &str,
+        success: bool,
+        steps_taken: usize,
+        error_type: Option<&str>,
+    ) {
         let tracker = match self.active.lock().unwrap().remove(inv_id) {
             Some(t) => t,
             None => return, // Already finished or invalid ID
@@ -107,7 +112,8 @@ impl SkillInvocationLogger {
             .open(&self.log_path)
             .expect("Failed to open instrumentation log");
 
-        file.write_all(line.as_bytes()).expect("Failed to write event");
+        file.write_all(line.as_bytes())
+            .expect("Failed to write event");
     }
 }
 

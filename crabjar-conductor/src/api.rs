@@ -1,11 +1,14 @@
 //! HTTP API endpoints for the conductor service.
 
-use axum::{Router, routing::{get, post}, Json};
-use serde_json::json;
 use crate::conductor::Conductor;
+use axum::{
+    Json, Router,
+    routing::{get, post},
+};
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, debug, warn, error};
+use tracing::{debug, error, info, warn};
 
 pub type ConductorState = Arc<Mutex<Conductor>>;
 
@@ -24,23 +27,26 @@ pub fn routes(conductor: ConductorState) -> Router {
         // Code Review
         .route("/review", post(submit_review))
         .with_state(Arc::clone(&conductor));
-    
+
     // Add request logging middleware
     app.layer(axum::middleware::from_fn(log_requests))
 }
 
-async fn log_requests(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
+async fn log_requests(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
     let method = req.method().clone();
     let path = req.uri().path().to_string();
     let start = std::time::Instant::now();
-    
+
     debug!(method = %method, path = %path, "Incoming request");
-    
+
     let resp = next.run(req).await;
-    
+
     let elapsed = start.elapsed();
     info!(method = %method, path = %path, status = resp.status().as_u16(), elapsed_ms = elapsed.as_millis(), "Request completed");
-    
+
     resp
 }
 
@@ -48,12 +54,16 @@ async fn submit_goal(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    let description = body["description"].as_str().unwrap_or("unnamed goal").to_string();
+    let description = body["description"]
+        .as_str()
+        .unwrap_or("unnamed goal")
+        .to_string();
 
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.submit_goal(description)
-    }).await;
+    })
+    .await;
 
     match result {
         Ok(Ok(goal)) => Json(json!({
@@ -68,7 +78,7 @@ async fn submit_goal(
         Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
-        }))
+        })),
     }
 }
 
@@ -82,7 +92,8 @@ async fn get_goal(
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.get_goal(&goal_id)
-    }).await;
+    })
+    .await;
 
     match result {
         Ok(Ok(Some(goal))) => Json(json!({
@@ -104,7 +115,7 @@ async fn get_goal(
             "goal_id": goal_id_for_response,
             "status": "error",
             "message": format!("task join error: {}", e)
-        }))
+        })),
     }
 }
 
@@ -114,7 +125,8 @@ async fn list_workers(
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.list_workers()
-    }).await;
+    })
+    .await;
 
     match result {
         Ok(workers) => Json(json!({
@@ -128,7 +140,7 @@ async fn list_workers(
         Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
-        }))
+        })),
     }
 }
 
@@ -139,13 +151,18 @@ async fn register_worker(
     let name = body["name"].as_str().unwrap_or("unknown").to_string();
     let capabilities: Vec<String> = body["capabilities"]
         .as_array()
-        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
         .unwrap_or_default();
 
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.register_worker(name, capabilities)
-    }).await;
+    })
+    .await;
 
     match result {
         Ok(Ok(worker)) => Json(json!({
@@ -160,7 +177,7 @@ async fn register_worker(
         Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
-        }))
+        })),
     }
 }
 
@@ -173,7 +190,8 @@ async fn worker_heartbeat(
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.worker_heartbeat(&worker_id)
-    }).await;
+    })
+    .await;
 
     match result {
         Ok(Ok(())) => Json(json!({ "status": "ok" })),
@@ -184,7 +202,7 @@ async fn worker_heartbeat(
         Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
-        }))
+        })),
     }
 }
 
@@ -197,7 +215,8 @@ async fn tasks_for_worker(
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.tasks_for_worker(&worker_id)
-    }).await;
+    })
+    .await;
 
     match result {
         Ok(Ok(tasks)) => Json(json!({
@@ -215,7 +234,7 @@ async fn tasks_for_worker(
         Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
-        }))
+        })),
     }
 }
 
@@ -237,7 +256,8 @@ async fn report_task_result(
             }
             _ => c.report_task_complete(&task_id, result_text),
         }
-    }).await;
+    })
+    .await;
 
     match result {
         Ok(Ok(())) => Json(json!({ "status": "recorded" })),
@@ -248,7 +268,7 @@ async fn report_task_result(
         Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
-        }))
+        })),
     }
 }
 
@@ -266,7 +286,7 @@ async fn submit_review(
     // Run the deterministic pre-processor using git2 directly for the demo
     // In production, this would clone and inspect the actual repo
     let changed_files = parse_diff_to_changed_files(&diff);
-    
+
     if changed_files.is_empty() {
         return Json(json!({
             "status": "completed",
@@ -275,7 +295,10 @@ async fn submit_review(
         }));
     }
 
-    info!(files = changed_files.len(), "Changed files selected for review");
+    info!(
+        files = changed_files.len(),
+        "Changed files selected for review"
+    );
 
     // Smart bundling
     let bundles = crabjar_review::bundling::create_bundles(changed_files);
@@ -305,45 +328,52 @@ description = "Style and formatting conventions"
 
     let rules = match crabjar_review::rules::load_rules_from_str(default_rules) {
         Ok(r) => r,
-        Err(e) => return Json(json!({
-            "status": "error",
-            "message": format!("Failed to load review rules: {}", e)
-        }))
+        Err(e) => {
+            return Json(json!({
+                "status": "error",
+                "message": format!("Failed to load review rules: {}", e)
+            }));
+        }
     };
 
     // Agent review phase (per bundle)
     let mut all_findings = Vec::new();
-    
+
     for bundle in &bundles {
         // Match rules per file within the bundle
         for file in &bundle.files {
             let matched_rules = crabjar_review::rules::match_rules(file, &rules);
-            
+
             if matched_rules.is_empty() {
                 continue;
             }
 
             // Generate review prompt
             let scenario = "general".to_string();
-            let owned_rules: Vec<crabjar_review::types::ReviewRule> = 
+            let owned_rules: Vec<crabjar_review::types::ReviewRule> =
                 matched_rules.iter().map(|r| (*r).clone()).collect();
-            let prompt = crabjar_review::prompts::generate_review_prompt(
-                bundle, &owned_rules, &scenario
-            );
+            let prompt =
+                crabjar_review::prompts::generate_review_prompt(bundle, &owned_rules, &scenario);
 
             debug!(bundle_files = bundle.files.len(), "Reviewing bundle");
-            
+
             // Simulated agent output (replace with real pesti-server call)
             let mock_findings = simulate_bundle_review(bundle, &owned_rules);
             all_findings.extend(mock_findings);
         }
     }
 
-    info!(findings = all_findings.len(), "Raw findings collected from review");
+    info!(
+        findings = all_findings.len(),
+        "Raw findings collected from review"
+    );
 
     // Post-processing: deduplication and reflection
     let processed_findings = crabjar_review::reflection::process_findings(&all_findings);
-    info!(processed_findings = processed_findings.len(), "Findings after post-processing");
+    info!(
+        processed_findings = processed_findings.len(),
+        "Findings after post-processing"
+    );
 
     // Generate summary
     let summary = crabjar_review::reflection::generate_reflection(&processed_findings);
@@ -403,8 +433,12 @@ fn parse_diff_to_changed_files(diff: &str) -> Vec<crabjar_review::types::Changed
 
 /// Classify file type based on extension and path.
 fn classify_file_type(path: &str) -> crabjar_review::types::FileType {
-    if path.ends_with(".rs") || path.ends_with(".ts") || path.ends_with(".js") 
-       || path.ends_with(".py") || path.ends_with(".go") {
+    if path.ends_with(".rs")
+        || path.ends_with(".ts")
+        || path.ends_with(".js")
+        || path.ends_with(".py")
+        || path.ends_with(".go")
+    {
         crabjar_review::types::FileType::Source
     } else if path.contains("test") || path.ends_with("_test.rs") {
         crabjar_review::types::FileType::Test
@@ -429,7 +463,9 @@ fn simulate_bundle_review(
             for rule in matched_rules {
                 match rule.id.as_str() {
                     "check_errors" => {
-                        if content.contains("unwrap()") && !file.path.to_string_lossy().contains("test") {
+                        if content.contains("unwrap()")
+                            && !file.path.to_string_lossy().contains("test")
+                        {
                             findings.push(serde_json::json!({
                                 "file": file.path.to_string_lossy(),
                                 "line": 1,

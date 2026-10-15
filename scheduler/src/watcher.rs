@@ -63,7 +63,10 @@ impl WatcherRegistry {
         }
     }
 
-    pub fn register<F>(&mut self, watcher: Watcher) where F: Fn() -> bool + Send + Sync + 'static {
+    pub fn register<F>(&mut self, watcher: Watcher)
+    where
+        F: Fn() -> bool + Send + Sync + 'static,
+    {
         let id = watcher.id.clone();
         self.watchers.insert(id, watcher);
     }

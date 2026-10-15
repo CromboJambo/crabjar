@@ -20,15 +20,15 @@
 //! - [`Task`] — Executable unit of work with dependency tracking
 //! - [`Worker`] — Registered fleet member with capability metadata
 
-pub mod conductor;
-pub mod worker_registry;
-pub mod task_scheduler;
-pub mod state_store;
 pub mod api;
+pub mod conductor;
+pub mod state_store;
+pub mod task_scheduler;
+pub mod worker_registry;
 
 // Re-export core types for ergonomic use
 pub use conductor::{Conductor, ConductorConfig};
-pub use worker_registry::WorkerRegistry;
 pub use state_store::Worker;
+pub use state_store::{Goal, StateStore, Task};
 pub use task_scheduler::TaskScheduler;
-pub use state_store::{StateStore, Goal, Task};
+pub use worker_registry::WorkerRegistry;

@@ -143,7 +143,11 @@ pub fn print_result<T: Serialize>(result: &AnalysisResult<T>) -> std::io::Result
         "success": true,
         "data": result,
     });
-    writeln!(std::io::stdout(), "{}", serde_json::to_string_pretty(&output)?)?;
+    writeln!(
+        std::io::stdout(),
+        "{}",
+        serde_json::to_string_pretty(&output)?
+    )?;
     Ok(())
 }
 
@@ -153,7 +157,11 @@ pub fn print_error(err: &AnalyzeError) -> std::io::Result<()> {
         "success": false,
         "error": err.to_string(),
     });
-    writeln!(std::io::stdout(), "{}", serde_json::to_string_pretty(&output)?)?;
+    writeln!(
+        std::io::stdout(),
+        "{}",
+        serde_json::to_string_pretty(&output)?
+    )?;
     Ok(())
 }
 

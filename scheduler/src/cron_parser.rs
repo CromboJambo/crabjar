@@ -18,9 +18,7 @@ impl CronSchedule {
     pub fn parse(expr: &str) -> Result<Self, SchedulerError> {
         let parts: Vec<&str> = expr.split_whitespace().collect();
         if parts.len() != 5 {
-            return Err(SchedulerError::InvalidCron(
-                "Expected 5 fields".to_string(),
-            ));
+            return Err(SchedulerError::InvalidCron("Expected 5 fields".to_string()));
         }
 
         Ok(Self {
@@ -83,8 +81,13 @@ fn parse_field(field: &str, min: u8, max: u8) -> Result<HashSet<u8>, SchedulerEr
 
 fn parse_dow(field: &str) -> Result<HashSet<u8>, SchedulerError> {
     let dow_map = [
-        ("SUN", 0), ("MON", 1), ("TUE", 2), ("WED", 3), ("THU", 4),
-        ("FRI", 5), ("SAT", 6),
+        ("SUN", 0),
+        ("MON", 1),
+        ("TUE", 2),
+        ("WED", 3),
+        ("THU", 4),
+        ("FRI", 5),
+        ("SAT", 6),
     ];
 
     if field == "*" {
@@ -100,10 +103,12 @@ fn parse_dow(field: &str) -> Result<HashSet<u8>, SchedulerError> {
                 let start_name = bounds[0].trim().to_uppercase();
                 let end_name = bounds[1].trim().to_uppercase();
 
-                let start_num = dow_map.iter()
+                let start_num = dow_map
+                    .iter()
                     .find(|(n, _)| *n == start_name)
                     .ok_or_else(|| SchedulerError::InvalidCron(part.to_string()))?;
-                let end_num = dow_map.iter()
+                let end_num = dow_map
+                    .iter()
                     .find(|(n, _)| *n == end_name)
                     .ok_or_else(|| SchedulerError::InvalidCron(part.to_string()))?;
 
@@ -114,8 +119,7 @@ fn parse_dow(field: &str) -> Result<HashSet<u8>, SchedulerError> {
         } else {
             // Single day name or number
             let upper = part.trim().to_uppercase();
-            let found = dow_map.iter()
-                .find(|(n, _)| *n == upper);
+            let found = dow_map.iter().find(|(n, _)| *n == upper);
 
             if let Some((_, num)) = found {
                 result.insert(*num);

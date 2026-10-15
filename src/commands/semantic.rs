@@ -99,10 +99,19 @@ pub fn handle(
     }
 
     // Find best match
-    let criteria_pairs: Vec<(&str, Vec<f64>)> = criteria_data.iter().map(|c| {
-        (c["name"].as_str().unwrap_or("unknown"), embed(c["text"].as_str().unwrap_or("")))
-    }).collect();
-    let eval_pairs: Vec<(&str, &[f64])> = criteria_pairs.iter().map(|(n, e)| (*n, e.as_slice())).collect();
+    let criteria_pairs: Vec<(&str, Vec<f64>)> = criteria_data
+        .iter()
+        .map(|c| {
+            (
+                c["name"].as_str().unwrap_or("unknown"),
+                embed(c["text"].as_str().unwrap_or("")),
+            )
+        })
+        .collect();
+    let eval_pairs: Vec<(&str, &[f64])> = criteria_pairs
+        .iter()
+        .map(|(n, e)| (*n, e.as_slice()))
+        .collect();
     let best = evaluate(&obs_emb, &eval_pairs);
 
     Ok(json!({

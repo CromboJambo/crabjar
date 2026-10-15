@@ -212,14 +212,17 @@ fn smoke_habitat_contract_returns_json() {
 
     let body = json_stdout(&output);
     assert_eq!(body["success"], true);
-    
+
     // Habitat contract has payload.contract with DAGR v3 structure
     let contract = &body["payload"]["contract"];
     assert_eq!(contract["dagr"], 3, "expected dagr version 3");
-    assert!(contract["generated_at"].is_string(), "missing generated_at timestamp");
+    assert!(
+        contract["generated_at"].is_string(),
+        "missing generated_at timestamp"
+    );
     assert!(contract["run"].is_object(), "missing run object");
     assert!(contract["tasks"].is_array(), "missing tasks array");
-    
+
     // Each task should have attempts array (even if empty)
     for task in contract["tasks"].as_array().unwrap() {
         assert!(task["attempts"].is_array(), "task missing attempts array");

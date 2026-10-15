@@ -4,7 +4,7 @@
 //! Schema migrations are handled automatically on open.
 
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{Connection, OptionalExtension, Row, params};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
@@ -237,7 +237,9 @@ impl StateStore {
     }
 
     pub fn list_goals(&self) -> Result<Vec<Goal>, rusqlite::Error> {
-        let mut stmt = self.db.prepare("SELECT id, description, status, created_at FROM goals")?;
+        let mut stmt = self
+            .db
+            .prepare("SELECT id, description, status, created_at FROM goals")?;
         let rows = stmt.query_map(params![], row_to_goal)?;
         rows.collect()
     }
@@ -306,7 +308,11 @@ impl StateStore {
         Ok(())
     }
 
-    pub fn complete_task(&self, task_id: &str, result: Option<String>) -> Result<(), rusqlite::Error> {
+    pub fn complete_task(
+        &self,
+        task_id: &str,
+        result: Option<String>,
+    ) -> Result<(), rusqlite::Error> {
         self.db.execute(
             "UPDATE tasks SET status = ?, result = ? WHERE id = ?",
             params![TaskStatus::Completed.as_str(), result, task_id],
@@ -343,7 +349,11 @@ impl StateStore {
 
     // ─── Worker operations ────────────────────────────────────────────
 
-    pub fn register_worker(&self, name: String, capabilities: Vec<String>) -> Result<Worker, rusqlite::Error> {
+    pub fn register_worker(
+        &self,
+        name: String,
+        capabilities: Vec<String>,
+    ) -> Result<Worker, rusqlite::Error> {
         let worker = Worker {
             id: Uuid::new_v4().to_string(),
             name: name.clone(),
@@ -389,12 +399,18 @@ impl StateStore {
     }
 
     pub fn list_workers(&self) -> Result<Vec<Worker>, rusqlite::Error> {
-        let mut stmt = self.db.prepare("SELECT id, name, ssh_key, capabilities, status FROM workers")?;
+        let mut stmt = self
+            .db
+            .prepare("SELECT id, name, ssh_key, capabilities, status FROM workers")?;
         let rows = stmt.query_map(params![], row_to_worker)?;
         rows.collect()
     }
 
-    pub fn update_worker_status(&self, id: &str, status: WorkerStatus) -> Result<(), rusqlite::Error> {
+    pub fn update_worker_status(
+        &self,
+        id: &str,
+        status: WorkerStatus,
+    ) -> Result<(), rusqlite::Error> {
         self.db.execute(
             "UPDATE workers SET status = ? WHERE id = ?",
             params![status.as_str(), id],
@@ -435,7 +451,9 @@ mod tests {
     #[test]
     fn worker_registration() {
         let (store, _dir) = test_store();
-        let worker = store.register_worker("ftw3".to_string(), vec!["gpu:nvidia:3070ti".to_string()]).unwrap();
+        let worker = store
+            .register_worker("ftw3".to_string(), vec!["gpu:nvidia:3070ti".to_string()])
+            .unwrap();
         let fetched = store.get_worker(&worker.id).unwrap().unwrap();
         assert_eq!(fetched.name, "ftw3");
         assert_eq!(fetched.capabilities[0], "gpu:nvidia:3070ti");
@@ -444,14 +462,18 @@ mod tests {
     #[test]
     fn task_lifecycle() {
         let (store, _dir) = test_store();
-        
+
         // Create a goal first (task depends on it via FK constraint)
         let goal = store.create_goal("Test".to_string()).unwrap();
-        
+
         // Register a fake worker so assign_task can reference it
-        let worker = store.register_worker("worker-1".to_string(), vec![]).unwrap();
-        
-        let task = store.create_task(&goal.id, "echo hello".to_string()).unwrap();
+        let worker = store
+            .register_worker("worker-1".to_string(), vec![])
+            .unwrap();
+
+        let task = store
+            .create_task(&goal.id, "echo hello".to_string())
+            .unwrap();
 
         assert_eq!(task.status, TaskStatus::Pending);
 
@@ -460,7 +482,9 @@ mod tests {
         let assigned = store.get_task(&task.id).unwrap().unwrap();
         assert_eq!(assigned.status, TaskStatus::Assigned);
 
-        store.complete_task(&task.id, Some("done".to_string())).unwrap();
+        store
+            .complete_task(&task.id, Some("done".to_string()))
+            .unwrap();
         let completed = store.get_task(&task.id).unwrap().unwrap();
         assert_eq!(completed.status, TaskStatus::Completed);
     }

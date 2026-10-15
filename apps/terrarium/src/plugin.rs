@@ -72,21 +72,33 @@ fn create_world() -> WorldState {
     let entities = vec![
         Entity {
             id: "crab_1".to_string(),
-            x: 2.0, y: 3.0, z: 0.0,
-            vx: 1.5, vy: 0.8,
-            symbol: "🦀", color: "#ff6b6b",
+            x: 2.0,
+            y: 3.0,
+            z: 0.0,
+            vx: 1.5,
+            vy: 0.8,
+            symbol: "🦀",
+            color: "#ff6b6b",
         },
         Entity {
             id: "crab_2".to_string(),
-            x: 5.0, y: 1.0, z: 0.0,
-            vx: -0.8, vy: 1.2,
-            symbol: "🦀", color: "#4ecdc4",
+            x: 5.0,
+            y: 1.0,
+            z: 0.0,
+            vx: -0.8,
+            vy: 1.2,
+            symbol: "🦀",
+            color: "#4ecdc4",
         },
         Entity {
             id: "crab_3".to_string(),
-            x: 1.0, y: 5.0, z: 0.0,
-            vx: 0.5, vy: -1.0,
-            symbol: "🦀", color: "#ffe66d",
+            x: 1.0,
+            y: 5.0,
+            z: 0.0,
+            vx: 0.5,
+            vy: -1.0,
+            symbol: "🦀",
+            color: "#ffe66d",
         },
     ];
 
@@ -111,21 +123,29 @@ impl Default for PluginState {
         Self {
             world: create_world(),
             running: false,
-            orchestrator_url: std::env::var("ORCHESTRATOR_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string()),
+            orchestrator_url: std::env::var("ORCHESTRATOR_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:3000".to_string()),
         }
     }
 }
 
 /// Publish entity state to the orchestrator's SSE channel for crabjar-gpui subscribers.
 async fn publish_entity_state(state: &PluginState) {
-    let entities = state.world.entities.iter().map(|e| serde_json::json!({
-        "id": e.id,
-        "x": e.x,
-        "y": e.y,
-        "z": e.z,
-        "symbol": e.symbol,
-        "color": e.color
-    })).collect::<Vec<_>>();
+    let entities = state
+        .world
+        .entities
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "id": e.id,
+                "x": e.x,
+                "y": e.y,
+                "z": e.z,
+                "symbol": e.symbol,
+                "color": e.color
+            })
+        })
+        .collect::<Vec<_>>();
 
     let event = serde_json::json!({
         "type": "entity_state",
@@ -254,14 +274,21 @@ fn handle_command(state: &mut PluginState, request: &CommandRequest) -> serde_js
         }
         "terrarium/query_state" => {
             // Return ACTUAL entity positions from the world
-            let entities = state.world.entities.iter().map(|e| serde_json::json!({
-                "id": e.id,
-                "x": e.x,
-                "y": e.y,
-                "z": e.z,
-                "symbol": e.symbol,
-                "color": e.color
-            })).collect::<Vec<_>>();
+            let entities = state
+                .world
+                .entities
+                .iter()
+                .map(|e| {
+                    serde_json::json!({
+                        "id": e.id,
+                        "x": e.x,
+                        "y": e.y,
+                        "z": e.z,
+                        "symbol": e.symbol,
+                        "color": e.color
+                    })
+                })
+                .collect::<Vec<_>>();
 
             serde_json::json!({
                 "status": "ok",

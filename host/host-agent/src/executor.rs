@@ -16,13 +16,19 @@ pub struct TaskExecutor {
 impl TaskExecutor {
     pub fn new() -> Self {
         let podman = PodmanExecutor::new().ok();
-        Self { scope: None, podman }
+        Self {
+            scope: None,
+            podman,
+        }
     }
 
     /// Create a TaskExecutor with a default scope.
     pub fn with_scope(scope: Scope) -> Self {
         let podman = PodmanExecutor::new().ok();
-        Self { scope: Some(scope), podman }
+        Self {
+            scope: Some(scope),
+            podman,
+        }
     }
 
     /// Get the default scope (if any).
@@ -32,15 +38,19 @@ impl TaskExecutor {
 
     /// Execute a task in an isolated Podman container.
     fn execute_in_container(&self, work_item: &WorkItem, task_id: usize) -> Result<String, String> {
-        let podman = self.podman.as_ref().ok_or_else(|| {
-            "Podman executor not available (binary not found)".to_string()
-        })?;
+        let podman = self
+            .podman
+            .as_ref()
+            .ok_or_else(|| "Podman executor not available (binary not found)".to_string())?;
 
         let task_desc = work_item.plan[task_id].description.clone();
         let agent_name = format!("agent-{}", work_item.id);
 
         // Build sandbox config from task description
-        let sandbox = SandboxConfig::new(&agent_name, vec!["/bin/sh".to_string(), "-c".to_string(), task_desc.clone()]);
+        let sandbox = SandboxConfig::new(
+            &agent_name,
+            vec!["/bin/sh".to_string(), "-c".to_string(), task_desc.clone()],
+        );
 
         // Create container
         match podman.create_container(&sandbox) {
@@ -48,7 +58,9 @@ impl TaskExecutor {
                 tracing::info!(container_id, "Created isolated container for task");
 
                 // Start and wait for completion
-                let result = podman.start_container(&container_id).map_err(|e| e.to_string());
+                let result = podman
+                    .start_container(&container_id)
+                    .map_err(|e| e.to_string());
 
                 // Clean up
                 if let Err(e) = podman.stop_container(&container_id) {

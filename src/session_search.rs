@@ -2,12 +2,11 @@
 ///
 /// Indexes session transcripts, tool calls, and outcomes for semantic retrieval.
 /// Enables "what did we learn last time about X?" queries across days/weeks of work.
-
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Session search index manager.
 pub struct SessionSearchIndex {
@@ -50,8 +49,9 @@ impl SessionSearchIndex {
                     CREATE VIRTUAL TABLE IF NOT EXISTS sessions_fts USING fts5(
                         query, tool_calls, outcome, error_type,
                         content=sessions, content_rowid=id
-                    );"
-                ).map_err(|e| format!("Failed to initialize search database: {}", e))?;
+                    );",
+                )
+                .map_err(|e| format!("Failed to initialize search database: {}", e))?;
                 self.index = Some(conn);
                 Ok(())
             }

@@ -1,10 +1,10 @@
 use crate::error::{FlightRecorderError, TelemetryError};
+#[cfg(feature = "otel")]
+use crate::otel_export::{OtelConfig, OtelExporter};
 use crate::schema::{
     CheckpointRow, FlightRecordRow, checkpoint_session, init_db, query_flight_records,
     query_session_checkpoints, query_transcript, record_command, record_transcript_line,
 };
-#[cfg(feature = "otel")]
-use crate::otel_export::{OtelConfig, OtelExporter};
 use base64::Engine;
 use hmac::{Hmac, Mac};
 use rusqlite::Connection;

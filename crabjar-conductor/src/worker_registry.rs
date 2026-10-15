@@ -74,7 +74,10 @@ mod tests {
     fn find_by_capability() {
         let mut reg = WorkerRegistry::new();
         reg.register("cpu-node".to_string(), vec!["cpu:8core".to_string()]);
-        let gpu_worker = reg.register("gpu-node".to_string(), vec!["gpu:nvidia:3070ti".to_string()]);
+        let gpu_worker = reg.register(
+            "gpu-node".to_string(),
+            vec!["gpu:nvidia:3070ti".to_string()],
+        );
         let found = reg.find_by_capability("gpu:nvidia:3070ti");
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].id, gpu_worker.id);

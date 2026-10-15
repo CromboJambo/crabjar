@@ -2,23 +2,22 @@
 ///
 /// Extends the guard approval flow with richer feedback signals that adapt
 /// future agent behavior without requiring manual policy updates.
-
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Types of user feedback.
 #[derive(Debug, Clone)]
 pub enum FeedbackType {
-    Approval,       // User approved an action
-    Rejection,      // User rejected an action
-    Correction,     // User said "do it differently"
-    Rating,         // Post-completion quality rating (1-5)
-    Preference,     // Style/behavior preference signal
+    Approval,   // User approved an action
+    Rejection,  // User rejected an action
+    Correction, // User said "do it differently"
+    Rating,     // Post-completion quality rating (1-5)
+    Preference, // Style/behavior preference signal
 }
 
 /// Captures and stores user feedback for adaptive behavior.
@@ -59,7 +58,11 @@ impl FeedbackCollector {
 
         let line = serde_json::to_string(&event).unwrap() + "\n";
 
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&self.feedback_path) {
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.feedback_path)
+        {
             file.write_all(line.as_bytes()).ok();
         }
     }
@@ -86,7 +89,8 @@ impl FeedbackCollector {
         }
 
         // Identify tasks that frequently get corrected (need policy updates)
-        let frequent_corrections: Vec<String> = corrections.iter()
+        let frequent_corrections: Vec<String> = corrections
+            .iter()
             .filter(|(_, count)| **count >= 3)
             .map(|(task, _)| task.clone())
             .collect();
@@ -113,8 +117,9 @@ impl FeedbackCollector {
 
         for line in content.lines() {
             if let Ok(event) = serde_json::from_str::<Value>(line) {
-                if event["type"].as_str() == Some("correction") &&
-                   event["details"]["task_type"].as_str() == Some(task_type) {
+                if event["type"].as_str() == Some("correction")
+                    && event["details"]["task_type"].as_str() == Some(task_type)
+                {
                     corrections.push(event);
                 }
             }

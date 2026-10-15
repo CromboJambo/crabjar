@@ -6,11 +6,11 @@
 //! - Assets and resources
 //! - Basic manifest info (package name, version from binary XML)
 
-use analyze_common::{AnalyzeError, AnalysisProvenance, AnalysisResult, DoubtBlock};
+use analyze_common::{AnalysisProvenance, AnalysisResult, AnalyzeError, DoubtBlock};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Read, Cursor};
+use std::io::{Cursor, Read};
 use zip::ZipArchive;
 
 /// APK analysis result data.
@@ -71,9 +71,8 @@ impl ApkParser {
         let provenance = AnalysisProvenance::new("analyze-apk", "0.1.0");
 
         // Read the APK file
-        let apk_data = std::fs::read(path).map_err(|e| {
-            AnalyzeError::FileNotFound(format!("{}: {}", path, e))
-        })?;
+        let apk_data = std::fs::read(path)
+            .map_err(|e| AnalyzeError::FileNotFound(format!("{}: {}", path, e)))?;
 
         let size_bytes = apk_data.len() as u64;
 
@@ -102,7 +101,8 @@ impl ApkParser {
             if let Some(lib_path) = name.strip_prefix("lib/") {
                 // lib/arm64-v8a/libfoo.so -> abi=arm64-v8a, file=libfoo.so
                 if let Some((abi, lib_name)) = lib_path.split_once('/') {
-                    native_libs.entry(abi.to_string())
+                    native_libs
+                        .entry(abi.to_string())
                         .or_default()
                         .push(lib_name.to_string());
                 }
@@ -124,9 +124,20 @@ impl ApkParser {
         }
 
         // Try to extract manifest info
-        let (package_name, version_code, version_name, app_label, min_sdk, target_sdk,
-             permissions, features, activities, services, receivers, providers) =
-            Self::extract_manifest_info(&apk_data);
+        let (
+            package_name,
+            version_code,
+            version_name,
+            app_label,
+            min_sdk,
+            target_sdk,
+            permissions,
+            features,
+            activities,
+            services,
+            receivers,
+            providers,
+        ) = Self::extract_manifest_info(&apk_data);
 
         let analysis = ApkAnalysis {
             path: path.to_string(),
@@ -167,10 +178,21 @@ impl ApkParser {
     }
 
     /// Extract manifest information from the APK.
-    fn extract_manifest_info(apk_data: &[u8]) -> (
-        Option<String>, Option<i32>, Option<String>, Option<String>,
-        Option<i32>, Option<i32>, Vec<String>, Vec<String>,
-        Vec<String>, Vec<String>, Vec<String>, Vec<String>
+    fn extract_manifest_info(
+        apk_data: &[u8],
+    ) -> (
+        Option<String>,
+        Option<i32>,
+        Option<String>,
+        Option<String>,
+        Option<i32>,
+        Option<i32>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
     ) {
         // Look for AndroidManifest.xml in the APK
         let manifest_name = "AndroidManifest.xml";
@@ -178,42 +200,115 @@ impl ApkParser {
         let cursor = std::io::Cursor::new(apk_data);
         let mut archive = match ZipArchive::new(cursor) {
             Ok(a) => a,
-            Err(_) => return (None, None, None, None, None, None, Vec::new(), Vec::new(),
-                Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+            Err(_) => {
+                return (
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                );
+            }
         };
 
         // Try to find and read the manifest
         if let Ok(mut manifest) = archive.by_name(manifest_name) {
             let mut manifest_data = Vec::new();
             if let Err(_) = manifest.read_to_end(&mut manifest_data) {
-                return (None, None, None, None, None, None, Vec::new(), Vec::new(),
-                    Vec::new(), Vec::new(), Vec::new(), Vec::new());
+                return (
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                );
             }
 
             // Parse AXML - extract strings section to find package name and permissions
             Self::parse_axml(&manifest_data)
         } else {
-            (None, None, None, None, None, None, Vec::new(), Vec::new(),
-                Vec::new(), Vec::new(), Vec::new(), Vec::new())
+            (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            )
         }
     }
 
     /// Parse Android binary XML (AXML) format.
-    fn parse_axml(data: &[u8]) -> (
-        Option<String>, Option<i32>, Option<String>, Option<String>,
-        Option<i32>, Option<i32>, Vec<String>, Vec<String>,
-        Vec<String>, Vec<String>, Vec<String>, Vec<String>
+    fn parse_axml(
+        data: &[u8],
+    ) -> (
+        Option<String>,
+        Option<i32>,
+        Option<String>,
+        Option<String>,
+        Option<i32>,
+        Option<i32>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
+        Vec<String>,
     ) {
         if data.len() < 8 {
-            return (None, None, None, None, None, None, Vec::new(), Vec::new(),
-                Vec::new(), Vec::new(), Vec::new(), Vec::new());
+            return (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            );
         }
 
         // AXML magic: 0x03584150 ("AXML" in little-endian)
         let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
         if magic != 0x03584150 {
-            return (None, None, None, None, None, None, Vec::new(), Vec::new(),
-                Vec::new(), Vec::new(), Vec::new(), Vec::new());
+            return (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            );
         }
 
         // Extract strings from the resource table section
@@ -233,14 +328,24 @@ impl ApkParser {
 
         // Look for permission strings in the binary data
         let bytes = &data[8..]; // Skip header
-        if let Some(idx) = bytes.windows(12).position(|w| {
-            w.starts_with(b"permission")
-        }) {
+        if let Some(idx) = bytes.windows(12).position(|w| w.starts_with(b"permission")) {
             permissions.push("android.permission.INTERNET".to_string());
         }
 
-        (package_name, version_code, version_name, app_label, min_sdk, target_sdk,
-            permissions, features, activities, services, receivers, providers)
+        (
+            package_name,
+            version_code,
+            version_name,
+            app_label,
+            min_sdk,
+            target_sdk,
+            permissions,
+            features,
+            activities,
+            services,
+            receivers,
+            providers,
+        )
     }
 }
 

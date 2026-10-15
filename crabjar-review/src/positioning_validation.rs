@@ -3,9 +3,17 @@ use serde_json::Value;
 
 /// Validate that a finding's position is correct by searching for the quoted code snippet
 /// in the actual file content. Do NOT trust LLM-reported line numbers directly.
-pub fn validate_position(bundle: &ReviewBundle, file_path: &str, line: u32, message: &str) -> Option<u32> {
+pub fn validate_position(
+    bundle: &ReviewBundle,
+    file_path: &str,
+    line: u32,
+    message: &str,
+) -> Option<u32> {
     // Find the file in the bundle
-    let changed_file = bundle.files.iter().find(|f| f.path.to_string_lossy() == file_path);
+    let changed_file = bundle
+        .files
+        .iter()
+        .find(|f| f.path.to_string_lossy() == file_path);
     if changed_file.is_none() {
         return None;
     }
@@ -23,13 +31,20 @@ pub fn validate_position(bundle: &ReviewBundle, file_path: &str, line: u32, mess
     let line_index = (line - 1) as usize;
     let tolerance = 2; // ±2 lines per spec
 
-    let start = if line_index >= tolerance { line_index - tolerance } else { 0 };
+    let start = if line_index >= tolerance {
+        line_index - tolerance
+    } else {
+        0
+    };
     let end = std::cmp::min(line_index + tolerance + 1, lines.len());
 
     for (i, l) in lines[start..end].iter().enumerate() {
         let actual_line = start + i;
         // Check if the message references code on this line
-        if message.contains(l.trim()) || l.trim().contains(&message[..std::cmp::min(50, message.len())]) {
+        if message.contains(l.trim())
+            || l.trim()
+                .contains(&message[..std::cmp::min(50, message.len())])
+        {
             return Some((actual_line + 1) as u32);
         }
     }
@@ -87,14 +102,24 @@ pub fn validate_findings(bundle: &ReviewBundle, findings: &[Value]) -> Vec<Value
         let finding_type = finding["type"].as_str();
         let description = finding["description"].as_str();
 
-        if file.is_none() || line.is_none() || severity.is_none()
-            || finding_type.is_none() || description.is_none()
+        if file.is_none()
+            || line.is_none()
+            || severity.is_none()
+            || finding_type.is_none()
+            || description.is_none()
         {
             continue;
         }
 
         // Validate position
-        if validate_position(bundle, file.unwrap(), line.unwrap() as u32, description.unwrap()).is_none() {
+        if validate_position(
+            bundle,
+            file.unwrap(),
+            line.unwrap() as u32,
+            description.unwrap(),
+        )
+        .is_none()
+        {
             continue;
         }
 

@@ -50,10 +50,16 @@ pub struct Action {
 /// Result of executing an action.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ActionResult {
-    Success { details: String },
-    Failure { error: String },
+    Success {
+        details: String,
+    },
+    Failure {
+        error: String,
+    },
     /// User rejected or modified the action proposal.
-    Rejected { reason: Option<String> },
+    Rejected {
+        reason: Option<String>,
+    },
 }
 
 /// Trait for executing actions through CrabJar's guard/concierge pipeline.

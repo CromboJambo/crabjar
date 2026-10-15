@@ -21,8 +21,8 @@
 use chrono::{DateTime, SecondsFormat, Utc};
 use serde_json::{Value, json};
 
-use crabjar_terminal::TriageQueue;
 use crate::kanban_source;
+use crabjar_terminal::TriageQueue;
 
 /// A pending guard action, projected from the `pending_queue` table.
 /// Intermediate form so [`build_contract`] stays pure (no SQLite).

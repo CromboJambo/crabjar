@@ -2,7 +2,7 @@
 
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
-use tracing::{info, debug, warn, error};
+use tracing::{debug, error, info, warn};
 
 /// Configuration for the conductor service.
 pub struct ConductorConfig {
@@ -43,7 +43,7 @@ impl Conductor {
     /// Submit a new goal for decomposition and execution.
     pub fn submit_goal(&self, description: String) -> Result<Goal> {
         info!(description = %description, "Submitting new goal");
-        
+
         // Create the goal record
         let goal = self.store.create_goal(description.clone())?;
         info!(goal_id = %goal.id, "Goal created");
@@ -53,7 +53,8 @@ impl Conductor {
         info!(goal_id = %goal.id, task_count = tasks.len(), "Goal decomposed into tasks");
 
         // Mark as running once decomposition is complete
-        self.store.update_goal_status(&goal.id, GoalStatus::Running)?;
+        self.store
+            .update_goal_status(&goal.id, GoalStatus::Running)?;
 
         Ok(goal)
     }
@@ -61,7 +62,7 @@ impl Conductor {
     /// Decompose a goal into executable tasks using LLM inference.
     fn decompose(&self, goal_id: String, description: &str) -> Result<Vec<Task>> {
         info!(goal_id = %goal_id, pesti_url = %self.config.pesti_server_url, "Decomposing goal via pesti-server");
-        
+
         // Call pesti-server to break the goal into steps via LLM inference.
         let prompt = format!(
             "You are a task planner that breaks goals into executable shell commands.\n\
@@ -76,24 +77,27 @@ impl Conductor {
         // Configure HTTP client with explicit timeout and DNS resolution
         let url = format!("{}/v1/chat/completions", self.config.pesti_server_url);
         info!(goal_id = %goal_id, url = %url, "Connecting to pesti-server");
-        
+
         // Debug: resolve the hostname ourselves to see what IP we get
-        let parsed = reqwest::Url::parse(&url).map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
-        let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("no host in URL"))?;
+        let parsed =
+            reqwest::Url::parse(&url).map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
+        let host = parsed
+            .host_str()
+            .ok_or_else(|| anyhow::anyhow!("no host in URL"))?;
         info!(goal_id = %goal_id, host = %host, "Resolved hostname");
-        
+
         // Try resolving manually to see what we get
         match std::net::ToSocketAddrs::to_socket_addrs(&format!("{}:8081", host)) {
             Ok(addrs) => {
                 for addr in addrs {
                     info!(goal_id = %goal_id, addr = ?addr, "DNS resolution result");
                 }
-            },
+            }
             Err(e) => {
                 error!(goal_id = %goal_id, err = %e, host = %host, "Manual DNS resolution failed");
             }
         }
-        
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
             .connect_timeout(std::time::Duration::from_secs(10))
@@ -116,23 +120,31 @@ impl Conductor {
             "max_tokens": 2048
         });
 
-        let resp = client.post(&url)
+        let resp = client
+            .post(&url)
             .json(&body)
             .send()
             .map_err(|e| anyhow::anyhow!("pesti-server request failed: {}", e))?;
 
         let status = resp.status();
         info!(goal_id = %goal_id, status = status.as_u16(), "Received response from pesti-server");
-        
-        let text = resp.text().map_err(|e| anyhow::anyhow!("failed to read response: {}", e))?;
+
+        let text = resp
+            .text()
+            .map_err(|e| anyhow::anyhow!("failed to read response: {}", e))?;
 
         if !status.is_success() {
             return Err(anyhow::anyhow!("pesti-server error {}: {}", status, text));
         }
 
         // Parse the LLM response
-        let parsed: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|e| anyhow::anyhow!("failed to parse pesti response as JSON: {} - {}", e, &text[..std::cmp::min(200, text.len())]))?;
+        let parsed: serde_json::Value = serde_json::from_str(&text).map_err(|e| {
+            anyhow::anyhow!(
+                "failed to parse pesti response as JSON: {} - {}",
+                e,
+                &text[..std::cmp::min(200, text.len())]
+            )
+        })?;
 
         // Extract content from chat completion format
         let content = parsed["choices"][0]["message"]["content"]
@@ -181,22 +193,31 @@ impl Conductor {
         };
 
         // Try to parse the content as JSON array of tasks
-        let task_specs: Vec<serde_json::Value> = serde_json::from_str(&json_to_parse)
-            .map_err(|e| anyhow::anyhow!("failed to parse task specs from LLM: {} - {}", e, &json_to_parse[..std::cmp::min(200, json_to_parse.len())]))?;
+        let task_specs: Vec<serde_json::Value> =
+            serde_json::from_str(&json_to_parse).map_err(|e| {
+                anyhow::anyhow!(
+                    "failed to parse task specs from LLM: {} - {}",
+                    e,
+                    &json_to_parse[..std::cmp::min(200, json_to_parse.len())]
+                )
+            })?;
 
         // Create tasks in the store
         let mut tasks = Vec::new();
         for spec in task_specs {
-            let command = spec["command"].as_str()
+            let command = spec["command"]
+                .as_str()
                 .ok_or_else(|| anyhow::anyhow!("task spec missing 'command'"))?
                 .to_string();
             let description = spec["description"].as_str().unwrap_or(&command).to_string();
 
             debug!(goal_id = %goal_id, command = %command, "Creating task from LLM spec");
-            let task = self.store.create_task(&goal_id, format!("[{}] {}", description, command))?;
+            let task = self
+                .store
+                .create_task(&goal_id, format!("[{}] {}", description, command))?;
             tasks.push(task);
         }
-        
+
         info!(goal_id = %goal_id, task_count = tasks.len(), "Created tasks from decomposition");
 
         Ok(tasks)
@@ -210,7 +231,9 @@ impl Conductor {
 
     /// Get full goal details.
     pub fn get_goal(&self, goal_id: &str) -> Result<Option<Goal>> {
-        self.store.get_goal(goal_id).map_err(|e| anyhow::anyhow!("{}", e))
+        self.store
+            .get_goal(goal_id)
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// List all registered workers.
@@ -228,7 +251,7 @@ impl Conductor {
     pub fn tasks_for_worker(&self, _worker_id: &str) -> Result<Vec<Task>> {
         // Get all pending tasks that are ready (dependencies met)
         let ready_tasks = self.store.get_ready_tasks()?;
-        
+
         // In production, filter by worker capabilities and assign
         // For now, return the first unassigned task if any
         for task in ready_tasks.iter() {
@@ -239,23 +262,27 @@ impl Conductor {
                 return Ok(vec![updated]);
             }
         }
-        
+
         Ok(vec![])
     }
 
     /// Report completion of a task.
     pub fn report_task_complete(&self, task_id: &str, result: Option<String>) -> Result<()> {
         self.store.complete_task(task_id, result)?;
-        
+
         // Check if all tasks for the goal are complete
-        let task = self.store.get_task(task_id)?.ok_or_else(|| anyhow::anyhow!("task not found"))?;
+        let task = self
+            .store
+            .get_task(task_id)?
+            .ok_or_else(|| anyhow::anyhow!("task not found"))?;
         let goal_tasks = self.store.list_tasks_for_goal(&task.goal_id)?;
         let all_complete = goal_tasks.iter().all(|t| t.status == TaskStatus::Completed);
-        
+
         if all_complete {
-            self.store.update_goal_status(&task.goal_id, GoalStatus::Completed)?;
+            self.store
+                .update_goal_status(&task.goal_id, GoalStatus::Completed)?;
         }
-        
+
         Ok(())
     }
 

@@ -35,7 +35,10 @@ impl RiskLevel {
     }
 
     pub fn requires_review(&self) -> bool {
-        matches!(self, RiskLevel::L2_Medium | RiskLevel::L3_High | RiskLevel::L4_Critical)
+        matches!(
+            self,
+            RiskLevel::L2_Medium | RiskLevel::L3_High | RiskLevel::L4_Critical
+        )
     }
 }
 
@@ -43,26 +46,41 @@ impl RiskLevel {
 pub fn classify_action(action_type: &str) -> RiskLevel {
     match action_type {
         // L0: Auto-approve (read-only, idempotent)
-        "file_read" | "search_files" | "list_directory" | "git_status"
-        | "git_log" | "cargo_check" | "cargo_test" | "cargo_clippy"
-        | "crabjar_state_list" | "crabjar_guard_pending" => RiskLevel::L0_Auto,
+        "file_read"
+        | "search_files"
+        | "list_directory"
+        | "git_status"
+        | "git_log"
+        | "cargo_check"
+        | "cargo_test"
+        | "cargo_clippy"
+        | "crabjar_state_list"
+        | "crabjar_guard_pending" => RiskLevel::L0_Auto,
 
         // L1: Low risk (local, reversible)
-        "file_write" | "file_patch" | "git_commit" | "git_add"
-        | "cargo_build" | "cargo_fmt" | "create_branch"
+        "file_write"
+        | "file_patch"
+        | "git_commit"
+        | "git_add"
+        | "cargo_build"
+        | "cargo_fmt"
+        | "create_branch"
         | "crabjar_state_update" => RiskLevel::L1_Low,
 
         // L2: Medium risk (shared state, needs review)
-        "git_push" | "git_merge" | "deploy_local"
-        | "modify_config" | "install_dependency" => RiskLevel::L2_Medium,
+        "git_push" | "git_merge" | "deploy_local" | "modify_config" | "install_dependency" => {
+            RiskLevel::L2_Medium
+        }
 
         // L3: High risk (destructive or hard to reverse)
-        "delete_file" | "git_reset" | "git_tag"
-        | "deploy_remote" | "modify_guard_policy" => RiskLevel::L3_High,
+        "delete_file" | "git_reset" | "git_tag" | "deploy_remote" | "modify_guard_policy" => {
+            RiskLevel::L3_High
+        }
 
         // L4: Critical (always require explicit approval)
-        "sudo_command" | "network_change" | "user_management"
-        | "crabjar_guard_modify" => RiskLevel::L4_Critical,
+        "sudo_command" | "network_change" | "user_management" | "crabjar_guard_modify" => {
+            RiskLevel::L4_Critical
+        }
 
         _ => RiskLevel::L2_Medium, // Default to review for unknown actions
     }
@@ -106,22 +124,36 @@ impl QueryCache {
         self.entries.get(key).filter(|e| !e.is_expired())
     }
 
-    pub fn set(&mut self, key: String, query: String, result: String, ttl_seconds: u64, source: String) {
+    pub fn set(
+        &mut self,
+        key: String,
+        query: String,
+        result: String,
+        ttl_seconds: u64,
+        source: String,
+    ) {
         // Evict oldest if at capacity
         if self.entries.len() >= self.max_size && !self.entries.contains_key(&key) {
-            let oldest_key = self.entries.iter().min_by_key(|(_, v)| v.timestamp).map(|(k, _)| k.clone());
+            let oldest_key = self
+                .entries
+                .iter()
+                .min_by_key(|(_, v)| v.timestamp)
+                .map(|(k, _)| k.clone());
             if let Some(k) = oldest_key {
                 self.entries.remove(&k);
             }
         }
 
-        self.entries.insert(key, CachedQuery {
-            query,
-            result,
-            timestamp: Utc::now().timestamp(),
-            ttl_seconds,
-            source,
-        });
+        self.entries.insert(
+            key,
+            CachedQuery {
+                query,
+                result,
+                timestamp: Utc::now().timestamp(),
+                ttl_seconds,
+                source,
+            },
+        );
     }
 
     pub fn stats(&self) -> (usize, usize) {
@@ -145,7 +177,11 @@ pub struct StudyMaterial {
 }
 
 /// Generate study material based on autonomous actions taken.
-pub fn generate_study_material(topic: &str, actions_taken: &[String], sources: &[String]) -> StudyMaterial {
+pub fn generate_study_material(
+    topic: &str,
+    actions_taken: &[String],
+    sources: &[String],
+) -> StudyMaterial {
     let title = format!("Understanding {}", topic);
     let content = format!(
         "# {}\n\n## Context\n\nThis material was generated based on the following autonomous actions:\n\n{}\n\n## Key Concepts\n\n- What risk levels mean in crabjar's guard system\n- Why certain actions require approval while others are auto-approved\n- How to override or adjust autonomy settings\n\n## Sources\n\n{}\n",
@@ -164,7 +200,10 @@ pub fn generate_study_material(topic: &str, actions_taken: &[String], sources: &
 }
 
 /// Save study material to user_courses directory.
-pub fn save_study_material(material: &StudyMaterial, output_dir: &PathBuf) -> Result<PathBuf, String> {
+pub fn save_study_material(
+    material: &StudyMaterial,
+    output_dir: &PathBuf,
+) -> Result<PathBuf, String> {
     fs::create_dir_all(output_dir).map_err(|e| format!("Failed to create dir: {}", e))?;
 
     let filename = format!(
@@ -196,12 +235,16 @@ pub struct AutonomyEntry {
 
 /// Log an autonomy decision to ~/.crabjar/autonomy-log.jsonl
 pub fn log_autonomy_decision(entry: &AutonomyEntry) -> Result<(), String> {
-    let home = std::env::var("HOME").map(PathBuf::from).map_err(|e| format!("Failed to get HOME env var: {}", e))?;
+    let home = std::env::var("HOME")
+        .map(PathBuf::from)
+        .map_err(|e| format!("Failed to get HOME env var: {}", e))?;
     let crabjar_dir = home.join(".crabjar");
-    fs::create_dir_all(&crabjar_dir).map_err(|e| format!("Failed to create .crabjar dir: {}", e))?;
+    fs::create_dir_all(&crabjar_dir)
+        .map_err(|e| format!("Failed to create .crabjar dir: {}", e))?;
 
     let log_path = crabjar_dir.join("autonomy-log.jsonl");
-    let line = serde_json::to_string(entry).map_err(|e| format!("Failed to serialize entry: {}", e))?;
+    let line =
+        serde_json::to_string(entry).map_err(|e| format!("Failed to serialize entry: {}", e))?;
 
     use std::fs::OpenOptions;
     let mut file = OpenOptions::new()
@@ -266,13 +309,16 @@ mod tests {
     fn test_query_cache_expiry() {
         let mut cache = QueryCache::new(10);
         // Manually set an expired entry (timestamp 2 seconds ago, TTL of 1 second)
-        cache.entries.insert("expired-key".to_string(), CachedQuery {
-            query: "query".to_string(),
-            result: "result".to_string(),
-            timestamp: Utc::now().timestamp() - 2,
-            ttl_seconds: 1,
-            source: "guard".to_string(),
-        });
+        cache.entries.insert(
+            "expired-key".to_string(),
+            CachedQuery {
+                query: "query".to_string(),
+                result: "result".to_string(),
+                timestamp: Utc::now().timestamp() - 2,
+                ttl_seconds: 1,
+                source: "guard".to_string(),
+            },
+        );
 
         assert!(cache.get("expired-key").is_none());
     }

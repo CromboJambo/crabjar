@@ -138,9 +138,7 @@ impl PodmanExecutor {
         }
 
         let output = self.run(&args)?;
-        let container_id = String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .to_string();
+        let container_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
         info!(
             container_id = %container_id,
@@ -177,11 +175,7 @@ impl PodmanExecutor {
     /// Remove a container (must be stopped first).
     pub fn remove_container(&self, container_id: &str) -> Result<(), PodmanError> {
         info!(container_id = %container_id, "removing podman container");
-        self.run(&[
-            "rm".to_string(),
-            "-f".to_string(),
-            container_id.to_string(),
-        ])?;
+        self.run(&["rm".to_string(), "-f".to_string(), container_id.to_string()])?;
         Ok(())
     }
 
@@ -206,10 +200,7 @@ impl PodmanExecutor {
 
     /// Inspect a container and return its JSON state.
     pub fn inspect_container(&self, container_id: &str) -> Result<Value, PodmanError> {
-        let output = self.run_json(&[
-            "inspect".to_string(),
-            container_id.to_string(),
-        ])?;
+        let output = self.run_json(&["inspect".to_string(), container_id.to_string()])?;
         Ok(output)
     }
 

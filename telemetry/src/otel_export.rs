@@ -4,12 +4,11 @@
 //! alongside the SQLite flight recorder (which remains the source of truth).
 
 use opentelemetry::{
-    global,
+    KeyValue, global,
     trace::{Span as _, SpanKind, Tracer as _, TracerProvider},
-    KeyValue,
 };
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{propagation::TraceContextPropagator, Resource};
+use opentelemetry_sdk::{Resource, propagation::TraceContextPropagator};
 use std::sync::Arc;
 
 /// Configuration for the OTel exporter.
@@ -52,12 +51,11 @@ impl OtelExporter {
         // Build tracer provider with batch exporter and service name resource
         let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
             .with_batch_exporter(exporter)
-            .with_resource(Resource::builder()
-                .with_attributes([KeyValue::new(
-                    "service.name",
-                    config.service_name.clone(),
-                )])
-                .build())
+            .with_resource(
+                Resource::builder()
+                    .with_attributes([KeyValue::new("service.name", config.service_name.clone())])
+                    .build(),
+            )
             .build();
 
         let tracer = provider.tracer("crabjar.telemetry");

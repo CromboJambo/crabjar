@@ -59,7 +59,8 @@ pub struct ObfuscationReport {
 
 /// Analyze JavaScript source code.
 pub fn analyze_js(path: &str) -> Result<AnalysisResult<JsAnalysis>, AnalyzeError> {
-    let source = fs::read_to_string(path).map_err(|_| AnalyzeError::FileNotFound(path.to_string()))?;
+    let source =
+        fs::read_to_string(path).map_err(|_| AnalyzeError::FileNotFound(path.to_string()))?;
     let size_bytes = source.len() as u64;
 
     // Extract imports
@@ -117,7 +118,8 @@ fn extract_imports(source: &str) -> Vec<String> {
     let mut imports = Vec::new();
 
     // ES6 import statements: import { x } from 'module', import x from 'module'
-    let re_import_from = Regex::new(r#"import\s+(?:\{[^}]+\}|[a-zA-Z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]"#).unwrap();
+    let re_import_from =
+        Regex::new(r#"import\s+(?:\{[^}]+\}|[a-zA-Z_$][\w$]*)\s+from\s+['"]([^'"]+)['"]"#).unwrap();
     for caps in re_import_from.captures_iter(source) {
         if let Some(module) = caps.get(1) {
             imports.push(module.as_str().to_string());
@@ -246,7 +248,7 @@ fn extract_classes(source: &str) -> Vec<ClassDecl> {
 
     // Find class declarations - look for class name and extends clause
     let re_class_header = Regex::new(r"class\s+(\w+)(?:\s+extends\s+(\w+))?\s*\{").unwrap();
-    
+
     for caps in re_class_header.captures_iter(source) {
         if let Some(name_cap) = caps.get(1) {
             let name = name_cap.as_str().to_string();
@@ -270,17 +272,19 @@ fn extract_classes(source: &str) -> Vec<ClassDecl> {
 
 fn extract_methods_for_class(source: &str) -> Vec<String> {
     let mut methods = Vec::new();
-    
+
     // Look for method patterns: name() { or async name() {
     // Stop when we hit another class declaration or end of input
     let re_method = Regex::new(r"(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{").unwrap();
-    
+
     // Find all method candidates
     for caps in re_method.captures_iter(source) {
         if let Some(name) = caps.get(1) {
             let name_str = name.as_str().to_string();
             // Skip constructor and keywords that aren't methods
-            if name_str != "constructor" && !["if", "else", "for", "while", "switch"].contains(&name_str.as_str()) {
+            if name_str != "constructor"
+                && !["if", "else", "for", "while", "switch"].contains(&name_str.as_str())
+            {
                 methods.push(name_str);
             }
         }
@@ -296,11 +300,26 @@ fn detect_globals(source: &str) -> Vec<String> {
 
     // Check for access to known global objects
     let global_names = [
-        "window", "document", "navigator", "location", "history",
-        "screen", "localStorage", "sessionStorage", "indexedDB",
-        "performance", "crypto", "setTimeout", "setInterval",
-        "clearTimeout", "clearInterval", "requestAnimationFrame",
-        "fetch", "WebSocket", "Worker", "BroadcastChannel",
+        "window",
+        "document",
+        "navigator",
+        "location",
+        "history",
+        "screen",
+        "localStorage",
+        "sessionStorage",
+        "indexedDB",
+        "performance",
+        "crypto",
+        "setTimeout",
+        "setInterval",
+        "clearTimeout",
+        "clearInterval",
+        "requestAnimationFrame",
+        "fetch",
+        "WebSocket",
+        "Worker",
+        "BroadcastChannel",
     ];
 
     for name in global_names {
@@ -322,9 +341,15 @@ fn detect_dom_apis(source: &str) -> Vec<String> {
     // Common DOM API patterns
     let dom_patterns = [
         ("getElementById", r"document\.getElementById"),
-        ("getElementsByClassName", r"document\.getElementsByClassName"),
+        (
+            "getElementsByClassName",
+            r"document\.getElementsByClassName",
+        ),
         ("querySelector", r"(?:document|element)\.querySelector"),
-        ("querySelectorAll", r"(?:document|element)\.querySelectorAll"),
+        (
+            "querySelectorAll",
+            r"(?:document|element)\.querySelectorAll",
+        ),
         ("addEventListener", r"\.addEventListener"),
         ("removeEventListener", r"\.removeEventListener"),
         ("createElement", r"document\.createElement"),

@@ -76,27 +76,29 @@ async fn main() {
         }) => {
             if let Some(t) = &target {
                 // Remote execution via SSH bastion (Phase 1 MVP)
-                match crabjar_ssh_bastion::execute_remote(
-                    t,
-                    &command,
-                    &args,
-                    None,
-                ).await {
+                match crabjar_ssh_bastion::execute_remote(t, &command, &args, None).await {
                     Ok(output) => serde_json::json!({
                         "success": true,
                         "target": t,
                         "output": output.trim()
                     }),
-                    Err(err) => error_response(
-                        &format!("remote execution failed on {}: {}", t, err),
-                        false,
-                    ),
+                    Err(err) => {
+                        error_response(&format!("remote execution failed on {}: {}", t, err), false)
+                    }
                 }
             } else {
                 // Local execution (existing behavior)
-                handle_exec(&command, &args, &cwd, &reason, dry_run, container, &otel_endpoint)
-                    .await
-                    .unwrap_or_else(|err| error_response(&err.to_string(), true))
+                handle_exec(
+                    &command,
+                    &args,
+                    &cwd,
+                    &reason,
+                    dry_run,
+                    container,
+                    &otel_endpoint,
+                )
+                .await
+                .unwrap_or_else(|err| error_response(&err.to_string(), true))
             }
         }
         Some(CliCommand::Bitwarden { command }) => handle_bitwarden_command(command)
@@ -115,28 +117,33 @@ async fn main() {
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Attempts { command }) => handle_attempts_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
-        Some(CliCommand::Decide { subcmd, observation, criteria_file }) => {
+        Some(CliCommand::Decide {
+            subcmd,
+            observation,
+            criteria_file,
+        }) => {
             let result = commands::semantic::handle(
                 &subcmd,
                 observation.as_deref(),
-                criteria_file.as_deref()
+                criteria_file.as_deref(),
             );
             match result {
                 Ok(json) => json,
                 Err(err) => error_response(&err.to_string(), true),
             }
-        },
+        }
         Some(CliCommand::SlowFriend { command }) => handle_slow_friend_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
-        Some(CliCommand::Learn { subcmd, min_invocations }) => {
+        Some(CliCommand::Learn {
+            subcmd,
+            min_invocations,
+        }) => {
             let analyzer = crabjar_lib::learning_loop::LearningAnalyzer::new();
             match subcmd.as_str() {
-                "analyze" => {
-                    match analyzer.generate_recommendations() {
-                        Ok(recommendations) => recommendations,
-                        Err(err) => error_response(&err.to_string(), true),
-                    }
-                }
+                "analyze" => match analyzer.generate_recommendations() {
+                    Ok(recommendations) => recommendations,
+                    Err(err) => error_response(&err.to_string(), true),
+                },
                 "training-candidates" => {
                     match analyzer.export_training_candidates(min_invocations) {
                         Ok(candidates) => json!({
@@ -148,18 +155,19 @@ async fn main() {
                         Err(err) => error_response(&err.to_string(), true),
                     }
                 }
-                "failure-patterns" => {
-                    match analyzer.identify_failure_patterns() {
-                        Ok(patterns) => json!({
-                            "success": true,
-                            "type": "failure_patterns",
-                            "patterns": patterns,
-                            "count": patterns.len()
-                        }),
-                        Err(err) => error_response(&err.to_string(), true),
-                    }
-                }
-                _ => error_response("Unknown learn subcommand. Use: analyze, training-candidates, failure-patterns", true),
+                "failure-patterns" => match analyzer.identify_failure_patterns() {
+                    Ok(patterns) => json!({
+                        "success": true,
+                        "type": "failure_patterns",
+                        "patterns": patterns,
+                        "count": patterns.len()
+                    }),
+                    Err(err) => error_response(&err.to_string(), true),
+                },
+                _ => error_response(
+                    "Unknown learn subcommand. Use: analyze, training-candidates, failure-patterns",
+                    true,
+                ),
             }
         }
         Some(CliCommand::Session { command }) => {
@@ -636,11 +644,10 @@ fn handle_habitat_command(
                 crabjar_lib::habitat_contract::read_theory_status(&db_path, &theory);
 
             // Read real Hermes kanban tasks from all boards
-            let kanban_tasks = crabjar_lib::kanban_source::read_all_tasks()
-                .unwrap_or_else(|err| {
-                    eprintln!("Warning: failed to read kanban tasks: {}", err);
-                    vec![]
-                });
+            let kanban_tasks = crabjar_lib::kanban_source::read_all_tasks().unwrap_or_else(|err| {
+                eprintln!("Warning: failed to read kanban tasks: {}", err);
+                vec![]
+            });
 
             let contract = crabjar_lib::habitat_contract::build_contract(
                 &queue,
@@ -881,7 +888,8 @@ async fn handle_exec(
             flight_recorder.init()?;
 
             // Enable OTel export if endpoint provided (CLI flag or env var)
-            let otel_endpoint = std::env::var("CRABJAR_OTEL_ENDPOINT").unwrap_or_else(|_| String::new());
+            let otel_endpoint =
+                std::env::var("CRABJAR_OTEL_ENDPOINT").unwrap_or_else(|_| String::new());
             let effective_otel = if !otel_endpoint.is_empty() {
                 otel_endpoint
             } else {
@@ -1078,7 +1086,10 @@ fn execute_in_podman_container(
     };
 
     // Build sandbox config for isolated execution
-    let agent_name = format!("agent-{}", uuid::Uuid::new_v4().to_string()[..8].to_string());
+    let agent_name = format!(
+        "agent-{}",
+        uuid::Uuid::new_v4().to_string()[..8].to_string()
+    );
     let mut sandbox = crabjar_podman::SandboxConfig::new(&agent_name, vec![command.to_string()]);
     sandbox.command.extend(args.iter().cloned());
     sandbox.working_dir = cwd.to_string();
@@ -1160,7 +1171,8 @@ fn handle_guard_command(
             }))
         }
         GuardCommand::Reject { action_id, reason } => {
-            let resolved = guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::Denied)?;
+            let resolved =
+                guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::Denied)?;
             // Non-existent IDs are no-ops (success:true with not_found status)
             Ok(json!({
                 "success": true,
@@ -1473,7 +1485,11 @@ fn handle_attempts_command(
                 })),
             }
         }
-        AttemptsCommand::Submit { intent, command, queue_path } => {
+        AttemptsCommand::Submit {
+            intent,
+            command,
+            queue_path,
+        } => {
             let path = std::path::Path::new(&queue_path);
             let mut queue = crabjar_terminal::TriageQueue::load(path)
                 .unwrap_or_else(|_| crabjar_terminal::TriageQueue::new(10));
@@ -1523,9 +1539,14 @@ fn handle_attempts_command(
 }
 
 /// Handle slow friend daemon commands (EXPL-005)
-fn handle_slow_friend_command(command: SlowFriendCommand) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+fn handle_slow_friend_command(
+    command: SlowFriendCommand,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     match command {
-        SlowFriendCommand::Start { tick_interval, sleep_after_quiet } => {
+        SlowFriendCommand::Start {
+            tick_interval,
+            sleep_after_quiet,
+        } => {
             // Daemon mode: report configuration and readiness
             Ok(json!({
                 "success": true,
@@ -1542,7 +1563,7 @@ fn handle_slow_friend_command(command: SlowFriendCommand) -> Result<serde_json::
                     ]
                 }
             }))
-        },
+        }
         SlowFriendCommand::Check => {
             // Single sensor check and report
             Ok(json!({
@@ -1554,16 +1575,20 @@ fn handle_slow_friend_command(command: SlowFriendCommand) -> Result<serde_json::
                     "status": "no_sensors_configured"
                 }
             }))
-        },
+        }
         SlowFriendCommand::Autonomy { class } => {
             // Show autonomy tracker status
             let tracker = crabjar_slow_friend::AutonomyTracker::new();
-            
+
             if let Some(class_name) = class {
                 // Map string back to ActionClass enum (simplified for CLI)
                 let permission = match class_name.as_str() {
-                    "disk-cleanup" | "disk_cleanup" => tracker.autonomy_level(&ActionClass::DiskCleanup),
-                    "restart-service" | "restart_service" => tracker.autonomy_level(&ActionClass::RestartService),
+                    "disk-cleanup" | "disk_cleanup" => {
+                        tracker.autonomy_level(&ActionClass::DiskCleanup)
+                    }
+                    "restart-service" | "restart_service" => {
+                        tracker.autonomy_level(&ActionClass::RestartService)
+                    }
                     _ => AutonomyLevel::Ask,
                 };
                 Ok(json!({
@@ -1586,7 +1611,7 @@ fn handle_slow_friend_command(command: SlowFriendCommand) -> Result<serde_json::
                     }
                 }))
             }
-        },
+        }
     }
 }
 

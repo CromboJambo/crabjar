@@ -8,8 +8,8 @@ use axum::{
     routing::post,
 };
 use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
-use futures_util::stream;
 use futures_util::StreamExt;
+use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -25,7 +25,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -1329,7 +1329,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/acp/search_logs", post(search_logs))
         .route("/acp/recent_events", post(recent_events))
         .route("/acp/by_source", post(by_source))
-        .route("/acp/events/subscribe", axum::routing::get(subscribe_events))
+        .route(
+            "/acp/events/subscribe",
+            axum::routing::get(subscribe_events),
+        )
         .route("/acp/events/publish", post(publish_event))
         .with_state(state);
 

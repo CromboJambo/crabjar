@@ -1,10 +1,10 @@
-use crate::reflection::{process_findings, generate_reflection};
+use crate::reflection::{generate_reflection, process_findings};
 use serde_json::Value;
 
 /// Benchmark PR with known issues (ground truth).
 pub struct BenchmarkPR {
     pub name: String,
-    pub findings: Vec<Value>, // Raw agent findings for this PR
+    pub findings: Vec<Value>,           // Raw agent findings for this PR
     pub expected_rule_ids: Vec<String>, // rule_ids that should be found (ground truth)
 }
 
@@ -54,7 +54,8 @@ fn evaluate_pr(pr: &BenchmarkPR) -> BenchmarkResults {
     let processed = process_findings(&pr.findings);
 
     // Extract rule_ids from processed findings
-    let found_rule_ids: Vec<String> = processed.iter()
+    let found_rule_ids: Vec<String> = processed
+        .iter()
         .filter_map(|f| f["rule_id"].as_str().map(String::from))
         .collect();
 
@@ -101,9 +102,12 @@ pub fn run_all_benchmarks(prs: &[BenchmarkPR]) -> Vec<BenchmarkResults> {
     let total_fp: usize = all_results.iter().map(|r| r.false_positives).sum();
     let total_fn: usize = all_results.iter().map(|r| r.false_negatives).sum();
 
-    let avg_precision: f64 = all_results.iter().map(|r| r.precision).sum::<f64>() / all_results.len() as f64;
-    let avg_recall: f64 = all_results.iter().map(|r| r.recall).sum::<f64>() / all_results.len() as f64;
-    let avg_f1: f64 = all_results.iter().map(|r| r.f1_score).sum::<f64>() / all_results.len() as f64;
+    let avg_precision: f64 =
+        all_results.iter().map(|r| r.precision).sum::<f64>() / all_results.len() as f64;
+    let avg_recall: f64 =
+        all_results.iter().map(|r| r.recall).sum::<f64>() / all_results.len() as f64;
+    let avg_f1: f64 =
+        all_results.iter().map(|r| r.f1_score).sum::<f64>() / all_results.len() as f64;
 
     println!("\n=== Benchmark Summary ===");
     println!("PRs tested: {}", prs.len());

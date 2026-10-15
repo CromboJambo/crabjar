@@ -2,11 +2,10 @@
 ///
 /// Detects available resources at session start and adapts agent behavior
 /// (tool selection, parallelism, fallback strategies) based on actual capabilities.
-
 use std::fs;
 use std::path::PathBuf;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// System capability profile detected at runtime.
 #[derive(Clone, Debug)]
@@ -33,7 +32,11 @@ impl EnvironmentDetector {
     /// Detect system capabilities at session start.
     pub fn detect(&mut self) -> Result<EnvironmentProfile, String> {
         let gpu_available = self.check_gpu()?;
-        let gpu_model = if gpu_available { self.get_gpu_model() } else { None };
+        let gpu_model = if gpu_available {
+            self.get_gpu_model()
+        } else {
+            None
+        };
         let cpu_cores = self.get_cpu_cores();
         let memory_gb = self.get_memory_gb();
         let disk_free_gb = self.get_disk_free_gb();
@@ -182,7 +185,7 @@ impl EnvironmentDetector {
                     })
                 }
             }
-            _ => json!({"primary": "default", "reason": "No specific recommendation"})
+            _ => json!({"primary": "default", "reason": "No specific recommendation"}),
         }
     }
 
@@ -190,11 +193,9 @@ impl EnvironmentDetector {
     pub fn check_for_changes(&mut self) -> Result<bool, String> {
         let new_profile = self.detect()?;
         match &self.profile {
-            Some(old) => {
-                Ok(new_profile.gpu_available != old.gpu_available ||
-                   new_profile.cpu_cores != old.cpu_cores ||
-                   new_profile.network_available != old.network_available)
-            }
+            Some(old) => Ok(new_profile.gpu_available != old.gpu_available
+                || new_profile.cpu_cores != old.cpu_cores
+                || new_profile.network_available != old.network_available),
             None => Ok(false),
         }
     }

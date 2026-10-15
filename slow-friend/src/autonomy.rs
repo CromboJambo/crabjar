@@ -94,8 +94,7 @@ impl AutonomyTracker {
             0.0
         };
 
-        record.permission = if record.approved >= self.autonomous_threshold
-            && approval_ratio >= 0.9
+        record.permission = if record.approved >= self.autonomous_threshold && approval_ratio >= 0.9
         {
             PermissionLevel::Autonomous
         } else if record.approved >= self.propose_threshold && approval_ratio >= 0.75 {
@@ -147,9 +146,12 @@ mod tests {
                 description: "Test".to_string(),
                 parameters: serde_json::json!({}),
             };
-            tracker.record_outcome(&action, &ActionResult::Success {
-                details: "ok".to_string(),
-            });
+            tracker.record_outcome(
+                &action,
+                &ActionResult::Success {
+                    details: "ok".to_string(),
+                },
+            );
         }
 
         assert_eq!(

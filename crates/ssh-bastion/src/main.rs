@@ -4,13 +4,13 @@
 // Routes by port: each target gets its own listener port
 // Supports multiple users (hermes, crombo) with pass-through auth
 
+use russh::server::Server as _;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
-use russh::server::Server as _;
 
 /// Load persistent host key for the bastion (avoids host-key mismatch on restart)
 fn load_bastion_key() -> russh::keys::PrivateKey {
@@ -21,7 +21,11 @@ fn load_bastion_key() -> russh::keys::PrivateKey {
             key
         }
         Err(e) => {
-            warn!("Failed to load bastion key from {}: {} (using random fallback)", key_path.display(), e);
+            warn!(
+                "Failed to load bastion key from {}: {} (using random fallback)",
+                key_path.display(),
+                e
+            );
             let mut rng = rand::rng();
             russh::keys::PrivateKey::random(&mut rng, russh::keys::Algorithm::Ed25519).unwrap()
         }
@@ -105,10 +109,7 @@ impl russh::server::Handler for Bastion {
         Ok(russh::server::Auth::Accept)
     }
 
-    async fn auth_none(
-        &mut self,
-        user: &str,
-    ) -> Result<russh::server::Auth, Self::Error> {
+    async fn auth_none(&mut self, user: &str) -> Result<russh::server::Auth, Self::Error> {
         if self.auth_user.is_empty() {
             self.auth_user = user.to_string();
         }
@@ -124,16 +125,23 @@ impl russh::server::Handler for Bastion {
     ) -> Result<(), Self::Error> {
         let client_id = self.id;
 
-        info!("Channel open session: {} -> {}", channel.id(), self.target.host);
+        info!(
+            "Channel open session: {} -> {}",
+            channel.id(),
+            self.target.host
+        );
 
         // Store client state — wait for shell/exec request before connecting to target
         {
             let mut clients_lock = self.clients.lock().await;
-            clients_lock.insert(client_id, ClientState {
-                channel_id: channel.id(),
-                server_handle: session.handle(),
-                user: String::new(),  // Will be set on shell/exec
-            });
+            clients_lock.insert(
+                client_id,
+                ClientState {
+                    channel_id: channel.id(),
+                    server_handle: session.handle(),
+                    user: String::new(), // Will be set on shell/exec
+                },
+            );
         }
 
         reply.accept().await;
@@ -156,14 +164,20 @@ impl russh::server::Handler for Bastion {
             self.target.user.clone()
         };
 
-        info!("Client requested interactive shell on channel {} -> {} as {}", channel, host, user);
+        info!(
+            "Client requested interactive shell on channel {} -> {} as {}",
+            channel, host, user
+        );
 
         match connect_to_target(&host, port, &user, &self.key_path).await {
             Ok((mut target_session, mut outbound_channel)) => {
                 info!("Outbound connection established to {}", host);
 
                 // Request PTY for interactive shell
-                if let Err(e) = outbound_channel.request_pty(false, "xterm-256color", 80, 24, 0, 0, &[]).await {
+                if let Err(e) = outbound_channel
+                    .request_pty(false, "xterm-256color", 80, 24, 0, 0, &[])
+                    .await
+                {
                     warn!("Failed to request PTY: {}", e);
                 }
 
@@ -224,13 +238,16 @@ impl russh::server::Handler for Bastion {
             let clients_lock = self.clients.lock().await;
             match clients_lock.get(&self.id) {
                 Some(state) if !state.user.is_empty() => state.user.clone(),
-                _ => self.target.user.clone(),  // Fallback to config default
+                _ => self.target.user.clone(), // Fallback to config default
             }
         };
 
         let cmd_str = String::from_utf8_lossy(cmd).to_string();
 
-        info!("Client requested exec on channel {} -> {} as {}: {}", channel, host, user, cmd_str);
+        info!(
+            "Client requested exec on channel {} -> {} as {}: {}",
+            channel, host, user, cmd_str
+        );
 
         match connect_to_target(&host, port, &user, &self.key_path).await {
             Ok((target_session, mut outbound_channel)) => {
@@ -304,8 +321,17 @@ async fn connect_to_target(
     port: u16,
     user: &str,
     key_path: &PathBuf,
-) -> anyhow::Result<(russh::client::Handle<OutboundHandler>, russh::Channel<russh::client::Msg>)> {
-    info!("Connecting to {}@{}:{} with key {}", user, host, port, key_path.display());
+) -> anyhow::Result<(
+    russh::client::Handle<OutboundHandler>,
+    russh::Channel<russh::client::Msg>,
+)> {
+    info!(
+        "Connecting to {}@{}:{} with key {}",
+        user,
+        host,
+        port,
+        key_path.display()
+    );
 
     let key = russh::keys::load_secret_key(key_path, None)?;
 
@@ -315,13 +341,14 @@ async fn connect_to_target(
     };
     let config = Arc::new(config);
 
-    let mut session = russh::client::connect(config, (host.to_string(), port), OutboundHandler {}).await?;
+    let mut session =
+        russh::client::connect(config, (host.to_string(), port), OutboundHandler {}).await?;
     info!("Connected to {}", host);
 
     let auth_result = session
         .authenticate_publickey(
             user.to_string(),
-            russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None)
+            russh::keys::PrivateKeyWithHashAlg::new(Arc::new(key), None),
         )
         .await?;
 
@@ -359,15 +386,16 @@ async fn spawn_bastion(
     let config = russh::server::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
         auth_rejection_time: std::time::Duration::from_secs(3),
-        keys: vec![
-            load_bastion_key(),
-        ],
+        keys: vec![load_bastion_key()],
         ..Default::default()
     };
     let config = Arc::new(config);
 
     let bastion_target = target.clone();
-    info!("Bastion for {} listening on 0.0.0.0:{}", target.host, listen_port);
+    info!(
+        "Bastion for {} listening on 0.0.0.0:{}",
+        target.host, listen_port
+    );
     let mut bastion = Bastion::new(key_path, target);
     let socket = TcpListener::bind(("0.0.0.0", listen_port)).await?;
 
@@ -391,9 +419,30 @@ async fn main() {
     // Define all targets with their bastion ports
     // User is crombo for now; later hermes/crabjar users will have their own routing
     let targets: Vec<(u16, TargetConfig)> = vec![
-        (2201, TargetConfig { host: "192.168.50.181".to_string(), port: 22, user: "crombo".to_string() }), // jambo
-        (2202, TargetConfig { host: "192.168.50.163".to_string(), port: 22, user: "crombo".to_string() }), // ftw3
-        (2203, TargetConfig { host: "192.168.50.229".to_string(), port: 22, user: "crombo".to_string() }), // artix-box
+        (
+            2201,
+            TargetConfig {
+                host: "192.168.50.181".to_string(),
+                port: 22,
+                user: "crombo".to_string(),
+            },
+        ), // jambo
+        (
+            2202,
+            TargetConfig {
+                host: "192.168.50.163".to_string(),
+                port: 22,
+                user: "crombo".to_string(),
+            },
+        ), // ftw3
+        (
+            2203,
+            TargetConfig {
+                host: "192.168.50.229".to_string(),
+                port: 22,
+                user: "crombo".to_string(),
+            },
+        ), // artix-box
     ];
 
     for (port, target) in targets {

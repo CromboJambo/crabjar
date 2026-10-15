@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_json::Value;
+use std::collections::HashMap;
 
 /// Deduplicate findings: merge findings that refer to the same code location with similar descriptions.
 pub fn deduplicate_findings(findings: &[Value]) -> Vec<Value> {
@@ -16,7 +16,12 @@ pub fn deduplicate_findings(findings: &[Value]) -> Vec<Value> {
         let description = finding["description"].as_str().unwrap_or("").to_lowercase();
 
         // Create a dedup key: file + line (within 5 lines) + description similarity
-        let key = format!("{}:{}:{}", file, line / 5, description.chars().take(30).collect::<String>());
+        let key = format!(
+            "{}:{}:{}",
+            file,
+            line / 5,
+            description.chars().take(30).collect::<String>()
+        );
 
         if !seen.contains_key(&key) {
             seen.insert(key, true);

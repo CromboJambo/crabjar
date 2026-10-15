@@ -211,7 +211,7 @@ pub fn parse_diff(repo_path: &Path, diff_text: &str) -> Result<Vec<ChangedFile>,
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use tempfile::TempDir;
 
     #[test]

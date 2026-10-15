@@ -41,12 +41,16 @@ pub fn analyze_dotnet(path: &str) -> Result<AnalysisResult<DotnetAnalysis>, Anal
 
     // Parse PE header
     if bytes.len() < 64 {
-        return Err(AnalyzeError::InvalidFormat("file too small for PE format".to_string()));
+        return Err(AnalyzeError::InvalidFormat(
+            "file too small for PE format".to_string(),
+        ));
     }
 
     // Check DOS header signature (MZ)
     if &bytes[0..2] != [0x4D, 0x5A] {
-        return Err(AnalyzeError::InvalidFormat("not a PE file (missing MZ signature)".to_string()));
+        return Err(AnalyzeError::InvalidFormat(
+            "not a PE file (missing MZ signature)".to_string(),
+        ));
     }
 
     // PE header offset is at DOS header +60 (e_lfanew)
@@ -57,26 +61,29 @@ pub fn analyze_dotnet(path: &str) -> Result<AnalysisResult<DotnetAnalysis>, Anal
     }
 
     // Check PE signature (PE\0\0)
-    if &bytes[pe_offset..pe_offset+4] != [0x50, 0x45, 0x00, 0x00] {
-        return Err(AnalyzeError::InvalidFormat("invalid PE signature".to_string()));
+    if &bytes[pe_offset..pe_offset + 4] != [0x50, 0x45, 0x00, 0x00] {
+        return Err(AnalyzeError::InvalidFormat(
+            "invalid PE signature".to_string(),
+        ));
     }
 
     // Parse COFF header (starts at pe_offset + 4)
     let coff_offset = pe_offset + 4;
-    let machine_type_raw = u16::from_le_bytes([bytes[coff_offset], bytes[coff_offset+1]]);
+    let machine_type_raw = u16::from_le_bytes([bytes[coff_offset], bytes[coff_offset + 1]]);
     let machine_type = match machine_type_raw {
         0x8664 => "x64",
         0x14c => "x86",
         0xAA64 => "ARM64",
         _ => "unknown",
-    }.to_string();
+    }
+    .to_string();
 
     // Entry point RVA is at coff_offset + 16
     let entry_point_rva = u32::from_le_bytes([
         bytes[coff_offset + 16],
         bytes[coff_offset + 17],
         bytes[coff_offset + 18],
-        bytes[coff_offset + 19]
+        bytes[coff_offset + 19],
     ]);
 
     // Try to detect CLR version by looking for .NET metadata markers
@@ -114,7 +121,10 @@ pub fn analyze_dotnet(path: &str) -> Result<AnalysisResult<DotnetAnalysis>, Anal
 
 fn detect_clr_version(bytes: &[u8]) -> Option<String> {
     // Look for .NET runtime version strings in the binary
-    if bytes.windows(26).any(|w| w == b".NETFramework,Version=v4.8") {
+    if bytes
+        .windows(26)
+        .any(|w| w == b".NETFramework,Version=v4.8")
+    {
         return Some("4.8".to_string());
     }
     if bytes.windows(24).any(|w| w == b".NETCoreApp,Version=v3.1") {
@@ -157,7 +167,12 @@ fn enumerate_types(bytes: &[u8]) -> Vec<DotnetType> {
                 let name_bytes = &bytes[start..j];
                 let name = String::from_utf8_lossy(name_bytes).to_string();
                 // Filter to plausible type names (start with uppercase, contain at least one lowercase)
-                if name.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+                if name
+                    .chars()
+                    .next()
+                    .map(|c| c.is_uppercase())
+                    .unwrap_or(false)
+                {
                     if name.chars().any(|c| c.is_lowercase()) {
                         types.push(DotnetType {
                             name,

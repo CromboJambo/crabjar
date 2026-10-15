@@ -10,10 +10,10 @@
 
 use futures_util::stream::StreamExt;
 use gpui::{
-    div, prelude::*, px, rgb, size, App, Application, Bounds, Context, IntoElement, ParentElement,
-    Render, Window, WindowBounds, WindowOptions, FontWeight,
+    App, Application, Bounds, Context, FontWeight, IntoElement, ParentElement, Render, Window,
+    WindowBounds, WindowOptions, div, prelude::*, px, rgb, size,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{ChildStdin, ChildStdout, Command, Stdio};
 
@@ -30,7 +30,11 @@ struct CommandRequest {
 
 impl CommandRequest {
     fn new(id: u64, method: &str, params: Option<Value>) -> Self {
-        Self { id, method: method.to_string(), params }
+        Self {
+            id,
+            method: method.to_string(),
+            params,
+        }
     }
 
     fn to_json(&self) -> String {
@@ -57,7 +61,10 @@ impl CommandResponse {
         Some(Self {
             id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
             result: v.get("result").cloned(),
-            error: v.get("error").and_then(|x| x.as_str()).map(|s| s.to_string()),
+            error: v
+                .get("error")
+                .and_then(|x| x.as_str())
+                .map(|s| s.to_string()),
         })
     }
 }
@@ -88,7 +95,15 @@ impl OrchestratorConnection {
     /// Spawn the terrarium plugin in JSON-RPC mode.
     fn spawn() -> anyhow::Result<Self> {
         let mut child = Command::new("cargo")
-            .args(["run", "-p", "crabjar-app-terrarium", "--bin", "crabjar-terrarium-plugin", "--", "stdio"])
+            .args([
+                "run",
+                "-p",
+                "crabjar-app-terrarium",
+                "--bin",
+                "crabjar-terrarium-plugin",
+                "--",
+                "stdio",
+            ])
             .current_dir("/home/crombo/projects/active/crabjar")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -117,8 +132,10 @@ impl OrchestratorConnection {
         let mut line = String::new();
         self.stdout_reader.read_line(&mut line)?;
 
-        let response = CommandResponse::parse(line.trim())
-            .ok_or(anyhow::anyhow!("Invalid JSON-RPC response: {}", line.trim()))?;
+        let response = CommandResponse::parse(line.trim()).ok_or(anyhow::anyhow!(
+            "Invalid JSON-RPC response: {}",
+            line.trim()
+        ))?;
 
         if let Some(error) = response.error {
             return Err(anyhow::anyhow!("JSON-RPC error: {}", error));
@@ -166,7 +183,7 @@ async fn subscribe_to_entity_events(
     tx: tokio::sync::mpsc::Sender<Vec<EntityInfo>>,
 ) {
     let url = format!("{}/acp/events/subscribe", orchestrator_url);
-    
+
     match reqwest::get(&url).await {
         Ok(response) => {
             if !response.status().is_success() {
@@ -175,24 +192,26 @@ async fn subscribe_to_entity_events(
             }
 
             let mut stream = response.bytes_stream();
-            
+
             while let Some(chunk) = stream.next().await {
                 match chunk {
                     Ok(bytes) => {
                         let text = String::from_utf8_lossy(&bytes);
-                        
+
                         // Parse SSE data lines
                         for line in text.lines() {
                             if line.starts_with("data: ") {
                                 let json_str = &line[6..];
-                                
+
                                 // Skip keepalive
                                 if json_str == "{\"type\":\"keepalive\"}" {
                                     continue;
                                 }
-                                
+
                                 if let Ok(event) = serde_json::from_str::<Value>(json_str) {
-                                    if event.get("type").and_then(|v| v.as_str()) == Some("entity_state") {
+                                    if event.get("type").and_then(|v| v.as_str())
+                                        == Some("entity_state")
+                                    {
                                         // Send parsed entities to the channel
                                         let entities = parse_entity_event(&event);
                                         if tx.send(entities).await.is_err() {
@@ -218,7 +237,7 @@ async fn subscribe_to_entity_events(
 
 fn parse_entity_event(event: &Value) -> Vec<EntityInfo> {
     let mut entities = Vec::new();
-    
+
     if let Some(array) = event.get("entities").and_then(|v| v.as_array()) {
         for item in array {
             let id = item
@@ -238,7 +257,7 @@ fn parse_entity_event(event: &Value) -> Vec<EntityInfo> {
             });
         }
     }
-    
+
     entities
 }
 
@@ -275,12 +294,17 @@ impl Render for DashboardView {
             .bg(gpui::black())
             .text_color(gpui::white())
             .child(
-                div().flex().items_center().gap_2().child("🦀 crabjar-gpui").child(
-                    div()
-                        .text_sm()
-                        .text_color(rgb(0x999999))
-                        .child(format!("({})", self.status_message)),
-                ),
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child("🦀 crabjar-gpui")
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(rgb(0x999999))
+                            .child(format!("({})", self.status_message)),
+                    ),
             )
             .child(div().border_1().border_color(rgb(0x4d4d4d)).w_full())
             .child(
@@ -329,45 +353,52 @@ fn main() {
         // Spawn orchestrator connection and update loop using cx.spawn (not std thread)
         let window_handle = window;
         let any_window: gpui::AnyWindowHandle = window_handle.into();
-        
+
         // Start terrarium plugin via JSON-RPC
-        let spawn_task = cx.spawn(async move |cx| {
-            match OrchestratorConnection::spawn() {
-                Ok(mut conn) => {
-                    eprintln!("Terrarium plugin spawned successfully");
-                    
-                    // Send start command to begin simulation
-                    if let Err(e) = conn.request("terrarium/start", None) {
-                        eprintln!("Failed to start terrarium: {}", e);
+        let spawn_task = cx
+            .spawn(async move |cx| {
+                match OrchestratorConnection::spawn() {
+                    Ok(mut conn) => {
+                        eprintln!("Terrarium plugin spawned successfully");
+
+                        // Send start command to begin simulation
+                        if let Err(e) = conn.request("terrarium/start", None) {
+                            eprintln!("Failed to start terrarium: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to spawn terrarium: {}", e);
                     }
                 }
-                Err(e) => {
-                    eprintln!("Failed to spawn terrarium: {}", e);
-                }
-            }
-        }).detach();
+            })
+            .detach();
 
         // Subscribe to live entity events via SSE
-        let orchestrator_url = std::env::var("ORCHESTRATOR_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
-        
+        let orchestrator_url = std::env::var("ORCHESTRATOR_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
+
         // Create channel for SSE events to communicate with the UI thread
         let (entity_tx, mut entity_rx) = tokio::sync::mpsc::channel::<Vec<EntityInfo>>(100);
-        
+
         cx.spawn(async move |cx| {
             eprintln!("Subscribing to entity events at {}", orchestrator_url);
             subscribe_to_entity_events(&orchestrator_url, entity_tx).await;
-        }).detach();
+        })
+        .detach();
 
         // Listen for entity updates on the UI thread
         let window_handle = window;
         cx.spawn(async move |cx| {
             while let Some(entities) = entity_rx.recv().await {
-                window_handle.update(cx, move |dash: &mut DashboardView, _, _| {
-                    dash.set_status("Live");
-                    dash.update_entities(entities);
-                }).ok();
+                window_handle
+                    .update(cx, move |dash: &mut DashboardView, _, _| {
+                        dash.set_status("Live");
+                        dash.update_entities(entities);
+                    })
+                    .ok();
             }
-        }).detach();
+        })
+        .detach();
 
         cx.activate(true);
     });

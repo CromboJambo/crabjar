@@ -22,7 +22,10 @@ impl ToolCallTracker {
 
     /// Record a tool call for a bundle. Returns Ok(()) if within limit, Err if exceeded.
     pub fn record_call(&mut self, bundle_id: &str) -> Result<()> {
-        let count = self.calls_per_bundle.entry(bundle_id.to_string()).or_insert(0);
+        let count = self
+            .calls_per_bundle
+            .entry(bundle_id.to_string())
+            .or_insert(0);
         *count += 1;
         if *count > self.limit {
             anyhow::bail!(
@@ -44,7 +47,8 @@ impl ToolCallTracker {
 
 /// Read a file's contents for context retrieval.
 pub fn read_file_at_path(path: &Path) -> Result<String> {
-    fs::read_to_string(path).map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))
+    fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))
 }
 
 /// Search the codebase for a pattern (simplified grep-like search).
@@ -71,13 +75,19 @@ fn search_dir(dir: &Path, pattern: &str, results: &mut Vec<String>) -> Result<()
                 continue;
             }
             search_dir(&path, pattern, results)?;
-        } else if path.extension().map_or(false, |ext| {
-            ext == "rs" || ext == "toml" || ext == "md"
-        }) {
+        } else if path
+            .extension()
+            .map_or(false, |ext| ext == "rs" || ext == "toml" || ext == "md")
+        {
             if let Ok(content) = fs::read_to_string(&path) {
                 for (line_num, line) in content.lines().enumerate() {
                     if line.contains(pattern) {
-                        results.push(format!("{}:{}: {}", path.display(), line_num + 1, line.trim()));
+                        results.push(format!(
+                            "{}:{}: {}",
+                            path.display(),
+                            line_num + 1,
+                            line.trim()
+                        ));
                     }
                 }
             }

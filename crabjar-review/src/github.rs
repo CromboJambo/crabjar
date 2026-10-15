@@ -1,5 +1,5 @@
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// GitHub API client for posting review comments and summaries.
 pub struct GithubClient {
@@ -24,7 +24,10 @@ impl GithubClient {
     }
 
     fn api_url(&self, path: &str) -> String {
-        format!("https://api.github.com/repos/{}/{}{}", self.owner, self.repo, path)
+        format!(
+            "https://api.github.com/repos/{}/{}{}",
+            self.owner, self.repo, path
+        )
     }
 
     /// Post a single review comment on a specific line.
@@ -43,7 +46,8 @@ impl GithubClient {
             "body": format!("**[{}]** {}", severity.to_uppercase(), body),
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github+json")
@@ -53,7 +57,10 @@ impl GithubClient {
             .map_err(|e| format!("Request failed: {}", e))?;
 
         let status = response.status();
-        let body = response.json::<Value>().await.map_err(|e| format!("JSON parse failed: {}", e))?;
+        let body = response
+            .json::<Value>()
+            .await
+            .map_err(|e| format!("JSON parse failed: {}", e))?;
 
         if !status.is_success() {
             return Err(format!("GitHub API error {}: {:?}", status, body));
@@ -63,7 +70,11 @@ impl GithubClient {
     }
 
     /// Post a review summary as a top-level PR comment.
-    pub async fn post_review_summary(&self, summary: &str, findings_count: usize) -> Result<Value, String> {
+    pub async fn post_review_summary(
+        &self,
+        summary: &str,
+        findings_count: usize,
+    ) -> Result<Value, String> {
         let url = self.api_url(&format!("/pulls/{}/reviews", self.pr_number));
 
         let payload = json!({
@@ -74,7 +85,8 @@ impl GithubClient {
             "event": "COMMENT",
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.token))
             .header("Accept", "application/vnd.github+json")
@@ -84,7 +96,10 @@ impl GithubClient {
             .map_err(|e| format!("Request failed: {}", e))?;
 
         let status = response.status();
-        let body = response.json::<Value>().await.map_err(|e| format!("JSON parse failed: {}", e))?;
+        let body = response
+            .json::<Value>()
+            .await
+            .map_err(|e| format!("JSON parse failed: {}", e))?;
 
         if !status.is_success() {
             return Err(format!("GitHub API error {}: {:?}", status, body));
@@ -94,10 +109,7 @@ impl GithubClient {
     }
 
     /// Post all findings as review comments.
-    pub async fn post_all_findings(
-        &self,
-        findings: &[Value],
-    ) -> Result<Vec<Value>, String> {
+    pub async fn post_all_findings(&self, findings: &[Value]) -> Result<Vec<Value>, String> {
         let results = Vec::new();
 
         for finding in findings {
@@ -110,7 +122,10 @@ impl GithubClient {
                 continue;
             }
 
-            if let Err(_e) = self.post_review_comment(file, line, description, severity).await {
+            if let Err(_e) = self
+                .post_review_comment(file, line, description, severity)
+                .await
+            {
                 eprintln!("Warning: failed to post comment on {}:{}", file, line);
             } else {
                 // success

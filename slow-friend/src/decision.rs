@@ -59,10 +59,9 @@ impl JevEngine for RuleBasedJevEngine {
                 "Severity {} below action threshold or non-disk event",
                 interpretation.severity
             ),
-            JevDecision::Execute(action) => format!(
-                "High severity disk event; proposing {}",
-                action.description
-            ),
+            JevDecision::Execute(action) => {
+                format!("High severity disk event; proposing {}", action.description)
+            }
         }
     }
 }

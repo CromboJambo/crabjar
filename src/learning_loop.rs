@@ -2,12 +2,11 @@
 ///
 /// Reads ~/.crabjar/skill-instrumentation.jsonl, computes skill health metrics,
 /// identifies failure patterns, and generates actionable recommendations.
-
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Skill health metrics computed from invocation logs.
 pub struct SkillHealth {
@@ -44,31 +43,35 @@ impl LearningAnalyzer {
         let mut health_map: HashMap<String, SkillHealth> = HashMap::new();
 
         for line in content.lines() {
-            let event: Value = serde_json::from_str(line).map_err(|e| {
-                format!("Failed to parse event line: {} (error: {})", line, e)
-            })?;
+            let event: Value = serde_json::from_str(line)
+                .map_err(|e| format!("Failed to parse event line: {} (error: {})", line, e))?;
 
             if event["type"] != "skill_invocation" {
                 continue;
             }
 
-            let skill_name = event["skill_name"].as_str().unwrap_or("unknown").to_string();
+            let skill_name = event["skill_name"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string();
             let success = event["success"].as_bool().unwrap_or(false);
             let duration_ms = event["duration_ms"].as_u64().unwrap_or(0);
             let error_type = event["error_type"].as_str().unwrap_or("");
             let timestamp = event["timestamp"].as_str().unwrap_or("").to_string();
 
-            let health = health_map.entry(skill_name.clone()).or_insert_with(|| SkillHealth {
-                name: skill_name,
-                invocations: 0,
-                successes: 0,
-                failures: 0,
-                success_rate: 0.0,
-                avg_duration_ms: 0,
-                total_duration_ms: 0,
-                error_types: HashMap::new(),
-                last_invoked: String::new(),
-            });
+            let health = health_map
+                .entry(skill_name.clone())
+                .or_insert_with(|| SkillHealth {
+                    name: skill_name,
+                    invocations: 0,
+                    successes: 0,
+                    failures: 0,
+                    success_rate: 0.0,
+                    avg_duration_ms: 0,
+                    total_duration_ms: 0,
+                    error_types: HashMap::new(),
+                    last_invoked: String::new(),
+                });
 
             health.invocations += 1;
             health.total_duration_ms += duration_ms;
@@ -77,7 +80,10 @@ impl LearningAnalyzer {
             } else {
                 health.failures += 1;
                 if !error_type.is_empty() {
-                    *health.error_types.entry(error_type.to_string()).or_insert(0) += 1;
+                    *health
+                        .error_types
+                        .entry(error_type.to_string())
+                        .or_insert(0) += 1;
                 }
             }
             health.last_invoked = timestamp;
@@ -120,14 +126,18 @@ impl LearningAnalyzer {
         let mut error_counts: HashMap<String, Vec<String>> = HashMap::new();
         for h in &health {
             for (error_type, count) in &h.error_types {
-                error_counts.entry(error_type.clone())
+                error_counts
+                    .entry(error_type.clone())
                     .or_insert_with(Vec::new)
                     .push(h.name.clone());
             }
         }
 
         for (error_type, skills) in error_counts {
-            if skills.len() >= 2 || error_type.contains("timeout") || error_type.contains("permission") {
+            if skills.len() >= 2
+                || error_type.contains("timeout")
+                || error_type.contains("permission")
+            {
                 patterns.push(json!({
                     "pattern": "repeated_error",
                     "error_type": error_type,
@@ -160,7 +170,8 @@ impl LearningAnalyzer {
         let patterns = self.identify_failure_patterns()?;
 
         // Identify top-performing skills (potential templates)
-        let mut top_skills: Vec<String> = health.iter()
+        let mut top_skills: Vec<String> = health
+            .iter()
             .filter(|h| h.invocations >= 5 && h.success_rate >= 0.9)
             .map(|h| h.name.clone())
             .collect();
@@ -201,7 +212,7 @@ impl LearningAnalyzer {
                     "invocations": h.invocations,
                     "success_rate": h.success_rate,
                     "avg_duration_ms": h.avg_duration_ms,
-                    "training_value_score": (h.invocations as f64) * h.success_rate * 
+                    "training_value_score": (h.invocations as f64) * h.success_rate *
                         (1.0 - ((h.avg_duration_ms as f64) / 60000.0).min(1.0))
                 }));
             }
@@ -211,7 +222,9 @@ impl LearningAnalyzer {
         candidates.sort_by(|a, b| {
             let score_a = a["training_value_score"].as_f64().unwrap_or(0.0);
             let score_b = b["training_value_score"].as_f64().unwrap_or(0.0);
-            score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            score_b
+                .partial_cmp(&score_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         Ok(candidates)

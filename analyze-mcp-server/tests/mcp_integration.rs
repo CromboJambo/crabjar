@@ -7,7 +7,7 @@ use std::time::Duration;
 fn run_server_with_requests(requests: &[&str]) -> String {
     // Use the built binary directly for faster test execution
     let server_path = "../../target/debug/analyze-mcp";
-    
+
     let mut child = Command::new(server_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -38,9 +38,18 @@ fn server_initializes_and_lists_tools() {
     let output = run_server_with_requests(&[init, tools_list]);
 
     // Should have gotten a tools list response containing our tool names
-    assert!(output.contains("analyze_binary"), "Expected analyze_binary in tools list");
-    assert!(output.contains("analyze_har"), "Expected analyze_har in tools list");
-    assert!(output.contains("analyze_js"), "Expected analyze_js in tools list");
+    assert!(
+        output.contains("analyze_binary"),
+        "Expected analyze_binary in tools list"
+    );
+    assert!(
+        output.contains("analyze_har"),
+        "Expected analyze_har in tools list"
+    );
+    assert!(
+        output.contains("analyze_js"),
+        "Expected analyze_js in tools list"
+    );
 }
 
 #[test]
@@ -83,5 +92,8 @@ fn analyze_nonexistent_binary_returns_error() {
     let output = run_server_with_requests(&[init, analyze_req]);
 
     // Should contain an error message about the nonexistent file
-    assert!(output.contains("Analysis error") || output.contains("error"), "Expected error for nonexistent file");
+    assert!(
+        output.contains("Analysis error") || output.contains("error"),
+        "Expected error for nonexistent file"
+    );
 }

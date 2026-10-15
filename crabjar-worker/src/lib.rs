@@ -3,7 +3,7 @@
 //! Lightweight agent that registers with crabjar-conductor, polls for tasks,
 //! executes them locally, and reports results.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::process::Command;
@@ -83,7 +83,9 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                 .await
                 {
                     Ok(()) => info!(task_id = %task.id, "Task completed and reported"),
-                    Err(e) => error!(task_id = %task.id, error = %e, "Failed to report task result"),
+                    Err(e) => {
+                        error!(task_id = %task.id, error = %e, "Failed to report task result")
+                    }
                 }
             }
             Ok(None) => {
@@ -111,7 +113,8 @@ async fn register(client: &reqwest::Client, config: &WorkerConfig) -> Result<Str
     }
 
     let reg: RegisterResponse = resp.json().await?;
-    reg.worker_id.ok_or_else(|| anyhow!("No worker_id in registration response"))
+    reg.worker_id
+        .ok_or_else(|| anyhow!("No worker_id in registration response"))
 }
 
 async fn poll_for_tasks(

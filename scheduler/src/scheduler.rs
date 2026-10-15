@@ -103,9 +103,12 @@ impl Scheduler {
                 timeout_secs: row.get(5).unwrap_or(3600) as u64,
                 requires_approval: row.get(6).unwrap_or(1) != 0,
                 last_run: row.get(7).ok().flatten().and_then(|s: String| {
-                    DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))
+                    DateTime::parse_from_rfc3339(&s)
+                        .ok()
+                        .map(|dt| dt.with_timezone(&Utc))
                 }),
-                next_run: DateTime::parse_from_rfc3339(&row.get::<_, String>(8)?).unwrap()
+                next_run: DateTime::parse_from_rfc3339(&row.get::<_, String>(8)?)
+                    .unwrap()
                     .with_timezone(&Utc),
             })
         })?;
@@ -119,7 +122,9 @@ impl Scheduler {
 
     /// Get job by name.
     pub fn get_job(&self, name: &str) -> Result<Option<JobSpec>, SchedulerError> {
-        let mut stmt = self.db.prepare("SELECT * FROM jobs WHERE name = ? LIMIT 1")?;
+        let mut stmt = self
+            .db
+            .prepare("SELECT * FROM jobs WHERE name = ? LIMIT 1")?;
         let mut rows = stmt.query_map([name], |row| {
             Ok(JobSpec {
                 id: row.get(0)?,
@@ -130,9 +135,12 @@ impl Scheduler {
                 timeout_secs: row.get(5).unwrap_or(3600) as u64,
                 requires_approval: row.get(6).unwrap_or(1) != 0,
                 last_run: row.get(7).ok().flatten().and_then(|s: String| {
-                    DateTime::parse_from_rfc3339(&s).ok().map(|dt| dt.with_timezone(&Utc))
+                    DateTime::parse_from_rfc3339(&s)
+                        .ok()
+                        .map(|dt| dt.with_timezone(&Utc))
                 }),
-                next_run: DateTime::parse_from_rfc3339(&row.get::<_, String>(8)?).unwrap()
+                next_run: DateTime::parse_from_rfc3339(&row.get::<_, String>(8)?)
+                    .unwrap()
                     .with_timezone(&Utc),
             })
         })?;

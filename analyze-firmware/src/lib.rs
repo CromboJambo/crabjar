@@ -97,7 +97,9 @@ fn detect_format(bytes: &[u8]) -> Option<String> {
     }
 
     // JFFS2 (embedded filesystem)
-    if bytes.len() >= 4 && (&bytes[0..4] == [0x85, 0xEC, 0x13, 0x37] || &bytes[0..4] == [0x1E, 0x90, 0x82, 0xA6]) {
+    if bytes.len() >= 4
+        && (&bytes[0..4] == [0x85, 0xEC, 0x13, 0x37] || &bytes[0..4] == [0x1E, 0x90, 0x82, 0xA6])
+    {
         return Some("JFFS2 filesystem".to_string());
     }
 
@@ -150,7 +152,9 @@ fn identify_regions(bytes: &[u8], size_bytes: u64) -> Vec<FirmwareRegion> {
         }
 
         // Look for SquashFS within the image
-        if bytes.len() > offset + 4 && (&bytes[offset..offset+4] == b"hsqs" || &bytes[offset..offset+4] == b"sqsh") {
+        if bytes.len() > offset + 4
+            && (&bytes[offset..offset + 4] == b"hsqs" || &bytes[offset..offset + 4] == b"sqsh")
+        {
             regions.push(FirmwareRegion {
                 name: "rootfs".to_string(),
                 offset: offset as u64,
@@ -160,7 +164,10 @@ fn identify_regions(bytes: &[u8], size_bytes: u64) -> Vec<FirmwareRegion> {
         }
 
         // Look for JFFS2 magic
-        if bytes.len() > offset + 4 && (&bytes[offset..offset+4] == [0x85, 0xEC, 0x13, 0x37] || &bytes[offset..offset+4] == [0x1E, 0x90, 0x82, 0xA6]) {
+        if bytes.len() > offset + 4
+            && (&bytes[offset..offset + 4] == [0x85, 0xEC, 0x13, 0x37]
+                || &bytes[offset..offset + 4] == [0x1E, 0x90, 0x82, 0xA6])
+        {
             regions.push(FirmwareRegion {
                 name: "rootfs".to_string(),
                 offset: offset as u64,
@@ -185,9 +192,7 @@ fn identify_regions(bytes: &[u8], size_bytes: u64) -> Vec<FirmwareRegion> {
 }
 
 fn run_binwalk(path: &str) -> Option<BinwalkOutput> {
-    let result = Command::new("which")
-        .arg("binwalk")
-        .output();
+    let result = Command::new("which").arg("binwalk").output();
 
     if result.is_err() {
         return None;

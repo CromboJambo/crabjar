@@ -159,22 +159,18 @@ pub enum SessionCommand {
         limit: usize,
     },
     /// Find sessions related to a specific topic
-    Related {
-        topic: String,
-    },
+    Related { topic: String },
     /// Find past failures of a specific type
-    Failures {
-        error_type: String,
-    },
+    Failures { error_type: String },
 }
 
+pub mod autonomy;
 pub mod cli_commands;
-pub mod skill_instrumentation;
+pub mod environment_awareness;
+pub mod feedback_integration;
 pub mod learning_loop;
 pub mod session_search;
-pub mod feedback_integration;
-pub mod environment_awareness;
-pub mod autonomy;
+pub mod skill_instrumentation;
 
 pub use cli_commands::*;
 

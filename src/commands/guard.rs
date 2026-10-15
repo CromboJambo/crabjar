@@ -1,7 +1,7 @@
 //! Guard CLI commands (execution gate, trust layers)
 
-use serde_json::json;
 use crabjar_lib::GuardCommand;
+use serde_json::json;
 
 fn open_guard_db() -> crabjar_guard::GuardDb {
     let project_root = std::env::current_dir().unwrap_or_default();
@@ -26,7 +26,8 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
             }))
         }
         GuardCommand::Approve { action_id } => {
-            guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::TrustApproved)?;
+            guard_db
+                .update_action_status(&action_id, crabjar_guard::ActionStatus::TrustApproved)?;
             Ok(json!({
                 "success": true,
                 "guard": {
@@ -73,7 +74,11 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
                 },
             }))
         }
-        GuardCommand::Grant { pid, trust_layer, auto_grant } => {
+        GuardCommand::Grant {
+            pid,
+            trust_layer,
+            auto_grant,
+        } => {
             guard_db.grant_pid_trust(pid, trust_layer, auto_grant)?;
             Ok(json!({
                 "success": true,
@@ -99,24 +104,30 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
                 },
             }))
         }
-        GuardCommand::Resolution { limit, effective_layer } => {
+        GuardCommand::Resolution {
+            limit,
+            effective_layer,
+        } => {
             let entries = guard_db.list_trust_resolutions(effective_layer, limit)?;
-            let items: Vec<serde_json::Value> = entries.iter().map(|e| {
-                json!({
-                    "id": e.id,
-                    "action_id": e.action_id,
-                    "requested_layer": e.requested_layer,
-                    "requested_confidence": e.requested_confidence,
-                    "requested_source": e.requested_source,
-                    "effective_layer": e.effective_layer,
-                    "effective_confidence": e.effective_confidence,
-                    "effective_by": e.effective_by,
-                    "scope_actor": e.scope_actor,
-                    "scope_target": e.scope_target,
-                    "applied_policies": e.applied_policies,
-                    "resolved_at": e.resolved_at,
+            let items: Vec<serde_json::Value> = entries
+                .iter()
+                .map(|e| {
+                    json!({
+                        "id": e.id,
+                        "action_id": e.action_id,
+                        "requested_layer": e.requested_layer,
+                        "requested_confidence": e.requested_confidence,
+                        "requested_source": e.requested_source,
+                        "effective_layer": e.effective_layer,
+                        "effective_confidence": e.effective_confidence,
+                        "effective_by": e.effective_by,
+                        "scope_actor": e.scope_actor,
+                        "scope_target": e.scope_target,
+                        "applied_policies": e.applied_policies,
+                        "resolved_at": e.resolved_at,
+                    })
                 })
-            }).collect();
+                .collect();
             Ok(json!({
                 "success": true,
                 "guard": {

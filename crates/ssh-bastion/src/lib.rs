@@ -32,7 +32,10 @@ fn load_topology() -> Result<LabTopology, Box<dyn std::error::Error>> {
         return LabTopology::from_file(&default_path).map_err(|e| e.to_string().into());
     }
 
-    Err("no topology file found (set LAB_TOPOLOGY_FILE or place at ~/.crabjar/topology.toml)".into())
+    Err(
+        "no topology file found (set LAB_TOPOLOGY_FILE or place at ~/.crabjar/topology.toml)"
+            .into(),
+    )
 }
 
 /// Resolve target host IP from topology and environment overrides.
@@ -65,10 +68,7 @@ fn resolve_target_host(
 
     // Try LAN IP from first interface
     if let Some(iface) = machine.network.interfaces.first() {
-        let env_var = format!(
-            "{}_LAN_IP",
-            topology_name.to_uppercase().replace('-', "_")
-        );
+        let env_var = format!("{}_LAN_IP", topology_name.to_uppercase().replace('-', "_"));
         if let Ok(env_ip) = env::var(&env_var) {
             return Ok(env_ip);
         }
@@ -110,9 +110,7 @@ pub async fn execute_remote(
     let topo = Arc::new(load_topology()?);
 
     // Resolve SSH config from topology
-    let ssh_config = topo
-        .get_ssh_config(target)
-        .map_err(|e| e.to_string())?;
+    let ssh_config = topo.get_ssh_config(target).map_err(|e| e.to_string())?;
 
     // Resolve actual host IP (with environment override support)
     let host = resolve_target_host(&topo, target)?;
@@ -136,10 +134,7 @@ pub async fn execute_remote(
 
     if ssh_config.password_auth {
         // Password auth — use sshpass for non-interactive password input
-        let env_var = format!(
-            "{}_SSH_PASSWORD",
-            target.to_uppercase().replace('-', "_")
-        );
+        let env_var = format!("{}_SSH_PASSWORD", target.to_uppercase().replace('-', "_"));
 
         // Try environment variable first, then fall back to file
         let password = match env::var(&env_var) {
@@ -155,7 +150,7 @@ pub async fn execute_remote(
                             "password auth required but {} not set and {} not found",
                             env_var, pw_file
                         )
-                        .into())
+                        .into());
                     }
                 }
             }
@@ -254,15 +249,15 @@ pub async fn execute_remote(
 pub fn validate_credentials(user: &str, password: &str) -> anyhow::Result<bool> {
     // Check for environment variable BASTION_<USER>_PASSWORD
     let env_var = format!("BASTION_{}_PASSWORD", user.to_uppercase().replace('-', "_"));
-    
+
     if let Ok(expected_password) = env::var(&env_var) {
         return Ok(password == expected_password);
     }
-    
+
     // Fall back to checking ~/.crabjar/bastion_users.toml
     let home = env::var("HOME").unwrap_or_else(|_| "/home/crombo".to_string());
     let users_file = format!("{}/.crabjar/bastion_users.toml", home);
-    
+
     if std::path::Path::new(&users_file).exists() {
         let content = std::fs::read_to_string(&users_file)?;
         // Simple TOML parsing for user:password pairs
@@ -283,7 +278,7 @@ pub fn validate_credentials(user: &str, password: &str) -> anyhow::Result<bool> 
             }
         }
     }
-    
+
     // No credentials configured for this user
     anyhow::bail!("no credentials configured for user '{}'", user);
 }
@@ -300,7 +295,9 @@ mod tests {
 
     #[test]
     fn test_expand_tilde() {
-        unsafe { env::set_var("HOME", "/home/testuser"); }
+        unsafe {
+            env::set_var("HOME", "/home/testuser");
+        }
         assert_eq!(expand_tilde("~/file"), "/home/testuser/file");
         assert_eq!(expand_tilde("/absolute/path"), "/absolute/path");
     }

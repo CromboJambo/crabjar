@@ -4,7 +4,9 @@
 //! resource types, status codes, and identifies suspicious patterns like unusual
 //! domains, large payloads, redirects, and errors.
 
-use analyze_common::{AnalysisProvenance, AnalysisResult, AnalyzeError, DoubtBlock, ANALYZE_COMMON_VERSION};
+use analyze_common::{
+    ANALYZE_COMMON_VERSION, AnalysisProvenance, AnalysisResult, AnalyzeError, DoubtBlock,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -112,8 +114,7 @@ pub struct HarAnalysis {
 
 /// Parse a HAR file from disk.
 fn parse_har(path: &str) -> Result<HarFile, AnalyzeError> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| AnalyzeError::Io(e))?;
+    let content = fs::read_to_string(path).map_err(|e| AnalyzeError::Io(e))?;
 
     let har: HarFile = serde_json::from_str(&content)
         .map_err(|e| AnalyzeError::ParseError(format!("invalid HAR JSON: {}", e)))?;
@@ -141,7 +142,10 @@ pub fn analyze_har(path: &str) -> Result<AnalysisResult<HarAnalysis>, AnalyzeErr
     for entry in &har.log.entries {
         // Parse domain from URL
         let url_parts = parse_url(&entry.request.url);
-        let domain = url_parts.domain().clone().unwrap_or_else(|| "unknown".to_string());
+        let domain = url_parts
+            .domain()
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
 
         // Calculate total size (headers + body)
         let req_headers = entry.request.headers_size.unwrap_or(0);
@@ -151,11 +155,13 @@ pub fn analyze_har(path: &str) -> Result<AnalysisResult<HarAnalysis>, AnalyzeErr
         let total_bytes = req_headers + req_body + resp_headers + resp_body;
 
         // Track domain stats
-        let entry_domain = domain_map.entry(domain.clone()).or_insert(HarDomainSummary {
-            domain: domain.clone(),
-            request_count: 0,
-            total_bytes: 0,
-        });
+        let entry_domain = domain_map
+            .entry(domain.clone())
+            .or_insert(HarDomainSummary {
+                domain: domain.clone(),
+                request_count: 0,
+                total_bytes: 0,
+            });
         entry_domain.request_count += 1;
         entry_domain.total_bytes += total_bytes;
 

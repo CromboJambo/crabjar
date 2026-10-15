@@ -8,17 +8,17 @@
 //!                File selection/bundling           Isolated sub-agents      Position/content validation
 //!                Rule matching per file            Context retrieval        Precision optimization
 
-pub mod types;
-pub mod rules;
-pub mod bundling;
-pub mod file_selection;
-pub mod prompts;
-pub mod context_retrieval;
-pub mod review_agent;
-pub mod positioning_validation;
-pub mod reflection;
-pub mod github;
 pub mod benchmark;
+pub mod bundling;
+pub mod context_retrieval;
+pub mod file_selection;
+pub mod github;
+pub mod positioning_validation;
+pub mod prompts;
+pub mod reflection;
+pub mod review_agent;
+pub mod rules;
+pub mod types;
 
 #[cfg(test)]
 mod integration_tests {
@@ -67,14 +67,21 @@ description = "Check error handling"
 
         // Simulate 3 tool calls for a bundle
         for i in 1..=3 {
-            assert!(tracker.record_call("bundle-1").is_ok(), "Call {} should succeed", i);
+            assert!(
+                tracker.record_call("bundle-1").is_ok(),
+                "Call {} should succeed",
+                i
+            );
         }
         assert_eq!(tracker.remaining("bundle-1"), 2);
 
         // Simulate exceeding the limit
         assert!(tracker.record_call("bundle-1").is_ok());
         assert!(tracker.record_call("bundle-1").is_ok());
-        assert!(tracker.record_call("bundle-1").is_err(), "6th call should fail");
+        assert!(
+            tracker.record_call("bundle-1").is_err(),
+            "6th call should fail"
+        );
     }
 
     /// Test that review agent can parse structured JSON output.

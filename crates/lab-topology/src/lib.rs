@@ -140,7 +140,9 @@ impl LabTopology {
 
     /// Get machine by name
     pub fn get_machine(&self, name: &str) -> Result<&MachineDef, TopologyError> {
-        self.machines.get(name).ok_or(TopologyError::MachineNotFound(name.to_string()))
+        self.machines
+            .get(name)
+            .ok_or(TopologyError::MachineNotFound(name.to_string()))
     }
 
     /// Get SSH config for a machine (falls back to defaults if not specified)

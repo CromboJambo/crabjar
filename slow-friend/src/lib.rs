@@ -28,21 +28,21 @@
 //! Each tier is more expensive but only triggered when cheaper checks detect
 //! something interesting. Attention itself becomes a scarce resource.
 
-pub mod sensor;
-pub mod interpretation;
-pub mod decision;
 pub mod action;
 pub mod autonomy;
-pub mod lattice;
-pub mod daemon;
 pub mod crabjar_bridge;
+pub mod daemon;
+pub mod decision;
+pub mod interpretation;
+pub mod lattice;
+pub mod sensor;
 pub mod testing;
 
 // Re-export key public types
-pub use sensor::{Sensor, SensorResult};
-pub use interpretation::{Interpretation, InterpretationEngine};
-pub use decision::{JevDecision, JevEngine};
 pub use action::{Action, ActionClass, PermissionLevel};
-pub use autonomy::{AutonomyTracker, AutonomyLevel};
-pub use lattice::SparseLattice;
+pub use autonomy::{AutonomyLevel, AutonomyTracker};
 pub use daemon::SlowFriendDaemon;
+pub use decision::{JevDecision, JevEngine};
+pub use interpretation::{Interpretation, InterpretationEngine};
+pub use lattice::SparseLattice;
+pub use sensor::{Sensor, SensorResult};

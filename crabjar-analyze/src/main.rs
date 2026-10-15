@@ -1,16 +1,16 @@
-use anyhow::Result;
-use analyze_common::{
-    AnalysisProvenance, AnalysisResult, AnalyzeError, DoubtBlock, ANALYZE_COMMON_VERSION,
-};
 use analyze_apk::ApkParser;
+use analyze_common::{
+    ANALYZE_COMMON_VERSION, AnalysisProvenance, AnalysisResult, AnalyzeError, DoubtBlock,
+};
 use analyze_dotnet::analyze_dotnet;
 use analyze_firmware::analyze_firmware;
 use analyze_har::analyze_har;
 use analyze_js::analyze_js;
 use analyze_native::ElfParser;
-use clap::{Parser, Subcommand};
+use anyhow::Result;
 use chrono::Utc;
-use serde_json::{json, Value};
+use clap::{Parser, Subcommand};
+use serde_json::{Value, json};
 use std::time::Instant;
 
 #[derive(Parser)]
@@ -44,7 +44,12 @@ enum Commands {
     Dotnet { path: String },
 }
 
-fn analyze_binary(path: &str, symbols: bool, strings: bool, sections: bool) -> Result<AnalysisResult<Value>, AnalyzeError> {
+fn analyze_binary(
+    path: &str,
+    symbols: bool,
+    strings: bool,
+    sections: bool,
+) -> Result<AnalysisResult<Value>, AnalyzeError> {
     let provenance = AnalysisProvenance::new("analyze-native", ANALYZE_COMMON_VERSION);
 
     // Use analyze-native crate for real ELF parsing
@@ -62,7 +67,10 @@ fn analyze_binary(path: &str, symbols: bool, strings: bool, sections: bool) -> R
             });
 
             if symbols {
-                let sym_names: Vec<String> = analysis.data.symbols.iter()
+                let sym_names: Vec<String> = analysis
+                    .data
+                    .symbols
+                    .iter()
                     .map(|s| s.name.clone())
                     .chain(analysis.data.dynamic_symbols.iter().map(|s| s.name.clone()))
                     .collect();
@@ -74,14 +82,19 @@ fn analyze_binary(path: &str, symbols: bool, strings: bool, sections: bool) -> R
             }
 
             if sections {
-                let sec_info: Vec<Value> = analysis.data.sections.iter()
-                    .map(|s| json!({
-                        "name": s.name,
-                        "type": s.r#type,
-                        "addr": format!("0x{:x}", s.addr),
-                        "offset": format!("0x{:x}", s.offset),
-                        "size": s.size,
-                    }))
+                let sec_info: Vec<Value> = analysis
+                    .data
+                    .sections
+                    .iter()
+                    .map(|s| {
+                        json!({
+                            "name": s.name,
+                            "type": s.r#type,
+                            "addr": format!("0x{:x}", s.addr),
+                            "offset": format!("0x{:x}", s.offset),
+                            "size": s.size,
+                        })
+                    })
                     .collect();
                 data["sections"] = json!(sec_info);
             }
@@ -137,7 +150,12 @@ fn main() -> Result<()> {
     let start = Instant::now();
 
     let result: Result<serde_json::Value> = match cli.command {
-        Commands::Binary { path, symbols, strings, sections } => {
+        Commands::Binary {
+            path,
+            symbols,
+            strings,
+            sections,
+        } => {
             let analysis = analyze_binary(&path, symbols, strings, sections)?;
             Ok(json!({
                 "analysis": analysis,

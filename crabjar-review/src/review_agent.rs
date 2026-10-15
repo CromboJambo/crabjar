@@ -56,13 +56,17 @@ impl ReviewAgent {
         rules_toml: Option<&str>,
     ) -> Result<Vec<ReviewFinding>> {
         // Phase 1: Parse diff and identify changed files (deterministic)
-        let changed_files = parse_diff(repo_path, diff_text)
-            .map_err(|e| anyhow::anyhow!(e))?;
+        let changed_files = parse_diff(repo_path, diff_text).map_err(|e| anyhow::anyhow!(e))?;
 
         // Filter out generated/binary files based on classification
         let relevant_files: Vec<_> = changed_files
             .into_iter()
-            .filter(|f| matches!(f.file_type, crate::types::FileType::Source | crate::types::FileType::Test))
+            .filter(|f| {
+                matches!(
+                    f.file_type,
+                    crate::types::FileType::Source | crate::types::FileType::Test
+                )
+            })
             .collect();
 
         if relevant_files.is_empty() {
@@ -134,7 +138,8 @@ description = "New public functions should have documentation comments."
         });
 
         let client = reqwest::Client::new();
-        let resp = client.post(&url)
+        let resp = client
+            .post(&url)
             .json(&body)
             .send()
             .await

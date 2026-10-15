@@ -1,19 +1,23 @@
 use crate::types::{ChangedFile, ReviewRule};
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// Load review rules from a TOML string.
 pub fn load_rules_from_str(content: &str) -> Result<Vec<ReviewRule>, String> {
-    let parsed: toml::Value = content.parse()
+    let parsed: toml::Value = content
+        .parse()
         .map_err(|e| format!("Failed to parse TOML: {}", e))?;
 
-    let rules_array = parsed.get("rules")
+    let rules_array = parsed
+        .get("rules")
         .and_then(|r| r.as_array())
         .ok_or_else(|| "Rules must contain a 'rules' array".to_string())?;
 
     let mut rules = Vec::new();
     for (i, rule_value) in rules_array.iter().enumerate() {
-        let rule: ReviewRule = rule_value.clone().try_into()
+        let rule: ReviewRule = rule_value
+            .clone()
+            .try_into()
             .map_err(|e| format!("Failed to parse rule at index {}: {}", i, e))?;
         rules.push(rule);
     }
@@ -33,7 +37,8 @@ pub fn load_rules(path: &Path) -> Result<Vec<ReviewRule>, String> {
 pub fn match_rules<'a>(file: &ChangedFile, rules: &'a [ReviewRule]) -> Vec<&'a ReviewRule> {
     let file_type = file.file_type.as_str();
 
-    rules.iter()
+    rules
+        .iter()
         .filter(|rule| {
             // Check applies_to (if specified)
             if !rule.applies_to.is_empty() && !rule.applies_to.contains(&file_type.to_string()) {

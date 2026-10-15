@@ -1,7 +1,7 @@
 //! Habitat CLI commands (spatial model via agent_context::habitat, ADR-003)
 
-use serde_json::json;
 use crabjar_lib::HabitatCommand;
+use serde_json::json;
 
 pub fn handle(command: HabitatCommand) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     match command {
@@ -144,14 +144,16 @@ pub fn handle(command: HabitatCommand) -> Result<serde_json::Value, Box<dyn std:
                 crabjar_lib::habitat_contract::read_theory_status(&db_path, &theory);
 
             // Read real Hermes kanban tasks from all boards
-            let kanban_tasks = crabjar_lib::kanban_source::read_all_tasks()
-                .unwrap_or_else(|err| {
-                    eprintln!("Warning: failed to read kanban tasks: {}", err);
-                    vec![]
-                });
+            let kanban_tasks = crabjar_lib::kanban_source::read_all_tasks().unwrap_or_else(|err| {
+                eprintln!("Warning: failed to read kanban tasks: {}", err);
+                vec![]
+            });
 
             let contract = crabjar_lib::habitat_contract::build_contract(
-                &queue, &pending, &theory_status, &kanban_tasks,
+                &queue,
+                &pending,
+                &theory_status,
+                &kanban_tasks,
             );
 
             let mut message = format!(

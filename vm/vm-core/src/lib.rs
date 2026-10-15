@@ -9,12 +9,12 @@
 //! - `manager` — high-level `VMManager` with guard integration
 //! - `error` — typed error hierarchy
 
-pub mod types;
 pub mod backend;
-pub mod manager;
 pub mod error;
+pub mod manager;
+pub mod types;
 
-pub use types::*;
 pub use backend::*;
-pub use manager::*;
 pub use error::VmError;
+pub use manager::*;
+pub use types::*;

@@ -63,8 +63,8 @@ fn list_board_paths() -> Result<Vec<PathBuf>, String> {
     }
 
     let mut paths = Vec::new();
-    for entry in std::fs::read_dir(&boards_dir)
-        .map_err(|e| format!("failed to list boards: {e}"))?
+    for entry in
+        std::fs::read_dir(&boards_dir).map_err(|e| format!("failed to list boards: {e}"))?
     {
         let entry = entry.map_err(|e| format!("failed to read board entry: {e}"))?;
         let db_path = entry.path().join("kanban.db");
@@ -98,17 +98,15 @@ pub fn read_all_tasks() -> Result<Vec<KanbanTask>, String> {
 pub fn read_board_config(board_path: &PathBuf) -> Option<BoardConfig> {
     let parent = board_path.parent()?;
     let config_path = parent.join("board.json");
-    
+
     match std::fs::read_to_string(&config_path) {
         Ok(content) => {
             // Check for model or provider configuration
             let has_model = content.contains("\"model\"") || content.contains("\"provider\"");
-            
-            let slug = board_path.file_name()?
-                .to_string_lossy().into_owned();
-            let name = parent.file_name()?
-                .to_string_lossy().into_owned();
-            
+
+            let slug = board_path.file_name()?.to_string_lossy().into_owned();
+            let name = parent.file_name()?.to_string_lossy().into_owned();
+
             Some(BoardConfig {
                 slug,
                 name,
@@ -124,55 +122,65 @@ pub fn read_board_config(board_path: &PathBuf) -> Option<BoardConfig> {
 pub fn detect_stuck_boards(tasks: &[KanbanTask]) -> Vec<String> {
     let board_paths = list_board_paths().unwrap_or_default();
     let mut stuck = Vec::new();
-    
+
     for path in &board_paths {
         // Check if this board has any ready tasks
         let has_ready_tasks = tasks.iter().any(|t| t.status == "ready");
         if !has_ready_tasks {
             continue;
         }
-        
+
         // Check if board has model configured
         match read_board_config(path) {
             Some(config) => {
                 if !config.has_model {
-                    stuck.push(format!("board '{}' has ready tasks but no model/provider configured", config.name));
+                    stuck.push(format!(
+                        "board '{}' has ready tasks but no model/provider configured",
+                        config.name
+                    ));
                 }
             }
             None => {
-                stuck.push(format!("board at {:?} has ready tasks but no board.json found", path));
+                stuck.push(format!(
+                    "board at {:?} has ready tasks but no board.json found",
+                    path
+                ));
             }
         }
     }
-    
+
     stuck
 }
 
 /// Read all non-archived tasks from the kanban board.
 pub fn read_tasks(board_path: &PathBuf) -> Result<Vec<KanbanTask>, String> {
-    let conn = Connection::open(board_path)
-        .map_err(|e| format!("failed to open kanban.db: {e}"))?;
+    let conn =
+        Connection::open(board_path).map_err(|e| format!("failed to open kanban.db: {e}"))?;
 
-    let mut stmt = conn.prepare(
-        "SELECT id, title, status, assignee, priority, created_at, started_at, \
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, title, status, assignee, priority, created_at, started_at, \
          completed_at, result, current_run_id \
-         FROM tasks WHERE status != 'archived' ORDER BY created_at DESC"
-    ).map_err(|e| format!("failed to prepare query: {e}"))?;
+         FROM tasks WHERE status != 'archived' ORDER BY created_at DESC",
+        )
+        .map_err(|e| format!("failed to prepare query: {e}"))?;
 
-    let rows = stmt.query_map([], |row| {
-        Ok(KanbanTask {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            status: row.get(2)?,
-            assignee: row.get(3)?,
-            priority: row.get(4)?,
-            created_at: row.get(5)?,
-            started_at: row.get(6)?,
-            completed_at: row.get(7)?,
-            result: row.get(8)?,
-            current_run_id: row.get(9)?,
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(KanbanTask {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                status: row.get(2)?,
+                assignee: row.get(3)?,
+                priority: row.get(4)?,
+                created_at: row.get(5)?,
+                started_at: row.get(6)?,
+                completed_at: row.get(7)?,
+                result: row.get(8)?,
+                current_run_id: row.get(9)?,
+            })
         })
-    }).map_err(|e| format!("failed to query tasks: {e}"))?;
+        .map_err(|e| format!("failed to query tasks: {e}"))?;
 
     let mut tasks = Vec::new();
     for row in rows {

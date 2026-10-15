@@ -1,11 +1,15 @@
 //! Attempts CLI commands (ADR-006, record-only first cut)
 
-use serde_json::json;
 use crabjar_lib::AttemptsCommand;
+use serde_json::json;
 
 pub fn handle(command: AttemptsCommand) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     match command {
-        AttemptsCommand::Status { queue_path, theory, db_path } => {
+        AttemptsCommand::Status {
+            queue_path,
+            theory,
+            db_path,
+        } => {
             let queue = crabjar_terminal::TriageQueue::load(std::path::Path::new(&queue_path))
                 .unwrap_or_else(|_| crabjar_terminal::TriageQueue::new(10));
 
@@ -62,7 +66,12 @@ pub fn handle(command: AttemptsCommand) -> Result<serde_json::Value, Box<dyn std
                 },
             }))
         }
-        AttemptsCommand::Rewind { commit, workdir, trunk, dry_run } => {
+        AttemptsCommand::Rewind {
+            commit,
+            workdir,
+            trunk,
+            dry_run,
+        } => {
             let workdir_path = std::path::Path::new(&workdir);
             let trunk = trunk.unwrap_or_else(|| {
                 crabjar_terminal::GitRepo::open(workdir_path)
@@ -155,7 +164,11 @@ pub fn handle(command: AttemptsCommand) -> Result<serde_json::Value, Box<dyn std
             }
 
             match crabjar_terminal::rewind_commit(&commit, workdir_path, &trunk) {
-                Ok(crabjar_terminal::RewindOutcome::Reverted { revert_commit, subject, regions }) => Ok(json!({
+                Ok(crabjar_terminal::RewindOutcome::Reverted {
+                    revert_commit,
+                    subject,
+                    regions,
+                }) => Ok(json!({
                     "success": true,
                     "message": "fine-tier rewind: attempt reverted",
                     "reverted": {
@@ -194,7 +207,11 @@ pub fn handle(command: AttemptsCommand) -> Result<serde_json::Value, Box<dyn std
                 })),
             }
         }
-        AttemptsCommand::Submit { intent, command, queue_path } => {
+        AttemptsCommand::Submit {
+            intent,
+            command,
+            queue_path,
+        } => {
             let path = std::path::Path::new(&queue_path);
             let mut queue = crabjar_terminal::TriageQueue::load(path)
                 .unwrap_or_else(|_| crabjar_terminal::TriageQueue::new(10));

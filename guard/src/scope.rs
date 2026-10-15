@@ -164,7 +164,6 @@ impl CrossScopeAuth {
         chrono::Utc::now().timestamp() - self.authorized_at < ttl_seconds
     }
 
-
     /// Create a CrossScopeAuth for a specific user's cross-project access.
     pub fn for_user_cross_project(
         user: impl Into<String>,

@@ -88,11 +88,17 @@ pub fn run_synthetic_test() -> Vec<ActionClass> {
     // Run tick — should trigger disk cleanup action
     let took_action = daemon.tick();
 
-    assert!(took_action, "Daemon should have taken action on synthetic alert");
+    assert!(
+        took_action,
+        "Daemon should have taken action on synthetic alert"
+    );
 
     // Verify the action was recorded
     let actions = exec_arc.executed_actions.lock().unwrap();
-    assert!(!actions.is_empty(), "Executor should have recorded an action");
+    assert!(
+        !actions.is_empty(),
+        "Executor should have recorded an action"
+    );
     assert_eq!(actions[0], ActionClass::DiskCleanup);
 
     actions.clone()

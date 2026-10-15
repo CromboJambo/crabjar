@@ -4,7 +4,7 @@
 //! processes. Designed for agent workflows where the agent generates commands
 //! but the user executes them in their environment.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::Utc;
 use clap::{Args, Parser, Subcommand};
 use serde_json::json;
@@ -139,7 +139,11 @@ fn cmd_monitor(pid: u32, timeout_secs: u64, interval_secs: u64) -> Result<()> {
 
     loop {
         if start.elapsed() >= timeout {
-            println!("[{}] Process timed out after {}s", Utc::now().format("%H:%M:%S"), timeout_secs);
+            println!(
+                "[{}] Process timed out after {}s",
+                Utc::now().format("%H:%M:%S"),
+                timeout_secs
+            );
             return Ok(());
         }
 
@@ -167,7 +171,11 @@ fn cmd_monitor(pid: u32, timeout_secs: u64, interval_secs: u64) -> Result<()> {
                 }
             }
             Err(e) => {
-                println!("[{}] Error checking process: {}", Utc::now().format("%H:%M:%S"), e);
+                println!(
+                    "[{}] Error checking process: {}",
+                    Utc::now().format("%H:%M:%S"),
+                    e
+                );
             }
         }
 

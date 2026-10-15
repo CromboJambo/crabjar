@@ -35,7 +35,9 @@ impl MqttClient {
 
         // Configure TLS if using mqtts://
         if config.broker_url.starts_with("mqtts://") {
-            mqttoptions.set_transport(Transport::tls_with_config(rumqttc::TlsConfiguration::Native));
+            mqttoptions.set_transport(Transport::tls_with_config(
+                rumqttc::TlsConfiguration::Native,
+            ));
         }
 
         // Keep-alive interval (5s like mqtt.js default)

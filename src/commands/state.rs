@@ -1,7 +1,7 @@
 //! State-docs CLI commands (SQLite-backed via agent_context::state_docs)
 
-use serde_json::json;
 use crabjar_lib::StateCommand;
+use serde_json::json;
 
 pub fn handle(command: StateCommand) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     match command {
@@ -243,7 +243,10 @@ pub fn handle(command: StateCommand) -> Result<serde_json::Value, Box<dyn std::e
             // Drift = coasting (stale) vs resisting (recent annotations added)
             let staleness = querier.staleness_status(&doc_name);
             let ann_result = querier.get_annotations(&doc_name);
-            let annotations = ann_result["annotations"].as_array().cloned().unwrap_or_default();
+            let annotations = ann_result["annotations"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
             let is_resisting = annotations.iter().any(|a| {
                 // Annotations added after last doc modification = resisting
                 a.get("created_at")

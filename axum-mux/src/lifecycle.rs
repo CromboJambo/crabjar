@@ -2,7 +2,6 @@
 //! managing VMs via vm-core's LibvirtBackend.
 
 use anyhow::Result;
-use serde_json::json;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -11,6 +10,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 
 use vm_core::{
@@ -79,17 +79,29 @@ pub struct ApiResponse<T> {
 
 impl<T: Serialize> ApiResponse<T> {
     fn ok(data: T) -> Self {
-        Self { success: true, data: Some(data), error: None }
+        Self {
+            success: true,
+            data: Some(data),
+            error: None,
+        }
     }
 
     fn err(msg: impl Into<String>) -> Self {
-        Self { success: false, data: None, error: Some(msg.into()) }
+        Self {
+            success: false,
+            data: None,
+            error: Some(msg.into()),
+        }
     }
 }
 
 impl<T: Serialize> IntoResponse for ApiResponse<T> {
     fn into_response(self) -> Response {
-        let status = if self.success { StatusCode::OK } else { StatusCode::BAD_REQUEST };
+        let status = if self.success {
+            StatusCode::OK
+        } else {
+            StatusCode::BAD_REQUEST
+        };
         (status, Json(self)).into_response()
     }
 }

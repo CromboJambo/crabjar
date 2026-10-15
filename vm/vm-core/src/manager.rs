@@ -64,7 +64,9 @@ impl VmManager {
 
     /// Stop a VM gracefully with timeout.
     pub async fn stop(&self, vm_id: VmId) -> anyhow::Result<()> {
-        self.backend.stop(vm_id, self.config.default_timeout).await?;
+        self.backend
+            .stop(vm_id, self.config.default_timeout)
+            .await?;
         self.states.write().await.insert(vm_id, VmState::Stopped);
         tracing::info!(vm_id = %vm_id.as_uuid(), "VM stopped");
         Ok(())
