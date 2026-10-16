@@ -4,14 +4,11 @@
 
 use serde_json::json;
 
-use crate::ToolCommand;
-
+use crabjar_lib::{ToolCommand, ToolCacheCommand};
 use crabjar_github_client::{GitHubClient, SearchOptions};
 use crabjar_github_client::models::SortField;
 use crabjar_clawhub_client::ClawHubClient;
 use crabjar_trust_manager::{SkillCache, UpdateDetector, TrustManager};
-
-use crate::{ToolCommand, ToolCacheCommand};
 
 /// Mapped tool row from a SQLite query.
 type ToolRow = (String, String, String, String, u32, f64, String);
@@ -47,6 +44,7 @@ pub async fn handle_tool_command(
         ToolCommand::Scan { path, checksum } => handle_skill_scan(path, checksum),
         ToolCommand::Cache { action } => handle_cache_command(action),
         ToolCommand::Updates { name } => handle_updates(name),
+        ToolCommand::Auth => handle_auth(),
     }
 }
 
@@ -773,4 +771,30 @@ fn handle_updates(name: Option<String>) -> Result<serde_json::Value, Box<dyn std
             }))
         }
     }
+}
+
+/// Show authentication status for remote registries.
+fn handle_auth() -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let github_token = std::env::var("CRABJAR_GITHUB_TOKEN").ok();
+    let clawhub_token = std::env::var("CRABJAR_CLAWHUB_TOKEN").ok();
+
+    Ok(json!({
+        "success": true,
+        "auth": {
+            "github": {
+                "authenticated": github_token.is_some(),
+                "token_source": if github_token.is_some() { "environment" } else { "none" },
+                "env_var": "CRABJAR_GITHUB_TOKEN",
+            },
+            "clawhub": {
+                "authenticated": clawhub_token.is_some(),
+                "token_source": if clawhub_token.is_some() { "environment" } else { "none" },
+                "env_var": "CRABJAR_CLAWHUB_TOKEN",
+            },
+            "instructions": [
+                "Set CRABJAR_GITHUB_TOKEN for authenticated GitHub API access (higher rate limits)",
+                "Set CRABJAR_CLAWHUB_TOKEN for ClawHub.io registry authentication"
+            ]
+        }
+    }))
 }

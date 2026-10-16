@@ -303,6 +303,8 @@ pub enum ToolCommand {
         /// Skill name to check (optional — checks all if omitted)
         name: Option<String>,
     },
+    /// Show authentication status for remote registries
+    Auth,
 }
 
 /// Skill cache management subcommands

@@ -1,5 +1,6 @@
 //! ClawHub.io registry client for skill discovery and installation.
 
+use std::env;
 use std::path::Path;
 
 use chrono::Utc;
@@ -18,17 +19,31 @@ const CLAWHUB_API_URL: &str = "https://clawhub.io/api/v1";
 #[derive(Clone)]
 pub struct ClawHubClient {
     http: Client,
+    token: Option<String>,
 }
 
 impl ClawHubClient {
     /// Create a new ClawHub client.
+    ///
+    /// Automatically reads `CRABJAR_CLAWHUB_TOKEN` from environment if set.
     pub fn new() -> Self {
+        let token = env::var("CRABJAR_CLAWHUB_TOKEN").ok();
+        Self::with_token(token)
+    }
+
+    /// Create a client with an explicit token.
+    pub fn with_token(token: Option<String>) -> Self {
         let http = Client::builder()
             .user_agent("crabjar-clawhub-client/0.12")
             .build()
             .expect("Failed to build HTTP client");
 
-        Self { http }
+        Self { http, token }
+    }
+
+    /// Check if the client is authenticated.
+    pub fn is_authenticated(&self) -> bool {
+        self.token.is_some()
     }
 
     /// List all available skills on ClawHub.
@@ -176,7 +191,13 @@ impl ClawHubClient {
 
     /// Make an authenticated GET request.
     async fn get(&self, url: &str) -> Result<reqwest::Response, ClawHubError> {
-        let resp = self.http.get(url).send().await?;
+        let mut req = self.http.get(url);
+
+        if let Some(token) = &self.token {
+            req = req.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let resp = req.send().await?;
 
         match resp.status() {
             StatusCode::OK | StatusCode::CREATED => Ok(resp),
