@@ -14,6 +14,10 @@ Declared in `Cargo.toml` `[workspace.members]`:
 - `orchestrator` — Axum SSE server (ACP orchestrator)
 - `sandbox` — agent isolation tooling
 - `tool_registry` — MCP tool registry
+- `crabjar-github-client` — GitHub API client for skill search/install (Phase 8)
+- `crabjar-clawhub-client` — ClawHub.io registry API integration with trust tier mapping (Phase 9)
+- `crabjar-skill-scanner` — Security scanning pipeline + SHA-256 checksum verification (Phase 10)
+- `crabjar-trust-manager` — Trust tier management, version-aware skill cache, update detection (Phase 11)
 - `axum-mux` — Axum mux utilities
 - `crabjar-architecture` — mechanical dependency boundary enforcement (8-layer model)
 - `host/host-core` — core host runtime
@@ -54,6 +58,10 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 | `telemetry` | Flight recorder |
 | `sandbox` | Agent isolation |
 | `tool_registry` | MCP tool registry with discovery |
+| `crabjar-github-client` | GitHub API client for skill search/install (Phase 8) |
+| `crabjar-clawhub-client` | ClawHub.io registry API integration with trust tier mapping (Phase 9) |
+| `crabjar-skill-scanner` | Security scanning pipeline + SHA-256 checksum verification (Phase 10) |
+| `crabjar-trust-manager` | Trust tier management, version-aware skill cache, update detection (Phase 11) |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement |
 | `axum-mux` | Axum mux utilities |
 | `host/host-agent` | ReAct agent loop with model routing, context compression |
@@ -100,6 +108,10 @@ crabjar/
 ├── telemetry/               # Flight recorder
 ├── sandbox/                 # Agent isolation
 ├── tool_registry/           # MCP tool registry
+├── crabjar-github-client/   # GitHub API client for skill search/install (Phase 8)
+├── crabjar-clawhub-client/  # ClawHub.io registry API integration with trust tier mapping (Phase 9)
+├── crabjar-skill-scanner/   # Security scanning pipeline + checksum verification (Phase 10)
+├── crabjar-trust-manager/   # Trust tier management, skill cache, update detection (Phase 11)
 ├── crabjar-architecture/    # Dependency boundary enforcement
 ├── axum-mux/               # Axum mux utilities
 │
@@ -201,6 +213,22 @@ crabjar guard resolution <action>
 
 ```bash
 crabjar exec <action>
+```
+
+### Tool Registry
+
+```bash
+crabjar tool list
+crabjar tool discover
+crabjar tool search <query> [--repo <owner/repo>]
+crabjar tool install <name> [--version <ver>] [--skip-scan]
+crabjar tool clawhub-search <query>
+crabjar tool clawhub-install <name>
+crabjar tool scan <path> [--checksum <sha256>]
+crabjar tool cache list
+crabjar tool cache remove <name>
+crabjar tool cache clean
+crabjar tool updates [name]
 ```
 
 ### Other

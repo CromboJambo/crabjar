@@ -1,6 +1,6 @@
 # CrabJar Remote Skill Discovery & Security Scanning
 
-**Status:** Draft — planning phase
+**Status:** Complete — all phases implemented
 **Date:** 2026-10-16
 **Author:** Hermes Agent (with user review)
 
@@ -205,7 +205,28 @@ crabjar-agent
 - [x] Can install a skill from ClawHub registry
 - [x] Security scanner detects binary files, network access, filesystem writes
 - [x] Checksum verification rejects corrupted downloads
-- [ ] Trust tiers mapped to CrabJar execution policies
-- [ ] Skill cache manages versions and stale entries
-- [ ] Update detection notifies about newer skill versions
+- [x] Trust tiers mapped to CrabJar execution policies
+- [x] Skill cache manages versions and stale entries
+- [x] Update detection notifies about newer skill versions
 - [ ] Integration tests pass across all phases
+
+## Completion Notes
+
+All four phases (8-11) implemented as separate crates:
+- `crabjar-github-client` — GitHub API integration for skill search/install
+- `crabjar-clawhub-client` — ClawHub registry API integration
+- `crabjar-skill-scanner` — Security scanning pipeline with checksum verification
+- `crabjar-trust-manager` — Trust tier management, skill cache, update detection
+
+CLI commands added:
+```bash
+crabjar tool search <query> [--stars N] [--sort field]
+crabjar tool install <owner/repo> [--target path]
+crabjar tool clawhub-search <query>
+crabjar tool clawhub-install <name> [--version v]
+crabjar tool scan <path> [--checksum sha256]
+crabjar tool cache list|remove|clean
+crabjar tool updates [name]
+```
+
+Remaining: integration tests against live GitHub/ClawHub endpoints.

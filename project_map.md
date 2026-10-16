@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: July 10 2026
+> Generated: July 10 2026 (updated October 16 2026 — remote skill discovery crates added)
 > Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, file search engine (BM25/Tantivy 0.22), plugin system (WASM runtime), Zed ACP bridge, and agent skills. LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
+CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, file search engine (BM25/Tantivy 0.22), plugin system (WASM runtime), Zed ACP bridge, agent skills, and remote skill discovery infrastructure (GitHub client, ClawHub registry client, security scanner, trust manager). LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
 
 ---
 
@@ -147,6 +147,34 @@ crabjar/
 │       ├── tool_registry.rs
 │       ├── schema.rs
 │       └── error.rs
+├── crabjar-github-client/   # GitHub API client for skill search/install (Phase 8)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── models.rs        # SkillInfo, SearchResult types
+│       └── error.rs         # GitHubError enum
+├── crabjar-clawhub-client/  # ClawHub.io registry API integration (Phase 9)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── models.rs        # SkillInfo with trust_tier, download_url fields
+│       └── error.rs         # ClawHubError enum
+├── crabjar-skill-scanner/   # Security scanning pipeline + checksum verification (Phase 10)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── scanner.rs       # SkillScanner with scan_skill(), scan_skill_with_checksum()
+│       ├── report.rs        # ScanReport, Finding types
+│       └── error.rs         # ScannerError enum
+├── crabjar-trust-manager/   # Trust tier management, skill cache, update detection (Phase 11)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       ├── trust.rs         # TrustManager with policy mapping logic
+│       ├── cache.rs         # SkillCache with version-aware caching and stale entry cleanup
+│       ├── updates.rs       # UpdateDetector with semantic version comparison
+│       ├── models.rs        # TrustTier, SkillCacheEntry, UpdateCheckResult types
+│       └── error.rs         # TrustManagerError enum
 ├── axum-mux/                # vm-bridge (per-VM websocket relay)
 │   ├── Cargo.toml
 │   ├── README.md
@@ -335,6 +363,10 @@ crabjar/
 | `telemetry` | Flight recorder, command executor | Telemetry | Active |
 | `sandbox` | Agent isolation (Unix user, dinit-container, cgroup) | Isolation | Active |
 | `tool_registry` | MCP tool registry | Registry | Active |
+| `crabjar-github-client` | GitHub API client for skill search/install (Phase 8) | Remote Discovery | Active |
+| `crabjar-clawhub-client` | ClawHub.io registry API integration (Phase 9) | Remote Discovery | Active |
+| `crabjar-skill-scanner` | Security scanning pipeline + checksum verification (Phase 10) | Remote Discovery | Active |
+| `crabjar-trust-manager` | Trust tier management, skill cache, update detection (Phase 11) | Remote Discovery | Active |
 | `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement (8-layer model) | Governance | Active |
 | `file_search` | BM25-based file indexing and search (Tantivy 0.22) | Search | Active |
@@ -357,8 +389,9 @@ crabjar/
 
 ### 2.3 Workspace Members
 
-Declared in Cargo.toml `[workspace.members]`: 25 crates total.
+Declared in Cargo.toml `[workspace.members]`: 29 crates total.
 - **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
+- **Remote skill discovery** (Phases 8-11): `crabjar-github-client`, `crabjar-clawhub-client`, `crabjar-skill-scanner`, `crabjar-trust-manager`
 - **Plugin system**: `crabjar-plugin` (WASM runtime, lifecycle management)
 - **File search**: `file_search` (BM25 indexing with Tantivy 0.22)
 - **Terminal**: `crates/terminal` (wezterm/zellij backends + asciinema v2 recording)
@@ -551,6 +584,10 @@ crabjar contains:
 - telemetry (flight recorder + command executor)
 - sandbox (agent isolation)
 - tool_registry (MCP tool registry with 4-layer discovery)
+- crabjar-github-client (GitHub API client for skill search/install — Phase 8)
+- crabjar-clawhub-client (ClawHub.io registry API integration — Phase 9)
+- crabjar-skill-scanner (security scanning pipeline + checksum verification — Phase 10)
+- crabjar-trust-manager (trust tier management, skill cache, update detection — Phase 11)
 - crabjar-architecture (mechanical dependency boundary enforcement, 8-layer model)
 - file_search (BM25-based file indexing with Tantivy 0.22)
 - crabjar-plugin (WASM runtime, lifecycle management — stub)
@@ -584,7 +621,7 @@ crabjar contains:
 
 ### 9.2 Active Rust Surface
 
-crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-architecture + file_search + crabjar-plugin + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux + crates/terminal
+crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + guard + telemetry + sandbox + tool_registry + crabjar-github-client + crabjar-clawhub-client + crabjar-skill-scanner + crabjar-trust-manager + crabjar-architecture + file_search + crabjar-plugin + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux + crates/terminal
 
 ### Test Count
 
@@ -598,6 +635,8 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 ### Last Audit
 
 2026-07-10 — Fresh filesystem scan. Workspace: 25 members + `specs/` (ADR process). Guard: 28 source files (added gate_tests.rs, concierge_types.rs, fingerprint_types.rs, trust_types.rs; all under 500 LoC). Memory/: 18 source files total (error.rs, models.rs, schema.rs, store.rs added; context/ split into mod/constants/fragment/budget; state_docs/ has extract.rs + insert.rs). Orchestrator: 11 .rs files (added backend/mod.rs for InferenceBackend trait; lm_studio_client split into prompt_types.rs + prompt_validator.rs). Host/host-agent: 13 source files (inference/ subdir with mod.rs, backend.rs, http_backend.rs). Axum-mux: gained proxy.rs and terminal_relay.rs. File search: 3 source files. crabjar-plugin: stub crate. crabjar-architecture: 3 source files. crates/terminal: 5 source files (added recording.rs). Skills: 32 agent skills. Version: 0.12.0, Rust 2024 edition. Total tests: 691 passing, 0 failing. Clippy clean — zero errors (only pre-existing vm-bridge warnings for missing lib target). ADR process established in specs/. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
+
+2026-10-16 — Remote skill discovery infrastructure added (Phases 8-11). Workspace: 29 members (+4 new crates). Added: crabjar-github-client (GitHub API client for skill search/install), crabjar-clawhub-client (ClawHub.io registry API integration with trust tier mapping), crabjar-skill-scanner (security scanning pipeline with SHA-256 checksum verification), crabjar-trust-manager (trust tier management, version-aware skill cache in ~/.crabjar/skill-cache/, update detection). CLI commands added: tool search, tool install, tool clawhub-search, tool clawhub-install, tool scan, tool cache list/remove/clean, tool updates. All crates at version 0.12.0, Rust 2024 edition. Build clean across workspace with no errors or warnings.
 
 ### Known Items
 
@@ -625,6 +664,10 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 - `crabjar-architecture/` — mechanical dependency boundary enforcement (8-layer model, CI gate candidate)
 - `file_search/` — BM25-based file indexing and search with Tantivy 0.22 (lib.rs, indexer.rs, storage.rs) — 6 tests
 - `crabjar-plugin/` — WASM runtime + lifecycle management (stub crate)
+- `crabjar-github-client/` — GitHub API client for skill search/install (Phase 8)
+- `crabjar-clawhub-client/` — ClawHub.io registry API integration with trust tier mapping (Phase 9)
+- `crabjar-skill-scanner/` — Security scanning pipeline + SHA-256 checksum verification (Phase 10)
+- `crabjar-trust-manager/` — Trust tier management, version-aware skill cache, update detection (Phase 11)
 - `axum-mux/` — vm-bridge (per-VM websocket relay, screen capture, terminal multiplexer)
 - `src/crabjar_config/` — workspace config crate (underscore, not hyphen)
 - `src/bitwarden/commands.rs` — additional bitwarden command handler
@@ -662,6 +705,7 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 | `prov-map-drift-2026-07-08` | project_map.md regenerated — generated date updated, Section 3 Build & Test expanded (module-sizes targets, reproducible-build, test count), Section 2.3 workspace members includes specs/ ADR process, Section 2.4 shared deps consolidated to single-line format, Section 2.5 profiles renamed and simplified, guard/src file listing expanded with policy/context_budget/command_risk/risk_config/db_error files, host/host-agent updated with model_routing/context_compression/decision_gate, Section 9 structure updated (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Drift Report Last Audit and Known Items refreshed with current state | 2026-07-08 | Structural alignment refresh + ADR process addition | crabjar/project_map.md
 | `prov-map-drift-2026-07-08b` | project_map.md regenerated — Section 9.1 structure list expanded (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Section 9.2 test count updated to 691 passing with breakdown by crate, Drift Report Known Items expanded with policy/context_budget/command_risk/risk_config/db_error files and ADR process entry | 2026-07-08 | Structural alignment refresh — second pass on Section 9 + Known Items | crabjar/project_map.md |
 | `prov-comparity-codewhale` | README + project_map parity credit: CodeWhale (monotonic authorization order, Fleet identity contract, deterministic scorers, roster-doesn't-execute) + guard/src/authorization_order.rs invariant tests (10) | 2026-08-30 | Feature parity analysis | crabjar/README.md, crabjar/project_map.md, Hmbown/CodeWhale docs (AUTHORIZATION_ORDER.md, FLEET.md) |
+| `prov-remote-skill-discovery` | Remote skill discovery infrastructure implemented (Phases 8-11): crabjar-github-client, crabjar-clawhub-client, crabjar-skill-scanner, crabjar-trust-manager crates; CLI commands: tool search/install/clawhub-search/clawhub-install/scan/cache/updates; workspace expanded from 25 to 29 members | 2026-10-16 | Remote skill discovery completion | crabjar/crabjar-github-client, crabjar/crabjar-clawhub-client, crabjar/crabjar-skill-scanner, crabjar/crabjar-trust-manager, crabjar/src/tool_registry_cli.rs, crabjar/specs/SKILLS-REMOTE-DISCOVERY.md |
 
 ---
 
