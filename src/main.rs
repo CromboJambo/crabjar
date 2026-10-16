@@ -1668,6 +1668,11 @@ fn usage_lines() -> &'static [&'static str] {
         "crabjar attempts status",
         "crabjar attempts rewind <commit> [--workdir <dir>] [--trunk <sha>] [--dry-run]",
         "crabjar habitat contract [--queue-path <p>] [--guard-db <p>] [--out <p>]",
+        "crabjar tool list",
+        "crabjar tool search --query=<q> [--stars=<n>] [--sort=stars|updated] [--limit=10]",
+        "crabjar tool install --repo=<org/repo> [--target=<path>]",
+        "crabjar tool clawhub-search --query=<q> [--limit=10]",
+        "crabjar tool clawhub-install --name=<skill> [--version=<ver>] [--target=<path>]",
     ]
 }
 

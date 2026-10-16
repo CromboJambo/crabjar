@@ -265,6 +265,25 @@ pub enum ToolCommand {
         #[arg(long)]
         target: Option<String>,
     },
+    /// Search for skills on ClawHub.io registry
+    ClawhubSearch {
+        /// Search query
+        query: Option<String>,
+        /// Maximum results to return
+        #[arg(long, default_value = "10")]
+        limit: u32,
+    },
+    /// Install a skill from ClawHub.io registry with security scanning
+    ClawhubInstall {
+        /// Skill name on ClawHub
+        name: String,
+        /// Version to install (default: latest)
+        #[arg(long)]
+        version: Option<String>,
+        /// Installation directory (default: ~/.crabjar/skills)
+        #[arg(long)]
+        target: Option<String>,
+    },
 }
 
 /// MCP client subcommands — connect to external MCP servers and call their tools
