@@ -2,7 +2,7 @@ use crate::discovery;
 use crate::error::ToolRegistryError;
 use crate::schema::{
     init_db, list_all_tools, list_tools_by_type, query_discovery, query_tool, query_tool_usage,
-    record_tool_discovery, record_tool_usage, register_tool,
+    record_tool_discovery, record_tool_usage, register_tool, unregister_tool,
 };
 use rusqlite::Connection;
 
@@ -49,6 +49,11 @@ impl<'a> ToolRegistry<'a> {
             metadata,
         )
         .map_err(ToolRegistryError::Schema)
+    }
+
+    /// Unregister (remove) a tool by name. Returns true if the tool was found and removed.
+    pub fn unregister_tool(&self, name: &str) -> Result<bool, ToolRegistryError> {
+        unregister_tool(self.conn, name).map_err(ToolRegistryError::Schema)
     }
 
     /// Query a tool by name.
@@ -542,5 +547,45 @@ mod tests {
         let all_tools = registry.list_all(10).unwrap();
         assert!(all_tools.iter().any(|t| t.name == "existing_tool"));
         assert!(all_tools.iter().any(|t| t.name == "new_tool"));
+    }
+
+    #[test]
+    fn test_unregister_tool() {
+        let dir = tempdir().unwrap();
+        let db_path = dir.path().join("tool_registry.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+
+        let registry = ToolRegistry::new(&conn);
+        registry.init().unwrap();
+
+        // Register a tool
+        registry
+            .register_tool(
+                "test_tool",
+                "command",
+                "Test tool for unregister",
+                "{}",
+                "low_risk",
+                3,
+                0.9,
+                "{}",
+            )
+            .unwrap();
+
+        // Verify it's registered
+        let row = registry.query_tool("test_tool").unwrap();
+        assert!(row.is_some());
+
+        // Unregister it
+        let removed = registry.unregister_tool("test_tool").unwrap();
+        assert!(removed);
+
+        // Verify it's gone
+        let row = registry.query_tool("test_tool").unwrap();
+        assert!(row.is_none());
+
+        // Try to unregister again — should return false (not found)
+        let removed_again = registry.unregister_tool("test_tool").unwrap();
+        assert!(!removed_again);
     }
 }

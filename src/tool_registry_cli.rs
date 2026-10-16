@@ -32,6 +32,7 @@ pub async fn handle_tool_command(
         ToolCommand::SkillInstall { path } => handle_skill_install(path),
         ToolCommand::PluginEnable { name } => handle_plugin_enable(name),
         ToolCommand::PluginDisable { name } => handle_plugin_disable(name),
+        ToolCommand::ToolUninstall { name } => handle_tool_uninstall(name),
     }
 }
 
@@ -225,4 +226,46 @@ fn handle_plugin_disable(name: String) -> Result<serde_json::Value, Box<dyn std:
             "note": "plugin enable/disable is managed by the plugin manager; this command updates registry metadata",
         }
     }))
+}
+
+/// Unregister (remove) a tool from the registry.
+fn handle_tool_uninstall(name: String) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let project_root = std::env::current_dir()?;
+    let db_path = project_root.join("tool_registry/tool_registry.db");
+
+    if !db_path.exists() {
+        return Ok(json!({
+            "success": false,
+            "error": "tool registry database not found — run 'crabjar tool discover' first",
+        }));
+    }
+
+    let conn = rusqlite::Connection::open(&db_path)?;
+    let schema = crabjar_tool_registry::schema::TOOL_REGISTRY_SCHEMA;
+    conn.execute_batch(schema)?;
+
+    let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
+
+    match registry.unregister_tool(&name) {
+        Ok(removed) => {
+            if removed {
+                Ok(json!({
+                    "success": true,
+                    "tool_uninstall": {
+                        "name": name,
+                        "status": "removed",
+                    }
+                }))
+            } else {
+                Ok(json!({
+                    "success": false,
+                    "error": format!("tool '{}' not found in registry", name),
+                }))
+            }
+        }
+        Err(e) => Ok(json!({
+            "success": false,
+            "error": format!("failed to unregister tool '{}': {}", name, e),
+        })),
+    }
 }

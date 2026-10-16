@@ -375,6 +375,16 @@ pub fn schema_version_display() -> String {
     format!("v{TOOL_REGISTRY_SCHEMA_VERSION}")
 }
 
+/// Unregister (remove) a tool by name.
+pub fn unregister_tool(conn: &Connection, name: &str) -> Result<bool, ToolRegistrySchemaError> {
+    let result = conn.execute(
+        "DELETE FROM tools WHERE name = ?1",
+        params![name],
+    )?;
+
+    Ok(result > 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

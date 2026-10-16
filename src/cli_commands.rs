@@ -238,6 +238,11 @@ pub enum ToolCommand {
         /// Plugin name
         name: String,
     },
+    /// Unregister (remove) a tool from the registry
+    ToolUninstall {
+        /// Tool name to remove
+        name: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
