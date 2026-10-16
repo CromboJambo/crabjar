@@ -9,6 +9,7 @@ use tracing::{debug, info};
 
 use crate::error::ClawHubError;
 use crate::models::{SearchOptions, SkillInfo, SkillVersion};
+use crabjar_skill_scanner::SkillScanner;
 
 /// ClawHub API base URL.
 const CLAWHUB_API_URL: &str = "https://clawhub.io/api/v1";
@@ -149,6 +150,28 @@ impl ClawHubClient {
         info!("Downloaded {} to {}", name, archive_path.display());
 
         Ok(archive_path)
+    }
+
+    /// Scan a downloaded skill package for security issues.
+    pub fn scan_skill(&self, name: &str, version: &str, package_path: &Path) -> Result<crabjar_skill_scanner::models::ScanResult, ClawHubError> {
+        let scanner = SkillScanner::new();
+        scanner.scan(name, version, package_path).map_err(|e| {
+            ClawHubError::Api(format!("Security scan failed: {}", e))
+        })
+    }
+
+    /// Scan and verify checksum of a downloaded skill package.
+    pub fn scan_skill_with_checksum(
+        &self,
+        name: &str,
+        version: &str,
+        package_path: &Path,
+        expected_checksum: &str,
+    ) -> Result<crabjar_skill_scanner::models::ScanResult, ClawHubError> {
+        let scanner = SkillScanner::new();
+        scanner.scan_with_checksum(name, version, package_path, expected_checksum).map_err(|e| {
+            ClawHubError::Api(format!("Security scan failed: {}", e))
+        })
     }
 
     /// Make an authenticated GET request.

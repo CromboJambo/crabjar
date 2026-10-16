@@ -1981,6 +1981,7 @@ dependencies = [
  "crabjar-lab-topology",
  "crabjar-mcp-client",
  "crabjar-podman",
+ "crabjar-skill-scanner",
  "crabjar-skills",
  "crabjar-ssh-bastion",
  "crabjar-telemetry",
@@ -2077,6 +2078,7 @@ name = "crabjar-clawhub-client"
 version = "0.12.0"
 dependencies = [
  "chrono",
+ "crabjar-skill-scanner",
  "mockito",
  "reqwest 0.12.28",
  "semver",
@@ -2428,6 +2430,19 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+]
+
+[[package]]
+name = "crabjar-skill-scanner"
+version = "0.12.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]

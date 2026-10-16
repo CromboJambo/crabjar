@@ -55,6 +55,7 @@ members = [
     "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker",
  "crabjar-analyze", "crabjar-review", "crabjar-mcp-tool-registry", "crabjar-skills", "crabjar-tool-binding", "crabjar-skill-example", "crabjar-skill-context", "crabjar-mcp-client",    "crabjar-github-client",
     "crabjar-clawhub-client",
+    "crabjar-skill-scanner",
 ]
 
 resolver = "2"
@@ -241,6 +242,7 @@ crabjar-tool-binding = { path = "crabjar-tool-binding" }
 crabjar-mcp-client = { path = "crabjar-mcp-client" }
 crabjar-github-client = { path = "crabjar-github-client" }
 crabjar-clawhub-client = { path = "crabjar-clawhub-client" }
+crabjar-skill-scanner = { path = "crabjar-skill-scanner" }
 dirs.workspace = true
 
 # Database

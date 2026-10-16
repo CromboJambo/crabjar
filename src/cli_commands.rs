@@ -284,6 +284,14 @@ pub enum ToolCommand {
         #[arg(long)]
         target: Option<String>,
     },
+    /// Scan a skill package for security issues
+    Scan {
+        /// Path to the skill package directory or zip file
+        path: String,
+        /// Expected checksum to verify (optional)
+        #[arg(long)]
+        checksum: Option<String>,
+    },
 }
 
 /// MCP client subcommands — connect to external MCP servers and call their tools

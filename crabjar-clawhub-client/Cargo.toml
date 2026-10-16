@@ -8,14 +8,15 @@ repository = "https://github.com/crombojambo/crabjar"
 description = "ClawHub.io registry client for CrabJar skill discovery and installation"
 
 [dependencies]
-reqwest = { version = "0.12", features = ["json", "gzip"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "gzip"], default-features = false }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 url = "2"
+crabjar-skill-scanner = { path = "../crabjar-skill-scanner", version = "0.12.0" }
 tempfile = "3"
 semver = "1.0"
 sha2 = "0.10"

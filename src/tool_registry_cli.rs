@@ -8,7 +8,7 @@ use crate::ToolCommand;
 
 use crabjar_github_client::{GitHubClient, SearchOptions};
 use crabjar_github_client::models::SortField;
-use crabjar_clawhub_client::{ClawHubClient, SecurityScanner};
+use crabjar_clawhub_client::ClawHubClient;
 
 /// Mapped tool row from a SQLite query.
 type ToolRow = (String, String, String, String, u32, f64, String);
@@ -41,6 +41,7 @@ pub async fn handle_tool_command(
         ToolCommand::Install { repo, target } => handle_github_install(repo, target).await,
         ToolCommand::ClawhubSearch { query, limit } => handle_clawhub_search(query, limit).await,
         ToolCommand::ClawhubInstall { name, version, target } => handle_clawhub_install(name, version, target).await,
+        ToolCommand::Scan { path, checksum } => handle_skill_scan(path, checksum),
     }
 }
 
@@ -492,7 +493,7 @@ async fn handle_clawhub_install(
     match client.download_skill(&name, version.as_deref(), temp_dir.path()).await {
         Ok(archive_path) => {
             // Run security scan before installation
-            let scanner = SecurityScanner::new();
+            let scanner = crabjar_skill_scanner::SkillScanner::new();
             let version_to_install = version.clone().unwrap_or_else(|| "latest".to_string());
             let scan_result = match scanner.scan(&name, &version_to_install, &archive_path) {
                 Ok(result) => result,
@@ -505,14 +506,17 @@ async fn handle_clawhub_install(
             };
 
             if !scan_result.passed {
+                let error_count = scan_result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Error).count();
+                let warning_count = scan_result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Warning).count();
+
                 return Ok(json!({
                     "success": false,
                     "clawhub_install": {
                         "name": name,
                         "version": version_to_install,
                         "status": "scan_failed",
-                        "errors": scan_result.errors,
-                        "warnings": scan_result.warnings,
+                        "error_count": error_count,
+                        "warning_count": warning_count,
                     }
                 }));
             }
@@ -550,8 +554,8 @@ async fn handle_clawhub_install(
                                         "tools_registered": count,
                                         "security_scan": {
                                             "passed": scan_result.passed,
-                                            "warnings": scan_result.warnings,
-                                            "permissions": scan_result.permissions,
+                                            "recommendation": format!("{}", scan_result.recommendation),
+                                            "files_scanned": scan_result.files_scanned,
                                         }
                                     }
                                 }));
@@ -572,7 +576,7 @@ async fn handle_clawhub_install(
                     "install_path": install_path.to_string_lossy().to_string(),
                     "security_scan": {
                         "passed": scan_result.passed,
-                        "warnings": scan_result.warnings,
+                        "recommendation": format!("{}", scan_result.recommendation),
                     },
                     "note": "installed but tool registry unavailable for binding",
                 }
@@ -581,6 +585,64 @@ async fn handle_clawhub_install(
         Err(e) => Ok(json!({
             "success": false,
             "error": format!("Failed to download skill: {}", e),
+        })),
+    }
+}
+
+/// Scan a skill package for security issues.
+fn handle_skill_scan(path: String, checksum: Option<String>) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let scanner = crabjar_skill_scanner::SkillScanner::new();
+    let package_path = std::path::PathBuf::from(&path);
+
+    if !package_path.exists() {
+        return Ok(json!({
+            "success": false,
+            "error": format!("Package path does not exist: {}", path),
+        }));
+    }
+
+    let scan_result = match checksum {
+        Some(expected) => scanner.scan_with_checksum("unknown", "unknown", &package_path, &expected),
+        None => scanner.scan("unknown", "unknown", &package_path),
+    };
+
+    match scan_result {
+        Ok(result) => {
+            let info_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Info).count();
+            let warn_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Warning).count();
+            let error_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Error).count();
+            let critical_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Critical).count();
+
+            let findings: Vec<serde_json::Value> = result.findings.iter().map(|f| {
+                json!({
+                    "severity": format!("{}", f.severity),
+                    "category": &f.category,
+                    "message": &f.message,
+                    "file": f.file.clone().unwrap_or_default(),
+                })
+            }).collect();
+
+            Ok(json!({
+                "success": true,
+                "scan": {
+                    "name": result.skill_name,
+                    "version": result.version,
+                    "passed": result.passed,
+                    "recommendation": format!("{}", result.recommendation),
+                    "info_count": info_count,
+                    "warning_count": warn_count,
+                    "error_count": error_count,
+                    "critical_count": critical_count,
+                    "files_scanned": result.files_scanned,
+                    "total_size_bytes": result.total_size_bytes,
+                    "checksum_verified": result.checksum_verified,
+                    "findings": findings,
+                }
+            }))
+        }
+        Err(e) => Ok(json!({
+            "success": false,
+            "error": format!("Scan failed: {}", e),
         })),
     }
 }

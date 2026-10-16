@@ -1673,6 +1673,7 @@ fn usage_lines() -> &'static [&'static str] {
         "crabjar tool install --repo=<org/repo> [--target=<path>]",
         "crabjar tool clawhub-search --query=<q> [--limit=10]",
         "crabjar tool clawhub-install --name=<skill> [--version=<ver>] [--target=<path>]",
+        "crabjar tool scan <path> [--checksum <sha256>]",
     ]
 }
 
