@@ -356,47 +356,41 @@ async fn handle_chat(
     }
 }
 
-/// Execute a binary with guard gate enforcement, capturing stdout/stderr.
-async fn execute_with_guard(
+/// Guard check + concierge enforcement — shared by all tool invocations.
+/// Returns Ok(()) if approved, Err with reason if pending/denied/gate error.
+fn guard_tool_call(
     tool_name: &str,
-    _args: &[String],
-    binary_path: &str,
-    project_root: &std::path::Path,
-    _store: &std::sync::Mutex<Store>,
-) -> Result<String, String> {
-    let guard_root = std::env::var("MIRROR_GUARD_ROOT")
-        .unwrap_or_else(|_| project_root.to_string_lossy().to_string());
+    args: &[String],
+    source_event_id: &str,
+) -> Result<(), String> {
+    let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| ".".to_string());
 
     let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(format!(
         "{}/guard.db",
         guard_root,
     )))
     .unwrap_or_else(|_| {
-        warn!("Failed to open guard DB for tool registry execution, using in-memory fallback");
+        warn!("Failed to open guard DB for '{}', using in-memory fallback", tool_name);
         crabjar_guard::GuardDb::open(":memory:").unwrap()
     });
 
     let gate = ExecutionGate::new(&guard_db, false, &guard_root);
-
-    // Construct scope for this orchestrator instance
     let actor_scope = crabjar_guard::Scope::project("orchestrator");
     let target_scope = actor_scope.clone();
-    let cross_scope_auth = None;
-
     let mut concierge = GateConcierge::new().with_db(guard_db.clone());
 
     match gate.check(GateContext {
         action_type: "tool_call",
         command: tool_name,
-        args: _args.to_vec(),
+        args: args.to_vec(),
         trust_layer: 2,
         confidence: crabjar_guard::TrustScore::new(0.5),
-        source_event_id: Some(&format!("orchestrator-tr-{}", tool_name)),
+        source_event_id: Some(source_event_id),
         can_interrupt: true,
         pid: None,
         scope: Some(actor_scope.clone()),
         target_scope: Some(target_scope.clone()),
-        cross_scope_auth,
+        cross_scope_auth: None,
         domains: vec![],
         context_budget: None,
         context_fragment_tokens: None,
@@ -406,53 +400,59 @@ async fn execute_with_guard(
                 result,
                 "tool_call",
                 tool_name,
-                _args,
+                args,
                 2,
                 0.5,
-                Some(format!("orchestrator-tr-{}", tool_name)),
+                Some(source_event_id.to_string()),
             );
 
             match status {
                 ActionStatus::TrustApproved => {
-                    info!("Gate concierge: Proceed — {} via tool registry", tool_name);
+                    info!("Gate concierge: Proceed — {}", tool_name);
+                    Ok(())
                 }
-                ActionStatus::Pending => {
-                    return Err(format!(
-                        "Pending: queued for review (pending_id: {})",
-                        pending_entry
-                            .as_ref()
-                            .map(|e| e.id.clone())
-                            .unwrap_or_default()
-                    ));
-                }
-                ActionStatus::Denied => {
-                    return Err(format!(
-                        "Interrupted: {} (interrupted_id: {})",
-                        interrupted_entry
-                            .as_ref()
-                            .map(|e| e.reason.clone())
-                            .unwrap_or_default(),
-                        interrupted_entry
-                            .as_ref()
-                            .map(|e| e.id.clone())
-                            .unwrap_or_default()
-                    ));
-                }
-                ActionStatus::Executed | ActionStatus::Interrupted => {
-                    return Err(
-                        "Status not handled by concierge for tool registry execution".to_string(),
-                    );
-                }
+                ActionStatus::Pending => Err(format!(
+                    "Pending: queued for review (pending_id: {})",
+                    pending_entry
+                        .as_ref()
+                        .map(|e| e.id.clone())
+                        .unwrap_or_default()
+                )),
+                ActionStatus::Denied => Err(format!(
+                    "Interrupted: {} (interrupted_id: {})",
+                    interrupted_entry
+                        .as_ref()
+                        .map(|e| e.reason.clone())
+                        .unwrap_or_default(),
+                    interrupted_entry
+                        .as_ref()
+                        .map(|e| e.id.clone())
+                        .unwrap_or_default()
+                )),
+                ActionStatus::Executed | ActionStatus::Interrupted => Err(
+                    "Status not handled by concierge".to_string(),
+                ),
             }
         }
         Err(e) => {
-            error!(
-                "Security gate error for registry tool '{}': {}",
-                tool_name, e
-            );
-            return Err(format!("Security gate error: {}", e));
+            error!("Security gate error for '{}': {}", tool_name, e);
+            Err(format!("Security gate error: {}", e))
         }
     }
+}
+
+/// Execute a binary with guard gate enforcement, capturing stdout/stderr.
+async fn execute_with_guard(
+    tool_name: &str,
+    _args: &[String],
+    binary_path: &str,
+    project_root: &std::path::Path,
+    _store: &std::sync::Mutex<Store>,
+) -> Result<String, String> {
+    let source_event_id = format!("orchestrator-tr-{}", tool_name);
+
+    // Guard check (shared helper)
+    guard_tool_call(tool_name, _args, &source_event_id)?;
 
     // Execute the binary
     let mut child = match tokio::process::Command::new(binary_path)
@@ -605,108 +605,7 @@ async fn execute_tool_call(
             let command_args = &args[1..];
 
             // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
-                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-            });
-
-            let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", guard_root),
-            ))
-            .unwrap_or_else(|_| {
-                warn!("Failed to open guard DB, using in-memory fallback");
-                crabjar_guard::GuardDb::open(":memory:").unwrap()
-            });
-
-            let gate = ExecutionGate::new(&guard_db, false, &guard_root);
-
-            // Construct scope for this orchestrator instance
-            let actor_scope = crabjar_guard::Scope::project("orchestrator");
-            let target_scope = actor_scope.clone();
-            let cross_scope_auth = None;
-
-            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
-
-            match gate.check(GateContext {
-                action_type: "tool_call",
-                command: tool,
-                args: command_args.to_vec(),
-                trust_layer: 2,
-                confidence: crabjar_guard::TrustScore::new(0.5),
-                source_event_id: Some("orchestrator-tc"),
-                can_interrupt: true,
-                pid: None,
-                scope: Some(actor_scope.clone()),
-                target_scope: Some(target_scope.clone()),
-                cross_scope_auth,
-                domains: vec![], // tool calls: no known domains at exec level
-                context_budget: None,
-                context_fragment_tokens: None,
-            }) {
-                Ok(result) => {
-                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
-                        result,
-                        "tool_call",
-                        tool,
-                        command_args,
-                        2,
-                        0.5,
-                        Some("orchestrator-tc".to_string()),
-                    );
-
-                    match status {
-                        ActionStatus::TrustApproved => {
-                            info!(
-                                "Gate concierge: Proceed — {} with args {:?}",
-                                tool, command_args
-                            );
-                        }
-                        ActionStatus::Pending => {
-                            if let Some(ref entry) = pending_entry {
-                                info!(
-                                    gate_result_id = %entry.gate_result_id,
-                                    pending_id = %entry.id,
-                                    "Gate concierge: Pending → PendingQueue — queued for review"
-                                );
-                            }
-                            return Err(format!(
-                                "Pending: queued for review (pending_id: {})",
-                                pending_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Denied => {
-                            if let Some(ref entry) = interrupted_entry {
-                                info!(
-                                    gate_result_id = %entry.gate_result_id,
-                                    interrupted_id = %entry.id,
-                                    reason = %entry.reason,
-                                    "Gate concierge: Interrupted → InterruptedLog"
-                                );
-                            }
-                            return Err(format!(
-                                "Interrupted: {} (interrupted_id: {})",
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.reason.clone())
-                                    .unwrap_or_default(),
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Executed | ActionStatus::Interrupted => {
-                            return Err("Status not handled by concierge".to_string());
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!("Security gate error: {}", e);
-                    return Err(format!("Security gate error: {}", e));
-                }
-            }
+            guard_tool_call(tool, command_args, "orchestrator-tc")?;
 
             let mut child = match tokio::process::Command::new(tool)
                 .args(command_args)
@@ -772,89 +671,15 @@ async fn execute_tool_call(
             Ok(output)
         }
         "search_logs" => {
-            // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
-                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-            });
-
-            let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/mirror.db", guard_root),
-            ))
-            .unwrap_or_else(|_| {
-                warn!("Failed to open guard DB for search_logs, using in-memory fallback");
-                crabjar_guard::GuardDb::open(":memory:").unwrap()
-            });
-
-            let gate = ExecutionGate::new(&guard_db, false, &guard_root);
-
-            // Construct scope for this orchestrator instance
-            let actor_scope = crabjar_guard::Scope::project("orchestrator");
-            let target_scope = actor_scope.clone();
-            let cross_scope_auth = None;
-
-            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
-
-            match gate.check(GateContext {
-                action_type: "tool_call",
-                command: "search_logs",
-                args: args.to_vec(),
-                trust_layer: 2,
-                confidence: crabjar_guard::TrustScore::new(0.5),
-                source_event_id: Some("orchestrator-sl"),
-                can_interrupt: true,
-                pid: None,
-                scope: Some(actor_scope.clone()),
-                target_scope: Some(target_scope.clone()),
-                cross_scope_auth,
-                domains: vec![],
-                context_budget: None,
-                context_fragment_tokens: None,
-            }) {
-                Ok(result) => {
-                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
-                        result,
-                        "tool_call",
-                        "search_logs",
-                        args,
-                        2,
-                        0.5,
-                        Some("orchestrator-sl".to_string()),
-                    );
-
-                    match status {
-                        ActionStatus::TrustApproved => {}
-                        ActionStatus::Pending => {
-                            return Err(format!(
-                                "Pending: queued for review (pending_id: {})",
-                                pending_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Denied => {
-                            return Err(format!(
-                                "Interrupted: {} (interrupted_id: {})",
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.reason.clone())
-                                    .unwrap_or_default(),
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Executed | ActionStatus::Interrupted => {
-                            return Err("Status not handled by concierge".to_string());
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!("Security gate error for search_logs: {}", e);
-                    return Err(format!("Security gate error: {}", e));
-                }
+            if args.len() < 2 {
+                return Err(
+                    "Error: search_logs requires at least 1 argument (query)".to_string(),
+                );
             }
+            let query = &args[0];
+
+            // Security layer: check command before execution with provenance.
+            guard_tool_call("search_logs", &[query.clone()], "orchestrator-tc")?;
 
             let search_req: SearchLogsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
@@ -900,88 +725,7 @@ async fn execute_tool_call(
         }
         "recent_events" => {
             // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
-                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-            });
-
-            let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/guard.db", guard_root),
-            ))
-            .unwrap_or_else(|_| {
-                warn!("Failed to open guard DB for recent_events, using in-memory fallback");
-                crabjar_guard::GuardDb::open(":memory:").unwrap()
-            });
-
-            let gate = ExecutionGate::new(&guard_db, false, &guard_root);
-
-            // Construct scope for this orchestrator instance
-            let actor_scope = crabjar_guard::Scope::project("orchestrator");
-            let target_scope = actor_scope.clone();
-            let cross_scope_auth = None;
-
-            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
-
-            match gate.check(GateContext {
-                action_type: "tool_call",
-                command: "recent_events",
-                args: args.to_vec(),
-                trust_layer: 2,
-                confidence: crabjar_guard::TrustScore::new(0.5),
-                source_event_id: Some("orchestrator-re"),
-                can_interrupt: true,
-                pid: None,
-                scope: Some(actor_scope.clone()),
-                target_scope: Some(target_scope.clone()),
-                cross_scope_auth,
-                domains: vec![],
-                context_budget: None,
-                context_fragment_tokens: None,
-            }) {
-                Ok(result) => {
-                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
-                        result,
-                        "tool_call",
-                        "recent_events",
-                        args,
-                        2,
-                        0.5,
-                        Some("orchestrator-re".to_string()),
-                    );
-
-                    match status {
-                        ActionStatus::TrustApproved => {}
-                        ActionStatus::Pending => {
-                            return Err(format!(
-                                "Pending: queued for review (pending_id: {})",
-                                pending_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Denied => {
-                            return Err(format!(
-                                "Interrupted: {} (interrupted_id: {})",
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.reason.clone())
-                                    .unwrap_or_default(),
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Executed | ActionStatus::Interrupted => {
-                            return Err("Status not handled by concierge".to_string());
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!("Security gate error for recent_events: {}", e);
-                    return Err(format!("Security gate error: {}", e));
-                }
-            }
+            guard_tool_call("recent_events", args, "orchestrator-re")?;
 
             let recent_req: RecentEventsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
@@ -1020,88 +764,7 @@ async fn execute_tool_call(
         }
         "by_source" => {
             // Security layer: check command before execution with provenance.
-            let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| {
-                std::env::var("CRABJAR_ROOT").unwrap_or_else(|_| ".".to_string())
-            });
-
-            let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(
-                format!("{}/guard.db", guard_root),
-            ))
-            .unwrap_or_else(|_| {
-                warn!("Failed to open guard DB for by_source, using in-memory fallback");
-                crabjar_guard::GuardDb::open(":memory:").unwrap()
-            });
-
-            let gate = ExecutionGate::new(&guard_db, false, &guard_root);
-
-            // Construct scope for this orchestrator instance
-            let actor_scope = crabjar_guard::Scope::project("orchestrator");
-            let target_scope = actor_scope.clone();
-            let cross_scope_auth = None;
-
-            let mut concierge = GateConcierge::new().with_db(guard_db.clone());
-
-            match gate.check(GateContext {
-                action_type: "tool_call",
-                command: "by_source",
-                args: args.to_vec(),
-                trust_layer: 2,
-                confidence: crabjar_guard::TrustScore::new(0.5),
-                source_event_id: Some("orchestrator-bs"),
-                can_interrupt: true,
-                pid: None,
-                scope: Some(actor_scope.clone()),
-                target_scope: Some(target_scope.clone()),
-                cross_scope_auth,
-                domains: vec![],
-                context_budget: None,
-                context_fragment_tokens: None,
-            }) {
-                Ok(result) => {
-                    let (status, pending_entry, interrupted_entry) = concierge.enforce(
-                        result,
-                        "tool_call",
-                        "by_source",
-                        args,
-                        2,
-                        0.5,
-                        Some("orchestrator-bs".to_string()),
-                    );
-
-                    match status {
-                        ActionStatus::TrustApproved => {}
-                        ActionStatus::Pending => {
-                            return Err(format!(
-                                "Pending: queued for review (pending_id: {})",
-                                pending_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Denied => {
-                            return Err(format!(
-                                "Interrupted: {} (interrupted_id: {})",
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.reason.clone())
-                                    .unwrap_or_default(),
-                                interrupted_entry
-                                    .as_ref()
-                                    .map(|e| e.id.clone())
-                                    .unwrap_or_default()
-                            ));
-                        }
-                        ActionStatus::Executed | ActionStatus::Interrupted => {
-                            return Err("Status not handled by concierge".to_string());
-                        }
-                    }
-                }
-                Err(e) => {
-                    error!("Security gate error for by_source: {}", e);
-                    return Err(format!("Security gate error: {}", e));
-                }
-            }
+            guard_tool_call("by_source", args, "orchestrator-bs")?;
 
             let source_req: BySourceRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
