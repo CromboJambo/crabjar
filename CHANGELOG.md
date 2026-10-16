@@ -2,6 +2,35 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## October 16, 2026 — Remote Skill Discovery Complete (Phases 8-11) + Test Infrastructure
+
+### Phase 11: Trust Management & Cache
+- **crabjar-trust-manager crate** — Trust tier management, version-aware skill cache (~/.crabjar/skill-cache/), update detection
+- CLI commands: `tool cache list`, `tool updates check`, `tool auth set`
+- Automatic trust level assignment based on source (ClawHub official → high, community → medium)
+
+### Phase 10: Checksum Verification
+- **crabjar-skill-scanner crate** — Security scanning pipeline with SHA-256 integrity verification
+- CLI command: `tool scan <name>` for security analysis of installed skills
+
+### Phase 9: ClawHub Integration
+- **crabjar-clawhub-client crate** — ClawHub.io registry API integration with trust tier mapping
+- CLI commands: `tool clawhub-search`, `tool clawhub-install`
+
+### Phase 8: GitHub Skill Discovery
+- **crabjar-github-client crate** — GitHub API client for skill search/install via crabjar-skill tags
+- CLI commands: `tool search`, `tool install`
+
+### Test Infrastructure (New)
+- **crabjar-test-registry crate** — Mock HTTP registry server for integration testing without network dependencies
+- Supports both ClawHub and GitHub-compatible API shapes with scenario-based test data
+- 8 passing integration tests validating discovery→install→scan→cache flow end-to-end
+
+### Architecture
+- All 4 remote discovery crates follow the glass abstraction boundary pattern
+- Workspace expanded from 25 to 30 members
+- Comprehensive test infrastructure spec at specs/TEST-INFRASTRUCTURE.md
+
 ## October 10, 2026 — Code Review Pipeline (crabjar-review)
 
 ### Full Pipeline Implementation (Phases 1-4 Complete)

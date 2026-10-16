@@ -167,6 +167,7 @@ crabjar/
 │       ├── report.rs        # ScanReport, Finding types
 │       └── error.rs         # ScannerError enum
 ├── crabjar-trust-manager/   # Trust tier management, skill cache, update detection (Phase 11)
+├── crabjar-test-registry/   # Mock HTTP registry server for integration testing (Phases 8-11)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
@@ -367,6 +368,7 @@ crabjar/
 | `crabjar-clawhub-client` | ClawHub.io registry API integration (Phase 9) | Remote Discovery | Active |
 | `crabjar-skill-scanner` | Security scanning pipeline + checksum verification (Phase 10) | Remote Discovery | Active |
 | `crabjar-trust-manager` | Trust tier management, skill cache, update detection (Phase 11) | Remote Discovery | Active |
+| `crabjar-test-registry` | Mock HTTP registry server for integration testing (Phases 8-11) | Testing | Active |
 | `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement (8-layer model) | Governance | Active |
 | `file_search` | BM25-based file indexing and search (Tantivy 0.22) | Search | Active |
@@ -392,6 +394,7 @@ crabjar/
 Declared in Cargo.toml `[workspace.members]`: 29 crates total.
 - **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
 - **Remote skill discovery** (Phases 8-11): `crabjar-github-client`, `crabjar-clawhub-client`, `crabjar-skill-scanner`, `crabjar-trust-manager`
+- **Test infrastructure**: `crabjar-test-registry` — mock HTTP registry for integration testing without network dependencies
 - **Plugin system**: `crabjar-plugin` (WASM runtime, lifecycle management)
 - **File search**: `file_search` (BM25 indexing with Tantivy 0.22)
 - **Terminal**: `crates/terminal` (wezterm/zellij backends + asciinema v2 recording)

@@ -18,6 +18,7 @@ Declared in `Cargo.toml` `[workspace.members]`:
 - `crabjar-clawhub-client` — ClawHub.io registry API integration with trust tier mapping (Phase 9)
 - `crabjar-skill-scanner` — Security scanning pipeline + SHA-256 checksum verification (Phase 10)
 - `crabjar-trust-manager` — Trust tier management, version-aware skill cache, update detection (Phase 11)
+- `crabjar-test-registry` — Mock HTTP registry server for integration testing (Phases 8-11)
 - `axum-mux` — Axum mux utilities
 - `crabjar-architecture` — mechanical dependency boundary enforcement (8-layer model)
 - `host/host-core` — core host runtime
