@@ -64,11 +64,11 @@ impl MockRegistryServer {
 }
 
 fn build_router(scenario: Arc<Mutex<Option<TestScenario>>>) -> Router {
-    // ClawHub endpoints
+    // ClawHub endpoints (match client API expectations)
     let clawhub = Router::new()
-        .route("/api/v1/skills", get(list_skills))
-        .route("/api/v1/skills/search", get(search_skills))
-        .route("/api/v1/skills/{name}", get(get_skill));
+        .route("/skills", get(list_skills))
+        .route("/skills/search", get(search_skills))
+        .route("/skills/{name}", get(get_skill));
 
     // Download endpoints
     let downloads = Router::new()

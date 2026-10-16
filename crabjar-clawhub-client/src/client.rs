@@ -20,25 +20,35 @@ const CLAWHUB_API_URL: &str = "https://clawhub.io/api/v1";
 pub struct ClawHubClient {
     http: Client,
     token: Option<String>,
+    base_url: String,
 }
 
 impl ClawHubClient {
-    /// Create a new ClawHub client.
+    /// Create a new ClawHub client with the default API URL.
     ///
     /// Automatically reads `CRABJAR_CLAWHUB_TOKEN` from environment if set.
     pub fn new() -> Self {
         let token = env::var("CRABJAR_CLAWHUB_TOKEN").ok();
-        Self::with_token(token)
+        Self::with_base_url(CLAWHUB_API_URL, token)
     }
 
     /// Create a client with an explicit token.
     pub fn with_token(token: Option<String>) -> Self {
+        Self::with_base_url(CLAWHUB_API_URL, token)
+    }
+
+    /// Create a new ClawHub client with a custom base URL (for testing).
+    pub fn with_base_url(base_url: &str, token: Option<String>) -> Self {
         let http = Client::builder()
             .user_agent("crabjar-clawhub-client/0.12")
             .build()
             .expect("Failed to build HTTP client");
 
-        Self { http, token }
+        Self {
+            http,
+            token,
+            base_url: base_url.to_string(),
+        }
     }
 
     /// Check if the client is authenticated.
@@ -48,7 +58,7 @@ impl ClawHubClient {
 
     /// List all available skills on ClawHub.
     pub async fn list_skills(&self, limit: u32) -> Result<Vec<SkillInfo>, ClawHubError> {
-        let url = format!("{}/skills?limit={}", CLAWHUB_API_URL, limit);
+        let url = format!("{}/skills?limit={}", self.base_url, limit);
         debug!("Listing skills from {}", url);
 
         let resp = self.get(&url).await?;
@@ -73,7 +83,7 @@ impl ClawHubClient {
     pub async fn search_skills(&self, options: SearchOptions) -> Result<Vec<SkillInfo>, ClawHubError> {
         let url = format!(
             "{}/skills/search?q={}&limit={}&offset={}",
-            CLAWHUB_API_URL,
+            self.base_url,
             options.query,
             options.limit,
             options.offset
@@ -100,7 +110,7 @@ impl ClawHubClient {
 
     /// Get information about a specific skill.
     pub async fn get_skill(&self, name: &str) -> Result<SkillInfo, ClawHubError> {
-        let url = format!("{}/skills/{}", CLAWHUB_API_URL, name);
+        let url = format!("{}/skills/{}", self.base_url, name);
         debug!("Getting skill info for {}", name);
 
         let resp = self.get(&url).await?;
