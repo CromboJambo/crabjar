@@ -243,6 +243,28 @@ pub enum ToolCommand {
         /// Tool name to remove
         name: String,
     },
+    /// Search for CrabJar skills on GitHub by tag
+    Search {
+        /// Search query (optional — defaults to all crabjar-skill tagged repos)
+        query: Option<String>,
+        /// Minimum star count filter
+        #[arg(long)]
+        stars: Option<u32>,
+        /// Sort field (stars, updated, name)
+        #[arg(long, default_value = "stars")]
+        sort: String,
+        /// Maximum results to return
+        #[arg(long, default_value = "10")]
+        limit: u32,
+    },
+    /// Install a skill from a GitHub repository
+    Install {
+        /// GitHub repository (owner/repo format)
+        repo: String,
+        /// Installation directory (default: ~/.crabjar/skills)
+        #[arg(long)]
+        target: Option<String>,
+    },
 }
 
 /// MCP client subcommands — connect to external MCP servers and call their tools
