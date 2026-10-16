@@ -292,6 +292,31 @@ pub enum ToolCommand {
         #[arg(long)]
         checksum: Option<String>,
     },
+    /// Manage the skill cache
+    Cache {
+        /// Cache subcommand
+        #[command(subcommand)]
+        action: ToolCacheCommand,
+    },
+    /// Check for skill updates
+    Updates {
+        /// Skill name to check (optional — checks all if omitted)
+        name: Option<String>,
+    },
+}
+
+/// Skill cache management subcommands
+#[derive(Debug, Subcommand, Clone)]
+pub enum ToolCacheCommand {
+    /// List cached skills
+    List,
+    /// Remove a skill from the cache
+    Remove {
+        /// Skill name to remove
+        name: String,
+    },
+    /// Clean up stale cache entries (>30 days)
+    Clean,
 }
 
 /// MCP client subcommands — connect to external MCP servers and call their tools

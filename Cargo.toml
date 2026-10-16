@@ -56,6 +56,7 @@ members = [
  "crabjar-analyze", "crabjar-review", "crabjar-mcp-tool-registry", "crabjar-skills", "crabjar-tool-binding", "crabjar-skill-example", "crabjar-skill-context", "crabjar-mcp-client",    "crabjar-github-client",
     "crabjar-clawhub-client",
     "crabjar-skill-scanner",
+    "crabjar-trust-manager",
 ]
 
 resolver = "2"
@@ -243,6 +244,7 @@ crabjar-mcp-client = { path = "crabjar-mcp-client" }
 crabjar-github-client = { path = "crabjar-github-client" }
 crabjar-clawhub-client = { path = "crabjar-clawhub-client" }
 crabjar-skill-scanner = { path = "crabjar-skill-scanner" }
+crabjar-trust-manager = { path = "crabjar-trust-manager" }
 dirs.workspace = true
 
 # Database
