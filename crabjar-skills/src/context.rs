@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub mod persistence;
-
 /// Execution context provided to loaded skills.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillContext {

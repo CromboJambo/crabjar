@@ -38,7 +38,11 @@
 pub mod error;
 pub mod loader;
 pub mod manifest;
+pub mod example;
+pub mod context;
 
 pub use error::SkillError;
 pub use loader::{LoadedSkill, SkillLoader};
 pub use manifest::{ContextRequirements, Dependency, SkillManifest, ToolDefinition};
+pub use example::create_example_skill_manifest;
+pub use context::SkillContext;

@@ -31,6 +31,23 @@ All notable changes to crabjar, organized chronologically. Completed work moves 
 - Workspace expanded from 25 to 30 members
 - Comprehensive test infrastructure spec at specs/TEST-INFRASTRUCTURE.md
 
+## October 16, 2026 — Structural Refactoring (Phase 1: Remove Tape)
+
+### Crate Consolidation
+- **Removed `crabjar-mcp-client`** — Incomplete placeholder implementation (90 lines), unused by any other crate
+- **Consolidated `crabjar-skill-example` into `crabjar-skills`** — Moved example skill manifest creation to `crabjar-skills/src/example.rs` module with tests
+- **Consolidated `crabjar-skill-context` into `crabjar-skills`** — Moved SkillContext struct and methods to `crabjar-skills/src/context.rs` module with tests
+
+### Workspace Changes
+- Workspace reduced from 60 to 57 packages (after removing 3 crates)
+- All existing tests pass (14 tests in crabjar-skills, including newly consolidated example and context tests)
+- No documentation updates needed — removed crates were not referenced in README.md or project_map.md
+
+### Next Steps
+- Phase 2: Improve abstractions in `host/host-agent` (15 workspace imports → facade pattern)
+- Phase 3: Clean up dependencies (fix xattr compilation error, remove unused deps)
+- Phase 4: Overengineer critical paths (comprehensive error handling, improved test coverage)
+
 ## October 10, 2026 — Code Review Pipeline (crabjar-review)
 
 ### Full Pipeline Implementation (Phases 1-4 Complete)
