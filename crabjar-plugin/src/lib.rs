@@ -149,14 +149,34 @@ pub trait Plugin: Send + Sync {
         vec![Capability::ToolExecute] // Default: at least tool execution
     }
 
-    /// Called when the host starts up. Plugin initializes its state.
-    async fn on_start(&mut self, _ctx: &PluginContext) -> Result<(), PluginError> {
-        Ok(())
+    /// Called when the plugin is loaded/registered. Initializes state.
+    fn on_load(&self) {
+        info!("plugin '{}' loaded", self.name());
     }
 
-    /// Called when the host is shutting down. Clean up resources.
-    async fn on_stop(&mut self, _ctx: &PluginContext) -> Result<(), PluginError> {
-        Ok(())
+    /// Called when the plugin is unloaded/unregistered. Clean up resources.
+    fn on_unload(&self) {
+        info!("plugin '{}' unloaded", self.name());
+    }
+
+    /// Called when a tool execution fails with an error.
+    fn on_error(&self, tool_name: &str, error: &PluginError) {
+        warn!(
+            plugin = self.name(),
+            tool = tool_name,
+            error = %error,
+            "plugin tool execution error"
+        );
+    }
+
+    /// Legacy alias for on_load — called when the host starts up.
+    fn on_start(&self) {
+        self.on_load();
+    }
+
+    /// Legacy alias for on_unload — called when the host is shutting down.
+    fn on_stop(&self) {
+        self.on_unload();
     }
 
     /// Health check — returns plugin status info.
@@ -447,6 +467,54 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Call on_load hook for a registered plugin.
+    pub async fn load(&self, name: &str) -> Result<(), PluginError> {
+        let plugins = self.plugins.read().await;
+        let (plugin_name, plugin) = plugins.iter().find(|(n, _)| n == name).ok_or_else(|| {
+            PluginError::NotFound(name.to_string())
+        })?;
+
+        plugin.on_load();
+        Ok(())
+    }
+
+    /// Call on_unload hook for a registered plugin.
+    pub async fn unload(&self, name: &str) -> Result<(), PluginError> {
+        let plugins = self.plugins.read().await;
+        let (plugin_name, _) = plugins.iter().find(|(n, _)| n == name).ok_or_else(|| {
+            PluginError::NotFound(name.to_string())
+        })?;
+
+        let plugin = self.get(plugin_name).await.ok_or_else(|| {
+            PluginError::NotFound(name.to_string())
+        })?;
+
+        plugin.on_unload();
+        info!("plugin '{}' unloaded", name);
+        Ok(())
+    }
+
+    /// Unregister a plugin by name (calls on_unload first).
+    pub async fn unregister(&self, name: &str) -> Result<(), PluginError> {
+        // Call on_unload hook before removal
+        let plugins = self.plugins.read().await;
+        if !plugins.iter().any(|(n, _)| n == name) {
+            return Err(PluginError::NotFound(name.to_string()));
+        }
+
+        let plugin = self.get(name).await.ok_or_else(|| {
+            PluginError::NotFound(name.to_string())
+        })?;
+
+        plugin.on_unload();
+
+        // Remove from registry
+        let mut plugins = self.plugins.write().await;
+        plugins.retain(|(n, _)| n != name);
+        info!("plugin '{}' unregistered", name);
+        Ok(())
+    }
+
     /// Get a plugin by name.
     pub async fn get(&self, name: &str) -> Option<std::sync::Arc<dyn Plugin>> {
         let plugins = self.plugins.read().await;
@@ -475,10 +543,17 @@ impl PluginRegistry {
         args: serde_json::Value,
     ) -> Result<ToolResult, PluginError> {
         let plugins = self.plugins.read().await;
-        for (_name, plugin) in plugins.iter() {
+        for (plugin_name, plugin) in plugins.iter() {
             let tools = plugin.list_tools();
             if tools.iter().any(|t| t.name == tool_name) {
-                return plugin.execute_tool(tool_name, args).await;
+                match plugin.execute_tool(tool_name, args).await {
+                    Ok(result) => return Ok(result),
+                    Err(e) => {
+                        // Call on_error hook before propagating
+                        plugin.on_error(tool_name, &e);
+                        return Err(e);
+                    }
+                }
             }
         }
         Err(PluginError::NotFound(format!(
