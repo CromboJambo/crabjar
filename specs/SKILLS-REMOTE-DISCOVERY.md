@@ -199,11 +199,11 @@ crabjar-agent
 
 ## Success Metrics
 
-- [ ] Can search for skills on GitHub by name/description
-- [ ] Can install a skill from a GitHub repository URL
-- [ ] Can search for skills on ClawHub by name/description/tags
-- [ ] Can install a skill from ClawHub registry
-- [ ] Security scanner detects binary files, network access, filesystem writes
+- [x] Can search for skills on GitHub by name/description
+- [x] Can install a skill from a GitHub repository URL
+- [x] Can search for skills on ClawHub by name/description/tags
+- [x] Can install a skill from ClawHub registry
+- [x] Security scanner detects binary files, network access, filesystem writes
 - [ ] Checksum verification rejects corrupted downloads
 - [ ] Trust tiers mapped to CrabJar execution policies
 - [ ] Skill cache manages versions and stale entries
