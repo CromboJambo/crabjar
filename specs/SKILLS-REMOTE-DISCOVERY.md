@@ -204,7 +204,7 @@ crabjar-agent
 - [x] Can search for skills on ClawHub by name/description/tags
 - [x] Can install a skill from ClawHub registry
 - [x] Security scanner detects binary files, network access, filesystem writes
-- [ ] Checksum verification rejects corrupted downloads
+- [x] Checksum verification rejects corrupted downloads
 - [ ] Trust tiers mapped to CrabJar execution policies
 - [ ] Skill cache manages versions and stale entries
 - [ ] Update detection notifies about newer skill versions
