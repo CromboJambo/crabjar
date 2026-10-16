@@ -1,0 +1,26 @@
+[package]
+name = "crabjar-tool-binding"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+description.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+crabjar-skills = { path = "../crabjar-skills" }
+crabjar-tool-registry = { path = "../tool_registry", package = "crabjar-tool-registry" }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+rusqlite.workspace = true
+
+[lints]
+workspace = true
