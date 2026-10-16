@@ -492,6 +492,60 @@ impl PluginRegistry {
         // Filesystem discovery is pending — scans `dir/` for binaries matching known plugin patterns.
         vec![]
     }
+
+    /// Bind all plugin tools to the tool registry via the tool binder.
+    ///
+    /// Converts each plugin's ToolDefinitions into LoadedSkill wrappers and
+    /// registers them with the tool registry for unified discovery.
+    pub async fn bind_to_registry(
+        &self,
+        registry: &crabjar_tool_registry::ToolRegistry<'_>,
+    ) -> Result<usize, crabjar_tool_binding::BindingError> {
+        use crabjar_skills::{LoadedSkill, SkillManifest};
+        use crabjar_tool_binding::ToolBinder;
+
+        let plugins = self.plugins.read().await;
+        let binder = ToolBinder::new(registry);
+
+        let mut total_bound = 0;
+
+        for (name, plugin) in plugins.iter() {
+            // Convert plugin tools to skill manifest format
+            let tools: Vec<crabjar_skills::ToolDefinition> = plugin
+                .list_tools()
+                .into_iter()
+                .map(|t| crabjar_skills::ToolDefinition {
+                    name: t.name,
+                    description: t.description,
+                    parameters: t.parameters,
+                    execution_policy: "low_risk".to_string(), // Default for plugins
+                    trust_layer: 3,
+                })
+                .collect();
+
+            let manifest = SkillManifest {
+                name: format!("plugin-{}", name),
+                version: plugin.version().to_string(),
+                description: format!("Plugin: {}", name),
+                author: Some("crabjar-plugin".to_string()),
+                license: None,
+                tools,
+                dependencies: Vec::new(),
+                context_requirements: None,
+            };
+
+            let loaded_skill = LoadedSkill {
+                manifest,
+                path: PathBuf::from("/tmp/plugin-binding"), // Placeholder path
+            };
+
+            let bound = binder.bind_skill(&loaded_skill)?;
+            total_bound += bound;
+        }
+
+        info!(bound = total_bound, "bound plugin tools to registry");
+        Ok(total_bound)
+    }
 }
 
 #[cfg(test)]
@@ -653,5 +707,33 @@ mod tests {
         let deserialized: ToolResult = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.stdout, "hello");
         assert_eq!(deserialized.exit_code, 0);
+    }
+
+    #[tokio::test]
+    async fn test_bind_plugins_to_registry() {
+        let plugin_registry = PluginRegistry::new();
+        plugin_registry
+            .register(
+                "test-plugin".to_string(),
+                std::sync::Arc::new(MockPlugin::new("test-plugin")),
+            )
+            .await
+            .unwrap();
+
+        // Create tool registry in temp dir
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let db_path = tmp_dir.path().join("tool_registry.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let tool_registry = crabjar_tool_registry::ToolRegistry::new(&conn);
+        tool_registry.init().unwrap();
+
+        // Bind plugin tools to registry
+        let bound = plugin_registry.bind_to_registry(&tool_registry).await.unwrap();
+        assert_eq!(bound, 1); // One tool from the mock plugin
+
+        // Verify tool is discoverable in registry
+        let all_tools = tool_registry.list_all(10).unwrap();
+        assert_eq!(all_tools.len(), 1);
+        assert_eq!(all_tools[0].name, "test-plugin.test");
     }
 }

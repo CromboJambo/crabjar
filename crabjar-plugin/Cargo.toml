@@ -29,6 +29,10 @@ tracing = { workspace = true }
 # CrabJar libs (for shared types)
 crabjar-guard = { path = "../guard" }
 crabjar-telemetry = { path = "../telemetry" }
+crabjar-tool-registry = { path = "../tool_registry" }
+crabjar-tool-binding = { path = "../crabjar-tool-binding" }
+crabjar-skills = { path = "../crabjar-skills" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+rusqlite.workspace = true
