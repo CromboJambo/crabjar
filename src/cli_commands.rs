@@ -245,6 +245,32 @@ pub enum ToolCommand {
     },
 }
 
+/// MCP client subcommands — connect to external MCP servers and call their tools
+#[derive(Debug, Subcommand, Clone)]
+pub enum McpCommand {
+    /// List tools available on an external MCP server (stdio transport)
+    Tools {
+        /// Program to spawn as the MCP server
+        program: String,
+        /// Arguments to pass to the MCP server
+        #[arg(num_args(0..))]
+        args: Vec<String>,
+    },
+    /// Call a tool on an external MCP server (stdio transport)
+    Call {
+        /// Program to spawn as the MCP server
+        program: String,
+        /// Arguments to pass to the MCP server
+        #[arg(num_args(0..))]
+        server_args: Vec<String>,
+        /// Tool name to call
+        tool: String,
+        /// JSON arguments for the tool (default: {})
+        #[arg(long, default_value = "{}")]
+        params: String,
+    },
+}
+
 #[derive(Debug, Subcommand, Clone)]
 pub enum GuardCommand {
     /// List pending queue entries

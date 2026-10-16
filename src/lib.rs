@@ -103,6 +103,12 @@ pub enum CliCommand {
         command: ToolCommand,
     },
 
+    /// MCP client — connect to external MCP servers and call their tools
+    Mcp {
+        #[command(subcommand)]
+        command: McpCommand,
+    },
+
     /// Workspace metrics (tests, modules, LoC, clippy)
     Metrics {
         #[command(subcommand)]

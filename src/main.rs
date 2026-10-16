@@ -10,12 +10,13 @@ mod knowledge_store;
 mod metrics;
 mod project_loader;
 mod tool_registry_cli;
+mod mcp_client_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
 mod commands;
 use crabjar_lib::{
     AttemptsCommand, BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
-    HabitatCommand, KnowledgeCommand, MetricsCommand, SlowFriendCommand, ToolCommand,
+    HabitatCommand, KnowledgeCommand, McpCommand, MetricsCommand, SlowFriendCommand, ToolCommand,
 };
 use crabjar_slow_friend::action::ActionClass;
 use crabjar_slow_friend::autonomy::{AutonomyLevel, AutonomyTracker};
@@ -26,6 +27,7 @@ use knowledge_store::commands::KnowledgeCommandExt;
 use metrics::{run_module_sizes, run_test_count};
 use project_loader::ProjectLoader;
 use tool_registry_cli::handle_tool_command;
+use mcp_client_cli::handle_mcp_command;
 
 fn is_help_request(args: &[String]) -> bool {
     args.iter()
@@ -109,6 +111,9 @@ async fn main() {
         Some(CliCommand::Backend { command }) => handle_backend_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Tool { command }) => handle_tool_command(command)
+            .await
+            .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Mcp { command }) => handle_mcp_command(command)
             .await
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Metrics { command }) => handle_metrics_command(command)
