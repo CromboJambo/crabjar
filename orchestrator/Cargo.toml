@@ -13,7 +13,6 @@ documentation.workspace = true
 # Async runtime
 async-trait.workspace = true
 tokio.workspace = true
-tokio-stream = { version = "0.1", features = ["time"] }
 futures-util = "0.3"
 
 # Serialization & JSON
@@ -30,12 +29,11 @@ thiserror.workspace = true
 anyhow = "1.0"
 
 # Utilities
-uuid.workspace = true
-chrono.workspace = true
-rusqlite.workspace = true
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sha2 = "0.10"
+rusqlite.workspace = true
+uuid.workspace = true
 
 # Security layer
 crabjar-guard = { path = "../guard" }
@@ -54,5 +52,4 @@ crabjar-tool-registry = { path = "../tool_registry" }
 futures.workspace = true
 
 # Testing
-tempfile = "3.10"
 serial_test = "3.2"
