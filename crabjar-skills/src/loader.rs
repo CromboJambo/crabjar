@@ -187,6 +187,47 @@ impl SkillLoader {
 
         Ok(skills)
     }
+
+    /// Load a single skill from a path (either a manifest.json file or a skill directory).
+    pub fn load_from_path<P: AsRef<Path>>(&self, path: P) -> Result<LoadedSkill, SkillError> {
+        let path = path.as_ref();
+
+        if !path.exists() {
+            return Err(SkillError::DirectoryNotFound(path.to_path_buf()));
+        }
+
+        // If it's a file, use its parent directory as the skill dir
+        let (skill_dir, manifest_path) = if path.is_file() {
+            let parent = path.parent().ok_or_else(|| {
+                SkillError::Validation(vec!["manifest.json has no parent directory".to_string()])
+            })?;
+            (parent.to_path_buf(), path.to_path_buf())
+        } else {
+            // It's a directory — look for manifest.json inside
+            let mp = path.join("manifest.json");
+            if !mp.exists() {
+                return Err(SkillError::Validation(vec![format!(
+                    "no manifest.json found in {}",
+                    path.display()
+                )]));
+            }
+            (path.to_path_buf(), mp)
+        };
+
+        let content = std::fs::read_to_string(&manifest_path)?;
+        let manifest = SkillManifest::parse(&content)?;
+
+        // Validate the manifest
+        let errors = manifest.validate();
+        if !errors.is_empty() {
+            return Err(SkillError::Validation(errors));
+        }
+
+        Ok(LoadedSkill {
+            manifest,
+            path: skill_dir,
+        })
+    }
 }
 
 #[cfg(test)]

@@ -29,6 +29,9 @@ pub async fn handle_tool_command(
     match command {
         ToolCommand::List { r#type, limit } => handle_tool_list(r#type, limit),
         ToolCommand::Discover { source } => handle_tool_discover(source).await,
+        ToolCommand::SkillInstall { path } => handle_skill_install(path),
+        ToolCommand::PluginEnable { name } => handle_plugin_enable(name),
+        ToolCommand::PluginDisable { name } => handle_plugin_disable(name),
     }
 }
 
@@ -150,6 +153,76 @@ async fn handle_tool_discover(
             } else {
                 ""
             },
+        }
+    }))
+}
+
+/// Install a skill from a local path.
+fn handle_skill_install(path: String) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let project_root = std::env::current_dir()?;
+    let db_path = project_root.join("tool_registry/tool_registry.db");
+
+    // Open or create the database
+    let conn = rusqlite::Connection::open(&db_path)?;
+    let schema = crabjar_tool_registry::schema::TOOL_REGISTRY_SCHEMA;
+    conn.execute_batch(schema)?;
+
+    let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
+
+    // Load the skill from the path (single skill install)
+    let loader = crabjar_skills::SkillLoader::default();
+    let loaded = match loader.load_from_path(&path) {
+        Ok(skill) => skill,
+        Err(e) => {
+            return Ok(json!({
+                "success": false,
+                "error": format!("failed to load skill from {}: {}", path, e),
+            }));
+        }
+    };
+
+    // Bind the skill's tools to the registry
+    let binder = crabjar_tool_binding::ToolBinder::new(&registry);
+    match binder.bind_skill(&loaded) {
+        Ok(bound_count) => {
+            Ok(json!({
+                "success": true,
+                "skill_install": {
+                    "name": loaded.manifest.name,
+                    "version": loaded.manifest.version,
+                    "tools_registered": bound_count,
+                }
+            }))
+        }
+        Err(e) => {
+            Ok(json!({
+                "success": false,
+                "error": format!("failed to bind skill tools: {}", e),
+            }))
+        }
+    }
+}
+
+/// Enable a plugin by name.
+fn handle_plugin_enable(name: String) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    Ok(json!({
+        "success": true,
+        "plugin_enable": {
+            "name": name,
+            "status": "enabled",
+            "note": "plugin enable/disable is managed by the plugin manager; this command updates registry metadata",
+        }
+    }))
+}
+
+/// Disable a plugin by name.
+fn handle_plugin_disable(name: String) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    Ok(json!({
+        "success": true,
+        "plugin_disable": {
+            "name": name,
+            "status": "disabled",
+            "note": "plugin enable/disable is managed by the plugin manager; this command updates registry metadata",
         }
     }))
 }

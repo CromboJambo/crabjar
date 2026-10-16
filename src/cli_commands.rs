@@ -223,6 +223,21 @@ pub enum ToolCommand {
         #[arg(short, long, default_value = "cli")]
         source: String,
     },
+    /// Install a skill from a local path (loads manifest and registers tools)
+    SkillInstall {
+        /// Path to the skill directory or manifest.json file
+        path: String,
+    },
+    /// Enable a plugin by name
+    PluginEnable {
+        /// Plugin name
+        name: String,
+    },
+    /// Disable a plugin by name
+    PluginDisable {
+        /// Plugin name
+        name: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
