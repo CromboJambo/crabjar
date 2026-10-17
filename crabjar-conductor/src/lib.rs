@@ -23,6 +23,7 @@
 pub mod api;
 pub mod auth;
 pub mod conductor;
+pub mod decision;
 pub mod gate;
 pub mod state_store;
 pub mod task_scheduler;

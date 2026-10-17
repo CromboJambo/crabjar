@@ -1,6 +1,7 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
 use crate::auth;
+use crate::decision::{BackendConfig, DecisionGate, DecisionPolicy};
 use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assign};
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
@@ -27,24 +28,86 @@ impl Default for ConductorConfig {
 pub struct Conductor {
     store: StateStore,
     config: ConductorConfig,
+    decision_gate: Option<DecisionGate>,
 }
 
 impl Conductor {
     /// Create a new conductor with an in-memory database (for testing).
     pub fn new(config: ConductorConfig) -> Result<Self> {
         let store = StateStore::open(":memory:")?;
-        Ok(Self { store, config })
+        Ok(Self { store, config, decision_gate: None })
     }
 
     /// Create a conductor with a specific database path.
     pub fn with_db(config: ConductorConfig, db_path: &str) -> Result<Self> {
         let store = StateStore::open(db_path)?;
-        Ok(Self { store, config })
+        Ok(Self { store, config, decision_gate: None })
+    }
+
+    /// Configure JEV decision gate for automated fleet decisions.
+    pub fn with_decision_gate(&mut self, backend_config: BackendConfig, policy: Option<DecisionPolicy>) {
+        let evaluator = crate::decision::evaluate::JevEvaluator::new(backend_config);
+        self.decision_gate = Some(DecisionGate::new(evaluator, policy));
+    }
+
+    /// Get a summary of the current fleet state for JEV evaluation context.
+    fn get_fleet_state_summary(&self) -> String {
+        let workers = self.list_workers();
+        let online_workers: Vec<&Worker> = workers
+            .iter()
+            .filter(|w| w.status == WorkerStatus::Online)
+            .collect();
+
+        let ready_tasks = match self.store.get_ready_tasks() {
+            Ok(tasks) => tasks.len(),
+            Err(_) => 0,
+        };
+
+        format!(
+            "{} workers online ({} total), {} ready tasks in queue",
+            online_workers.len(),
+            workers.len(),
+            ready_tasks
+        )
     }
 
     /// Submit a new goal for decomposition and execution.
     pub fn submit_goal(&self, description: String) -> Result<Goal> {
         info!(description = %description, "Submitting new goal");
+
+        // Pre-execution readiness check via JEV decision gate
+        if let Some(gate) = &self.decision_gate {
+            let fleet_state = self.get_fleet_state_summary();
+            match tokio::runtime::Handle::current().block_on(
+                gate.evaluate_pre_execution(&description, &fleet_state, None)
+            ) {
+                Ok(result) => {
+                    info!(
+                        goal_description = %description,
+                        decision = %result.result.option,
+                        confidence = result.result.confidence,
+                        "JEV pre-execution readiness check"
+                    );
+
+                    if result.result.option == "abort" {
+                        return Err(anyhow::anyhow!(
+                            "JEV decision gate: fleet not ready for goal '{}'. Rationale: {}",
+                            description,
+                            result.result.rationale
+                        ));
+                    } else if result.result.option == "hold" {
+                        warn!(
+                            goal_description = %description,
+                            "JEV decision gate recommends holding goal due to fleet state"
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!("JEV pre-execution check failed: {}", e);
+                    // Continue without JEV if evaluation fails
+                }
+            }
+        }
 
         // Create the goal record
         let goal = self.store.create_goal(description.clone())?;
