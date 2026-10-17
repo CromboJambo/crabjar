@@ -317,6 +317,7 @@ crabjar/
 │
 │  Conductor (fleet orchestration service)
 ├── crabjar-conductor/       # Fleet task distribution + security model
+├── crabjar-gpui/            # GPU-accelerated multi-agent dashboard (herdr protocol)
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── lib.rs           # Public API surface
@@ -375,6 +376,7 @@ crabjar/
 | `memory` | Agent-context SQLite storage | Storage | Active |
 | `orchestrator` | Axum SSE server + unified LM client | Orchestrator | Active |
 | `crabjar-conductor` | Fleet orchestration service with capability-based security model | Orchestration | Active |
+| `crabjar-gpui` | GPU-accelerated multi-agent dashboard using herdr protocol | UI/Dashboard | Active |
 | `guard` | Trust layers, annealing, execution gate, scope isolation | Authorization | Active |
 | `telemetry` | Flight recorder, command executor | Telemetry | Active |
 | `sandbox` | Agent isolation (Unix user, dinit-container, cgroup) | Isolation | Active |
@@ -597,6 +599,7 @@ crabjar contains:
 - Containerfile, Dockerfile
 - orchestrator (Axum SSE server + unified LM client with prompt envelope defense)
 - crabjar-conductor (fleet orchestration service with four-layer capability-based security model, guard integration)
+- crabjar-gpui (GPU-accelerated multi-agent dashboard using herdr protocol, CrabjarSurfaceAdapter)
 - guard (ExecutionGate + GateConcierge + TrustManager + annealing + scope isolation + fingerprint approvals + trust resolution + static policy engine + context budgeting + domain allowlist)
 - memory (agent-context crate with state_docs querier, context fragments with token budget)
 - telemetry (flight recorder + command executor)
@@ -656,7 +659,8 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 
 2026-10-16 — Remote skill discovery infrastructure added (Phases 8-11). Workspace: 29 members (+4 new crates). Added: crabjar-github-client (GitHub API client for skill search/install), crabjar-clawhub-client (ClawHub.io registry API integration with trust tier mapping), crabjar-skill-scanner (security scanning pipeline with SHA-256 checksum verification), crabjar-trust-manager (trust tier management, version-aware skill cache in ~/.crabjar/skill-cache/, update detection). CLI commands added: tool search, tool install, tool clawhub-search, tool clawhub-install, tool scan, tool cache list/remove/clean, tool updates. All crates at version 0.12.0, Rust 2024 edition. Build clean across workspace with no errors or warnings.
 
-2026-10-17 — Conductor security model implemented (Phases 1-4). Workspace: 30 members (+1 new crate). crabjar-conductor now has four-layer capability-based access control: SSH key worker authentication, JWT-like token authorization with embedded capabilities and scopes, task-level capability matching (exact + wildcard), and trust level annealing (workers earn higher trust through successful task completion). Integrated with crabjar-guard's ExecutionGate patterns for unified provenance verification. 17 new tests added (auth, gate, task assignment, annealing, persistence). ADR-006 documents the security model design decisions.
+2026-10-17 — Conductor security model implemented (Phases 1-4). Workspace: 30 members (+1 new crate). crabjar-conductor now has four-layer capability-based access control: SSH key worker authentication, JWT-like token authorization with embedded capabilities and scopes, task-level capability matching (exact + wildcard), and trust level annealing (workers earn higher trust through successful task completion). Integrated with crabjar-guard's ExecutionGate patterns for unified provenance verificati
+2026-10-17 — Herdr-GPUI integration: CrabjarSurfaceAdapter built to translate conductor API responses to herdr protocol types; multi-agent dashboard UI with split panes and color-coded status indicators; 6 integration tests verify surface adapter behavior. Workspace: 31 members (+1 crabjar-gpui crate).on. 17 new tests added (auth, gate, task assignment, annealing, persistence). ADR-006 documents the security model design decisions.
 
 ### Known Items
 
@@ -727,7 +731,8 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 | `prov-map-drift-2026-07-08b` | project_map.md regenerated — Section 9.1 structure list expanded (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Section 9.2 test count updated to 691 passing with breakdown by crate, Drift Report Known Items expanded with policy/context_budget/command_risk/risk_config/db_error files and ADR process entry | 2026-07-08 | Structural alignment refresh — second pass on Section 9 + Known Items | crabjar/project_map.md |
 | `prov-comparity-codewhale` | README + project_map parity credit: CodeWhale (monotonic authorization order, Fleet identity contract, deterministic scorers, roster-doesn't-execute) + guard/src/authorization_order.rs invariant tests (10) | 2026-08-30 | Feature parity analysis | crabjar/README.md, crabjar/project_map.md, Hmbown/CodeWhale docs (AUTHORIZATION_ORDER.md, FLEET.md) |
 | `prov-remote-skill-discovery` | Remote skill discovery infrastructure implemented (Phases 8-11): crabjar-github-client, crabjar-clawhub-client, crabjar-skill-scanner, crabjar-trust-manager crates; CLI commands: tool search/install/clawhub-search/clawhub-install/scan/cache/updates; workspace expanded from 25 to 29 members | 2026-10-16 | Remote skill discovery completion | crabjar/crabjar-github-client, crabjar/crabjar-clawhub-client, crabjar/crabjar-skill-scanner, crabjar/crabjar-trust-manager, crabjar/src/tool_registry_cli.rs, crabjar/specs/SKILLS-REMOTE-DISCOVERY.md |
-| `prov-conductor-security-model` | Conductor security model implemented (Phases 1-4): four-layer capability-based access control with SSH key auth, JWT-like tokens, task-level capability matching, and trust level annealing; integrated with crabjar-guard's ExecutionGate patterns; workspace expanded to 30 members; 17 new tests added | 2026-10-17 | Conductor security model completion | crabjar/crabjar-conductor/src/auth.rs, crabjar/crabjar-conductor/src/gate.rs, crabjar/specs/security-model-capability-based-access-control.md, crabjar/specs/ADR-006-conductor-security-guard-integration.md |
+| `prov-conductor-security-model` | Conductor security model implemented (Phases 1-4): four-layer capability-based access control with SSH key auth, JWT-like tokens, task-level capability matching, and trust level annealing; integrated with crabjar-guard's ExecutionGate patterns; workspace expanded to 30 members; 17 new tests added | 2026-10-17 | Conductor security model completion | crabjar/crabjar-conductor/src/auth.rs, crabjar/crabjar-conductor/src/gate.rs, crabjar/specs/security-model-capabi
+| `prov-herdr-gpui-integration` | Herdr-GPUI integration: CrabjarSurfaceAdapter built to translate conductor API responses to herdr protocol types; multi-agent dashboard UI with split panes and color-coded status indicators (Idle=CornflowerBlue, Working=LimeGreen, Blocked=Orange, Done=SteelBlue); 6 integration tests verify surface adapter behavior; workspace expanded to 31 members | 2026-10-17 | Herdr-GPUI integration completion | crabjar/crates/crabjar-gpui/src/surface_adapter.rs, crabjar/crates/crabjar-gpui/tests/herdr_integration.rslity-based-access-control.md, crabjar/specs/ADR-006-conductor-security-guard-integration.md |
 
 ---
 

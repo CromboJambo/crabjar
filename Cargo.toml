@@ -272,3 +272,4 @@ tempfile.workspace = true
 crabjar-host-core = { path = "host/host-core" }
 crabjar-host-agent = { path = "host/host-agent" }
 insta = { version = "1.43", features = ["json"] }
+

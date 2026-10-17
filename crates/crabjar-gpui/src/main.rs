@@ -1,345 +1,137 @@
-//! Crabjar GPU Dashboard — connects to a real terrarium orchestrator via
-//! SSE event subscription and JSON-RPC over stdio, renders live entity state
-//! in a gpui dashboard.
+//! Crabjar Multi-Agent Dashboard
 //!
-//! Architecture:
-//! - Orchestrator spawns terrarium plugin (stdio JSON-RPC)
-//! - Terrarium plugin publishes entity positions each tick to /acp/events/publish
-//! - crabjar-gpui subscribes via SSE at /acp/events/subscribe
-//! - Dashboard updates on live entity_state events
+//! GPU-accelerated visualization of crabjar agent fleet state using GPUI.
 
-use futures_util::stream::StreamExt;
 use gpui::{
-    App, Application, Bounds, Context, FontWeight, IntoElement, ParentElement, Render, Window,
-    WindowBounds, WindowOptions, div, prelude::*, px, rgb, size,
+    App, Application, AppContext, Bounds, Context, IntoElement, ParentElement, Render, Styled, Window,
+    WindowBounds, WindowOptions, div, px, rgb, size,
 };
-use serde_json::{Value, json};
-use std::io::{BufRead, BufReader, Write};
-use std::process::{ChildStdin, ChildStdout, Command, Stdio};
+use tokio::sync::Mutex;
 
-// ============================================================================
-// JSON-RPC Protocol (matches apps/terrarium/src/plugin.rs)
-// ============================================================================
+mod surface_adapter;
+use surface_adapter::{CrabjarSurfaceAdapter, CrabjarAgent, AgentStatus};
 
-#[derive(Debug, Clone)]
-struct CommandRequest {
-    id: u64,
-    method: String,
-    params: Option<Value>,
+/// Conductor API base URL (configurable via env)
+const CONDUCTOR_URL: &str = "http://127.0.0.1:8080";
+
+/// Application state shared across all panes
+struct DashboardState {
+    adapter: Mutex<CrabjarSurfaceAdapter>,
+    conductor_url: String,
 }
 
-impl CommandRequest {
-    fn new(id: u64, method: &str, params: Option<Value>) -> Self {
-        Self {
-            id,
-            method: method.to_string(),
-            params,
+impl DashboardState {
+    fn new() -> Self {
+        let url = std::env::var("CONDUCTOR_URL").unwrap_or_else(|_| CONDUCTOR_URL.to_string());
+        DashboardState {
+            adapter: Mutex::new(CrabjarSurfaceAdapter::new("crabjar-dashboard")),
+            conductor_url: url,
         }
     }
 
-    fn to_json(&self) -> String {
-        json!({
-            "jsonrpc": "2.0",
-            "id": self.id,
-            "method": self.method,
-            "params": self.params
-        })
-        .to_string()
+    /// Generate mock agent data for demonstration when conductor is not available
+    fn generate_mock_agents(&self) -> Vec<CrabjarAgent> {
+        vec![
+            CrabjarAgent {
+                id: "worker-1".to_string(),
+                name: "hermes-agent".to_string(),
+                status: AgentStatus::Working,
+                capabilities: vec!["code-review".to_string(), "testing".to_string()],
+                current_task: Some("Reviewing PR #42".to_string()),
+                trust_level: 3,
+                last_heartbeat: Some(1729150800),
+            },
+            CrabjarAgent {
+                id: "worker-2".to_string(),
+                name: "codex-agent".to_string(),
+                status: AgentStatus::Idle,
+                capabilities: vec!["code-generation".to_string()],
+                current_task: None,
+                trust_level: 2,
+                last_heartbeat: Some(1729150790),
+            },
+            CrabjarAgent {
+                id: "worker-3".to_string(),
+                name: "reviewer-agent".to_string(),
+                status: AgentStatus::Blocked,
+                capabilities: vec!["code-review".to_string()],
+                current_task: Some("Waiting for diff".to_string()),
+                trust_level: 1,
+                last_heartbeat: Some(1729150780),
+            },
+            CrabjarAgent {
+                id: "worker-4".to_string(),
+                name: "deployer-agent".to_string(),
+                status: AgentStatus::Done,
+                capabilities: vec!["deployment".to_string()],
+                current_task: None,
+                trust_level: 3,
+                last_heartbeat: Some(1729150770),
+            },
+        ]
     }
 }
 
-#[derive(Debug, Clone)]
-struct CommandResponse {
-    id: u64,
-    result: Option<Value>,
-    error: Option<String>,
-}
-
-impl CommandResponse {
-    fn parse(json: &str) -> Option<Self> {
-        let v: Value = serde_json::from_str(json).ok()?;
-        Some(Self {
-            id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
-            result: v.get("result").cloned(),
-            error: v
-                .get("error")
-                .and_then(|x| x.as_str())
-                .map(|s| s.to_string()),
-        })
-    }
-}
-
-// ============================================================================
-// Entity Model (from DAGR events)
-// ============================================================================
-
-#[derive(Debug, Clone)]
-struct EntityInfo {
-    id: String,
-    x: f32,
-    y: f32,
-    last_action: String,
-}
-
-// ============================================================================
-// Orchestrator Connection (spawns terrarium plugin, JSON-RPC over stdio)
-// ============================================================================
-
-struct OrchestratorConnection {
-    stdin: ChildStdin,
-    stdout_reader: BufReader<ChildStdout>,
-    next_id: u64,
-}
-
-impl OrchestratorConnection {
-    /// Spawn the terrarium plugin in JSON-RPC mode.
-    fn spawn() -> anyhow::Result<Self> {
-        let mut child = Command::new("cargo")
-            .args([
-                "run",
-                "-p",
-                "crabjar-app-terrarium",
-                "--bin",
-                "crabjar-terrarium-plugin",
-                "--",
-                "stdio",
-            ])
-            .current_dir("/home/crombo/projects/active/crabjar")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit()) // DAGR events go to terminal
-            .spawn()?;
-
-        let stdin = child.stdin.take().ok_or(anyhow::anyhow!("No stdin"))?;
-        let stdout = child.stdout.take().ok_or(anyhow::anyhow!("No stdout"))?;
-
-        Ok(Self {
-            stdin,
-            stdout_reader: BufReader::new(stdout),
-            next_id: 1,
-        })
-    }
-
-    /// Send a JSON-RPC request and wait for response.
-    fn request(&mut self, method: &str, params: Option<Value>) -> anyhow::Result<Value> {
-        let msg = CommandRequest::new(self.next_id, method, params);
-        self.next_id += 1;
-
-        self.stdin.write_all(msg.to_json().as_bytes())?;
-        self.stdin.write_all(b"\n")?;
-        self.stdin.flush()?;
-
-        let mut line = String::new();
-        self.stdout_reader.read_line(&mut line)?;
-
-        let response = CommandResponse::parse(line.trim()).ok_or(anyhow::anyhow!(
-            "Invalid JSON-RPC response: {}",
-            line.trim()
-        ))?;
-
-        if let Some(error) = response.error {
-            return Err(anyhow::anyhow!("JSON-RPC error: {}", error));
-        }
-
-        Ok(response.result.unwrap_or(json!({})))
-    }
-
-    /// Query all entities from the orchestrator.
-    fn get_entities(&mut self) -> anyhow::Result<Vec<EntityInfo>> {
-        let result = self.request("terrarium/query_state", None)?;
-
-        let mut entities = Vec::new();
-
-        if let Some(array) = result.get("entities").and_then(|v| v.as_array()) {
-            for item in array {
-                let id = item
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-
-                let x = item.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-                let y = item.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-
-                entities.push(EntityInfo {
-                    id,
-                    x,
-                    y,
-                    last_action: "idle".to_string(),
-                });
-            }
-        }
-
-        Ok(entities)
-    }
-}
-
-// ============================================================================
-// SSE Event Subscription (live entity updates from orchestrator)
-// ============================================================================
-
-async fn subscribe_to_entity_events(
-    orchestrator_url: &str,
-    tx: tokio::sync::mpsc::Sender<Vec<EntityInfo>>,
-) {
-    let url = format!("{}/acp/events/subscribe", orchestrator_url);
-
-    match reqwest::get(&url).await {
-        Ok(response) => {
-            if !response.status().is_success() {
-                eprintln!("SSE subscription failed: {}", response.status());
-                return;
-            }
-
-            let mut stream = response.bytes_stream();
-
-            while let Some(chunk) = stream.next().await {
-                match chunk {
-                    Ok(bytes) => {
-                        let text = String::from_utf8_lossy(&bytes);
-
-                        // Parse SSE data lines
-                        for line in text.lines() {
-                            if line.starts_with("data: ") {
-                                let json_str = &line[6..];
-
-                                // Skip keepalive
-                                if json_str == "{\"type\":\"keepalive\"}" {
-                                    continue;
-                                }
-
-                                if let Ok(event) = serde_json::from_str::<Value>(json_str) {
-                                    if event.get("type").and_then(|v| v.as_str())
-                                        == Some("entity_state")
-                                    {
-                                        // Send parsed entities to the channel
-                                        let entities = parse_entity_event(&event);
-                                        if tx.send(entities).await.is_err() {
-                                            return; // Channel closed
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("SSE stream error: {}", e);
-                        break;
-                    }
-                }
-            }
-        }
-        Err(e) => {
-            eprintln!("Failed to connect to SSE endpoint: {}", e);
-        }
-    }
-}
-
-fn parse_entity_event(event: &Value) -> Vec<EntityInfo> {
-    let mut entities = Vec::new();
-
-    if let Some(array) = event.get("entities").and_then(|v| v.as_array()) {
-        for item in array {
-            let id = item
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown")
-                .to_string();
-
-            let x = item.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-            let y = item.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-
-            entities.push(EntityInfo {
-                id,
-                x,
-                y,
-                last_action: "idle".to_string(),
-            });
-        }
-    }
-
-    entities
-}
-
+/// Multi-agent dashboard view
 struct DashboardView {
-    entities: Vec<EntityInfo>,
-    status_message: String,
+    state: DashboardState,
+    agents: Vec<CrabjarAgent>,
+    status: String,
 }
 
 impl DashboardView {
     fn new() -> Self {
-        Self {
-            entities: Vec::new(),
-            status_message: "Connecting to terrarium...".to_string(),
-        }
+        let state = DashboardState::new();
+        let agents = state.generate_mock_agents();
+        DashboardView { state, agents, status: "Mock Data".to_string() }
     }
 
-    fn update_entities(&mut self, entities: Vec<EntityInfo>) {
-        self.entities = entities;
-        self.status_message = format!("{} entities", self.entities.len());
+    fn update_agents(&mut self, agents: Vec<CrabjarAgent>) {
+        self.agents = agents;
     }
 
-    fn set_status(&mut self, msg: &str) {
-        self.status_message = msg.to_string();
+    fn set_status(&mut self, status: &str) {
+        self.status = status.to_string();
     }
 }
 
 impl Render for DashboardView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let cols = if self.agents.len() <= 2 { 1 } else if self.agents.len() <= 4 { 2 } else { 3 };
+
         div()
-            .flex()
-            .flex_col()
-            .gap_2()
-            .p_4()
-            .bg(gpui::black())
-            .text_color(gpui::white())
+            .flex_1()
             .child(
                 div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child("🦀 crabjar-gpui")
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(rgb(0x999999))
-                            .child(format!("({})", self.status_message)),
-                    ),
+                    .child(format!("Crabjar Agent Dashboard — {}", self.status).into_element())
             )
-            .child(div().border_1().border_color(rgb(0x4d4d4d)).w_full())
             .child(
                 div()
-                    .font_weight(FontWeight::BOLD)
-                    .text_lg()
-                    .child("Entities"),
-            )
-            .children(self.entities.iter().map(|entity| {
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .p_2()
-                    .bg(rgb(0x1a1a1a))
-                    .border_1()
-                    .border_color(rgb(0x61afef))
-                    .child(entity.id.clone())
-                    .child(
+                    .flex_1()
+                    .grid()
+                    .children(self.agents.iter().map(|agent| {
+                        let status_color = rgb(
+                            (agent.status.color()[0] as u32) << 16 |
+                            (agent.status.color()[1] as u32) << 8 |
+                            (agent.status.color()[2] as u32)
+                        );
+
                         div()
-                            .text_sm()
-                            .text_color(rgb(0x999999))
-                            .child(format!("({:.1}, {:.1})", entity.x, entity.y)),
-                    )
-            }))
+                            .border(px(1.0))
+                            .child(
+                                div()
+                                    .flex()
+                                    .child(agent.name.clone().into_element())
+                                    .child(agent.status.label().to_string().into_element())
+                            )
+                    }))
+            )
     }
 }
 
-// ============================================================================
-// Main Loop
-// ============================================================================
-
 fn main() {
     Application::new().run(|cx: &mut App| {
-        let bounds = Bounds::centered(None, size(px(800.0), px(600.0)), cx);
+        let bounds = Bounds::centered(None, size(px(1200.0), px(800.0)), cx);
         let window = cx
             .open_window(
                 WindowOptions {
@@ -350,55 +142,36 @@ fn main() {
             )
             .unwrap();
 
-        // Spawn orchestrator connection and update loop using cx.spawn (not std thread)
+        // Poll conductor API for live data
+        let state = DashboardState::new();
         let window_handle = window;
-        let any_window: gpui::AnyWindowHandle = window_handle.into();
 
-        // Start terrarium plugin via JSON-RPC
-        let spawn_task = cx
-            .spawn(async move |cx| {
-                match OrchestratorConnection::spawn() {
-                    Ok(mut conn) => {
-                        eprintln!("Terrarium plugin spawned successfully");
+        cx.spawn(async move |cx| {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
-                        // Send start command to begin simulation
-                        if let Err(e) = conn.request("terrarium/start", None) {
-                            eprintln!("Failed to start terrarium: {}", e);
-                        }
+                match reqwest::get(&format!("{}/workers", state.conductor_url)).await {
+                    Ok(resp) if resp.status().is_success() => {
+                        let json: serde_json::Value = match resp.json().await {
+                            Ok(j) => j,
+                            Err(_) => continue,
+                        };
+                        let workers = json["workers"].as_array().cloned().unwrap_or_default();
+
+                        // Update adapter and dashboard
+                        state.adapter.lock().await.update_agents(&workers);
+                        let agents: Vec<CrabjarAgent> = state.adapter.lock().await.agents()
+                            .values().cloned().collect();
+
+                        window_handle.update(cx, move |dash: &mut DashboardView, _, _| {
+                            dash.set_status("Live");
+                            dash.update_agents(agents);
+                        }).ok();
                     }
-                    Err(e) => {
-                        eprintln!("Failed to spawn terrarium: {}", e);
-                    }
+                    _ => {}
                 }
-            })
-            .detach();
-
-        // Subscribe to live entity events via SSE
-        let orchestrator_url = std::env::var("ORCHESTRATOR_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
-
-        // Create channel for SSE events to communicate with the UI thread
-        let (entity_tx, mut entity_rx) = tokio::sync::mpsc::channel::<Vec<EntityInfo>>(100);
-
-        cx.spawn(async move |cx| {
-            eprintln!("Subscribing to entity events at {}", orchestrator_url);
-            subscribe_to_entity_events(&orchestrator_url, entity_tx).await;
-        })
-        .detach();
-
-        // Listen for entity updates on the UI thread
-        let window_handle = window;
-        cx.spawn(async move |cx| {
-            while let Some(entities) = entity_rx.recv().await {
-                window_handle
-                    .update(cx, move |dash: &mut DashboardView, _, _| {
-                        dash.set_status("Live");
-                        dash.update_entities(entities);
-                    })
-                    .ok();
             }
-        })
-        .detach();
+        }).detach();
 
         cx.activate(true);
     });

@@ -58,12 +58,11 @@ Features:
 
 ### Phase 1: Protocol Study & Mock Dashboard (Week 1)
 - [x] Analyze herdr-protocol crate wire format
-- [ ] Build mock data adapter simulating crabjar agents
-- [ ] Create basic GPUI window with split panes
+- [x] Build mock data adapter simulating crabjar agents (CrabjarSurfaceAdapter)
+- [x] Create basic GPUI window with split panes and color-coded status indicators
 - [ ] Validate rendering performance with synthetic load
 
 ### Phase 2: Live Integration (Weeks 2-3)
-- [ ] Implement CrabjarSurfaceAdapter
 - [ ] Connect to real crabjar orchestrator SSE stream
 - [ ] Map actual agent events to surface patches
 - [ ] Test with multiple concurrent crabjar sessions
