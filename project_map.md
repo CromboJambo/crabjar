@@ -167,7 +167,6 @@ crabjar/
 │       ├── report.rs        # ScanReport, Finding types
 │       └── error.rs         # ScannerError enum
 ├── crabjar-trust-manager/   # Trust tier management, skill cache, update detection (Phase 11)
-├── crabjar-test-registry/   # Mock HTTP registry server for integration testing (Phases 8-11)
 │   ├── Cargo.toml
 │   └── src/
 │       ├── lib.rs
@@ -367,8 +366,7 @@ crabjar/
 | `crabjar-github-client` | GitHub API client for skill search/install (Phase 8) | Remote Discovery | Active |
 | `crabjar-clawhub-client` | ClawHub.io registry API integration (Phase 9) | Remote Discovery | Active |
 | `crabjar-skill-scanner` | Security scanning pipeline + checksum verification (Phase 10) | Remote Discovery | Active |
-| `crabjar-trust-manager` | Trust tier management, skill cache, update detection (Phase 11) | Remote Discovery | Active |
-| `crabjar-test-registry` | Mock HTTP registry server for integration testing (Phases 8-11) | Testing | Active |
+| `crabjar-trust-manager` | Trust tier management, version-aware skill cache, update detection (Phase 11) | Remote Discovery | Active |
 | `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement (8-layer model) | Governance | Active |
 | `file_search` | BM25-based file indexing and search (Tantivy 0.22) | Search | Active |

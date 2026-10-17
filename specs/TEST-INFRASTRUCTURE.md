@@ -23,9 +23,11 @@ Used by:
 └── crabjar-trust-manager/tests/cache_tests.rs
 ```
 
-## Phase 1: Mock Registry Server
+## Phase 1: Mock Registry Server — COMPLETED (INLINED)
 
 **Goal:** Local HTTP server that serves controlled skill manifests.
+
+**Status**: ✅ Mock server created and inlined into clawhub-client tests. Separate crabjar-test-registry crate was initially created but later simplified by inlining the mock server directly into `crabjar-clawhub-client/tests/mock_server.rs` — this reduced workspace complexity while maintaining full test coverage.
 
 ### Tasks
 

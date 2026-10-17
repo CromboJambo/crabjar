@@ -2,13 +2,15 @@
 //! Comprehensive test coverage for Phase 3 "overengineer critical paths"
 
 use crabjar_clawhub_client::{ClawHubClient, models::SearchOptions};
-use crabjar_test_registry::{MockRegistryServer, fixtures::basic_scenario};
+
+mod mock_server;
+use mock_server::{MockRegistryServer, make_test_skill, basic_skills};
 
 // Basic functionality tests
 
 #[tokio::test]
 async fn test_list_skills() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let skills = client.list_skills(10).await.unwrap();
@@ -21,7 +23,7 @@ async fn test_list_skills() {
 
 #[tokio::test]
 async fn test_search_skills() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let skills = client.search_skills(SearchOptions {
@@ -38,7 +40,7 @@ async fn test_search_skills() {
 
 #[tokio::test]
 async fn test_get_skill_by_name() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let skill = client.get_skill("hello-world").await.unwrap();
@@ -50,7 +52,7 @@ async fn test_get_skill_by_name() {
 
 #[tokio::test]
 async fn test_skill_not_found() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let result = client.get_skill("nonexistent-skill").await;
@@ -64,7 +66,7 @@ async fn test_skill_not_found() {
 
 #[tokio::test]
 async fn test_client_with_token() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     // Client with token should still work for public endpoints
     let client = ClawHubClient::with_base_url(server.url(), Some("test-token-123".to_string()));
@@ -79,7 +81,7 @@ async fn test_client_with_token() {
 
 #[tokio::test]
 async fn test_search_with_no_results() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let skills = client.search_skills(SearchOptions {
@@ -96,7 +98,7 @@ async fn test_search_with_no_results() {
 
 #[tokio::test]
 async fn test_search_with_special_characters() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     // Search with special chars should not crash
@@ -114,7 +116,7 @@ async fn test_search_with_special_characters() {
 
 #[tokio::test]
 async fn test_list_with_small_limit() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let skills = client.list_skills(1).await.unwrap();
@@ -127,7 +129,7 @@ async fn test_list_with_small_limit() {
 
 #[tokio::test]
 async fn test_multiple_skill_retrieval() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     
@@ -146,7 +148,7 @@ async fn test_multiple_skill_retrieval() {
 
 #[tokio::test]
 async fn test_get_skill_empty_name() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let result = client.get_skill("").await;
@@ -172,7 +174,7 @@ async fn test_client_default_url() {
 
 #[tokio::test]
 async fn test_concurrent_requests() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     
@@ -192,7 +194,7 @@ async fn test_concurrent_requests() {
 
 #[tokio::test]
 async fn test_skill_has_versions() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let skill = client.get_skill("hello-world").await.unwrap();
@@ -205,7 +207,7 @@ async fn test_skill_has_versions() {
 
 #[tokio::test]
 async fn test_skill_has_download_url() {
-    let server = MockRegistryServer::start(Some(basic_scenario())).await;
+    let server = MockRegistryServer::start(basic_skills()).await;
     
     let client = ClawHubClient::with_base_url(server.url(), None);
     let skill = client.get_skill("hello-world").await.unwrap();

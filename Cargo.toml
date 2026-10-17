@@ -56,7 +56,7 @@ members = [
  "crabjar-analyze", "crabjar-review", "crabjar-mcp-tool-registry", "crabjar-skills",    "crabjar-tool-binding",    "crabjar-github-client",
     "crabjar-clawhub-client",
     "crabjar-skill-scanner",
-    "crabjar-trust-manager", "crabjar-test-registry",
+    "crabjar-trust-manager",
 ]
 
 resolver = "2"

@@ -830,6 +830,7 @@ checksum = "31b698c5f9a010f6573133b09e0de5408834d0c82f8d7475a89fc1867a71cd90"
 dependencies = [
  "axum-core 0.5.6",
  "bytes",
+ "form_urlencoded",
  "futures-util",
  "http",
  "http-body",
@@ -845,11 +846,13 @@ dependencies = [
  "serde_core",
  "serde_json",
  "serde_path_to_error",
+ "serde_urlencoded",
  "sync_wrapper",
  "tokio",
  "tower",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]
@@ -889,6 +892,7 @@ dependencies = [
  "sync_wrapper",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]
@@ -2077,9 +2081,9 @@ dependencies = [
 name = "crabjar-clawhub-client"
 version = "0.12.0"
 dependencies = [
+ "axum 0.8.9",
  "chrono",
  "crabjar-skill-scanner",
- "crabjar-test-registry",
  "mockito",
  "reqwest 0.12.28",
  "semver",
@@ -2485,19 +2489,6 @@ dependencies = [
  "tokio",
  "tracing",
  "which 7.0.3",
-]
-
-[[package]]
-name = "crabjar-test-registry"
-version = "0.12.0"
-dependencies = [
- "axum 0.8.9",
- "rand 0.8.8",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
 ]
 
 [[package]]
