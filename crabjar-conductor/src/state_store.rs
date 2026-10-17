@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 
+use crate::auth;
+
 /// High-level objective submitted by a user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Goal {
@@ -97,6 +99,12 @@ pub struct Worker {
     pub ssh_key: Option<String>,
     pub capabilities: Vec<String>,
     pub status: WorkerStatus,
+    /// Trust level (0-3): earned through successful task completion.
+    pub trust_level: u8,
+    /// Count of successfully completed tasks.
+    pub successful_tasks: i32,
+    /// Count of failed tasks.
+    pub failed_tasks: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -159,6 +167,9 @@ fn row_to_worker(row: &Row<'_>) -> rusqlite::Result<Worker> {
         capabilities: serde_json::from_str(&caps_str)
             .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?,
         status: WorkerStatus::from_str(&row.get::<_, String>(4)?),
+        trust_level: row.get(5).unwrap_or(0u8),
+        successful_tasks: row.get(6).unwrap_or(0i32),
+        failed_tasks: row.get(7).unwrap_or(0i32),
     })
 }
 
@@ -188,7 +199,9 @@ impl StateStore {
                 command TEXT NOT NULL,
                 dependencies TEXT NOT NULL DEFAULT '[]',
                 status TEXT NOT NULL DEFAULT 'pending',
-                result TEXT
+                result TEXT,
+                required_capabilities TEXT NOT NULL DEFAULT '[]',
+                trust_level_required INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS workers (
@@ -196,7 +209,12 @@ impl StateStore {
                 name TEXT NOT NULL UNIQUE,
                 ssh_key TEXT,
                 capabilities TEXT NOT NULL DEFAULT '[]',
-                status TEXT NOT NULL DEFAULT 'online'
+                status TEXT NOT NULL DEFAULT 'online',
+                trust_level INTEGER NOT NULL DEFAULT 0,
+                successful_tasks INTEGER NOT NULL DEFAULT 0,
+                failed_tasks INTEGER NOT NULL DEFAULT 0,
+                auth_token TEXT UNIQUE,
+                token_expires_at TEXT
             );",
         )?;
 
@@ -328,6 +346,61 @@ impl StateStore {
         Ok(())
     }
 
+    /// Get the trust level required for a task (defaults to 0).
+    pub fn get_task_trust_level(&self, task_id: &str) -> Result<u8, rusqlite::Error> {
+        self.db
+            .query_row(
+                "SELECT trust_level_required FROM tasks WHERE id = ?",
+                params![task_id],
+                |r| r.get::<_, u8>(0),
+            )
+            .optional()?
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)
+    }
+
+    /// Get the capabilities required for a task (defaults to empty list).
+    pub fn get_task_capabilities(&self, task_id: &str) -> Result<Vec<String>, rusqlite::Error> {
+        let caps_str = self
+            .db
+            .query_row(
+                "SELECT required_capabilities FROM tasks WHERE id = ?",
+                params![task_id],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()?
+            .unwrap_or_else(|| "[]".to_string());
+
+        serde_json::from_str(&caps_str).map_err(|e| rusqlite::Error::ExecuteReturnedResults)
+    }
+
+    /// Set the trust level required for a task.
+    pub fn set_task_trust_level(
+        &self,
+        task_id: &str,
+        trust_level: u8,
+    ) -> Result<(), rusqlite::Error> {
+        self.db.execute(
+            "UPDATE tasks SET trust_level_required = ? WHERE id = ?",
+            params![trust_level, task_id],
+        )?;
+        Ok(())
+    }
+
+    /// Set the capabilities required for a task.
+    pub fn set_task_capabilities(
+        &self,
+        task_id: &str,
+        caps: &[String],
+    ) -> Result<(), rusqlite::Error> {
+        let caps_json =
+            serde_json::to_string(caps).map_err(|e| rusqlite::Error::ExecuteReturnedResults)?;
+        self.db.execute(
+            "UPDATE tasks SET required_capabilities = ? WHERE id = ?",
+            params![caps_json, task_id],
+        )?;
+        Ok(())
+    }
+
     /// Get pending tasks that have no dependencies or whose dependencies are all completed.
     pub fn get_ready_tasks(&self) -> Result<Vec<Task>, rusqlite::Error> {
         let sql = r#"
@@ -353,35 +426,49 @@ impl StateStore {
         &self,
         name: String,
         capabilities: Vec<String>,
-    ) -> Result<Worker, rusqlite::Error> {
+        ssh_key: Option<String>,
+    ) -> Result<(Worker, String), rusqlite::Error> {
         let worker = Worker {
             id: Uuid::new_v4().to_string(),
             name: name.clone(),
-            ssh_key: None,
-            capabilities,
+            ssh_key: ssh_key.clone(),
+            capabilities: capabilities.clone(),
             status: WorkerStatus::Online,
+            trust_level: 0,
+            successful_tasks: 0,
+            failed_tasks: 0,
+        };
+
+        // Generate auth token for the worker
+        let token = match auth::generate_token(&worker.id, &worker.name, &capabilities, 0) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("Failed to generate auth token: {}", e);
+                String::new()
+            }
         };
 
         let caps_json = serde_json::to_string(&worker.capabilities)
             .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?;
         self.db.execute(
-            "INSERT OR REPLACE INTO workers (id, name, ssh_key, capabilities, status) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO workers (id, name, ssh_key, capabilities, status, auth_token) VALUES (?, ?, ?, ?, ?, ?)",
             params![
                 worker.id,
                 worker.name,
-                worker.ssh_key,
+                ssh_key,
                 caps_json,
-                worker.status.as_str()
+                worker.status.as_str(),
+                token.clone()
             ],
         )?;
 
-        Ok(worker)
+        Ok((worker, token))
     }
 
     pub fn get_worker(&self, id: &str) -> Result<Option<Worker>, rusqlite::Error> {
         self.db
             .query_row(
-                "SELECT id, name, ssh_key, capabilities, status FROM workers WHERE id = ?",
+                "SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks FROM workers WHERE id = ?",
                 params![id],
                 row_to_worker,
             )
@@ -391,7 +478,7 @@ impl StateStore {
     pub fn get_worker_by_name(&self, name: &str) -> Result<Option<Worker>, rusqlite::Error> {
         self.db
             .query_row(
-                "SELECT id, name, ssh_key, capabilities, status FROM workers WHERE name = ?",
+                "SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks FROM workers WHERE name = ?",
                 params![name],
                 row_to_worker,
             )
@@ -401,7 +488,7 @@ impl StateStore {
     pub fn list_workers(&self) -> Result<Vec<Worker>, rusqlite::Error> {
         let mut stmt = self
             .db
-            .prepare("SELECT id, name, ssh_key, capabilities, status FROM workers")?;
+            .prepare("SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks FROM workers")?;
         let rows = stmt.query_map(params![], row_to_worker)?;
         rows.collect()
     }
@@ -418,12 +505,132 @@ impl StateStore {
         Ok(())
     }
 
+    /// Set a worker's trust level directly (for testing or manual override).
+    pub fn set_worker_trust_level(&self, id: &str, level: u8) -> Result<(), rusqlite::Error> {
+        self.db.execute(
+            "UPDATE workers SET trust_level = ? WHERE id = ?",
+            params![level, id],
+        )?;
+        Ok(())
+    }
+
     pub fn heartbeat(&self, worker_id: &str) -> Result<(), rusqlite::Error> {
         self.db.execute(
             "UPDATE workers SET status = 'online' WHERE id = ?",
             params![worker_id],
         )?;
         Ok(())
+    }
+
+    /// Record a successful task completion and potentially upgrade trust level.
+    pub fn record_task_success(&self, worker_id: &str) -> Result<u8, rusqlite::Error> {
+        // Increment success count
+        self.db.execute(
+            "UPDATE workers SET successful_tasks = successful_tasks + 1 WHERE id = ?",
+            params![worker_id],
+        )?;
+
+        // Check if worker should be upgraded
+        let new_level = self.should_upgrade_trust(worker_id)?;
+        if new_level > 0 {
+            self.db.execute(
+                "UPDATE workers SET trust_level = ? WHERE id = ?",
+                params![new_level, worker_id],
+            )?;
+        }
+
+        Ok(new_level)
+    }
+
+    /// Record a task failure and potentially downgrade trust level.
+    pub fn record_task_failure(&self, worker_id: &str) -> Result<u8, rusqlite::Error> {
+        // Increment failure count
+        self.db.execute(
+            "UPDATE workers SET failed_tasks = failed_tasks + 1 WHERE id = ?",
+            params![worker_id],
+        )?;
+
+        // Check if worker should be downgraded
+        let new_level = self.should_downgrade_trust(worker_id)?;
+        if new_level >= 0 {
+            self.db.execute(
+                "UPDATE workers SET trust_level = ? WHERE id = ?",
+                params![new_level, worker_id],
+            )?;
+            return Ok(new_level as u8);
+        }
+
+        // Return current level if no downgrade
+        let row = self.db.query_row(
+            "SELECT trust_level FROM workers WHERE id = ?",
+            params![worker_id],
+            |r| r.get::<_, u8>(0),
+        )?;
+        Ok(row)
+    }
+
+    /// Check if worker qualifies for trust level upgrade.
+    fn should_upgrade_trust(&self, worker_id: &str) -> Result<u8, rusqlite::Error> {
+        let row = self.db.query_row(
+            "SELECT trust_level, successful_tasks FROM workers WHERE id = ?",
+            params![worker_id],
+            |r| Ok((r.get::<_, u8>(0)?, r.get::<_, i32>(1)?)),
+        )?;
+
+        let (current_level, successes) = row;
+
+        match current_level {
+            0 if successes >= 5 => Ok(1),
+            1 if successes >= 20 => Ok(2),
+            2 if successes >= 50 => Ok(3),
+            _ => Ok(0), // No upgrade
+        }
+    }
+
+    /// Check if worker should be downgraded due to failures.
+    fn should_downgrade_trust(&self, worker_id: &str) -> Result<i8, rusqlite::Error> {
+        let row = self.db.query_row(
+            "SELECT trust_level, successful_tasks, failed_tasks FROM workers WHERE id = ?",
+            params![worker_id],
+            |r| Ok((r.get::<_, u8>(0)?, r.get::<_, i32>(1)?, r.get::<_, i32>(2)?)),
+        )?;
+
+        let (current_level, successes, failures) = row;
+
+        // Downgrade if failure rate exceeds 50% of recent tasks
+        let total = successes + failures;
+        if total > 10 && (failures as f64 / total as f64) > 0.5 {
+            return Ok((current_level.saturating_sub(1)) as i8);
+        }
+
+        Ok(-1) // No downgrade
+    }
+
+    /// Generate a new auth token for a worker (after trust level change).
+    pub fn refresh_worker_token(&self, worker_id: &str) -> Result<String, rusqlite::Error> {
+        let worker = self
+            .get_worker(worker_id)?
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+
+        let token = match auth::generate_token(
+            &worker.id,
+            &worker.name,
+            &worker.capabilities,
+            worker.trust_level,
+        ) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("Failed to refresh auth token: {}", e);
+                return Err(rusqlite::Error::ExecuteReturnedResults);
+            }
+        };
+
+        self.db.execute(
+            "UPDATE workers SET auth_token = ? WHERE id = ?",
+            params![token.clone(), worker_id],
+        )?;
+
+        Ok(token)
     }
 }
 
@@ -451,24 +658,32 @@ mod tests {
     #[test]
     fn worker_registration() {
         let (store, _dir) = test_store();
-        let worker = store
-            .register_worker("ftw3".to_string(), vec!["gpu:nvidia:3070ti".to_string()])
+        unsafe { std::env::set_var("CRABJAR_AUTH_SECRET", "test-secret") };
+        let (worker, token) = store
+            .register_worker(
+                "ftw3".to_string(),
+                vec!["gpu:nvidia:3070ti".to_string()],
+                None,
+            )
             .unwrap();
+        assert!(!token.is_empty());
         let fetched = store.get_worker(&worker.id).unwrap().unwrap();
         assert_eq!(fetched.name, "ftw3");
         assert_eq!(fetched.capabilities[0], "gpu:nvidia:3070ti");
+        assert_eq!(fetched.trust_level, 0);
     }
 
     #[test]
     fn task_lifecycle() {
         let (store, _dir) = test_store();
+        unsafe { std::env::set_var("CRABJAR_AUTH_SECRET", "test-secret") };
 
         // Create a goal first (task depends on it via FK constraint)
         let goal = store.create_goal("Test".to_string()).unwrap();
 
         // Register a fake worker so assign_task can reference it
-        let worker = store
-            .register_worker("worker-1".to_string(), vec![])
+        let (worker, _token) = store
+            .register_worker("worker-1".to_string(), vec![], None)
             .unwrap();
 
         let task = store

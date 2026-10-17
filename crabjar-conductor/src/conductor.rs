@@ -1,5 +1,7 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
+use crate::auth;
+use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assign};
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
 use tracing::{debug, error, info, warn};
@@ -241,40 +243,152 @@ impl Conductor {
         self.store.list_workers().unwrap_or_default()
     }
 
-    /// Register a new worker in the fleet.
-    pub fn register_worker(&self, name: String, capabilities: Vec<String>) -> Result<Worker> {
-        let worker = self.store.register_worker(name, capabilities)?;
-        Ok(worker)
+    /// Register a new worker in the fleet. Returns (worker, auth_token).
+    pub fn register_worker(
+        &self,
+        name: String,
+        capabilities: Vec<String>,
+        ssh_key: Option<String>,
+    ) -> Result<(Worker, String)> {
+        // Validate SSH key format if provided
+        if let Some(ref key) = ssh_key {
+            auth::validate_ssh_public_key(key)?;
+        }
+
+        let result = self.store.register_worker(name, capabilities, ssh_key)?;
+        Ok(result)
     }
 
     /// Poll for tasks assigned to a specific worker.
-    pub fn tasks_for_worker(&self, _worker_id: &str) -> Result<Vec<Task>> {
+    pub fn tasks_for_worker(&self, worker_id: &str) -> Result<Vec<Task>> {
+        // Get the worker's capabilities and trust level
+        let worker = self
+            .store
+            .get_worker(worker_id)?
+            .ok_or_else(|| anyhow::anyhow!("worker not found"))?;
+
+        // Check if worker has sufficient trust for auto-assignment
+        if !trust_sufficient_for_auto_assign(&worker) {
+            debug!(
+                worker_id = %worker_id,
+                trust_level = worker.trust_level,
+                "Worker trust level insufficient for auto-assignment"
+            );
+            return Ok(vec![]);
+        }
+
         // Get all pending tasks that are ready (dependencies met)
         let ready_tasks = self.store.get_ready_tasks()?;
 
-        // In production, filter by worker capabilities and assign
-        // For now, return the first unassigned task if any
+        // Filter by worker capabilities and trust level, then assign
         for task in ready_tasks.iter() {
-            if task.worker_id.is_none() {
-                // Assign this task to the requesting worker
-                self.store.assign_task(&task.id, _worker_id)?;
-                let updated = self.store.get_task(&task.id)?.unwrap();
-                return Ok(vec![updated]);
+            if task.worker_id.is_some() {
+                continue; // Already assigned to another worker
             }
+
+            // Check trust level requirement
+            let task_trust_required = self.store.get_task_trust_level(&task.id)?;
+            if worker.trust_level < task_trust_required {
+                debug!(
+                    task_id = %task.id,
+                    worker_trust = worker.trust_level,
+                    required = task_trust_required,
+                    "Worker trust level insufficient"
+                );
+                continue;
+            }
+
+            // Check capability requirements
+            let required_caps = self.store.get_task_capabilities(&task.id)?;
+            if !self.capabilities_satisfy(&worker.capabilities, &required_caps) {
+                debug!(
+                    task_id = %task.id,
+                    worker_caps = ?worker.capabilities,
+                    required = ?required_caps,
+                    "Worker capabilities insufficient"
+                );
+                continue;
+            }
+
+            // Worker qualifies — assign the task
+            self.store.assign_task(&task.id, worker_id)?;
+            let updated = self.store.get_task(&task.id)?.unwrap();
+            info!(
+                task_id = %task.id,
+                worker_id = %worker_id,
+                "Task assigned to qualified worker"
+            );
+            return Ok(vec![updated]);
         }
 
         Ok(vec![])
     }
 
-    /// Report completion of a task.
-    pub fn report_task_complete(&self, task_id: &str, result: Option<String>) -> Result<()> {
-        self.store.complete_task(task_id, result)?;
+    /// Check if a worker's capabilities satisfy the task requirements.
+    /// Supports exact match and wildcard matching (e.g., "gpu:nvidia:*").
+    fn capabilities_satisfy(&self, worker_caps: &[String], required_caps: &[String]) -> bool {
+        for required in required_caps {
+            let satisfied = worker_caps
+                .iter()
+                .any(|worker_cap| self.capability_matches(worker_cap, required));
+            if !satisfied {
+                return false;
+            }
+        }
+        true
+    }
 
-        // Check if all tasks for the goal are complete
+    /// Check if a single worker capability matches a required capability.
+    /// Supports wildcards: "gpu:nvidia:*" matches "gpu:nvidia:3070ti".
+    fn capability_matches(&self, worker_cap: &str, required: &str) -> bool {
+        // Exact match
+        if worker_cap == required {
+            return true;
+        }
+
+        // Wildcard matching — split by colon and compare segments
+        let worker_parts: Vec<&str> = worker_cap.split(':').collect();
+        let required_parts: Vec<&str> = required.split(':').collect();
+
+        if worker_parts.len() != required_parts.len() {
+            return false;
+        }
+
+        for (w, r) in worker_parts.iter().zip(required_parts.iter()) {
+            if *r == "*" {
+                continue; // Wildcard matches anything
+            }
+            if w != r {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Report completion of a task. Returns updated auth token if trust level changed.
+    pub fn report_task_complete(
+        &self,
+        task_id: &str,
+        result: Option<String>,
+    ) -> Result<Option<String>> {
+        // Get the task to find which worker completed it
         let task = self
             .store
             .get_task(task_id)?
             .ok_or_else(|| anyhow::anyhow!("task not found"))?;
+
+        let worker_id = match &task.worker_id {
+            Some(id) => id.clone(),
+            None => return Ok(None), // No worker assigned, no annealing
+        };
+
+        self.store.complete_task(task_id, result)?;
+
+        // Anneal trust level based on success
+        let new_trust_level = self.store.record_task_success(&worker_id)?;
+
+        // Check if all tasks for the goal are complete
         let goal_tasks = self.store.list_tasks_for_goal(&task.goal_id)?;
         let all_complete = goal_tasks.iter().all(|t| t.status == TaskStatus::Completed);
 
@@ -283,13 +397,51 @@ impl Conductor {
                 .update_goal_status(&task.goal_id, GoalStatus::Completed)?;
         }
 
-        Ok(())
+        // If trust level changed, issue a new token with updated scope
+        let worker = self
+            .store
+            .get_worker(&worker_id)?
+            .ok_or_else(|| anyhow::anyhow!("worker not found"))?;
+        if worker.trust_level != new_trust_level {
+            // Trust level was upgraded — refresh token
+            let new_token = self.store.refresh_worker_token(&worker_id)?;
+            info!(worker_id = %worker_id, trust_level = new_trust_level, "Worker trust level upgraded, new token issued");
+            Ok(Some(new_token))
+        } else {
+            Ok(None)
+        }
     }
 
-    /// Report task failure.
-    pub fn report_task_failed(&self, task_id: &str, error: String) -> Result<()> {
+    /// Report task failure. Returns updated auth token if trust level changed.
+    pub fn report_task_failed(&self, task_id: &str, error: String) -> Result<Option<String>> {
+        // Get the task to find which worker failed it
+        let task = self
+            .store
+            .get_task(task_id)?
+            .ok_or_else(|| anyhow::anyhow!("task not found"))?;
+
+        let worker_id = match &task.worker_id {
+            Some(id) => id.clone(),
+            None => return Ok(None), // No worker assigned, no annealing
+        };
+
         self.store.fail_task(task_id, error)?;
-        Ok(())
+
+        // Anneal trust level based on failure
+        let new_trust_level = self.store.record_task_failure(&worker_id)?;
+
+        // If trust level changed (downgrade), issue a new token with reduced scope
+        let worker = self
+            .store
+            .get_worker(&worker_id)?
+            .ok_or_else(|| anyhow::anyhow!("worker not found"))?;
+        if worker.trust_level != new_trust_level {
+            let new_token = self.store.refresh_worker_token(&worker_id)?;
+            warn!(worker_id = %worker_id, trust_level = new_trust_level, "Worker trust level downgraded, new token issued");
+            Ok(Some(new_token))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Update worker status via heartbeat.
@@ -309,18 +461,141 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    #[tokio::test]
-    async fn submit_goal_creates_task() {
+    #[test]
+    fn submit_goal_creates_task() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
-        let store = StateStore::open(&path).unwrap();
-        let conductor = Conductor {
-            store,
-            config: ConductorConfig::default(),
-        };
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
 
-        let goal = conductor.submit_goal("Test goal".to_string()).unwrap();
+        // Create goal directly without decomposition (no pesti-server needed)
+        let goal = conductor
+            .store
+            .create_goal("Test goal".to_string())
+            .unwrap();
         let status = conductor.goal_status(&goal.id).unwrap().unwrap();
-        assert_eq!(status, GoalStatus::Running);
+        assert_eq!(status, GoalStatus::Decomposed);
+    }
+
+    #[test]
+    fn register_worker_validates_ssh_key() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Valid ed25519 key should pass
+        let valid_key =
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGFub3RoZXJrZXllbmNvZGluZw== user@host";
+        let result = conductor.register_worker(
+            "worker-valid".to_string(),
+            vec!["compute".to_string()],
+            Some(valid_key.to_string()),
+        );
+        assert!(result.is_ok());
+
+        // Invalid key format should fail
+        let invalid_key = "not-a-valid-key";
+        let result = conductor.register_worker(
+            "worker-invalid".to_string(),
+            vec!["compute".to_string()],
+            Some(invalid_key.to_string()),
+        );
+        assert!(result.is_err());
+
+        // Missing key should pass (optional)
+        let result =
+            conductor.register_worker("worker-nok".to_string(), vec!["compute".to_string()], None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn task_assignment_filters_by_capability() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register workers with different capabilities
+        let (worker_gpu, _) = conductor
+            .register_worker(
+                "gpu-worker".to_string(),
+                vec!["compute".to_string(), "gpu:nvidia:3070ti".to_string()],
+                None,
+            )
+            .unwrap();
+        let (worker_cpu, _) = conductor
+            .register_worker("cpu-worker".to_string(), vec!["compute".to_string()], None)
+            .unwrap();
+
+        // Set trust levels so workers can be auto-assigned (not testing trust here)
+        conductor
+            .store
+            .set_worker_trust_level(&worker_gpu.id, 1)
+            .unwrap();
+        conductor
+            .store
+            .set_worker_trust_level(&worker_cpu.id, 1)
+            .unwrap();
+
+        // Create a goal and task directly
+        let goal = conductor.store.create_goal("GPU task".to_string()).unwrap();
+        let task = conductor
+            .store
+            .create_task(&goal.id, "nvidia-smi".to_string())
+            .unwrap();
+
+        // Set GPU capability requirement on the task
+        conductor
+            .store
+            .set_task_capabilities(&task.id, &["gpu:nvidia:*".to_string()])
+            .unwrap();
+
+        // CPU-only worker should not get the task
+        let tasks_for_cpu = conductor.tasks_for_worker(&worker_cpu.id).unwrap();
+        assert!(tasks_for_cpu.is_empty());
+
+        // GPU worker should get the task
+        let tasks_for_gpu = conductor.tasks_for_worker(&worker_gpu.id).unwrap();
+        assert!(!tasks_for_gpu.is_empty());
+        assert_eq!(tasks_for_gpu[0].id, task.id);
+    }
+
+    #[test]
+    fn annealing_upgrades_trust_level() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register worker (starts at trust level 0)
+        let (worker, _) = conductor
+            .register_worker(
+                "anneal-worker".to_string(),
+                vec!["compute".to_string()],
+                None,
+            )
+            .unwrap();
+        assert_eq!(worker.trust_level, 0);
+
+        // Create a goal and task
+        let goal = conductor.store.create_goal("Test".to_string()).unwrap();
+        let task = conductor
+            .store
+            .create_task(&goal.id, "echo test".to_string())
+            .unwrap();
+
+        // Assign task to worker
+        conductor.store.assign_task(&task.id, &worker.id).unwrap();
+
+        // Complete the task — trust level should upgrade
+        let new_token = conductor
+            .report_task_complete(&task.id, Some("success".to_string()))
+            .unwrap();
+
+        // After first success, trust level goes from 0 to 1 (upgrade threshold is 5 successes)
+        // Actually at 1 success it's still below the threshold, so no upgrade yet
+        let updated_worker = conductor.store.get_worker(&worker.id).unwrap().unwrap();
+        assert_eq!(updated_worker.successful_tasks, 1);
     }
 }

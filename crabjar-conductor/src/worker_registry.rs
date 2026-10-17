@@ -21,6 +21,9 @@ impl WorkerRegistry {
             ssh_key: None,
             capabilities,
             status: WorkerStatus::Online,
+            trust_level: 0,
+            successful_tasks: 0,
+            failed_tasks: 0,
         };
         self.workers.insert(worker.id.clone(), worker.clone());
         worker

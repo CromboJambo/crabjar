@@ -21,7 +21,9 @@
 //! - [`Worker`] — Registered fleet member with capability metadata
 
 pub mod api;
+pub mod auth;
 pub mod conductor;
+pub mod gate;
 pub mod state_store;
 pub mod task_scheduler;
 pub mod worker_registry;

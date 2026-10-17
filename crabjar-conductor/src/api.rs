@@ -1,8 +1,13 @@
 //! HTTP API endpoints for the conductor service.
 
+use crate::auth::{AuthError, validate_token};
 use crate::conductor::Conductor;
 use axum::{
     Json, Router,
+    extract::{Request, State},
+    http::StatusCode,
+    middleware::{self, Next},
+    response::{IntoResponse, Json as JsonResponse},
     routing::{get, post},
 };
 use serde_json::json;
@@ -13,7 +18,7 @@ use tracing::{debug, error, info, warn};
 pub type ConductorState = Arc<Mutex<Conductor>>;
 
 pub fn routes(conductor: ConductorState) -> Router {
-    let app = Router::new()
+    let mut app: Router = Router::new()
         // Goals
         .route("/goals", post(submit_goal))
         .route("/goals/{id}", get(get_goal))
@@ -29,7 +34,70 @@ pub fn routes(conductor: ConductorState) -> Router {
         .with_state(Arc::clone(&conductor));
 
     // Add request logging middleware
-    app.layer(axum::middleware::from_fn(log_requests))
+    app = app.layer(middleware::from_fn(log_requests));
+
+    // Add JWT auth middleware to protected routes
+    let protected: Router = Router::new()
+        .route("/goals", post(submit_goal))
+        .route("/goals/{id}", get(get_goal))
+        .route("/workers", get(list_workers))
+        .route("/workers/register", post(register_worker))
+        .route("/workers/{id}/heartbeat", post(worker_heartbeat))
+        .route("/tasks/for-worker/{worker_id}", get(tasks_for_worker))
+        .route("/tasks/{id}/result", post(report_task_result))
+        .route("/review", post(submit_review))
+        .layer(middleware::from_fn(jwt_auth_middleware))
+        .with_state(Arc::clone(&conductor));
+
+    protected
+}
+
+/// JWT authentication middleware.
+async fn jwt_auth_middleware(request: Request, next: Next) -> axum::response::Response {
+    // Extract Authorization header
+    let auth_header = request
+        .headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .unwrap_or("");
+
+    // Parse Bearer token
+    let token = if auth_header.starts_with("Bearer ") {
+        &auth_header[7..]
+    } else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({
+                "status": "error",
+                "message": "missing or invalid Authorization header"
+            })),
+        )
+            .into_response();
+    };
+
+    // Validate token
+    match validate_token(token) {
+        Ok(_claims) => {
+            // Token is valid — continue to handler
+            next.run(request).await
+        }
+        Err(AuthError::Expired) => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({
+                "status": "error",
+                "message": "token expired"
+            })),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({
+                "status": "error",
+                "message": format!("invalid token: {}", e)
+            })),
+        )
+            .into_response(),
+    }
 }
 
 async fn log_requests(
@@ -157,18 +225,20 @@ async fn register_worker(
                 .collect()
         })
         .unwrap_or_default();
+    let ssh_key = body["ssh_key"].as_str().map(|s| s.to_string());
 
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
-        c.register_worker(name, capabilities)
+        c.register_worker(name, capabilities, ssh_key)
     })
     .await;
 
     match result {
-        Ok(Ok(worker)) => Json(json!({
+        Ok(Ok((worker, token))) => Json(json!({
             "status": "registered",
             "worker_id": worker.id,
-            "name": worker.name
+            "name": worker.name,
+            "auth_token": token
         })),
         Ok(Err(e)) => Json(json!({
             "status": "error",
@@ -260,7 +330,12 @@ async fn report_task_result(
     .await;
 
     match result {
-        Ok(Ok(())) => Json(json!({ "status": "recorded" })),
+        Ok(Ok(Some(new_token))) => Json(json!({
+            "status": "recorded",
+            "trust_level_changed": true,
+            "auth_token": new_token
+        })),
+        Ok(Ok(None)) => Json(json!({ "status": "recorded" })),
         Ok(Err(e)) => Json(json!({
             "status": "error",
             "message": e.to_string()
