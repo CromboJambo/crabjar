@@ -3,12 +3,12 @@
 //! Provides checksum verification, pattern analysis, and risk assessment
 //! for skills downloaded from GitHub or ClawHub registries.
 
-pub mod error;
-pub mod scanner;
 pub mod checksum;
+pub mod error;
 pub mod models;
+pub mod scanner;
 
-pub use error::ScannerError;
-pub use scanner::SkillScanner;
 pub use checksum::{compute_sha256, verify_checksum};
-pub use models::{ScanResult, ScanFinding, Severity, Recommendation};
+pub use error::ScannerError;
+pub use models::{Recommendation, ScanFinding, ScanResult, Severity};
+pub use scanner::SkillScanner;

@@ -1,7 +1,7 @@
 //! Data models for GitHub API interactions.
 
-use serde::{Deserialize, Serialize};
 use chrono::DateTime;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Repository information returned by GitHub API.

@@ -47,7 +47,10 @@ impl GitHubClient {
     /// Search for CrabJar skills on GitHub by tag.
     ///
     /// Uses the `crabjar-skill` topic filter and optionally additional query terms.
-    pub async fn search_skills(&self, options: SearchOptions) -> Result<Vec<RepoInfo>, GitHubError> {
+    pub async fn search_skills(
+        &self,
+        options: SearchOptions,
+    ) -> Result<Vec<RepoInfo>, GitHubError> {
         let mut query_parts = Vec::new();
 
         // Always filter by crabjar-skill tag
@@ -66,7 +69,10 @@ impl GitHubClient {
         let query = query_parts.join(" ");
         let sort = options.sort_by.to_string();
 
-        debug!("Searching GitHub for skills: {} (sort: {}, limit: {})", query, sort, options.limit);
+        debug!(
+            "Searching GitHub for skills: {} (sort: {}, limit: {})",
+            query, sort, options.limit
+        );
 
         // URL-encode the query parameter manually
         let encoded_query = query.replace(" ", "+");
@@ -79,11 +85,9 @@ impl GitHubClient {
         let body: Value = resp.json().await?;
 
         // Parse search results
-        let items = body["items"].as_array().ok_or_else(|| {
-            GitHubError::Api {
-                code: 0,
-                message: "Invalid search response format".to_string(),
-            }
+        let items = body["items"].as_array().ok_or_else(|| GitHubError::Api {
+            code: 0,
+            message: "Invalid search response format".to_string(),
         })?;
 
         let mut repos: Vec<RepoInfo> = Vec::new();
@@ -138,7 +142,8 @@ impl GitHubClient {
             .tempdir()
             .map_err(|e| GitHubError::CloneFailed(e.to_string()))?;
 
-        self.clone_repo(&repo_info.clone_url, temp_dir.path()).await?;
+        self.clone_repo(&repo_info.clone_url, temp_dir.path())
+            .await?;
 
         // Find manifest.json in root or skill/ subdirectory
         let manifest_path = self.find_manifest(temp_dir.path())?;
@@ -154,14 +159,12 @@ impl GitHubClient {
             .as_str()
             .unwrap_or("unknown")
             .to_string();
-        let skill_name = manifest["name"]
-            .as_str()
-            .unwrap_or(name)
-            .to_string();
+        let skill_name = manifest["name"].as_str().unwrap_or(name).to_string();
 
         // Copy to install directory (simplified - would do actual install logic here)
         let target_dir = install_dir.join(&skill_name);
-        std::fs::create_dir_all(&target_dir).map_err(|e| GitHubError::CloneFailed(e.to_string()))?;
+        std::fs::create_dir_all(&target_dir)
+            .map_err(|e| GitHubError::CloneFailed(e.to_string()))?;
 
         Ok(SkillInstallResult {
             name: skill_name,
@@ -206,7 +209,10 @@ impl GitHubClient {
                 if let Ok(unix_ts) = reset_time.parse::<i64>() {
                     let now = Utc::now().timestamp();
                     if unix_ts > now {
-                        warn!("GitHub rate limit approaching; resets in {}s", unix_ts - now);
+                        warn!(
+                            "GitHub rate limit approaching; resets in {}s",
+                            unix_ts - now
+                        );
                     }
                 }
             }
@@ -225,11 +231,7 @@ impl GitHubClient {
     }
 
     /// Clone a repository to the specified directory.
-    async fn clone_repo(
-        &self,
-        url: &str,
-        target: &std::path::Path,
-    ) -> Result<(), GitHubError> {
+    async fn clone_repo(&self, url: &str, target: &std::path::Path) -> Result<(), GitHubError> {
         info!("Cloning {} to {}", url, target.display());
 
         let output = tokio::process::Command::new("git")
@@ -248,10 +250,7 @@ impl GitHubClient {
     }
 
     /// Find manifest.json in the repository root or skill/ subdirectory.
-    fn find_manifest(
-        &self,
-        repo_dir: &std::path::Path,
-    ) -> Result<std::path::PathBuf, GitHubError> {
+    fn find_manifest(&self, repo_dir: &std::path::Path) -> Result<std::path::PathBuf, GitHubError> {
         // Check root first
         let root_manifest = repo_dir.join("manifest.json");
         if root_manifest.exists() {
@@ -264,6 +263,8 @@ impl GitHubClient {
             return Ok(skill_manifest);
         }
 
-        Err(GitHubError::ManifestNotFound(repo_dir.display().to_string()))
+        Err(GitHubError::ManifestNotFound(
+            repo_dir.display().to_string(),
+        ))
     }
 }

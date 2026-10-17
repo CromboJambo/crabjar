@@ -4,11 +4,11 @@
 
 use serde_json::json;
 
-use crabjar_lib::{ToolCommand, ToolCacheCommand};
-use crabjar_github_client::{GitHubClient, SearchOptions};
-use crabjar_github_client::models::SortField;
 use crabjar_clawhub_client::ClawHubClient;
-use crabjar_trust_manager::{SkillCache, UpdateDetector, TrustManager};
+use crabjar_github_client::models::SortField;
+use crabjar_github_client::{GitHubClient, SearchOptions};
+use crabjar_lib::{ToolCacheCommand, ToolCommand};
+use crabjar_trust_manager::{SkillCache, TrustManager, UpdateDetector};
 
 /// Mapped tool row from a SQLite query.
 type ToolRow = (String, String, String, String, u32, f64, String);
@@ -37,10 +37,19 @@ pub async fn handle_tool_command(
         ToolCommand::PluginEnable { name } => handle_plugin_enable(name),
         ToolCommand::PluginDisable { name } => handle_plugin_disable(name),
         ToolCommand::ToolUninstall { name } => handle_tool_uninstall(name),
-        ToolCommand::Search { query, stars, sort, limit } => handle_github_search(query, stars, sort, limit).await,
+        ToolCommand::Search {
+            query,
+            stars,
+            sort,
+            limit,
+        } => handle_github_search(query, stars, sort, limit).await,
         ToolCommand::Install { repo, target } => handle_github_install(repo, target).await,
         ToolCommand::ClawhubSearch { query, limit } => handle_clawhub_search(query, limit).await,
-        ToolCommand::ClawhubInstall { name, version, target } => handle_clawhub_install(name, version, target).await,
+        ToolCommand::ClawhubInstall {
+            name,
+            version,
+            target,
+        } => handle_clawhub_install(name, version, target).await,
         ToolCommand::Scan { path, checksum } => handle_skill_scan(path, checksum),
         ToolCommand::Cache { action } => handle_cache_command(action),
         ToolCommand::Updates { name } => handle_updates(name),
@@ -197,22 +206,18 @@ fn handle_skill_install(path: String) -> Result<serde_json::Value, Box<dyn std::
     // Bind the skill's tools to the registry
     let binder = crabjar_tool_binding::ToolBinder::new(&registry);
     match binder.bind_skill(&loaded) {
-        Ok(bound_count) => {
-            Ok(json!({
-                "success": true,
-                "skill_install": {
-                    "name": loaded.manifest.name,
-                    "version": loaded.manifest.version,
-                    "tools_registered": bound_count,
-                }
-            }))
-        }
-        Err(e) => {
-            Ok(json!({
-                "success": false,
-                "error": format!("failed to bind skill tools: {}", e),
-            }))
-        }
+        Ok(bound_count) => Ok(json!({
+            "success": true,
+            "skill_install": {
+                "name": loaded.manifest.name,
+                "version": loaded.manifest.version,
+                "tools_registered": bound_count,
+            }
+        })),
+        Err(e) => Ok(json!({
+            "success": false,
+            "error": format!("failed to bind skill tools: {}", e),
+        })),
     }
 }
 
@@ -371,7 +376,10 @@ async fn handle_github_install(
         }
     };
 
-    match client.install_skill_from_repo(owner, name, &install_dir).await {
+    match client
+        .install_skill_from_repo(owner, name, &install_dir)
+        .await
+    {
         Ok(result) => {
             // Register the installed skill's tools with the registry
             let project_root = std::env::current_dir()?;
@@ -401,7 +409,10 @@ async fn handle_github_install(
                                 }));
                             }
                             Err(e) => {
-                                eprintln!("Warning: Failed to bind tools for installed skill: {}", e);
+                                eprintln!(
+                                    "Warning: Failed to bind tools for installed skill: {}",
+                                    e
+                                );
                             }
                         }
                     }
@@ -493,7 +504,10 @@ async fn handle_clawhub_install(
     // Download the skill to a temp directory first for scanning
     let temp_dir = tempfile::tempdir()?;
 
-    match client.download_skill(&name, version.as_deref(), temp_dir.path()).await {
+    match client
+        .download_skill(&name, version.as_deref(), temp_dir.path())
+        .await
+    {
         Ok(archive_path) => {
             // Run security scan before installation
             let scanner = crabjar_skill_scanner::SkillScanner::new();
@@ -509,8 +523,16 @@ async fn handle_clawhub_install(
             };
 
             if !scan_result.passed {
-                let error_count = scan_result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Error).count();
-                let warning_count = scan_result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Warning).count();
+                let error_count = scan_result
+                    .findings
+                    .iter()
+                    .filter(|f| f.severity == crabjar_skill_scanner::Severity::Error)
+                    .count();
+                let warning_count = scan_result
+                    .findings
+                    .iter()
+                    .filter(|f| f.severity == crabjar_skill_scanner::Severity::Warning)
+                    .count();
 
                 return Ok(json!({
                     "success": false,
@@ -564,7 +586,10 @@ async fn handle_clawhub_install(
                                 }));
                             }
                             Err(e) => {
-                                eprintln!("Warning: Failed to bind tools for installed skill: {}", e);
+                                eprintln!(
+                                    "Warning: Failed to bind tools for installed skill: {}",
+                                    e
+                                );
                             }
                         }
                     }
@@ -593,7 +618,10 @@ async fn handle_clawhub_install(
 }
 
 /// Scan a skill package for security issues.
-fn handle_skill_scan(path: String, checksum: Option<String>) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+fn handle_skill_scan(
+    path: String,
+    checksum: Option<String>,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let scanner = crabjar_skill_scanner::SkillScanner::new();
     let package_path = std::path::PathBuf::from(&path);
 
@@ -605,25 +633,47 @@ fn handle_skill_scan(path: String, checksum: Option<String>) -> Result<serde_jso
     }
 
     let scan_result = match checksum {
-        Some(expected) => scanner.scan_with_checksum("unknown", "unknown", &package_path, &expected),
+        Some(expected) => {
+            scanner.scan_with_checksum("unknown", "unknown", &package_path, &expected)
+        }
         None => scanner.scan("unknown", "unknown", &package_path),
     };
 
     match scan_result {
         Ok(result) => {
-            let info_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Info).count();
-            let warn_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Warning).count();
-            let error_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Error).count();
-            let critical_count = result.findings.iter().filter(|f| f.severity == crabjar_skill_scanner::Severity::Critical).count();
+            let info_count = result
+                .findings
+                .iter()
+                .filter(|f| f.severity == crabjar_skill_scanner::Severity::Info)
+                .count();
+            let warn_count = result
+                .findings
+                .iter()
+                .filter(|f| f.severity == crabjar_skill_scanner::Severity::Warning)
+                .count();
+            let error_count = result
+                .findings
+                .iter()
+                .filter(|f| f.severity == crabjar_skill_scanner::Severity::Error)
+                .count();
+            let critical_count = result
+                .findings
+                .iter()
+                .filter(|f| f.severity == crabjar_skill_scanner::Severity::Critical)
+                .count();
 
-            let findings: Vec<serde_json::Value> = result.findings.iter().map(|f| {
-                json!({
-                    "severity": format!("{}", f.severity),
-                    "category": &f.category,
-                    "message": &f.message,
-                    "file": f.file.clone().unwrap_or_default(),
+            let findings: Vec<serde_json::Value> = result
+                .findings
+                .iter()
+                .map(|f| {
+                    json!({
+                        "severity": format!("{}", f.severity),
+                        "category": &f.category,
+                        "message": &f.message,
+                        "file": f.file.clone().unwrap_or_default(),
+                    })
                 })
-            }).collect();
+                .collect();
 
             Ok(json!({
                 "success": true,
@@ -666,16 +716,19 @@ fn handle_cache_list() -> Result<serde_json::Value, Box<dyn std::error::Error>> 
     let cache = SkillCache::new()?;
     let entries = cache.list();
 
-    let results: Vec<serde_json::Value> = entries.iter().map(|entry| {
-        json!({
-            "name": entry.name,
-            "version": entry.version,
-            "source": entry.source,
-            "trust_tier": format!("{}", entry.trust_tier),
-            "installed_at": entry.installed_at.to_string(),
-            "last_used": entry.last_used.to_string(),
+    let results: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|entry| {
+            json!({
+                "name": entry.name,
+                "version": entry.version,
+                "source": entry.source,
+                "trust_tier": format!("{}", entry.trust_tier),
+                "installed_at": entry.installed_at.to_string(),
+                "last_used": entry.last_used.to_string(),
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(json!({
         "success": true,
@@ -752,15 +805,18 @@ fn handle_updates(name: Option<String>) -> Result<serde_json::Value, Box<dyn std
         None => {
             // Check all cached skills
             let entries = cache.list();
-            let results: Vec<serde_json::Value> = entries.iter().map(|entry| {
-                let result = detector.check_for_update(entry, None);
-                json!({
-                    "name": entry.name,
-                    "current_version": result.current_version,
-                    "has_update": result.has_update,
-                    "latest_version": result.latest_version,
+            let results: Vec<serde_json::Value> = entries
+                .iter()
+                .map(|entry| {
+                    let result = detector.check_for_update(entry, None);
+                    json!({
+                        "name": entry.name,
+                        "current_version": result.current_version,
+                        "has_update": result.has_update,
+                        "latest_version": result.latest_version,
+                    })
                 })
-            }).collect();
+                .collect();
 
             Ok(json!({
                 "success": true,

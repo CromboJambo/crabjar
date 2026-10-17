@@ -25,7 +25,12 @@ impl SkillScanner {
     }
 
     /// Scan a downloaded skill package for security issues.
-    pub fn scan(&self, name: &str, version: &str, package_path: &Path) -> Result<ScanResult, String> {
+    pub fn scan(
+        &self,
+        name: &str,
+        version: &str,
+        package_path: &Path,
+    ) -> Result<ScanResult, String> {
         info!("Scanning {} v{} for security issues", name, version);
 
         let mut result = ScanResult::new(name, version);
@@ -154,13 +159,19 @@ impl SkillScanner {
         let mut files_scanned = 0;
         let mut total_size: u64 = 0;
 
-        for entry in WalkDir::new(package_path).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
 
             files_scanned += 1;
-            let size = entry.metadata().map_err(|e| format!("failed to read metadata: {}", e))?.len();
+            let size = entry
+                .metadata()
+                .map_err(|e| format!("failed to read metadata: {}", e))?
+                .len();
             total_size += size;
 
             if size > MAX_FILE_SIZE {
@@ -177,7 +188,10 @@ impl SkillScanner {
             result.add_finding(ScanFinding {
                 severity: Severity::Warning,
                 category: "file_count".to_string(),
-                message: format!("Skill contains {} files (limit: {})", files_scanned, MAX_FILES),
+                message: format!(
+                    "Skill contains {} files (limit: {})",
+                    files_scanned, MAX_FILES
+                ),
                 file: None,
             });
         }
@@ -189,7 +203,10 @@ impl SkillScanner {
     }
 
     fn check_binary_files(&self, package_path: &Path, result: &mut ScanResult) {
-        for entry in WalkDir::new(package_path).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -213,7 +230,10 @@ impl SkillScanner {
                             result.add_finding(ScanFinding {
                                 severity: Severity::Warning,
                                 category: "binary_file".to_string(),
-                                message: format!("Non-text file > 1KB detected ({} bytes)", metadata.len()),
+                                message: format!(
+                                    "Non-text file > 1KB detected ({} bytes)",
+                                    metadata.len()
+                                ),
                                 file: Some(path.to_string_lossy().to_string()),
                             });
                         }
@@ -225,9 +245,19 @@ impl SkillScanner {
     }
 
     fn check_network_patterns(&self, package_path: &Path, result: &mut ScanResult) {
-        let patterns = ["curl ", "wget ", "http://", "https://", "fetch(", "XMLHttpRequest"];
+        let patterns = [
+            "curl ",
+            "wget ",
+            "http://",
+            "https://",
+            "fetch(",
+            "XMLHttpRequest",
+        ];
 
-        for entry in WalkDir::new(package_path).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -255,7 +285,10 @@ impl SkillScanner {
     fn check_filesystem_patterns(&self, package_path: &Path, result: &mut ScanResult) {
         let patterns = ["fs.write", "writeFile", "open(", "createWriteStream"];
 
-        for entry in WalkDir::new(package_path).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -283,7 +316,10 @@ impl SkillScanner {
     fn check_env_patterns(&self, package_path: &Path, result: &mut ScanResult) {
         let patterns = ["process.env", "HOME", "SSH_AUTH_SOCK", "PATH"];
 
-        for entry in WalkDir::new(package_path).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
             if !entry.file_type().is_file() {
                 continue;
             }
@@ -296,7 +332,10 @@ impl SkillScanner {
                             result.add_finding(ScanFinding {
                                 severity: Severity::Info,
                                 category: "environment".to_string(),
-                                message: format!("Environment variable access detected: {}", pattern),
+                                message: format!(
+                                    "Environment variable access detected: {}",
+                                    pattern
+                                ),
                                 file: Some(path.to_string_lossy().to_string()),
                             });
                             break;
@@ -319,12 +358,14 @@ mod tests {
         // Create manifest.json
         let manifest = dir.join("manifest.json");
         let mut f = fs::File::create(&manifest).map_err(|e| e.to_string())?;
-        f.write_all(b"{\"name\": \"test-skill\", \"version\": \"1.0.0\"}").map_err(|e| e.to_string())?;
+        f.write_all(b"{\"name\": \"test-skill\", \"version\": \"1.0.0\"}")
+            .map_err(|e| e.to_string())?;
 
         // Create a simple script
         let script = dir.join("index.js");
         let mut f = fs::File::create(&script).map_err(|e| e.to_string())?;
-        f.write_all(b"console.log('hello');").map_err(|e| e.to_string())?;
+        f.write_all(b"console.log('hello');")
+            .map_err(|e| e.to_string())?;
 
         Ok(())
     }
@@ -364,7 +405,8 @@ mod tests {
         fs::write(
             dir.path().join("index.js"),
             "const response = fetch('https://example.com');",
-        ).unwrap();
+        )
+        .unwrap();
 
         let result = scanner.scan("test-skill", "1.0.0", dir.path()).unwrap();
         assert!(result.findings.iter().any(|f| f.category == "network"));

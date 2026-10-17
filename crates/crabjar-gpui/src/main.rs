@@ -3,13 +3,13 @@
 //! GPU-accelerated visualization of crabjar agent fleet state using GPUI.
 
 use gpui::{
-    App, Application, AppContext, Bounds, Context, IntoElement, ParentElement, Render, Styled, Window,
-    WindowBounds, WindowOptions, div, px, rgb, size,
+    App, AppContext, Application, Bounds, Context, IntoElement, ParentElement, Render, Styled,
+    Window, WindowBounds, WindowOptions, div, px, rgb, size,
 };
 use tokio::sync::Mutex;
 
 mod surface_adapter;
-use surface_adapter::{CrabjarSurfaceAdapter, CrabjarAgent, AgentStatus};
+use surface_adapter::{AgentStatus, CrabjarAgent, CrabjarSurfaceAdapter};
 
 /// Conductor API base URL (configurable via env)
 const CONDUCTOR_URL: &str = "http://127.0.0.1:8080";
@@ -83,7 +83,11 @@ impl DashboardView {
     fn new() -> Self {
         let state = DashboardState::new();
         let agents = state.generate_mock_agents();
-        DashboardView { state, agents, status: "Mock Data".to_string() }
+        DashboardView {
+            state,
+            agents,
+            status: "Mock Data".to_string(),
+        }
     }
 
     fn update_agents(&mut self, agents: Vec<CrabjarAgent>) {
@@ -97,34 +101,33 @@ impl DashboardView {
 
 impl Render for DashboardView {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let cols = if self.agents.len() <= 2 { 1 } else if self.agents.len() <= 4 { 2 } else { 3 };
+        let cols = if self.agents.len() <= 2 {
+            1
+        } else if self.agents.len() <= 4 {
+            2
+        } else {
+            3
+        };
 
         div()
             .flex_1()
-            .child(
-                div()
-                    .child(format!("Crabjar Agent Dashboard — {}", self.status).into_element())
-            )
+            .child(div().child(format!("Crabjar Agent Dashboard — {}", self.status).into_element()))
             .child(
                 div()
                     .flex_1()
                     .grid()
                     .children(self.agents.iter().map(|agent| {
-                        let status_color = rgb(
-                            (agent.status.color()[0] as u32) << 16 |
-                            (agent.status.color()[1] as u32) << 8 |
-                            (agent.status.color()[2] as u32)
-                        );
+                        let status_color = rgb((agent.status.color()[0] as u32) << 16
+                            | (agent.status.color()[1] as u32) << 8
+                            | (agent.status.color()[2] as u32));
 
-                        div()
-                            .border(px(1.0))
-                            .child(
-                                div()
-                                    .flex()
-                                    .child(agent.name.clone().into_element())
-                                    .child(agent.status.label().to_string().into_element())
-                            )
-                    }))
+                        div().border(px(1.0)).child(
+                            div()
+                                .flex()
+                                .child(agent.name.clone().into_element())
+                                .child(agent.status.label().to_string().into_element()),
+                        )
+                    })),
             )
     }
 }
@@ -160,18 +163,27 @@ fn main() {
 
                         // Update adapter and dashboard
                         state.adapter.lock().await.update_agents(&workers);
-                        let agents: Vec<CrabjarAgent> = state.adapter.lock().await.agents()
-                            .values().cloned().collect();
+                        let agents: Vec<CrabjarAgent> = state
+                            .adapter
+                            .lock()
+                            .await
+                            .agents()
+                            .values()
+                            .cloned()
+                            .collect();
 
-                        window_handle.update(cx, move |dash: &mut DashboardView, _, _| {
-                            dash.set_status("Live");
-                            dash.update_agents(agents);
-                        }).ok();
+                        window_handle
+                            .update(cx, move |dash: &mut DashboardView, _, _| {
+                                dash.set_status("Live");
+                                dash.update_agents(agents);
+                            })
+                            .ok();
                     }
                     _ => {}
                 }
             }
-        }).detach();
+        })
+        .detach();
 
         cx.activate(true);
     });

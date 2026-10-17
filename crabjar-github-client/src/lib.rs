@@ -4,9 +4,9 @@
 //! Supports authenticated/unauthenticated requests, rate limiting,
 //! repository search by tags, and skill installation from repos.
 
+pub mod client;
 pub mod error;
 pub mod models;
-pub mod client;
 
 pub use client::GitHubClient;
 pub use error::GitHubError;

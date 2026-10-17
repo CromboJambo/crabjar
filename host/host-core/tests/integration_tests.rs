@@ -33,12 +33,17 @@ impl crabjar_host_core::ProductAdapter for TestAdapter {
 
     async fn send(&self, _msg: &OutgoingMessage) -> Result<(), crabjar_host_core::AdapterError> {
         if !*self.connected.read().await {
-            return Err(crabjar_host_core::AdapterError::NotConnected(self.adapter_type.clone()));
+            return Err(crabjar_host_core::AdapterError::NotConnected(
+                self.adapter_type.clone(),
+            ));
         }
         Ok(())
     }
 
-    async fn handle_incoming(&self, _msg: IncomingMessage) -> Result<(), crabjar_host_core::AdapterError> {
+    async fn handle_incoming(
+        &self,
+        _msg: IncomingMessage,
+    ) -> Result<(), crabjar_host_core::AdapterError> {
         Ok(())
     }
 }
@@ -91,7 +96,10 @@ impl Plugin for TestPlugin {
         action: &str,
         data: Option<serde_json::Value>,
     ) -> Result<serde_json::Value, PluginError> {
-        self.events_received.write().await.push(format!("action:{}:{}", action, data.is_some()));
+        self.events_received
+            .write()
+            .await
+            .push(format!("action:{}:{}", action, data.is_some()));
         Ok(serde_json::json!({"handled": true, "action": action}))
     }
 }
@@ -105,14 +113,18 @@ async fn test_event_bus_multiple_subscribers() {
     let mut sub2 = bus.subscriber();
 
     // Publish an event
-    bus.publish_typed(
-        EventType::Tick { interval_ms: 100 },
-        "test",
-    ).unwrap();
+    bus.publish_typed(EventType::Tick { interval_ms: 100 }, "test")
+        .unwrap();
 
     // Both subscribers should receive it
-    let e1 = tokio::time::timeout(tokio::time::Duration::from_millis(100), sub1.recv()).await.unwrap().unwrap();
-    let e2 = tokio::time::timeout(tokio::time::Duration::from_millis(100), sub2.recv()).await.unwrap().unwrap();
+    let e1 = tokio::time::timeout(tokio::time::Duration::from_millis(100), sub1.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    let e2 = tokio::time::timeout(tokio::time::Duration::from_millis(100), sub2.recv())
+        .await
+        .unwrap()
+        .unwrap();
 
     assert_eq!(e1.kind, EventType::Tick { interval_ms: 100 });
     assert_eq!(e2.kind, EventType::Tick { interval_ms: 100 });
@@ -136,10 +148,17 @@ async fn test_event_bus_capacity_overflow() {
     }
 
     // At least some should succeed (capacity allows at least 4)
-    assert!(success_count >= 4, "Expected at least 4 successful publishes, got {}", success_count);
+    assert!(
+        success_count >= 4,
+        "Expected at least 4 successful publishes, got {}",
+        success_count
+    );
 
     // Drain the subscriber
-    while tokio::time::timeout(tokio::time::Duration::from_millis(10), sub.recv()).await.is_ok() {}
+    while tokio::time::timeout(tokio::time::Duration::from_millis(10), sub.recv())
+        .await
+        .is_ok()
+    {}
 }
 
 #[tokio::test]
@@ -193,7 +212,14 @@ async fn test_plugin_lifecycle_with_event_bus() {
 
     // Verify plugin can receive events from bus
     let _sub = bus.subscriber();
-    bus.publish_typed(EventType::Agent { stage: "testing".into(), work_item_id: "123".into() }, "test").unwrap();
+    bus.publish_typed(
+        EventType::Agent {
+            stage: "testing".into(),
+            work_item_id: "123".into(),
+        },
+        "test",
+    )
+    .unwrap();
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
     // Stop the plugin
@@ -208,7 +234,9 @@ async fn test_workitem_json_roundtrip() {
     wi.add_task("Task 2");
     wi.update_task(0, TaskStatus::Completed, Some("Done".to_string()));
     wi.set_confidence(0.85);
-    wi.progress_to(Status::Executing { current_task: Some(1) });
+    wi.progress_to(Status::Executing {
+        current_task: Some(1),
+    });
 
     // Serialize
     let json = wi.to_json().unwrap();
@@ -281,11 +309,14 @@ async fn test_plugin_action_with_data() {
     resolved.on_start(&ctx).await.unwrap();
 
     // Trigger an action with data
-    let result = resolved.on_action(
-        &ctx,
-        "test-action",
-        Some(serde_json::json!({"param": "value"})),
-    ).await.unwrap();
+    let result = resolved
+        .on_action(
+            &ctx,
+            "test-action",
+            Some(serde_json::json!({"param": "value"})),
+        )
+        .await
+        .unwrap();
 
     assert_eq!(result["handled"], true);
     assert_eq!(result["action"], "test-action");
@@ -306,7 +337,8 @@ async fn test_event_bus_broadcast_scale() {
     }
 
     // Publish one event
-    bus.publish_typed(EventType::Tick { interval_ms: 1 }, "scale-test").unwrap();
+    bus.publish_typed(EventType::Tick { interval_ms: 1 }, "scale-test")
+        .unwrap();
 
     // Wait a bit for events to propagate
     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -321,7 +353,11 @@ async fn test_event_bus_broadcast_scale() {
     }
 
     // All or most should have received it
-    assert!(received_count >= 45, "Expected at least 45 subscribers to receive event, got {}", received_count);
+    assert!(
+        received_count >= 45,
+        "Expected at least 45 subscribers to receive event, got {}",
+        received_count
+    );
 }
 
 #[tokio::test]
@@ -386,19 +422,41 @@ async fn test_plugin_registry_operations() {
 #[tokio::test]
 async fn test_event_types_display() {
     let events = vec![
-        EventType::TrayChanged { action: "shown".into() },
-        EventType::Notification { title: "Alert".into(), body: "Message".into() },
-        EventType::ClipboardChanged { mime_type: "text/plain".into() },
-        EventType::WebView { event: "load".into(), url: Some("https://example.com".into()) },
-        EventType::Agent { stage: "planning".into(), work_item_id: "123".into() },
-        EventType::Plugin { event: "start".into(), plugin_id: "test".into() },
-        EventType::ConfigReload { source: "file".into() },
+        EventType::TrayChanged {
+            action: "shown".into(),
+        },
+        EventType::Notification {
+            title: "Alert".into(),
+            body: "Message".into(),
+        },
+        EventType::ClipboardChanged {
+            mime_type: "text/plain".into(),
+        },
+        EventType::WebView {
+            event: "load".into(),
+            url: Some("https://example.com".into()),
+        },
+        EventType::Agent {
+            stage: "planning".into(),
+            work_item_id: "123".into(),
+        },
+        EventType::Plugin {
+            event: "start".into(),
+            plugin_id: "test".into(),
+        },
+        EventType::ConfigReload {
+            source: "file".into(),
+        },
         EventType::Tick { interval_ms: 500 },
     ];
 
     for event in events {
         let display = format!("{}", event);
-        assert!(!display.is_empty(), "Display should not be empty for {:?}", event);
+        assert!(
+            !display.is_empty(),
+            "Display should not be empty for {:?}",
+            event
+        );
     }
 }
 
@@ -408,14 +466,20 @@ async fn test_workitem_hypothesis_tracking() {
 
     wi.set_hypothesis("The bug is in module X", 0.75);
     assert!(wi.hypothesis.is_some());
-    assert_eq!(wi.hypothesis.as_ref().unwrap().statement, "The bug is in module X");
+    assert_eq!(
+        wi.hypothesis.as_ref().unwrap().statement,
+        "The bug is in module X"
+    );
     assert!((wi.hypothesis.as_ref().unwrap().confidence - 0.75).abs() < f32::EPSILON);
 
     // Verify JSON roundtrip preserves hypothesis
     let json = wi.to_json().unwrap();
     let restored = WorkItem::from_json(&json).unwrap();
     assert!(restored.hypothesis.is_some());
-    assert_eq!(restored.hypothesis.as_ref().unwrap().statement, "The bug is in module X");
+    assert_eq!(
+        restored.hypothesis.as_ref().unwrap().statement,
+        "The bug is in module X"
+    );
 }
 
 #[tokio::test]
@@ -434,7 +498,9 @@ async fn test_status_transitions() {
     wi.progress_to(Status::Planning);
     assert!(wi.status.is_active());
 
-    wi.progress_to(Status::Executing { current_task: Some(0) });
+    wi.progress_to(Status::Executing {
+        current_task: Some(0),
+    });
     assert!(wi.status.is_active());
 
     wi.progress_to(Status::Verifying);

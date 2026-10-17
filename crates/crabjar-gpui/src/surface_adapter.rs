@@ -35,11 +35,11 @@ impl AgentStatus {
     /// Color code for status indicators (RGB values)
     pub fn color(&self) -> [u8; 3] {
         match self {
-            AgentStatus::Idle => [100, 149, 237],      // CornflowerBlue
-            AgentStatus::Working => [50, 205, 50],     // LimeGreen
-            AgentStatus::Blocked => [255, 165, 0],     // Orange
-            AgentStatus::Done => [70, 130, 180],       // SteelBlue
-            AgentStatus::Unknown => [128, 128, 128],   // Gray
+            AgentStatus::Idle => [100, 149, 237],    // CornflowerBlue
+            AgentStatus::Working => [50, 205, 50],   // LimeGreen
+            AgentStatus::Blocked => [255, 165, 0],   // Orange
+            AgentStatus::Done => [70, 130, 180],     // SteelBlue
+            AgentStatus::Unknown => [128, 128, 128], // Gray
         }
     }
 
@@ -74,7 +74,11 @@ impl CrabjarAgent {
         let status_str = worker["status"].as_str().unwrap_or("unknown");
         let capabilities: Vec<String> = worker["capabilities"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         CrabjarAgent {
@@ -146,21 +150,25 @@ impl CrabjarSurfaceAdapter {
     /// Generate a surface patch describing the current agent state.
     /// This would be serialized and sent to the GPUI renderer.
     pub fn generate_patch(&mut self) -> serde_json::Value {
-        let agents_vec: Vec<serde_json::Value> = self.agents.values().map(|a| {
-            serde_json::json!({
-                "id": a.id,
-                "name": a.name,
-                "status": match a.status {
-                    AgentStatus::Idle => "idle",
-                    AgentStatus::Working => "working",
-                    AgentStatus::Blocked => "blocked",
-                    AgentStatus::Done => "done",
-                    AgentStatus::Unknown => "unknown",
-                },
-                "capabilities": a.capabilities,
-                "trust_level": a.trust_level,
+        let agents_vec: Vec<serde_json::Value> = self
+            .agents
+            .values()
+            .map(|a| {
+                serde_json::json!({
+                    "id": a.id,
+                    "name": a.name,
+                    "status": match a.status {
+                        AgentStatus::Idle => "idle",
+                        AgentStatus::Working => "working",
+                        AgentStatus::Blocked => "blocked",
+                        AgentStatus::Done => "done",
+                        AgentStatus::Unknown => "unknown",
+                    },
+                    "capabilities": a.capabilities,
+                    "trust_level": a.trust_level,
+                })
             })
-        }).collect();
+            .collect();
 
         serde_json::json!({
             "boot_id": self.boot_id,

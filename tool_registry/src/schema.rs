@@ -377,10 +377,7 @@ pub fn schema_version_display() -> String {
 
 /// Unregister (remove) a tool by name.
 pub fn unregister_tool(conn: &Connection, name: &str) -> Result<bool, ToolRegistrySchemaError> {
-    let result = conn.execute(
-        "DELETE FROM tools WHERE name = ?1",
-        params![name],
-    )?;
+    let result = conn.execute("DELETE FROM tools WHERE name = ?1", params![name])?;
 
     Ok(result > 0)
 }

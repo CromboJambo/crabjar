@@ -470,9 +470,10 @@ impl PluginRegistry {
     /// Call on_load hook for a registered plugin.
     pub async fn load(&self, name: &str) -> Result<(), PluginError> {
         let plugins = self.plugins.read().await;
-        let (plugin_name, plugin) = plugins.iter().find(|(n, _)| n == name).ok_or_else(|| {
-            PluginError::NotFound(name.to_string())
-        })?;
+        let (plugin_name, plugin) = plugins
+            .iter()
+            .find(|(n, _)| n == name)
+            .ok_or_else(|| PluginError::NotFound(name.to_string()))?;
 
         plugin.on_load();
         Ok(())
@@ -481,13 +482,15 @@ impl PluginRegistry {
     /// Call on_unload hook for a registered plugin.
     pub async fn unload(&self, name: &str) -> Result<(), PluginError> {
         let plugins = self.plugins.read().await;
-        let (plugin_name, _) = plugins.iter().find(|(n, _)| n == name).ok_or_else(|| {
-            PluginError::NotFound(name.to_string())
-        })?;
+        let (plugin_name, _) = plugins
+            .iter()
+            .find(|(n, _)| n == name)
+            .ok_or_else(|| PluginError::NotFound(name.to_string()))?;
 
-        let plugin = self.get(plugin_name).await.ok_or_else(|| {
-            PluginError::NotFound(name.to_string())
-        })?;
+        let plugin = self
+            .get(plugin_name)
+            .await
+            .ok_or_else(|| PluginError::NotFound(name.to_string()))?;
 
         plugin.on_unload();
         info!("plugin '{}' unloaded", name);
@@ -502,9 +505,10 @@ impl PluginRegistry {
             return Err(PluginError::NotFound(name.to_string()));
         }
 
-        let plugin = self.get(name).await.ok_or_else(|| {
-            PluginError::NotFound(name.to_string())
-        })?;
+        let plugin = self
+            .get(name)
+            .await
+            .ok_or_else(|| PluginError::NotFound(name.to_string()))?;
 
         plugin.on_unload();
 
@@ -803,7 +807,10 @@ mod tests {
         tool_registry.init().unwrap();
 
         // Bind plugin tools to registry
-        let bound = plugin_registry.bind_to_registry(&tool_registry).await.unwrap();
+        let bound = plugin_registry
+            .bind_to_registry(&tool_registry)
+            .await
+            .unwrap();
         assert_eq!(bound, 1); // One tool from the mock plugin
 
         // Verify tool is discoverable in registry

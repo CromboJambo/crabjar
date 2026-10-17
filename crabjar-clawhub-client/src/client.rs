@@ -64,9 +64,9 @@ impl ClawHubClient {
         let resp = self.get(&url).await?;
         let body: Value = resp.json().await?;
 
-        let items = body["skills"].as_array().ok_or_else(|| {
-            ClawHubError::Api("Invalid list response format".to_string())
-        })?;
+        let items = body["skills"]
+            .as_array()
+            .ok_or_else(|| ClawHubError::Api("Invalid list response format".to_string()))?;
 
         let mut skills = Vec::new();
         for item in items {
@@ -80,22 +80,22 @@ impl ClawHubClient {
     }
 
     /// Search for skills by query term.
-    pub async fn search_skills(&self, options: SearchOptions) -> Result<Vec<SkillInfo>, ClawHubError> {
+    pub async fn search_skills(
+        &self,
+        options: SearchOptions,
+    ) -> Result<Vec<SkillInfo>, ClawHubError> {
         let url = format!(
             "{}/skills/search?q={}&limit={}&offset={}",
-            self.base_url,
-            options.query,
-            options.limit,
-            options.offset
+            self.base_url, options.query, options.limit, options.offset
         );
         debug!("Searching ClawHub for: {}", options.query);
 
         let resp = self.get(&url).await?;
         let body: Value = resp.json().await?;
 
-        let items = body["skills"].as_array().ok_or_else(|| {
-            ClawHubError::Api("Invalid search response format".to_string())
-        })?;
+        let items = body["skills"]
+            .as_array()
+            .ok_or_else(|| ClawHubError::Api("Invalid search response format".to_string()))?;
 
         let mut skills = Vec::new();
         for item in items {
@@ -131,12 +131,12 @@ impl ClawHubClient {
 
         // Determine version to download
         let version_info = match version {
-            Some(v) => skill.get_version(v).ok_or_else(|| {
-                ClawHubError::VersionNotFound(format!("{} v{}", name, v))
-            })?,
-            None => skill.latest().ok_or_else(|| {
-                ClawHubError::VersionNotFound(format!("{} (no latest)", name))
-            })?,
+            Some(v) => skill
+                .get_version(v)
+                .ok_or_else(|| ClawHubError::VersionNotFound(format!("{} v{}", name, v)))?,
+            None => skill
+                .latest()
+                .ok_or_else(|| ClawHubError::VersionNotFound(format!("{} (no latest)", name)))?,
         };
 
         info!(
@@ -178,11 +178,16 @@ impl ClawHubClient {
     }
 
     /// Scan a downloaded skill package for security issues.
-    pub fn scan_skill(&self, name: &str, version: &str, package_path: &Path) -> Result<crabjar_skill_scanner::models::ScanResult, ClawHubError> {
+    pub fn scan_skill(
+        &self,
+        name: &str,
+        version: &str,
+        package_path: &Path,
+    ) -> Result<crabjar_skill_scanner::models::ScanResult, ClawHubError> {
         let scanner = SkillScanner::new();
-        scanner.scan(name, version, package_path).map_err(|e| {
-            ClawHubError::Api(format!("Security scan failed: {}", e))
-        })
+        scanner
+            .scan(name, version, package_path)
+            .map_err(|e| ClawHubError::Api(format!("Security scan failed: {}", e)))
     }
 
     /// Scan and verify checksum of a downloaded skill package.
@@ -194,9 +199,9 @@ impl ClawHubClient {
         expected_checksum: &str,
     ) -> Result<crabjar_skill_scanner::models::ScanResult, ClawHubError> {
         let scanner = SkillScanner::new();
-        scanner.scan_with_checksum(name, version, package_path, expected_checksum).map_err(|e| {
-            ClawHubError::Api(format!("Security scan failed: {}", e))
-        })
+        scanner
+            .scan_with_checksum(name, version, package_path, expected_checksum)
+            .map_err(|e| ClawHubError::Api(format!("Security scan failed: {}", e)))
     }
 
     /// Make an authenticated GET request.

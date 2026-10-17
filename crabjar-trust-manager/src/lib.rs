@@ -5,14 +5,14 @@
 //! manages version-aware skill caching in ~/.crabjar/skill-cache/,
 //! and provides update detection for installed skills.
 
+pub mod cache;
 pub mod error;
 pub mod models;
 pub mod trust;
-pub mod cache;
 pub mod updates;
 
-pub use error::TrustManagerError;
-pub use models::{TrustTier, SkillCacheEntry, UpdateCheckResult};
-pub use trust::TrustManager;
 pub use cache::SkillCache;
+pub use error::TrustManagerError;
+pub use models::{SkillCacheEntry, TrustTier, UpdateCheckResult};
+pub use trust::TrustManager;
 pub use updates::UpdateDetector;

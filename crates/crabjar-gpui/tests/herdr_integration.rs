@@ -3,8 +3,8 @@
 #[path = "../src/surface_adapter.rs"]
 mod surface_adapter;
 
-use surface_adapter::{CrabjarSurfaceAdapter, CrabjarAgent, AgentStatus};
 use serde_json::json;
+use surface_adapter::{AgentStatus, CrabjarAgent, CrabjarSurfaceAdapter};
 
 #[test]
 fn test_agent_status_from_conductor() {
@@ -29,10 +29,10 @@ fn test_agent_status_from_conductor() {
 #[test]
 fn test_agent_status_colors() {
     // Verify color codes match the architecture doc spec
-    assert_eq!(AgentStatus::Idle.color(), [100, 149, 237]);   // CornflowerBlue
-    assert_eq!(AgentStatus::Working.color(), [50, 205, 50]);  // LimeGreen
-    assert_eq!(AgentStatus::Blocked.color(), [255, 165, 0]);  // Orange
-    assert_eq!(AgentStatus::Done.color(), [70, 130, 180]);    // SteelBlue
+    assert_eq!(AgentStatus::Idle.color(), [100, 149, 237]); // CornflowerBlue
+    assert_eq!(AgentStatus::Working.color(), [50, 205, 50]); // LimeGreen
+    assert_eq!(AgentStatus::Blocked.color(), [255, 165, 0]); // Orange
+    assert_eq!(AgentStatus::Done.color(), [70, 130, 180]); // SteelBlue
 }
 
 #[test]
@@ -55,9 +55,7 @@ fn test_surface_adapter_update() {
 fn test_surface_patch_generation() {
     let mut adapter = CrabjarSurfaceAdapter::new("test-boot-id");
 
-    let workers = vec![
-        json!({"id": "w1", "name": "hermes-agent", "status": "working"}),
-    ];
+    let workers = vec![json!({"id": "w1", "name": "hermes-agent", "status": "working"})];
 
     adapter.update_agents(&workers);
     let patch = adapter.generate_patch();

@@ -9,11 +9,14 @@ use sha2::{Digest, Sha256};
 /// Compute SHA-256 checksum of a file.
 pub fn compute_sha256(path: &Path) -> Result<String, String> {
     let mut hasher = Sha256::new();
-    let mut file = fs::File::open(path).map_err(|e| format!("failed to open {}: {}", path.display(), e))?;
+    let mut file =
+        fs::File::open(path).map_err(|e| format!("failed to open {}: {}", path.display(), e))?;
 
     let mut buffer = vec![0u8; 8192];
     loop {
-        let bytes_read = file.read(&mut buffer).map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
+        let bytes_read = file
+            .read(&mut buffer)
+            .map_err(|e| format!("failed to read {}: {}", path.display(), e))?;
         if bytes_read == 0 {
             break;
         }

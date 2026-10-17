@@ -207,7 +207,8 @@ impl SkillCache {
             if path.extension().map_or(false, |ext| ext == "json") {
                 let content = fs::read_to_string(&path)?;
                 if let Ok(meta) = serde_json::from_str::<CacheMetadata>(&content) {
-                    let tier = TrustTier::from_str(&meta.trust_tier).unwrap_or(TrustTier::Community);
+                    let tier =
+                        TrustTier::from_str(&meta.trust_tier).unwrap_or(TrustTier::Community);
                     let entry = SkillCacheEntry {
                         name: meta.name.clone(),
                         version: meta.version,
@@ -238,7 +239,9 @@ mod tests {
     #[test]
     fn test_cache_skill() {
         let dir = tempdir().unwrap();
-        unsafe { std::env::set_var("HOME", dir.path()); }
+        unsafe {
+            std::env::set_var("HOME", dir.path());
+        }
 
         let mut cache = SkillCache::new().unwrap();
         let entry = cache
@@ -261,7 +264,9 @@ mod tests {
     #[test]
     fn test_remove_skill() {
         let dir = tempdir().unwrap();
-        unsafe { std::env::set_var("HOME", dir.path()); }
+        unsafe {
+            std::env::set_var("HOME", dir.path());
+        }
 
         let mut cache = SkillCache::new().unwrap();
         cache

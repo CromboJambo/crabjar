@@ -1,7 +1,7 @@
 //! Data models for ClawHub API interactions.
 
-use serde::{Deserialize, Serialize};
 use chrono::DateTime;
+use serde::{Deserialize, Serialize};
 
 /// Skill information from ClawHub registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,7 +28,9 @@ pub struct SkillVersion {
 impl SkillInfo {
     /// Get the latest version info.
     pub fn latest(&self) -> Option<&SkillVersion> {
-        self.versions.iter().find(|v| v.version == self.latest_version)
+        self.versions
+            .iter()
+            .find(|v| v.version == self.latest_version)
     }
 
     /// Get a specific version by semver.

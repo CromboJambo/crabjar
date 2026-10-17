@@ -1,6 +1,6 @@
+use crabjar_tool_registry::ToolRegistry;
 use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
 use serde_json::Value;
-use crabjar_tool_registry::ToolRegistry;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -14,13 +14,16 @@ impl ToolRegistryMcpServer {
     pub fn new() -> anyhow::Result<Self> {
         let db_dir = tempfile::tempdir()?;
         let db_path = db_dir.path().join("tool_registry.db");
-        
+
         // Initialize database schema
         let conn = rusqlite::Connection::open(&db_path)?;
         let registry = ToolRegistry::new(&conn);
         registry.init()?;
-        
-        Ok(Self { db_path, _db_dir: db_dir })
+
+        Ok(Self {
+            db_path,
+            _db_dir: db_dir,
+        })
     }
 
     fn get_registry(&self) -> anyhow::Result<ToolRegistry<'static>> {

@@ -358,11 +358,7 @@ async fn handle_chat(
 
 /// Guard check + concierge enforcement — shared by all tool invocations.
 /// Returns Ok(()) if approved, Err with reason if pending/denied/gate error.
-fn guard_tool_call(
-    tool_name: &str,
-    args: &[String],
-    source_event_id: &str,
-) -> Result<(), String> {
+fn guard_tool_call(tool_name: &str, args: &[String], source_event_id: &str) -> Result<(), String> {
     let guard_root = std::env::var("MIRROR_GUARD_ROOT").unwrap_or_else(|_| ".".to_string());
 
     let guard_db = crabjar_guard::GuardDb::open(crabjar_guard::GuardDb::from_mirror_path(format!(
@@ -370,7 +366,10 @@ fn guard_tool_call(
         guard_root,
     )))
     .unwrap_or_else(|_| {
-        warn!("Failed to open guard DB for '{}', using in-memory fallback", tool_name);
+        warn!(
+            "Failed to open guard DB for '{}', using in-memory fallback",
+            tool_name
+        );
         crabjar_guard::GuardDb::open(":memory:").unwrap()
     });
 
@@ -429,9 +428,9 @@ fn guard_tool_call(
                         .map(|e| e.id.clone())
                         .unwrap_or_default()
                 )),
-                ActionStatus::Executed | ActionStatus::Interrupted => Err(
-                    "Status not handled by concierge".to_string(),
-                ),
+                ActionStatus::Executed | ActionStatus::Interrupted => {
+                    Err("Status not handled by concierge".to_string())
+                }
             }
         }
         Err(e) => {
@@ -672,9 +671,7 @@ async fn execute_tool_call(
         }
         "search_logs" => {
             if args.len() < 2 {
-                return Err(
-                    "Error: search_logs requires at least 1 argument (query)".to_string(),
-                );
+                return Err("Error: search_logs requires at least 1 argument (query)".to_string());
             }
             let query = &args[0];
 

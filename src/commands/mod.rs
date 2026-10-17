@@ -1,4 +1,9 @@
 pub mod attempts;
+pub mod decide_backend;
+pub mod decide_cache;
+pub mod decide_criteria;
+pub mod decide_db;
+pub mod decide_rules;
 pub mod guard;
 pub mod habitat;
 pub mod semantic;

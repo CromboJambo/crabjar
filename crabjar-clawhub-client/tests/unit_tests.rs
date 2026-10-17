@@ -1,7 +1,7 @@
 //! Unit tests for CrabJar ClawHub Client
 
-use crabjar_clawhub_client::models::{SearchOptions, SkillInfo, SkillVersion};
 use chrono::Utc;
+use crabjar_clawhub_client::models::{SearchOptions, SkillInfo, SkillVersion};
 
 #[test]
 fn test_skill_info_latest() {
@@ -38,14 +38,12 @@ fn test_skill_info_get_version() {
         name: "test-skill".to_string(),
         description: Some("Test skill".to_string()),
         author: "author".to_string(),
-        versions: vec![
-            SkillVersion {
-                version: "1.0.0".to_string(),
-                download_url: "https://example.com/1.0.0.tar.gz".to_string(),
-                checksum: None,
-                published_at: Some(Utc::now()),
-            },
-        ],
+        versions: vec![SkillVersion {
+            version: "1.0.0".to_string(),
+            download_url: "https://example.com/1.0.0.tar.gz".to_string(),
+            checksum: None,
+            published_at: Some(Utc::now()),
+        }],
         latest_version: "1.0.0".to_string(),
         download_count: 50,
         created_at: Some(Utc::now()),

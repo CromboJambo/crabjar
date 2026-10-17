@@ -93,10 +93,26 @@ impl ScanResult {
     }
 
     pub fn summary(&self) -> String {
-        let info_count = self.findings.iter().filter(|f| f.severity == Severity::Info).count();
-        let warn_count = self.findings.iter().filter(|f| f.severity == Severity::Warning).count();
-        let error_count = self.findings.iter().filter(|f| f.severity == Severity::Error).count();
-        let critical_count = self.findings.iter().filter(|f| f.severity == Severity::Critical).count();
+        let info_count = self
+            .findings
+            .iter()
+            .filter(|f| f.severity == Severity::Info)
+            .count();
+        let warn_count = self
+            .findings
+            .iter()
+            .filter(|f| f.severity == Severity::Warning)
+            .count();
+        let error_count = self
+            .findings
+            .iter()
+            .filter(|f| f.severity == Severity::Error)
+            .count();
+        let critical_count = self
+            .findings
+            .iter()
+            .filter(|f| f.severity == Severity::Critical)
+            .count();
 
         format!(
             "{}: {} files scanned, {} bytes. Findings: {} info, {} warning, {} error, {} critical. Recommendation: {}",

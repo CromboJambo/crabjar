@@ -8,8 +8,8 @@ use axum::body::Bytes;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::Json;
-use axum::routing::{get, Router};
-use serde_json::{json, Value};
+use axum::routing::{Router, get};
+use serde_json::{Value, json};
 use tokio::task::JoinHandle;
 
 /// Test skill definition.
@@ -32,7 +32,9 @@ pub struct MockRegistryServer {
 impl MockRegistryServer {
     /// Start a new mock registry server on a random available port.
     pub async fn start(skills: Vec<TestSkill>) -> Self {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind");
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("Failed to bind");
         let addr = listener.local_addr().unwrap();
 
         let skills_arc = Arc::new(Mutex::new(skills));
@@ -82,9 +84,13 @@ async fn list_skills(
 ) -> Json<Value> {
     let params = parse_query_params(query);
     let skills = skills.lock().unwrap();
-    let limit: u32 = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(20);
+    let limit: u32 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
 
-    let results: Vec<Value> = skills.iter()
+    let results: Vec<Value> = skills
+        .iter()
         .take(limit as usize)
         .map(skill_to_json)
         .collect();
@@ -99,9 +105,13 @@ async fn search_skills(
     let params = parse_query_params(query);
     let skills = skills.lock().unwrap();
     let query_str = params.get("q").cloned().unwrap_or_default();
-    let limit: u32 = params.get("limit").and_then(|v| v.parse().ok()).unwrap_or(20);
+    let limit: u32 = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
 
-    let results: Vec<Value> = skills.iter()
+    let results: Vec<Value> = skills
+        .iter()
         .filter(|s| s.name.contains(&query_str) || s.description.contains(&query_str))
         .take(limit as usize)
         .map(skill_to_json)
@@ -119,7 +129,10 @@ async fn get_skill(
     if let Some(skill) = skills.iter().find(|s| s.name == name) {
         Ok(Json(skill_to_json(skill)))
     } else {
-        Err((StatusCode::NOT_FOUND, Json(json!({ "error": "Skill not found" })) ))
+        Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "Skill not found" })),
+        ))
     }
 }
 
