@@ -133,6 +133,30 @@ pub enum CliCommand {
         subcmd: String,
         observation: Option<String>,
         criteria_file: Option<String>,
+        #[arg(long, default_value = "hash")]
+        backend: String,
+        #[arg(long, default_value = "0.3")]
+        threshold: f64,
+        #[arg(short, long)]
+        verbose: bool,
+        /// Bypass cache and recompute decision
+        #[arg(long, default_value = "false")]
+        fresh: bool,
+        /// Observation hash for feedback/metrics subcommands
+        #[arg(long)]
+        obs_hash: Option<String>,
+        /// Outcome for feedback subcommand (correct/incorrect)
+        #[arg(long)]
+        outcome: Option<String>,
+        /// Time window for metrics (e.g., "24h", "7d")
+        #[arg(long, default_value = "all")]
+        last: String,
+        /// Decision ID for promote-rule subcommand
+        #[arg(long)]
+        decision_id: Option<i64>,
+        /// Component name for learnings subcommand
+        #[arg(long)]
+        component: Option<String>,
     },
 
     /// Slow Friend daemon: tiered attention system (EXPL-005)

@@ -7,10 +7,10 @@ mod crabjar_config;
 mod doctor;
 mod dotfile_manager;
 mod knowledge_store;
+mod mcp_client_cli;
 mod metrics;
 mod project_loader;
 mod tool_registry_cli;
-mod mcp_client_cli;
 
 use bitwarden::commands::handle_bitwarden_command;
 mod commands;
@@ -24,10 +24,10 @@ use doctor::handle_doctor_command;
 use dotfile_manager::DotfileManager;
 use knowledge_store::KnowledgeBridge;
 use knowledge_store::commands::KnowledgeCommandExt;
+use mcp_client_cli::handle_mcp_command;
 use metrics::{run_module_sizes, run_test_count};
 use project_loader::ProjectLoader;
 use tool_registry_cli::handle_tool_command;
-use mcp_client_cli::handle_mcp_command;
 
 fn is_help_request(args: &[String]) -> bool {
     args.iter()
@@ -126,17 +126,72 @@ async fn main() {
             subcmd,
             observation,
             criteria_file,
-        }) => {
-            let result = commands::semantic::handle(
-                &subcmd,
-                observation.as_deref(),
-                criteria_file.as_deref(),
-            );
-            match result {
+            backend,
+            threshold,
+            verbose,
+            fresh,
+            obs_hash,
+            outcome,
+            last,
+            decision_id,
+            component,
+        }) => match (subcmd.as_str(), observation, criteria_file) {
+            ("evaluate", Some(obs), Some(crit)) => {
+                match commands::semantic::handle_evaluate(
+                    &obs, &crit, &backend, threshold, verbose, fresh,
+                ) {
+                    Ok(json) => json,
+                    Err(err) => error_response(&err.to_string(), true),
+                }
+            }
+            ("evaluate", None, _) => {
+                error_response("Missing --observation for decide evaluate", true)
+            }
+            ("evaluate", _, None) => {
+                error_response("Missing --criteria-file for decide evaluate", true)
+            }
+            ("feedback", _, _) => {
+                match commands::semantic::handle_feedback(obs_hash.as_deref(), outcome.as_deref()) {
+                    Ok(json) => json,
+                    Err(err) => error_response(&err.to_string(), true),
+                }
+            }
+            ("metrics", _, _) => {
+                match commands::semantic::handle_metrics(&last) {
+                    Ok(json) => json,
+                    Err(err) => error_response(&err.to_string(), true),
+                }
+            }
+            ("promote-rule", _, _) => {
+                match commands::semantic::handle_promote_rule(decision_id) {
+                    Ok(json) => json,
+                    Err(err) => error_response(&err.to_string(), true),
+                }
+            }
+            ("learnings", _, _) => {
+                match commands::semantic::handle_learnings(component.as_deref()) {
+                    Ok(json) => json,
+                    Err(err) => error_response(&err.to_string(), true),
+                }
+            }
+            ("list-criteria", _, search_path) => {
+                match commands::semantic::handle_list_criteria(search_path.as_deref()) {
+                    Ok(json) => json,
+                    Err(err) => error_response(&err.to_string(), true),
+                }
+            }
+            ("validate", _, Some(file)) => match commands::semantic::handle_validate(&file) {
                 Ok(json) => json,
                 Err(err) => error_response(&err.to_string(), true),
+            },
+            ("validate", _, None) => {
+                error_response("Missing --criteria-file for decide validate", true)
             }
-        }
+            _ => error_response(
+                "Unknown decide subcommand. Use: evaluate, feedback, metrics, promote-rule, learnings, list-criteria, validate",
+                true,
+            ),
+        },
         Some(CliCommand::SlowFriend { command }) => handle_slow_friend_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Learn {
@@ -146,20 +201,23 @@ async fn main() {
             let analyzer = crabjar_lib::learning_loop::LearningAnalyzer::new();
             match subcmd.as_str() {
                 "analyze" => match analyzer.generate_recommendations() {
-                    Ok(recommendations) => recommendations,
+                    Ok(recommendations) => json!({
+                        "success": true,
+                        "type": "learn_analysis",
+                        "recommendations": recommendations
+                    }),
                     Err(err) => error_response(&err.to_string(), true),
                 },
-                "training-candidates" => {
-                    match analyzer.export_training_candidates(min_invocations) {
-                        Ok(candidates) => json!({
-                            "success": true,
-                            "type": "training_candidates",
-                            "candidates": candidates,
-                            "count": candidates.len()
-                        }),
-                        Err(err) => error_response(&err.to_string(), true),
-                    }
-                }
+                "training-candidates" => match analyzer.export_training_candidates(min_invocations)
+                {
+                    Ok(candidates) => json!({
+                        "success": true,
+                        "type": "training_candidates",
+                        "candidates": candidates,
+                        "count": candidates.len()
+                    }),
+                    Err(err) => error_response(&err.to_string(), true),
+                },
                 "failure-patterns" => match analyzer.identify_failure_patterns() {
                     Ok(patterns) => json!({
                         "success": true,
