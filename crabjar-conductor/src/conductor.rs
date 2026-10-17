@@ -78,6 +78,34 @@ impl Conductor {
             .map(|gate| gate.cache_stats())
     }
 
+    /// Extract candidate rules from decision history.
+    pub fn extract_rules(
+        &self,
+        criteria_file: &str,
+        min_occurrences: i64,
+    ) -> anyhow::Result<Vec<crate::decision::rule_extraction::CandidateRule>> {
+        let rules = crate::decision::rule_extraction::extract_rules(&self.store, criteria_file, min_occurrences)?;
+        Ok(rules)
+    }
+
+    /// Promote a candidate rule to persistent storage.
+    pub fn promote_rule(
+        &self,
+        pattern_id: &str,
+        criteria_file: &str,
+        recommended_option: &str,
+    ) -> anyhow::Result<i64> {
+        let rule = crate::decision::rule_extraction::CandidateRule {
+            criteria_file: criteria_file.to_string(),
+            pattern_id: pattern_id.to_string(),
+            recommended_option: recommended_option.to_string(),
+            avg_confidence: 0.0,
+            occurrence_count: 0,
+        };
+        let rule_id = crate::decision::rule_extraction::promote_rule(&self.store, &rule)?;
+        Ok(rule_id)
+    }
+
     /// Submit a new goal for decomposition and execution.
     pub fn submit_goal(&self, description: String) -> Result<Goal> {
         info!(description = %description, "Submitting new goal");

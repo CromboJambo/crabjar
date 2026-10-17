@@ -228,7 +228,19 @@ impl StateStore {
             );
 
             CREATE INDEX IF NOT EXISTS idx_decisions_criteria ON decisions(criteria_file);
-            CREATE INDEX IF NOT EXISTS idx_decisions_hash ON decisions(observation_hash);",
+            CREATE INDEX IF NOT EXISTS idx_decisions_hash ON decisions(observation_hash);
+
+            -- Promoted decision rules (JEV Phase 1 Milestone 3)
+            CREATE TABLE IF NOT EXISTS decision_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern_id TEXT NOT NULL,
+                criteria_file TEXT NOT NULL,
+                recommended_option TEXT NOT NULL,
+                avg_confidence REAL NOT NULL,
+                occurrence_count INTEGER NOT NULL,
+                promoted_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_decision_rules_criteria ON decision_rules(criteria_file);",
         )?;
 
         Ok(Self { db })
@@ -731,6 +743,73 @@ impl StateStore {
         )?;
         Ok(row)
     }
+
+    // ─── Promoted rule operations ─────────────────────────────────────
+
+    /// Store a promoted decision rule.
+    pub fn promote_rule(
+        &self,
+        pattern_id: &str,
+        criteria_file: &str,
+        recommended_option: &str,
+        avg_confidence: f64,
+        occurrence_count: i64,
+    ) -> Result<i64, rusqlite::Error> {
+        let promoted_at = Utc::now().to_rfc3339();
+        let result = self.db.execute(
+            "INSERT INTO decision_rules (pattern_id, criteria_file, recommended_option, avg_confidence, occurrence_count, promoted_at) VALUES (?, ?, ?, ?, ?, ?)",
+            params![pattern_id, criteria_file, recommended_option, avg_confidence, occurrence_count, promoted_at],
+        )?;
+        Ok(self.db.last_insert_rowid())
+    }
+
+    /// Get all promoted rules for a specific criteria file.
+    pub fn get_promoted_rules(&self, criteria_file: &str) -> Result<Vec<PromotedRule>, rusqlite::Error> {
+        let mut stmt = self.db.prepare(
+            "SELECT id, pattern_id, recommended_option, avg_confidence, occurrence_count, promoted_at FROM decision_rules WHERE criteria_file = ? ORDER BY promoted_at DESC",
+        )?;
+        let rows = stmt.query_map(params![criteria_file], |row| {
+            Ok(PromotedRule {
+                id: row.get(0)?,
+                pattern_id: row.get(1)?,
+                recommended_option: row.get(2)?,
+                avg_confidence: row.get(3)?,
+                occurrence_count: row.get(4)?,
+                promoted_at: row.get(5)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// Check if a rule exists for the given pattern and criteria.
+    pub fn has_rule(&self, pattern_id: &str, criteria_file: &str) -> Result<bool, rusqlite::Error> {
+        let row = self.db.query_row(
+            "SELECT COUNT(*) FROM decision_rules WHERE pattern_id = ? AND criteria_file = ?",
+            params![pattern_id, criteria_file],
+            |r| r.get::<_, i64>(0),
+        )?;
+        Ok(row > 0)
+    }
+
+    /// Get the recommended option for a given pattern and criteria.
+    pub fn get_rule_option(&self, pattern_id: &str, criteria_file: &str) -> Result<Option<String>, rusqlite::Error> {
+        self.db.query_row(
+            "SELECT recommended_option FROM decision_rules WHERE pattern_id = ? AND criteria_file = ?",
+            params![pattern_id, criteria_file],
+            |r| r.get::<_, String>(0),
+        ).optional()
+    }
+}
+
+/// A promoted decision rule stored in the database.
+#[derive(Debug, Clone)]
+pub struct PromotedRule {
+    pub id: i64,
+    pub pattern_id: String,
+    pub recommended_option: String,
+    pub avg_confidence: f64,
+    pub occurrence_count: i64,
+    pub promoted_at: String,
 }
 
 /// A single decision record from history.
