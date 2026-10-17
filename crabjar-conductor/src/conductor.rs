@@ -86,7 +86,7 @@ impl Conductor {
         if let Some(gate) = &self.decision_gate {
             let fleet_state = self.get_fleet_state_summary();
             match tokio::runtime::Handle::current().block_on(
-                gate.evaluate_pre_execution(&description, &fleet_state, None)
+                gate.evaluate_pre_execution(&description, &fleet_state, None, Some(&self.store))
             ) {
                 Ok(result) => {
                     info!(

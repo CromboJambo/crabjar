@@ -8,8 +8,10 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use super::cache::DecisionCache;
+use crate::state_store::StateStore;
 
 /// Embedding backend configuration
 #[derive(Debug, Clone)]
@@ -93,7 +95,11 @@ impl JevEvaluator {
         &self,
         observation: &str,
         criteria_file: &str,
+        state_store: Option<&StateStore>,
     ) -> Result<DecisionResult> {
+        // Compute cache key hash for logging
+        let obs_hash = compute_observation_hash(observation, criteria_file);
+
         // Check cache first for recurring observation patterns
         let mut cache = self.decision_cache.lock().unwrap();
         if let Some(cached) = cache.get(observation, criteria_file) {
@@ -102,6 +108,18 @@ impl JevEvaluator {
                 &criteria_file[..criteria_file.len().min(40)],
                 cache.hit_rate()
             );
+
+            // Log cache hit to decision history
+            if let Some(store) = state_store {
+                let _ = store.log_decision(
+                    &obs_hash,
+                    criteria_file,
+                    &cached.option,
+                    cached.confidence,
+                    true,
+                );
+            }
+
             return Ok(cached);
         }
 
@@ -156,6 +174,17 @@ impl JevEvaluator {
             &criteria_file[..criteria_file.len().min(40)],
             cache.hit_rate()
         );
+
+        // Log computed decision to history
+        if let Some(store) = state_store {
+            let _ = store.log_decision(
+                &obs_hash,
+                criteria_file,
+                &result.option,
+                result.confidence,
+                false,
+            );
+        }
 
         Ok(result)
     }
@@ -223,4 +252,14 @@ fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
     }
 
     dot_product / (magnitude_a * magnitude_b)
+}
+
+/// Compute SHA-256 hash of observation + criteria for decision logging.
+fn compute_observation_hash(observation: &str, criteria_file: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(observation.as_bytes());
+    hasher.update(b"|");
+    hasher.update(criteria_file.as_bytes());
+    let result = hasher.finalize();
+    format!("{:x}", result)
 }

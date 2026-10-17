@@ -9,6 +9,8 @@ pub mod cache;
 pub mod evaluate;
 pub mod policy;
 
+use crate::state_store::StateStore;
+
 pub use cache::{CacheStats, DecisionCache};
 pub use evaluate::{BackendConfig, DecisionResult, JevEvaluator};
 pub use policy::DecisionPolicy;
@@ -54,6 +56,7 @@ impl DecisionGate {
         goal_description: &str,
         fleet_state: &str,
         criteria_file: Option<&str>,
+        state_store: Option<&StateStore>,
     ) -> Result<GateResult, Box<dyn std::error::Error>> {
         let policy = self.policy.as_ref();
         let criteria = if let Some(cf) = criteria_file {
@@ -69,7 +72,7 @@ impl DecisionGate {
             goal_description, fleet_state
         );
 
-        let result = self.evaluator.evaluate(&observation, &criteria).await?;
+        let result = self.evaluator.evaluate(&observation, &criteria, state_store).await?;
 
         Ok(GateResult {
             gate: GateType::PreExecution,
@@ -89,6 +92,7 @@ impl DecisionGate {
         failure_summary: &str,
         fleet_load_percent: f64,
         criteria_file: Option<&str>,
+        state_store: Option<&StateStore>,
     ) -> Result<GateResult, Box<dyn std::error::Error>> {
         let policy = self.policy.as_ref();
         let criteria = if let Some(cf) = criteria_file {
@@ -105,7 +109,7 @@ impl DecisionGate {
             iteration, success_count, failure_count, failure_summary, fleet_load_percent
         );
 
-        let result = self.evaluator.evaluate(&observation, &criteria).await?;
+        let result = self.evaluator.evaluate(&observation, &criteria, state_store).await?;
 
         Ok(GateResult {
             gate: GateType::Annealing,
@@ -122,6 +126,7 @@ impl DecisionGate {
         competing_goals: &[String],
         queue_depth: usize,
         criteria_file: Option<&str>,
+        state_store: Option<&StateStore>,
     ) -> Result<GateResult, Box<dyn std::error::Error>> {
         let policy = self.policy.as_ref();
         let criteria = if let Some(cf) = criteria_file {
@@ -139,7 +144,7 @@ impl DecisionGate {
             competing_goals.join("; ")
         );
 
-        let result = self.evaluator.evaluate(&observation, &criteria).await?;
+        let result = self.evaluator.evaluate(&observation, &criteria, state_store).await?;
 
         Ok(GateResult {
             gate: GateType::ResourceContention,

@@ -215,7 +215,20 @@ impl StateStore {
                 failed_tasks INTEGER NOT NULL DEFAULT 0,
                 auth_token TEXT UNIQUE,
                 token_expires_at TEXT
-            );",
+            );
+
+            CREATE TABLE IF NOT EXISTS decisions (
+                id TEXT PRIMARY KEY,
+                observation_hash TEXT NOT NULL,
+                criteria_file TEXT NOT NULL,
+                chosen_option TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                cache_hit INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_decisions_criteria ON decisions(criteria_file);
+            CREATE INDEX IF NOT EXISTS idx_decisions_hash ON decisions(observation_hash);",
         )?;
 
         Ok(Self { db })
@@ -632,6 +645,111 @@ impl StateStore {
 
         Ok(token)
     }
+
+    // ─── Decision history operations ──────────────────────────────────
+
+    /// Log a JEV decision to the history store.
+    pub fn log_decision(
+        &self,
+        observation_hash: &str,
+        criteria_file: &str,
+        chosen_option: &str,
+        confidence: f64,
+        cache_hit: bool,
+    ) -> Result<(), rusqlite::Error> {
+        let id = Uuid::new_v4().to_string();
+        let created_at = Utc::now().to_rfc3339();
+
+        self.db.execute(
+            "INSERT INTO decisions (id, observation_hash, criteria_file, chosen_option, confidence, cache_hit, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id,
+                observation_hash,
+                criteria_file,
+                chosen_option,
+                confidence,
+                if cache_hit { 1 } else { 0 },
+                created_at
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    /// Get decision history for a specific criteria file.
+    pub fn get_decisions_for_criteria(
+        &self,
+        criteria_file: &str,
+        limit: i32,
+    ) -> Result<Vec<DecisionRecord>, rusqlite::Error> {
+        let mut stmt = self.db.prepare(
+            "SELECT id, observation_hash, chosen_option, confidence, cache_hit, created_at FROM decisions WHERE criteria_file = ? ORDER BY created_at DESC LIMIT ?",
+        )?;
+        let rows = stmt.query_map(params![criteria_file, limit], |row| {
+            Ok(DecisionRecord {
+                id: row.get(0)?,
+                observation_hash: row.get(1)?,
+                chosen_option: row.get(2)?,
+                confidence: row.get(3)?,
+                cache_hit: row.get::<_, i32>(4)? == 1,
+                created_at: row.get(5)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// Get decision frequency statistics for rule extraction.
+    /// Returns option counts grouped by observation hash pattern for a criteria file.
+    pub fn get_decision_frequencies(
+        &self,
+        criteria_file: &str,
+    ) -> Result<Vec<DecisionFrequency>, rusqlite::Error> {
+        let sql = r#"
+            SELECT chosen_option, COUNT(*) as count, AVG(confidence) as avg_confidence
+            FROM decisions
+            WHERE criteria_file = ?
+            GROUP BY chosen_option
+            ORDER BY count DESC
+        "#;
+        let mut stmt = self.db.prepare(sql)?;
+        let rows = stmt.query_map(params![criteria_file], |row| {
+            Ok(DecisionFrequency {
+                option: row.get(0)?,
+                count: row.get(1)?,
+                avg_confidence: row.get(2)?,
+            })
+        })?;
+        rows.collect()
+    }
+
+    /// Get total decision count for a criteria file.
+    pub fn get_decision_count(&self, criteria_file: &str) -> Result<i64, rusqlite::Error> {
+        let row = self.db.query_row(
+            "SELECT COUNT(*) FROM decisions WHERE criteria_file = ?",
+            params![criteria_file],
+            |r| r.get::<_, i64>(0),
+        )?;
+        Ok(row)
+    }
+}
+
+/// A single decision record from history.
+#[derive(Debug, Clone)]
+pub struct DecisionRecord {
+    pub id: String,
+    pub observation_hash: String,
+    pub chosen_option: String,
+    pub confidence: f64,
+    pub cache_hit: bool,
+    pub created_at: String,
+}
+
+/// Decision frequency statistics for rule extraction.
+#[derive(Debug, Clone)]
+pub struct DecisionFrequency {
+    pub option: String,
+    pub count: i64,
+    pub avg_confidence: f64,
 }
 
 #[cfg(test)]
