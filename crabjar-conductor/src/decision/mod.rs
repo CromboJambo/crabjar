@@ -51,6 +51,16 @@ impl DecisionGate {
         self.evaluator.cache_stats()
     }
 
+    /// Evaluate an observation against decision criteria (generic, for external callers).
+    pub async fn evaluate(
+        &self,
+        observation: &str,
+        criteria_file: &str,
+        state_store: Option<&StateStore>,
+    ) -> Result<DecisionResult, Box<dyn std::error::Error>> {
+        self.evaluator.evaluate(observation, criteria_file, state_store).await.map_err(|e| e.into())
+    }
+
     /// Evaluate pre-execution readiness for a goal
     pub async fn evaluate_pre_execution(
         &self,

@@ -106,6 +106,22 @@ impl Conductor {
         Ok(rule_id)
     }
 
+    /// Evaluate a decision via JEV (for external callers like pesti-runner model routing).
+    pub async fn evaluate_decision(
+        &self,
+        observation: &str,
+        criteria_file: &str,
+    ) -> anyhow::Result<crate::decision::evaluate::DecisionResult> {
+        let gate = self
+            .decision_gate
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("JEV decision gate not configured"))?;
+
+        gate.evaluate(observation, criteria_file, Some(&self.store))
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
     /// Submit a new goal for decomposition and execution.
     pub fn submit_goal(&self, description: String) -> Result<Goal> {
         info!(description = %description, "Submitting new goal");

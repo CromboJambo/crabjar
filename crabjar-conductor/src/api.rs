@@ -10,6 +10,7 @@ use axum::{
     response::{IntoResponse, Json as JsonResponse},
     routing::{get, post},
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -18,30 +19,16 @@ use tracing::{debug, error, info, warn};
 pub type ConductorState = Arc<Mutex<Conductor>>;
 
 pub fn routes(conductor: ConductorState) -> Router {
-    let mut app: Router = Router::new()
-        // Goals
-        .route("/goals", post(submit_goal))
-        .route("/goals/{id}", get(get_goal))
-        // Workers
-        .route("/workers", get(list_workers))
-        .route("/workers/register", post(register_worker))
-        .route("/workers/{id}/heartbeat", post(worker_heartbeat))
-        // Tasks
-        .route("/tasks/for-worker/{worker_id}", get(tasks_for_worker))
-        .route("/tasks/{id}/result", post(report_task_result))
-        // Code Review
-        .route("/review", post(submit_review))
-        // Metrics (public, no auth)
+    // Public routes (no auth required)
+    let public_app: Router = Router::new()
         .route("/metrics/cache", get(get_cache_stats))
+        .route("/decide/evaluate", post(evaluate_decision_handler))
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         .with_state(Arc::clone(&conductor));
 
-    // Add request logging middleware
-    app = app.layer(middleware::from_fn(log_requests));
-
-    // Add JWT auth middleware to protected routes
-    let protected: Router = Router::new()
+    // Protected routes (JWT auth required)
+    let protected_app: Router = Router::new()
         .route("/goals", post(submit_goal))
         .route("/goals/{id}", get(get_goal))
         .route("/workers", get(list_workers))
@@ -53,7 +40,11 @@ pub fn routes(conductor: ConductorState) -> Router {
         .layer(middleware::from_fn(jwt_auth_middleware))
         .with_state(Arc::clone(&conductor));
 
-    protected
+    // Merge public and protected routes
+    let app = public_app.merge(protected_app);
+
+    // Add request logging middleware to all routes
+    app.layer(middleware::from_fn(log_requests))
 }
 
 /// JWT authentication middleware.
@@ -600,7 +591,65 @@ async fn get_cache_stats(
 
 // ─── Rule Extraction Handlers ────────────────────────────────────────
 
-/// POST /rules/extract — extract candidate rules from decision history
+/// Request for decision evaluation.
+#[derive(Debug, Deserialize)]
+struct EvaluateDecisionRequest {
+    observation: String,
+    criteria_file: String,
+}
+
+/// Response for decision evaluation.
+#[derive(Debug, Serialize)]
+struct EvaluateDecisionResponse {
+    success: bool,
+    option: String,
+    confidence: f64,
+    model: Option<String>,
+    rationale: String,
+}
+
+/// POST /decide/evaluate - Evaluate a decision via JEV semantic matching.
+async fn evaluate_decision_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(req): Json<EvaluateDecisionRequest>,
+) -> Json<serde_json::Value> {
+    let observation = req.observation;
+    let criteria_file = req.criteria_file;
+
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        // Use block_on to run the async evaluate_decision method within spawn_blocking
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(c.evaluate_decision(&observation, &criteria_file))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(decision)) => Json(json!({
+            "success": true,
+            "option": decision.option,
+            "confidence": decision.confidence,
+            "model": null,
+            "rationale": decision.rationale
+        })),
+        Ok(Err(e)) => Json(json!({
+            "success": false,
+            "option": "error",
+            "confidence": 0.0,
+            "model": null,
+            "rationale": format!("Evaluation failed: {}", e)
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "option": "error",
+            "confidence": 0.0,
+            "model": null,
+            "rationale": format!("Task join error: {}", e)
+        })),
+    }
+}
+
+/// POST /rules/extract - Extract candidate rules from decision history.
 async fn extract_rules_handler(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     Json(body): Json<serde_json::Value>,
