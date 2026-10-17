@@ -1,7 +1,7 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
 use crate::auth;
-use crate::decision::{BackendConfig, DecisionGate, DecisionPolicy};
+use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
 use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assign};
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
@@ -69,6 +69,13 @@ impl Conductor {
             workers.len(),
             ready_tasks
         )
+    }
+
+    /// Get JEV decision cache statistics (for monitoring and metrics).
+    pub fn cache_stats(&self) -> Option<CacheStats> {
+        self.decision_gate
+            .as_ref()
+            .map(|gate| gate.cache_stats())
     }
 
     /// Submit a new goal for decomposition and execution.

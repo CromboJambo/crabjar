@@ -31,6 +31,8 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/tasks/{id}/result", post(report_task_result))
         // Code Review
         .route("/review", post(submit_review))
+        // Metrics (public, no auth)
+        .route("/metrics/cache", get(get_cache_stats))
         .with_state(Arc::clone(&conductor));
 
     // Add request logging middleware
@@ -558,4 +560,38 @@ fn simulate_bundle_review(
     }
 
     findings
+}
+
+/// Get JEV decision cache statistics (public metrics endpoint).
+async fn get_cache_stats(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+) -> Json<serde_json::Value> {
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        c.cache_stats()
+    })
+    .await;
+
+    match result {
+        Ok(Some(stats)) => Json(json!({
+            "status": "ok",
+            "cache": {
+                "entries": stats.entries,
+                "max_entries": stats.max_entries,
+                "hits": stats.hits,
+                "misses": stats.misses,
+                "evictions": stats.evictions,
+                "hit_rate_percent": stats.hit_rate
+            }
+        })),
+        Ok(None) => Json(json!({
+            "status": "ok",
+            "cache": null,
+            "message": "JEV decision gate not configured"
+        })),
+        Err(e) => Json(json!({
+            "status": "error",
+            "message": format!("task join error: {}", e)
+        })),
+    }
 }

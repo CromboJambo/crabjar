@@ -3,9 +3,13 @@
 //! Wraps llama-server HTTP API for embedding-based semantic decision-making.
 
 use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+
+use super::cache::DecisionCache;
 
 /// Embedding backend configuration
 #[derive(Debug, Clone)]
@@ -36,6 +40,7 @@ pub struct JevEvaluator {
     client: reqwest::Client,
     config: BackendConfig,
     criteria_cache: HashMap<String, DecisionCriteria>,
+    decision_cache: Mutex<DecisionCache>,
 }
 
 /// Decision criteria loaded from JSON file
@@ -73,7 +78,14 @@ impl JevEvaluator {
             client: reqwest::Client::new(),
             config,
             criteria_cache: HashMap::new(),
+            decision_cache: Mutex::new(DecisionCache::default_config()),
         }
+    }
+
+    /// Get cache statistics for monitoring
+    pub fn cache_stats(&self) -> super::cache::CacheStats {
+        let cache = self.decision_cache.lock().unwrap();
+        cache.stats()
     }
 
     /// Evaluate an observation against decision criteria
@@ -82,6 +94,20 @@ impl JevEvaluator {
         observation: &str,
         criteria_file: &str,
     ) -> Result<DecisionResult> {
+        // Check cache first for recurring observation patterns
+        let mut cache = self.decision_cache.lock().unwrap();
+        if let Some(cached) = cache.get(observation, criteria_file) {
+            tracing::debug!(
+                "JEV cache hit: {} ({:.1}% hit rate)",
+                &criteria_file[..criteria_file.len().min(40)],
+                cache.hit_rate()
+            );
+            return Ok(cached);
+        }
+
+        // Cache miss - compute decision via embedding API
+        drop(cache); // Release lock before expensive API call
+
         // Load or retrieve cached criteria
         let criteria = self.load_criteria(criteria_file).await?;
 
@@ -102,25 +128,36 @@ impl JevEvaluator {
         }
 
         // Apply threshold and format response
-        if best_similarity >= criteria.threshold {
-            Ok(DecisionResult {
+        let result = if best_similarity >= criteria.threshold {
+            DecisionResult {
                 option: best_option.id.clone(),
                 confidence: best_similarity,
                 rationale: format!(
                     "High similarity to '{}' criterion ({:.3} vs threshold {:.2})",
                     best_option.id, best_similarity, criteria.threshold
                 ),
-            })
+            }
         } else {
-            Ok(DecisionResult {
+            DecisionResult {
                 option: String::new(),
                 confidence: best_similarity,
                 rationale: format!(
                     "Best match below threshold ({:.3} < {:.2}); route to human review",
                     best_similarity, criteria.threshold
                 ),
-            })
-        }
+            }
+        };
+
+        // Cache the result for future similar observations
+        let mut cache = self.decision_cache.lock().unwrap();
+        cache.set(observation, criteria_file, result.clone());
+        tracing::debug!(
+            "JEV cache miss (computed): {} ({:.1}% hit rate)",
+            &criteria_file[..criteria_file.len().min(40)],
+            cache.hit_rate()
+        );
+
+        Ok(result)
     }
 
     /// Load decision criteria from file (with caching)

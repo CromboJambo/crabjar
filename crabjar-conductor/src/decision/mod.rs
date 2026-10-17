@@ -5,9 +5,11 @@
 //! - Annealing/trust-update loop decisions
 //! - Cross-goal resource contention coordination
 
+pub mod cache;
 pub mod evaluate;
 pub mod policy;
 
+pub use cache::{CacheStats, DecisionCache};
 pub use evaluate::{BackendConfig, DecisionResult, JevEvaluator};
 pub use policy::DecisionPolicy;
 
@@ -39,6 +41,11 @@ impl DecisionGate {
     /// Create a new decision gate with optional policy configuration
     pub fn new(evaluator: JevEvaluator, policy: Option<DecisionPolicy>) -> Self {
         Self { evaluator, policy }
+    }
+
+    /// Get cache statistics from the underlying JEV evaluator
+    pub fn cache_stats(&self) -> CacheStats {
+        self.evaluator.cache_stats()
     }
 
     /// Evaluate pre-execution readiness for a goal
