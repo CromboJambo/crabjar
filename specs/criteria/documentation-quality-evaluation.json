@@ -1,0 +1,34 @@
+{
+  "name": "documentation-quality-evaluation",
+  "description": "JEV criteria for evaluating optimal documentation improvement actions based on content data, user feedback, and historical improvement outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "add_missing_sections",
+      "description": "Add missing sections to improve completeness"
+    },
+    {
+      "id": "update_existing_content",
+      "description": "Update existing content to improve accuracy and freshness"
+    },
+    {
+      "id": "improve_readability",
+      "description": "Improve readability through formatting, examples, and clearer language"
+    },
+    {
+      "id": "add_examples_and_tutorials",
+      "description": "Add practical examples and step-by-step tutorials"
+    },
+    {
+      "id": "restructure_documentation",
+      "description": "Restructure for better navigation and user experience"
+    }
+  ],
+  "evaluation_factors": [
+    "Documentation completeness percentage, last updated date, and content freshness",
+    "User feedback scores, support ticket volume, and common confusion points",
+    "Historical success rates for each improvement action in similar documentation scenarios",
+    "Time sensitivity and potential impact on users during documentation improvement process",
+    "Risk of introducing new issues with more invasive documentation approaches"
+  ]
+}
