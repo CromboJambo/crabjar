@@ -79,6 +79,13 @@ Parameter names must match column names, not semantic intent. Semantic naming dr
 - `snake_case` functions/variables/modules; `PascalCase` types/traits; `SCREAMING_SNAKE_CASE` constants
 - `thiserror` for library errors; `?` propagation; no `unwrap()` outside tests
 
+### Linting Discipline
+
+- **Run clippy before every commit** — fix all warnings immediately. A warning today is a blocker tomorrow when CI runs `-D warnings`.
+- **Dev vs CI linting**: In development, run `cargo clippy` (warnings only) for fast feedback. Reserve `-- -D warnings` for the pre-commit/CI check where you declare "this is clean enough to ship."
+- **Understand your lint groups**: `[workspace.lints.clippy]` enables `all` and `pedantic` as warnings. If a pedantic lint is genuinely noisy for your API design patterns (e.g., `too_many_arguments`), add it to the allow list in `Cargo.toml` rather than fighting it function-by-function with `#[allow(...)]`.
+- **Never use `-D warnings` casually** — it's a gate, not a dev tool. It turns every clippy pedantic warning into an error and will block progress on unrelated work.
+
 ## Module Size Governance
 
 **500 LoC rule**: No single `.rs` module may exceed 500 lines. This is a CI gate, not a suggestion.

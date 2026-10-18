@@ -12,6 +12,8 @@ pub struct ConductorConfig {
     pub listen_addr: String,
     pub listen_port: u16,
     pub pesti_server_url: String,
+    /// Optional path to mirror-log database for attention-based decision filtering.
+    pub mirror_log_db_path: Option<String>,
 }
 
 impl Default for ConductorConfig {
@@ -20,6 +22,7 @@ impl Default for ConductorConfig {
             listen_addr: "0.0.0.0".to_string(),
             listen_port: 8091,
             pesti_server_url: "http://localhost:8000".to_string(),
+            mirror_log_db_path: None,
         }
     }
 }
@@ -29,25 +32,49 @@ pub struct Conductor {
     store: StateStore,
     config: ConductorConfig,
     decision_gate: Option<DecisionGate>,
+    hybrid_layer: Option<crate::attention::HybridDecisionLayer>,
 }
 
 impl Conductor {
     /// Create a new conductor with an in-memory database (for testing).
     pub fn new(config: ConductorConfig) -> Result<Self> {
         let store = StateStore::open(":memory:")?;
-        Ok(Self { store, config, decision_gate: None })
+        Ok(Self { store, config, decision_gate: None, hybrid_layer: None })
     }
 
     /// Create a conductor with a specific database path.
     pub fn with_db(config: ConductorConfig, db_path: &str) -> Result<Self> {
         let store = StateStore::open(db_path)?;
-        Ok(Self { store, config, decision_gate: None })
+        Ok(Self { store, config, decision_gate: None, hybrid_layer: None })
     }
 
     /// Configure JEV decision gate for automated fleet decisions.
     pub fn with_decision_gate(&mut self, backend_config: BackendConfig, policy: Option<DecisionPolicy>) {
         let evaluator = crate::decision::evaluate::JevEvaluator::new(backend_config);
         self.decision_gate = Some(DecisionGate::new(evaluator, policy));
+    }
+
+    /// Configure hybrid attention + JEV decision layer.
+    pub fn with_hybrid_decision_layer(&mut self, backend_config: BackendConfig, policy: Option<crate::attention::HybridDecisionPolicy>) {
+        let evaluator = crate::decision::evaluate::JevEvaluator::new(backend_config.clone());
+        let gate = DecisionGate::new(evaluator, None::<crate::decision::DecisionPolicy>);
+
+        if let Some(mirror_log_path) = &self.config.mirror_log_db_path {
+            match crate::attention::HybridDecisionLayer::new(mirror_log_path, gate, policy) {
+                Ok(layer) => {
+                    self.hybrid_layer = Some(layer);
+                    info!("Hybrid attention + JEV decision layer configured");
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to configure hybrid decision layer, falling back to JEV-only");
+                    let evaluator2 = crate::decision::evaluate::JevEvaluator::new(backend_config);
+                    self.decision_gate = Some(DecisionGate::new(evaluator2, None::<crate::decision::DecisionPolicy>));
+                }
+            }
+        } else {
+            // No mirror-log path configured, use plain JEV gate
+            self.decision_gate = Some(gate);
+        }
     }
 
     /// Get a summary of the current fleet state for JEV evaluation context.
@@ -112,6 +139,24 @@ impl Conductor {
         observation: &str,
         criteria_file: &str,
     ) -> anyhow::Result<crate::decision::evaluate::DecisionResult> {
+        // If hybrid layer is configured, use the two-stage pipeline
+        if let Some(hybrid) = &self.hybrid_layer {
+            return hybrid.process_observation(
+                uuid::Uuid::new_v4().to_string().as_str(),
+                "conductor",
+                observation,
+                None,
+            ).await.map(|decision| {
+                // Extract JEV result if available, otherwise create a default
+                decision.jev_result.unwrap_or_else(|| crate::decision::evaluate::DecisionResult {
+                    option: "ignore".to_string(),
+                    rationale: format!("Filtered by attention layer (score: {:.0})", decision.attention_score),
+                    confidence: 0.95,
+                })
+            });
+        }
+
+        // Fall back to plain JEV evaluation
         let gate = self
             .decision_gate
             .as_ref()

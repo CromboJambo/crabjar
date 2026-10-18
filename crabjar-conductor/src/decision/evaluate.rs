@@ -213,7 +213,7 @@ impl JevEvaluator {
 
         let response = self
             .client
-            .post(format!("{}/api/v1/embeddings", self.config.url))
+            .post(format!("{}/v1/embeddings", self.config.url))
             .json(&body)
             .send()
             .await?;

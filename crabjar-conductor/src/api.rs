@@ -5,24 +5,53 @@ use crate::conductor::Conductor;
 use axum::{
     Json, Router,
     extract::{Request, State},
-    http::StatusCode,
+    http::{HeaderMap, Method, StatusCode},
     middleware::{self, Next},
-    response::{IntoResponse, Json as JsonResponse},
+    response::IntoResponse,
     routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
+use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
-pub type ConductorState = Arc<Mutex<Conductor>>;
+/// In-memory store for background evaluation results (dev/testing).
+static BG_EVALUATIONS: OnceLock<Arc<Mutex<HashMap<String, serde_json::Value>>>> = OnceLock::new();
+
+fn bg_evaluations() -> &'static Arc<Mutex<HashMap<String, serde_json::Value>>> {
+    BG_EVALUATIONS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())))
+}
+
+pub type ConductorState = Arc<TokioMutex<Conductor>>;
+
+/// Poll status of a background decision evaluation.
+async fn get_evaluation_status(
+    axum::extract::Path(eval_id): axum::extract::Path<String>,
+) -> Json<serde_json::Value> {
+    let store = bg_evaluations().lock().unwrap();
+    match store.get(&eval_id) {
+        Some(result) => Json(json!({
+            "success": true,
+            "evaluation_id": eval_id,
+            "result": result
+        })),
+        None => Json(json!({
+            "success": false,
+            "error": "Evaluation not found or not yet started",
+            "evaluation_id": eval_id
+        })),
+    }
+}
 
 pub fn routes(conductor: ConductorState) -> Router {
     // Public routes (no auth required)
     let public_app: Router = Router::new()
         .route("/metrics/cache", get(get_cache_stats))
         .route("/decide/evaluate", post(evaluate_decision_handler))
+        .route("/decide/evaluate/{id}", get(get_evaluation_status))
         .route("/schema/propose", post(propose_schema_change_handler))
         .route("/interface/propose", post(propose_interface_optimization_handler))
         .route("/route/decide", post(decide_routing_handler))
@@ -31,7 +60,7 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/upgrade/evaluate", post(evaluate_upgrade_handler))
         .route("/upgrade/outcome", post(record_upgrade_outcome_handler))
         .route("/health/evaluate", post(evaluate_health_handler))
-        .route("/recovery/outcome", post(record_recovery_outcome_handler))
+        .route("/health/outcome", post(record_recovery_outcome_handler))
         .route("/cost/evaluate", post(evaluate_cost_handler))
         .route("/optimization/outcome", post(record_optimization_outcome_handler))
         // Milestone 20: Disaster recovery decision-making
@@ -39,8 +68,6 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/recovery/outcome", post(record_disaster_recovery_outcome_handler))
         .route("/capacity/evaluate", post(evaluate_capacity_handler))
         .route("/capacity/outcome", post(record_capacity_outcome_handler))
-        .route("/recovery/evaluate", post(evaluate_recovery_handler))
-        .route("/recovery/outcome", post(record_disaster_recovery_outcome_handler))
         .route("/security/evaluate", post(evaluate_security_handler))
         .route("/security/outcome", post(record_security_outcome_handler))
         .route("/compliance/evaluate", post(evaluate_compliance_handler))
@@ -51,10 +78,7 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/monitoring/outcome", post(record_monitoring_outcome_handler))
         .route("/drift/evaluate", post(evaluate_drift_handler))
         .route("/drift/outcome", post(record_drift_outcome_handler))
-        .route("/cost/evaluate", post(evaluate_cost_handler))
         .route("/cost/outcome", post(record_optimization_outcome_handler))
-        .route("/capacity/evaluate", post(evaluate_capacity_handler))
-        .route("/capacity/outcome", post(record_capacity_outcome_handler))
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         .with_state(Arc::clone(&conductor));
@@ -720,6 +744,9 @@ async fn record_disaster_recovery_outcome_handler(
 struct EvaluateDecisionRequest {
     observation: String,
     criteria_file: String,
+    /// If true, run evaluation asynchronously and return an ID for polling.
+    #[serde(default)]
+    background: bool,
 }
 
 /// Response for decision evaluation.
@@ -740,6 +767,65 @@ async fn evaluate_decision_handler(
     let observation = req.observation;
     let criteria_file = req.criteria_file;
 
+    // If background flag is set, spawn async task and return ID immediately
+    if req.background {
+        let eval_id = Uuid::new_v4().to_string();
+        let eval_id_for_closure = eval_id.clone();
+        let conductor_clone = conductor.clone();
+
+        tokio::spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let c = conductor_clone.blocking_lock();
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(c.evaluate_decision(&observation, &criteria_file))
+            })
+            .await;
+
+            // Store result for polling
+            let mut store = bg_evaluations().lock().unwrap();
+            match result {
+                Ok(Ok(decision)) => {
+                    store.insert(eval_id_for_closure.clone(), json!({
+                        "status": "completed",
+                        "success": true,
+                        "option": decision.option,
+                        "confidence": decision.confidence,
+                        "model": null,
+                        "rationale": decision.rationale
+                    }));
+                }
+                Ok(Err(e)) => {
+                    store.insert(eval_id_for_closure.clone(), json!({
+                        "status": "completed",
+                        "success": false,
+                        "option": "error",
+                        "confidence": 0.0,
+                        "model": null,
+                        "rationale": format!("Evaluation failed: {}", e)
+                    }));
+                }
+                Err(e) => {
+                    store.insert(eval_id_for_closure, json!({
+                        "status": "completed",
+                        "success": false,
+                        "option": "error",
+                        "confidence": 0.0,
+                        "model": null,
+                        "rationale": format!("Task join error: {}", e)
+                    }));
+                }
+            }
+        });
+
+        return Json(json!({
+            "success": true,
+            "evaluation_id": eval_id,
+            "status": "pending",
+            "message": "Evaluation started in background. Poll /decide/evaluate/{id} for result."
+        }));
+    }
+
+    // Synchronous evaluation (default)
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         // Use block_on to run the async evaluate_decision method within spawn_blocking

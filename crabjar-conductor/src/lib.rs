@@ -21,6 +21,7 @@
 //! - [`Worker`] — Registered fleet member with capability metadata
 
 pub mod api;
+pub mod attention;
 pub mod auth;
 pub mod conductor;
 pub mod decision;

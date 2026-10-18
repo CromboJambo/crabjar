@@ -32,6 +32,10 @@ struct Args {
     /// SQLite database path (default: conductor-state.db in current directory)
     #[arg(long, default_value = "conductor-state.db")]
     db_path: String,
+
+    /// JEV embedding backend URL (overrides CRABJAR_JEV_API_URL if set)
+    #[arg(long)]
+    jev_url: Option<String>,
 }
 
 #[tokio::main]
@@ -49,13 +53,25 @@ async fn main() -> Result<()> {
         listen_addr: args.addr.clone(),
         listen_port: args.port,
         pesti_server_url: args.pesti_url,
+        mirror_log_db_path: std::env::var("CRABJAR_MIRROR_LOG_DB").ok(),
     };
 
     tracing::info!("Starting crabjar-conductor");
     tracing::info!("Listening on {}:{} ", args.addr, args.port);
 
     // Create conductor with SQLite state store
-    let conductor = conductor::Conductor::with_db(config, &args.db_path)?;
+    let mut conductor = conductor::Conductor::with_db(config, &args.db_path)?;
+
+    // Configure JEV decision gate (required for automated fleet decisions)
+    use crabjar_conductor::decision::{BackendConfig, DecisionPolicy};
+    let jev_url = args.jev_url
+        .or_else(|| std::env::var("CRABJAR_JEV_API_URL").ok())
+        .unwrap_or_else(|| "http://localhost:8080".to_string());
+    let backend_config = BackendConfig {
+        url: jev_url,
+        model_id: "qwen3.5-4b-q4_k_s".to_string(),
+    };
+    conductor.with_decision_gate(backend_config, Some(DecisionPolicy::default()));
 
     // Wrap in Arc<Mutex<>> for shared state across API handlers
     use tokio::sync::Mutex;
