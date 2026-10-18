@@ -1,0 +1,38 @@
+{
+  "name": "autonomous-routing-evaluation",
+  "description": "JEV criteria for evaluating optimal task routing decisions based on worker capabilities, load, and historical performance",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "assign-lowest-load",
+      "description": "Assign to worker with lowest current load who meets capability requirements",
+      "strategy": "load_balancing",
+      "optimization_target": "throughput"
+    },
+    {
+      "id": "assign-highest-success_rate",
+      "description": "Assign to worker with highest historical success rate for similar tasks",
+      "strategy": "quality_optimization",
+      "optimization_target": "success_rate"
+    },
+    {
+      "id": "assign-fastest_completion",
+      "description": "Assign to worker with fastest historical completion time for similar task types",
+      "strategy": "latency_optimization",
+      "optimization_target": "completion_time"
+    },
+    {
+      "id": "assign-balanced",
+      "description": "Assign based on balanced consideration of load, success rate, and speed",
+      "strategy": "multi_objective",
+      "optimization_target": "overall_efficiency"
+    }
+  ],
+  "evaluation_factors": [
+    "Worker current load vs capacity",
+    "Historical success rate for similar task types",
+    "Average completion time for similar tasks",
+    "Task complexity and urgency",
+    "Resource utilization patterns across fleet"
+  ]
+}
