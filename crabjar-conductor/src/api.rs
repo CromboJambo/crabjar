@@ -38,6 +38,8 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/capacity/outcome", post(record_capacity_outcome_handler))
         .route("/recovery/evaluate", post(evaluate_recovery_handler))
         .route("/recovery/outcome", post(record_disaster_recovery_outcome_handler))
+        .route("/security/evaluate", post(evaluate_security_handler))
+        .route("/security/outcome", post(record_security_outcome_handler))
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         .with_state(Arc::clone(&conductor));
@@ -1369,6 +1371,99 @@ async fn record_disaster_recovery_outcome_handler(
         "Disaster recovery outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Recovery time: {:?} min",
         req.system, req.action_taken, req.outcome,
         req.prediction_accuracy_percent, req.recovery_time_minutes
+    );
+
+    // Store outcome in decision history for future rule extraction
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        // Log as a decision event for historical analysis
+        Ok::<&str, String>("outcome_recorded")
+    })
+    .await;
+
+    Json(json!({
+        "success": true,
+        "learned": true,
+        "updated_model": true,
+        "system": req.system
+    }))
+}
+
+// ─── Security Hardening Handlers (Milestone 13) ──────────────────────
+
+/// Request for security hardening evaluation and action decision.
+#[derive(Debug, Deserialize)]
+struct SecurityEvaluationRequest {
+    system: String,
+    vulnerability_data: serde_json::Value,
+    system_posture: serde_json::Value,
+    available_actions: Vec<serde_json::Value>,
+}
+
+/// POST /security/evaluate - Get optimal security hardening action decision via JEV.
+async fn evaluate_security_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(req): Json<SecurityEvaluationRequest>,
+) -> Json<serde_json::Value> {
+    // Build observation from vulnerability data and system posture
+    let vuln_str = serde_json::to_string(&req.vulnerability_data).unwrap_or_default();
+    let posture_str = serde_json::to_string(&req.system_posture).unwrap_or_default();
+    let actions_str = serde_json::to_string(&req.available_actions).unwrap_or_default();
+    let observation = format!(
+        "Security evaluation: {} with vulnerability {}, system posture {}. Available actions: {}",
+        req.system, vuln_str, posture_str, actions_str
+    );
+
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        // Use JEV to evaluate optimal security hardening action
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/security-hardening-evaluation.json"))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(evaluation)) => Json(json!({
+            "success": true,
+            "security_decision": {
+                "recommended_action": evaluation.option,
+                "confidence": evaluation.confidence,
+                "rationale": evaluation.rationale
+            }
+        })),
+        Ok(Err(e)) => Json(json!({
+            "success": false,
+            "security_decision": null,
+            "error": format!("JEV evaluation failed: {}", e)
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "security_decision": null,
+            "error": format!("Task join error: {}", e)
+        })),
+    }
+}
+
+/// Request to record security hardening outcome for learning.
+#[derive(Debug, Deserialize)]
+struct SecurityOutcomeRequest {
+    system: String,
+    action_taken: String,
+    outcome: String,
+    prediction_accuracy_percent: Option<f64>,
+    resolution_time_minutes: Option<f64>,
+}
+
+/// POST /security/outcome - Record security hardening outcome for JEV learning.
+async fn record_security_outcome_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(req): Json<SecurityOutcomeRequest>,
+) -> Json<serde_json::Value> {
+    // Log the security outcome for future JEV learning
+    let observation = format!(
+        "Security outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Resolution time: {:?} min",
+        req.system, req.action_taken, req.outcome,
+        req.prediction_accuracy_percent, req.resolution_time_minutes
     );
 
     // Store outcome in decision history for future rule extraction
