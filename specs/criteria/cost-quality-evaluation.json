@@ -1,0 +1,34 @@
+{
+  "name": "cost-quality-evaluation",
+  "description": "JEV criteria for evaluating optimal cost optimization actions based on resource usage patterns, cost history, and historical outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "scale_down_instances",
+      "description": "Reduce the number of running instances to lower compute costs"
+    },
+    {
+      "id": "switch_to_spot_instances",
+      "description": "Migrate to spot/preemptible instances for significant cost savings"
+    },
+    {
+      "id": "rightsize_instance_type",
+      "description": "Adjust instance types to match actual resource utilization patterns"
+    },
+    {
+      "id": "enable_auto_scaling",
+      "description": "Implement auto-scaling policies to optimize costs based on demand"
+    },
+    {
+      "id": "optimize_storage_tier",
+      "description": "Move data to appropriate storage tiers based on access patterns"
+    }
+  ],
+  "evaluation_factors": [
+    "Resource usage trends, cost history, and growth rates",
+    "User feedback scores and satisfaction ratings for current configuration state",
+    "Historical success rates for each optimization action in similar cost scenarios",
+    "Time sensitivity and potential impact on users during optimization process",
+    "Risk of introducing new issues with more invasive cost approaches"
+  ]
+}

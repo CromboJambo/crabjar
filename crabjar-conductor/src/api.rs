@@ -48,6 +48,8 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/monitoring/outcome", post(record_monitoring_outcome_handler))
         .route("/drift/evaluate", post(evaluate_drift_handler))
         .route("/drift/outcome", post(record_drift_outcome_handler))
+        .route("/cost/evaluate", post(evaluate_cost_handler))
+        .route("/cost/outcome", post(record_optimization_outcome_handler))
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         .with_state(Arc::clone(&conductor));
