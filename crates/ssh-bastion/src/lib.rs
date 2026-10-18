@@ -3,6 +3,13 @@
 //! Uses lab topology definitions for target resolution, enabling clean separation
 //! of infrastructure code (public) from environment-specific configuration (private).
 //! Actual IPs are resolved at runtime via environment variables or private config.
+//!
+//! # Security
+//!
+//! Prefers Ed25519 keys (`id_bastion`, `id_lab`) to mitigate the Marvin Attack
+//! timing sidechannel in the rsa crate (RUSTSEC-2023-0071). The rsa dependency
+//! remains via russh but is only exercised when connecting to servers that
+//! exclusively support RSA host keys. Best practice: Ed25519 or ECDSA for all lab machines.
 
 use crabjar_lab_topology::{LabTopology, TopologyError};
 use std::env;

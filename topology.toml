@@ -1,6 +1,10 @@
 name = "crombo-home-lab"
 version = 1
 
+# SSH Key Security: All lab machines use Ed25519 keys (id_lab, id_bastion)
+# to mitigate the Marvin Attack timing sidechannel in the rsa crate.
+# See crates/ssh-bastion/src/lib.rs for details.
+
 [machines.jambo]
 name = "jambo"
 label = "Main Desktop Workstation"

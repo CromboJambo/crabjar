@@ -7,7 +7,7 @@ description = "SSH bastion host using russh — transparent proxy for home-lab S
 
 [dependencies]
 crabjar-lab-topology = { path = "../lab-topology" }
-russh = { version = "0.63", features = ["des", "dsa", "rsa", "aws-lc-rs"], default-features = false }
+russh = { version = "0.64", features = ["des", "dsa", "rsa", "aws-lc-rs"], default-features = false }
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true

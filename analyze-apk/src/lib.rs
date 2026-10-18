@@ -88,7 +88,12 @@ impl ApkParser {
             let entry = archive.by_index(i).map_err(|e| {
                 AnalyzeError::ParseError(format!("failed to read entry {}: {}", i, e))
             })?;
-            let name = entry.name().to_string();
+            let name = entry
+                .name()
+                .map_err(|e| {
+                    AnalyzeError::ParseError(format!("failed to read entry name {}: {}", i, e))
+                })?
+                .to_string();
             all_files.push(name);
         }
 
