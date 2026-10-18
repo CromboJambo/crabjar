@@ -1,0 +1,38 @@
+{
+  "name": "interface-optimization-evaluation",
+  "description": "JEV criteria for evaluating proposed interface optimizations and their impact on cross-service communication efficiency",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "approve-low-risk",
+      "description": "Approve: low-risk optimization with clear efficiency benefit (e.g., adding caching, reducing payload size)",
+      "efficiency_impact": "positive",
+      "risk_level": "low"
+    },
+    {
+      "id": "approve-medium-risk",
+      "description": "Approve: moderate-risk optimization requiring coordinated deployment across services",
+      "efficiency_impact": "positive",
+      "risk_level": "medium"
+    },
+    {
+      "id": "reject-high-risk",
+      "description": "Reject: high-risk optimization with potential for significant compatibility breakage or performance regression",
+      "efficiency_impact": "negative",
+      "risk_level": "high"
+    },
+    {
+      "id": "defer-more-data",
+      "description": "Defer: insufficient data to predict impact; recommend A/B testing or gradual rollout with monitoring",
+      "efficiency_impact": "unknown",
+      "risk_level": "unknown"
+    }
+  ],
+  "evaluation_factors": [
+    "Historical interface optimization outcomes for similar patterns",
+    "Cross-service dependency analysis and compatibility impact",
+    "Serialization overhead reduction potential",
+    "Latency improvement predictions based on payload characteristics",
+    "Deployment complexity and rollback feasibility"
+  ]
+}

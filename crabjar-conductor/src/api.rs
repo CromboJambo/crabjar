@@ -24,6 +24,7 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/metrics/cache", get(get_cache_stats))
         .route("/decide/evaluate", post(evaluate_decision_handler))
         .route("/schema/propose", post(propose_schema_change_handler))
+        .route("/interface/propose", post(propose_interface_optimization_handler))
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         .with_state(Arc::clone(&conductor));
@@ -694,6 +695,66 @@ async fn propose_schema_change_handler(
                 "steps": [],
                 "rollback_steps": [],
                 "affected_components": [req.component]
+            }
+        })),
+        Ok(Err(e)) => Json(json!({
+            "success": false,
+            "evaluation": null,
+            "error": format!("JEV evaluation failed: {}", e)
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "evaluation": null,
+            "error": format!("Task join error: {}", e)
+        })),
+    }
+}
+
+// ─── Interface Optimization Handlers (Milestone 6) ──────────────────
+
+/// Request for interface optimization proposal evaluation.
+#[derive(Debug, Deserialize)]
+struct InterfaceOptimizationRequest {
+    optimization_type: String,
+    source_component: String,
+    target_component: String,
+    current_format: String,
+    proposed_format: String,
+    justification: String,
+}
+
+/// POST /interface/propose - Evaluate an interface optimization proposal via JEV.
+async fn propose_interface_optimization_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(req): Json<InterfaceOptimizationRequest>,
+) -> Json<serde_json::Value> {
+    // Build observation from proposal details
+    let observation = format!(
+        "Interface optimization proposal: {} wants to change interface to {} from {} to {}. Justification: {}",
+        req.source_component, req.target_component,
+        req.current_format, req.proposed_format, req.justification
+    );
+
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        // Use JEV to evaluate interface optimization impact
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/interface-optimization-evaluation.json"))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(evaluation)) => Json(json!({
+            "success": true,
+            "evaluation": {
+                "option": evaluation.option,
+                "confidence": evaluation.confidence,
+                "rationale": evaluation.rationale
+            },
+            "deployment_plan": {
+                "steps": [],
+                "rollback_steps": [],
+                "affected_endpoints": []
             }
         })),
         Ok(Err(e)) => Json(json!({
