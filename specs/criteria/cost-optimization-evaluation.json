@@ -1,0 +1,34 @@
+{
+  "name": "cost-optimization-evaluation",
+  "description": "JEV criteria for evaluating optimal cost optimization actions based on resource usage patterns and historical optimization outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "scale_down_instances",
+      "description": "Reduce the number of running instances to match actual workload demand"
+    },
+    {
+      "id": "switch_to_spot_instances",
+      "description": "Replace on-demand instances with cheaper spot/preemptible instances"
+    },
+    {
+      "id": "rightsize_instance_type",
+      "description": "Change instance type to better match workload resource requirements"
+    },
+    {
+      "id": "enable_auto_scaling",
+      "description": "Configure auto-scaling policies to dynamically adjust capacity based on demand"
+    },
+    {
+      "id": "optimize_storage_tier",
+      "description": "Move data to more cost-effective storage tiers based on access patterns"
+    }
+  ],
+  "evaluation_factors": [
+    "Current resource usage metrics (CPU, memory, disk utilization)",
+    "Historical success rates for each optimization action in similar situations",
+    "Risk and impact of each action on service performance and availability",
+    "Estimated cost savings potential for each approach",
+    "Performance trade-offs associated with different optimization strategies"
+  ]
+}
