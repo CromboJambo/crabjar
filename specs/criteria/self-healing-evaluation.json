@@ -1,0 +1,34 @@
+{
+  "name": "self-healing-evaluation",
+  "description": "JEV criteria for evaluating optimal self-healing actions based on system health metrics and historical recovery outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "restart_service",
+      "description": "Restart the affected service to clear transient state and resource leaks"
+    },
+    {
+      "id": "scale_up_instances",
+      "description": "Add more instances to handle increased load or recover from instance failures"
+    },
+    {
+      "id": "rollback_version",
+      "description": "Roll back to previous stable version if recent deployment caused issues"
+    },
+    {
+      "id": "increase_resources",
+      "description": "Allocate more CPU/memory/disk resources to the affected service"
+    },
+    {
+      "id": "clear_cache",
+      "description": "Clear service cache to resolve stale data or memory issues"
+    }
+  ],
+  "evaluation_factors": [
+    "Current system health metrics (error rate, response time, resource utilization)",
+    "Historical success rates for each corrective action in similar situations",
+    "Risk and impact of each action on service availability",
+    "Time required for recovery with each approach",
+    "Recurrence patterns after different healing actions"
+  ]
+}
