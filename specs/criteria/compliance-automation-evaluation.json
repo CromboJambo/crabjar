@@ -1,0 +1,34 @@
+{
+  "name": "compliance-automation-evaluation",
+  "description": "JEV criteria for evaluating optimal compliance automation actions based on requirement data, system configuration, and historical remediation outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "enable_mfa",
+      "description": "Enable multi-factor authentication for all users"
+    },
+    {
+      "id": "tighten_password_policy",
+      "description": "Increase password complexity and reduce expiry interval"
+    },
+    {
+      "id": "add_access_review_process",
+      "description": "Implement periodic access review process with automated reminders"
+    },
+    {
+      "id": "encrypt_data_at_rest",
+      "description": "Enable encryption for data at rest using industry-standard algorithms"
+    },
+    {
+      "id": "implement_network_segmentation",
+      "description": "Add network segmentation to isolate sensitive systems from general traffic"
+    }
+  ],
+  "evaluation_factors": [
+    "Compliance requirement severity, standard (SOC2/HIPAA/PCI), and control ID",
+    "Current system configuration including existing security controls and gaps",
+    "Historical success rates for each remediation action in similar compliance scenarios",
+    "Time sensitivity and potential impact on users during compliance remediation process",
+    "Risk of introducing new issues with more invasive compliance approaches"
+  ]
+}
