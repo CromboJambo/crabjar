@@ -23,6 +23,7 @@ pub fn routes(conductor: ConductorState) -> Router {
     let public_app: Router = Router::new()
         .route("/metrics/cache", get(get_cache_stats))
         .route("/decide/evaluate", post(evaluate_decision_handler))
+        .route("/schema/propose", post(propose_schema_change_handler))
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         .with_state(Arc::clone(&conductor));
@@ -645,6 +646,65 @@ async fn evaluate_decision_handler(
             "confidence": 0.0,
             "model": null,
             "rationale": format!("Task join error: {}", e)
+        })),
+    }
+}
+
+// ─── Schema Co-evolution Handlers (Milestone 5) ──────────────────────
+
+/// Request for schema change proposal evaluation.
+#[derive(Debug, Deserialize)]
+struct SchemaProposalRequest {
+    component: String,
+    change_type: String,
+    target_table: String,
+    column_name: Option<String>,
+    column_type: Option<String>,
+    justification: String,
+}
+
+/// POST /schema/propose - Evaluate a schema change proposal via JEV.
+async fn propose_schema_change_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(req): Json<SchemaProposalRequest>,
+) -> Json<serde_json::Value> {
+    // Build observation from proposal details
+    let observation = format!(
+        "Schema change proposal: {} wants to {} on {}. Justification: {}",
+        req.component, req.change_type, req.target_table, req.justification
+    );
+
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        // Use JEV to evaluate schema change impact
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/schema-change-evaluation.json"))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(evaluation)) => Json(json!({
+            "success": true,
+            "evaluation": {
+                "option": evaluation.option,
+                "confidence": evaluation.confidence,
+                "rationale": evaluation.rationale
+            },
+            "migration_plan": {
+                "steps": [],
+                "rollback_steps": [],
+                "affected_components": [req.component]
+            }
+        })),
+        Ok(Err(e)) => Json(json!({
+            "success": false,
+            "evaluation": null,
+            "error": format!("JEV evaluation failed: {}", e)
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "evaluation": null,
+            "error": format!("Task join error: {}", e)
         })),
     }
 }
