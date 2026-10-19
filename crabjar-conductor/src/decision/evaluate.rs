@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -254,12 +254,65 @@ fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
     dot_product / (magnitude_a * magnitude_b)
 }
 
-/// Compute SHA-256 hash of observation + criteria for decision logging.
+/// Compute a hash of the observation + criteria for caching and logging.
 fn compute_observation_hash(observation: &str, criteria_file: &str) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(observation.as_bytes());
-    hasher.update(b"|");
     hasher.update(criteria_file.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(observation.as_bytes());
     let result = hasher.finalize();
-    format!("{:x}", result)
+    format!("{:x}", result)[..16].to_string()
+}
+
+/// Evaluate a structural target against criteria, using fast-path condition
+/// evaluation first and falling back to embedding-based JEV evaluation.
+pub async fn evaluate_structural_target(
+    evaluator: &JevEvaluator,
+    target: &crate::decision::structural::EvaluationTarget,
+    criteria_path: &str,
+    state_store: Option<&StateStore>,
+) -> Result<DecisionResult> {
+    // First, try direct structural condition evaluation (fast path)
+    if let Some(result) = evaluate_structural_conditions(target, criteria_path) {
+        return Ok(result);
+    }
+
+    // Fall back to embedding-based JEV evaluation
+    let observation = target.to_observation();
+    evaluator.evaluate(&observation, criteria_path, state_store).await
+}
+
+/// Evaluate structural conditions directly against the target.
+/// Returns Some(DecisionResult) if a condition matched, None to fall back to embedding evaluation.
+pub fn evaluate_structural_conditions(
+    target: &crate::decision::structural::EvaluationTarget,
+    criteria_path: &str,
+) -> Option<DecisionResult> {
+    // Read and parse the criteria file
+    let criteria_content = match std::fs::read_to_string(criteria_path) {
+        Ok(content) => content,
+        Err(_) => return None, // File not found or unreadable — fall back to JEV
+    };
+
+    let criteria: serde_json::Value = match serde_json::from_str(&criteria_content) {
+        Ok(value) => value,
+        Err(_) => return None, // Invalid JSON — fall back to JEV
+    };
+
+    // Check each option for structural conditions
+    if let Some(options) = criteria["options"].as_array() {
+        for option in options {
+            if let Some(condition) = option["conditions"].as_str() {
+                if crate::decision::condition::evaluate_condition(target, condition) {
+                    return Some(DecisionResult {
+                        option: option["id"].as_str().unwrap_or("unknown").to_string(),
+                        confidence: 1.0,
+                        rationale: format!("Structural condition matched: {}", condition),
+                    });
+                }
+            }
+        }
+    }
+
+    None // No conditions matched — fall back to JEV embedding evaluation
 }

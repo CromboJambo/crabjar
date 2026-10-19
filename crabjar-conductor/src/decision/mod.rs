@@ -12,6 +12,9 @@ pub mod policy;
 pub mod postprocessor;
 pub mod rule_extraction;
 pub mod structural;
+pub mod workspace;
+
+pub use workspace::{AnalysisBudget, CrateInfo, EvaluationResult, WorkspaceAnalysis};
 
 use crate::state_store::StateStore;
 
