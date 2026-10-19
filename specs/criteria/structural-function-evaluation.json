@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "name": "structural-function-evaluation",
+  "description": "Evaluate function declarations based on structure and error handling patterns",
+  "options": [
+    {
+      "id": "well-structured-function",
+      "description": "Function with proper error propagation, clear name, and stable ownership",
+      "conditions": "structure == FnDecl && error_handling == Propagated"
+    },
+    {
+      "id": "simple-function",
+      "description": "Simple function without complex error handling",
+      "conditions": "structure == FnDecl && error_handling != Propagated"
+    },
+    {
+      "id": "not-a-function",
+      "description": "Code region that is not a function declaration",
+      "conditions": "structure != FnDecl"
+    }
+  ],
+  "threshold": 0.75,
+  "metadata": {
+    "created": "2026-10-19",
+    "owner": "crabjar-team",
+    "purpose": "Phase 1 structural region evaluation test"
+  }
+}

@@ -6,6 +6,7 @@
 //! - Cross-goal resource contention coordination
 
 pub mod cache;
+pub mod condition;
 pub mod evaluate;
 pub mod policy;
 pub mod rule_extraction;
@@ -59,7 +60,10 @@ impl DecisionGate {
         criteria_file: &str,
         state_store: Option<&StateStore>,
     ) -> Result<DecisionResult, Box<dyn std::error::Error>> {
-        self.evaluator.evaluate(observation, criteria_file, state_store).await.map_err(|e| e.into())
+        self.evaluator
+            .evaluate(observation, criteria_file, state_store)
+            .await
+            .map_err(|e| e.into())
     }
 
     /// Evaluate pre-execution readiness for a goal
@@ -84,7 +88,10 @@ impl DecisionGate {
             goal_description, fleet_state
         );
 
-        let result = self.evaluator.evaluate(&observation, &criteria, state_store).await?;
+        let result = self
+            .evaluator
+            .evaluate(&observation, &criteria, state_store)
+            .await?;
 
         Ok(GateResult {
             gate: GateType::PreExecution,
@@ -121,7 +128,10 @@ impl DecisionGate {
             iteration, success_count, failure_count, failure_summary, fleet_load_percent
         );
 
-        let result = self.evaluator.evaluate(&observation, &criteria, state_store).await?;
+        let result = self
+            .evaluator
+            .evaluate(&observation, &criteria, state_store)
+            .await?;
 
         Ok(GateResult {
             gate: GateType::Annealing,
@@ -156,7 +166,10 @@ impl DecisionGate {
             competing_goals.join("; ")
         );
 
-        let result = self.evaluator.evaluate(&observation, &criteria, state_store).await?;
+        let result = self
+            .evaluator
+            .evaluate(&observation, &criteria, state_store)
+            .await?;
 
         Ok(GateResult {
             gate: GateType::ResourceContention,

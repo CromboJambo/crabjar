@@ -54,7 +54,10 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/decide/evaluate/{id}", get(get_evaluation_status))
         .route("/jev/evaluate", post(evaluate_structural_handler))
         .route("/schema/propose", post(propose_schema_change_handler))
-        .route("/interface/propose", post(propose_interface_optimization_handler))
+        .route(
+            "/interface/propose",
+            post(propose_interface_optimization_handler),
+        )
         .route("/route/decide", post(decide_routing_handler))
         .route("/route/outcome", post(record_routing_outcome_handler))
         .route("/dependencies/declare", post(declare_dependencies_handler))
@@ -63,20 +66,32 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/health/evaluate", post(evaluate_health_handler))
         .route("/health/outcome", post(record_recovery_outcome_handler))
         .route("/cost/evaluate", post(evaluate_cost_handler))
-        .route("/optimization/outcome", post(record_optimization_outcome_handler))
+        .route(
+            "/optimization/outcome",
+            post(record_optimization_outcome_handler),
+        )
         // Milestone 20: Disaster recovery decision-making
         .route("/recovery/evaluate", post(evaluate_recovery_handler))
-        .route("/recovery/outcome", post(record_disaster_recovery_outcome_handler))
+        .route(
+            "/recovery/outcome",
+            post(record_disaster_recovery_outcome_handler),
+        )
         .route("/capacity/evaluate", post(evaluate_capacity_handler))
         .route("/capacity/outcome", post(record_capacity_outcome_handler))
         .route("/security/evaluate", post(evaluate_security_handler))
         .route("/security/outcome", post(record_security_outcome_handler))
         .route("/compliance/evaluate", post(evaluate_compliance_handler))
-        .route("/compliance/outcome", post(record_compliance_outcome_handler))
+        .route(
+            "/compliance/outcome",
+            post(record_compliance_outcome_handler),
+        )
         .route("/docs/evaluate", post(evaluate_documentation_handler))
         .route("/docs/outcome", post(record_documentation_outcome_handler))
         .route("/monitoring/evaluate", post(evaluate_monitoring_handler))
-        .route("/monitoring/outcome", post(record_monitoring_outcome_handler))
+        .route(
+            "/monitoring/outcome",
+            post(record_monitoring_outcome_handler),
+        )
         .route("/drift/evaluate", post(evaluate_drift_handler))
         .route("/drift/outcome", post(record_drift_outcome_handler))
         .route("/cost/outcome", post(record_optimization_outcome_handler))
@@ -674,7 +689,10 @@ async fn evaluate_recovery_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal disaster recovery action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/disaster-recovery-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/disaster-recovery-evaluation.json",
+        ))
     })
     .await;
 
@@ -718,8 +736,11 @@ async fn record_disaster_recovery_outcome_handler(
     // Log the disaster recovery outcome for future JEV learning
     let observation = format!(
         "Disaster recovery outcome: {} action '{}' resulted in {}. Recovery time: {:?} min, Data loss: {:?}%.",
-        req.system, req.action_taken, req.outcome,
-        req.recovery_time_minutes, req.actual_data_loss_percent
+        req.system,
+        req.action_taken,
+        req.outcome,
+        req.recovery_time_minutes,
+        req.actual_data_loss_percent
     );
 
     // Store outcome in decision history for future rule extraction
@@ -779,10 +800,13 @@ async fn evaluate_structural_handler(
     let target = req.target;
     let criteria_path = req.criteria_path;
 
-    // Convert structural target to observation string
-    let observation = target.to_observation();
+    // First, try direct structural condition evaluation
+    if let Some(result) = evaluate_structural_conditions(&target, &criteria_path) {
+        return result;
+    }
 
-    // Use the decision gate's evaluate method (same path as /decide/evaluate)
+    // Fall back to embedding-based JEV evaluation
+    let observation = target.to_observation();
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         let rt = tokio::runtime::Handle::current();
@@ -806,8 +830,47 @@ async fn evaluate_structural_handler(
         Err(e) => Json(json!({
             "success": false,
             "error": format!("Task join error: {}", e)
-        }))
+        })),
     }
+}
+
+/// Evaluate structural conditions directly against the target.
+/// Returns Some(Json) if a condition matched, None to fall back to embedding evaluation.
+fn evaluate_structural_conditions(
+    target: &crate::decision::structural::EvaluationTarget,
+    criteria_path: &str,
+) -> Option<Json<serde_json::Value>> {
+    // Read and parse the criteria file
+    let criteria_content = match std::fs::read_to_string(criteria_path) {
+        Ok(content) => content,
+        Err(_) => return None, // File not found or unreadable — fall back to JEV
+    };
+
+    let criteria: serde_json::Value = match serde_json::from_str(&criteria_content) {
+        Ok(value) => value,
+        Err(_) => return None, // Invalid JSON — fall back to JEV
+    };
+
+    // Check each option for structural conditions
+    if let Some(options) = criteria["options"].as_array() {
+        for option in options {
+            if let Some(condition) = option["conditions"].as_str() {
+                if crate::decision::condition::evaluate_condition(target, condition) {
+                    return Some(Json(json!({
+                        "success": true,
+                        "evaluation": {
+                            "option": option["id"].as_str().unwrap_or("unknown"),
+                            "rationale": format!("Structural condition matched: {}", condition),
+                            "confidence": 1.0,
+                            "method": "structural-condition"
+                        }
+                    })));
+                }
+            }
+        }
+    }
+
+    None // No conditions matched — fall back to JEV embedding evaluation
 }
 
 /// POST /decide/evaluate - Evaluate a decision via JEV semantic matching.
@@ -836,34 +899,43 @@ async fn evaluate_decision_handler(
             let mut store = bg_evaluations().lock().unwrap();
             match result {
                 Ok(Ok(decision)) => {
-                    store.insert(eval_id_for_closure.clone(), json!({
-                        "status": "completed",
-                        "success": true,
-                        "option": decision.option,
-                        "confidence": decision.confidence,
-                        "model": null,
-                        "rationale": decision.rationale
-                    }));
+                    store.insert(
+                        eval_id_for_closure.clone(),
+                        json!({
+                            "status": "completed",
+                            "success": true,
+                            "option": decision.option,
+                            "confidence": decision.confidence,
+                            "model": null,
+                            "rationale": decision.rationale
+                        }),
+                    );
                 }
                 Ok(Err(e)) => {
-                    store.insert(eval_id_for_closure.clone(), json!({
-                        "status": "completed",
-                        "success": false,
-                        "option": "error",
-                        "confidence": 0.0,
-                        "model": null,
-                        "rationale": format!("Evaluation failed: {}", e)
-                    }));
+                    store.insert(
+                        eval_id_for_closure.clone(),
+                        json!({
+                            "status": "completed",
+                            "success": false,
+                            "option": "error",
+                            "confidence": 0.0,
+                            "model": null,
+                            "rationale": format!("Evaluation failed: {}", e)
+                        }),
+                    );
                 }
                 Err(e) => {
-                    store.insert(eval_id_for_closure, json!({
-                        "status": "completed",
-                        "success": false,
-                        "option": "error",
-                        "confidence": 0.0,
-                        "model": null,
-                        "rationale": format!("Task join error: {}", e)
-                    }));
+                    store.insert(
+                        eval_id_for_closure,
+                        json!({
+                            "status": "completed",
+                            "success": false,
+                            "option": "error",
+                            "confidence": 0.0,
+                            "model": null,
+                            "rationale": format!("Task join error: {}", e)
+                        }),
+                    );
                 }
             }
         });
@@ -938,7 +1010,9 @@ async fn propose_schema_change_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate schema change impact
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/schema-change-evaluation.json"))
+        rt.block_on(
+            c.evaluate_decision(&observation, "specs/criteria/schema-change-evaluation.json"),
+        )
     })
     .await;
 
@@ -990,15 +1064,21 @@ async fn propose_interface_optimization_handler(
     // Build observation from proposal details
     let observation = format!(
         "Interface optimization proposal: {} wants to change interface to {} from {} to {}. Justification: {}",
-        req.source_component, req.target_component,
-        req.current_format, req.proposed_format, req.justification
+        req.source_component,
+        req.target_component,
+        req.current_format,
+        req.proposed_format,
+        req.justification
     );
 
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         // Use JEV to evaluate interface optimization impact
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/interface-optimization-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/interface-optimization-evaluation.json",
+        ))
     })
     .await;
 
@@ -1058,7 +1138,10 @@ async fn decide_routing_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal routing decision
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/autonomous-routing-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/autonomous-routing-evaluation.json",
+        ))
     })
     .await;
 
@@ -1102,8 +1185,11 @@ async fn record_routing_outcome_handler(
     // Log the routing outcome for future JEV learning
     let observation = format!(
         "Routing outcome: task {} assigned to {} resulted in {}. Time: {:?}s, Quality: {:?}",
-        req.task_id, req.assigned_worker, req.outcome,
-        req.completion_time_seconds, req.quality_score
+        req.task_id,
+        req.assigned_worker,
+        req.outcome,
+        req.completion_time_seconds,
+        req.quality_score
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1148,7 +1234,10 @@ async fn declare_dependencies_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate dependency compatibility
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/upgrade-impact-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/upgrade-impact-evaluation.json",
+        ))
     })
     .await;
 
@@ -1199,7 +1288,10 @@ async fn evaluate_upgrade_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate upgrade impact
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/upgrade-impact-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/upgrade-impact-evaluation.json",
+        ))
     })
     .await;
 
@@ -1245,8 +1337,7 @@ async fn record_upgrade_outcome_handler(
     let issues_str = req.compatibility_issues.join(", ");
     let observation = format!(
         "Upgrade outcome: {} {} resulted in {}. Downtime: {:?}s, Issues: {}",
-        req.service, req.version_change, req.outcome,
-        req.downtime_seconds, issues_str
+        req.service, req.version_change, req.outcome, req.downtime_seconds, issues_str
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1292,7 +1383,9 @@ async fn evaluate_health_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal healing action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/self-healing-evaluation.json"))
+        rt.block_on(
+            c.evaluate_decision(&observation, "specs/criteria/self-healing-evaluation.json"),
+        )
     })
     .await;
 
@@ -1336,8 +1429,11 @@ async fn record_recovery_outcome_handler(
     // Log the recovery outcome for future JEV learning
     let observation = format!(
         "Recovery outcome: {} action '{}' resulted in {}. Time: {:?}s, Recurrence: {:?}",
-        req.service, req.action_taken, req.outcome,
-        req.recovery_time_seconds, req.recurrence_within_24h
+        req.service,
+        req.action_taken,
+        req.outcome,
+        req.recovery_time_seconds,
+        req.recurrence_within_24h
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1383,7 +1479,10 @@ async fn evaluate_cost_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal cost optimization action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/cost-optimization-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/cost-optimization-evaluation.json",
+        ))
     })
     .await;
 
@@ -1427,8 +1526,11 @@ async fn record_optimization_outcome_handler(
     // Log the optimization outcome for future JEV learning
     let observation = format!(
         "Optimization outcome: {} action '{}' resulted in {}. Savings: ${:?}, Performance impact: {:?}%",
-        req.service, req.action_taken, req.outcome,
-        req.savings_achieved_usd, req.performance_impact_percent
+        req.service,
+        req.action_taken,
+        req.outcome,
+        req.savings_achieved_usd,
+        req.performance_impact_percent
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1476,7 +1578,10 @@ async fn evaluate_capacity_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal capacity adjustment action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/capacity-planning-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/capacity-planning-evaluation.json",
+        ))
     })
     .await;
 
@@ -1520,8 +1625,11 @@ async fn record_capacity_outcome_handler(
     // Log the capacity outcome for future JEV learning
     let observation = format!(
         "Capacity outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Utilization after: {:?}%",
-        req.service, req.action_taken, req.outcome,
-        req.prediction_accuracy_percent, req.resource_utilization_after_percent
+        req.service,
+        req.action_taken,
+        req.outcome,
+        req.prediction_accuracy_percent,
+        req.resource_utilization_after_percent
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1568,7 +1676,10 @@ async fn evaluate_security_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal security hardening action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/security-hardening-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/security-hardening-evaluation.json",
+        ))
     })
     .await;
 
@@ -1612,8 +1723,11 @@ async fn record_security_outcome_handler(
     // Log the security outcome for future JEV learning
     let observation = format!(
         "Security outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Resolution time: {:?} min",
-        req.system, req.action_taken, req.outcome,
-        req.prediction_accuracy_percent, req.resolution_time_minutes
+        req.system,
+        req.action_taken,
+        req.outcome,
+        req.prediction_accuracy_percent,
+        req.resolution_time_minutes
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1661,7 +1775,10 @@ async fn evaluate_compliance_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal compliance action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/compliance-automation-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/compliance-automation-evaluation.json",
+        ))
     })
     .await;
 
@@ -1705,8 +1822,11 @@ async fn record_compliance_outcome_handler(
     // Log the compliance outcome for future JEV learning
     let observation = format!(
         "Compliance outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Resolution time: {:?} hours",
-        req.system, req.action_taken, req.outcome,
-        req.prediction_accuracy_percent, req.resolution_time_hours
+        req.system,
+        req.action_taken,
+        req.outcome,
+        req.prediction_accuracy_percent,
+        req.resolution_time_hours
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1752,7 +1872,10 @@ async fn evaluate_documentation_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal documentation improvement action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/documentation-quality-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/documentation-quality-evaluation.json",
+        ))
     })
     .await;
 
@@ -1796,8 +1919,11 @@ async fn record_documentation_outcome_handler(
     // Log the documentation outcome for future JEV learning
     let observation = format!(
         "Documentation outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Improvement time: {:?} hours",
-        req.system, req.action_taken, req.outcome,
-        req.prediction_accuracy_percent, req.improvement_time_hours
+        req.system,
+        req.action_taken,
+        req.outcome,
+        req.prediction_accuracy_percent,
+        req.improvement_time_hours
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1843,7 +1969,10 @@ async fn evaluate_monitoring_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal monitoring improvement action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/monitoring-quality-evaluation.json"))
+        rt.block_on(c.evaluate_decision(
+            &observation,
+            "specs/criteria/monitoring-quality-evaluation.json",
+        ))
     })
     .await;
 
@@ -1887,8 +2016,11 @@ async fn record_monitoring_outcome_handler(
     // Log the monitoring outcome for future JEV learning
     let observation = format!(
         "Monitoring outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Improvement time: {:?} hours",
-        req.system, req.action_taken, req.outcome,
-        req.prediction_accuracy_percent, req.improvement_time_hours
+        req.system,
+        req.action_taken,
+        req.outcome,
+        req.prediction_accuracy_percent,
+        req.improvement_time_hours
     );
 
     // Store outcome in decision history for future rule extraction
@@ -1934,7 +2066,9 @@ async fn evaluate_drift_handler(
         let c = conductor.blocking_lock();
         // Use JEV to evaluate optimal drift remediation action
         let rt = tokio::runtime::Handle::current();
-        rt.block_on(c.evaluate_decision(&observation, "specs/criteria/drift-quality-evaluation.json"))
+        rt.block_on(
+            c.evaluate_decision(&observation, "specs/criteria/drift-quality-evaluation.json"),
+        )
     })
     .await;
 
@@ -1978,8 +2112,11 @@ async fn record_drift_outcome_handler(
     // Log the drift outcome for future JEV learning
     let observation = format!(
         "Drift outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Remediation time: {:?} minutes",
-        req.system, req.action_taken, req.outcome,
-        req.prediction_accuracy_percent, req.remediation_time_minutes
+        req.system,
+        req.action_taken,
+        req.outcome,
+        req.prediction_accuracy_percent,
+        req.remediation_time_minutes
     );
 
     // Store outcome in decision history for future rule extraction
@@ -2008,9 +2145,7 @@ async fn extract_rules_handler(
         .unwrap_or("default")
         .to_string();
 
-    let min_occurrences = body["min_occurrences"]
-        .as_i64()
-        .unwrap_or(3);
+    let min_occurrences = body["min_occurrences"].as_i64().unwrap_or(3);
 
     // Spawn blocking task to access state store and extract rules
     let result = tokio::task::spawn_blocking(move || {
@@ -2056,15 +2191,9 @@ async fn promote_rule_handler(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    let pattern_id = body["pattern_id"]
-        .as_str()
-        .map(|s| s.to_string());
-    let criteria_file = body["criteria_file"]
-        .as_str()
-        .map(|s| s.to_string());
-    let recommended_option = body["recommended_option"]
-        .as_str()
-        .map(|s| s.to_string());
+    let pattern_id = body["pattern_id"].as_str().map(|s| s.to_string());
+    let criteria_file = body["criteria_file"].as_str().map(|s| s.to_string());
+    let recommended_option = body["recommended_option"].as_str().map(|s| s.to_string());
 
     match (pattern_id, criteria_file, recommended_option) {
         (Some(pid), Some(cf), Some(opt)) => {
