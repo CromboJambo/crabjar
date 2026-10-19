@@ -1,0 +1,43 @@
+{
+  "id": "error-handling-adequacy",
+  "name": "Error Handling Adequacy",
+  "description": "Evaluate whether functions have adequate error handling based on structural and semantic analysis.",
+  "version": "1.0.0",
+  "options": [
+    {
+      "id": "well-handled-function",
+      "label": "Well-Handled Function",
+      "conditions": "structure == FnDecl && error_handling == Propagated",
+      "score": 95,
+      "explanation": "Function properly propagates errors to caller using Result type."
+    },
+    {
+      "id": "recovered-errors",
+      "label": "Errors Recovered Internally",
+      "conditions": "structure == FnDecl && error_handling == Recovered",
+      "score": 85,
+      "explanation": "Function handles errors internally with fallback logic."
+    },
+    {
+      "id": "ignored-errors",
+      "label": "Errors Ignored (Warning)",
+      "conditions": "structure == FnDecl && error_handling == Ignored",
+      "score": 40,
+      "explanation": "Function silently ignores errors — potential data loss or undefined behavior."
+    },
+    {
+      "id": "panics-on-error",
+      "label": "Panics on Error (Critical)",
+      "conditions": "structure == FnDecl && error_handling == Panicked",
+      "score": 20,
+      "explanation": "Function panics instead of returning errors — caller has no recovery path."
+    },
+    {
+      "id": "not-a-function",
+      "label": "Not a Function Declaration",
+      "conditions": "structure != FnDecl",
+      "score": 100,
+      "explanation": "Error handling evaluation only applies to function declarations."
+    }
+  ]
+}

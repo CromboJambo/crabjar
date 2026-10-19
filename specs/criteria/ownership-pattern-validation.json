@@ -1,0 +1,36 @@
+{
+  "id": "ownership-pattern-validation",
+  "name": "Ownership Pattern Validation",
+  "description": "Validate ownership patterns in function parameters and return values.",
+  "version": "1.0.0",
+  "options": [
+    {
+      "id": "borrowed-immutable-parameter",
+      "label": "Borrowed Immutable Parameter (Good)",
+      "conditions": "structure == FnDecl && ownership_mode == Borrowed && mutability == Immutable",
+      "score": 90,
+      "explanation": "Function takes immutable reference — efficient and safe."
+    },
+    {
+      "id": "owned-parameter",
+      "label": "Owned Parameter (Acceptable)",
+      "conditions": "structure == FnDecl && ownership_mode == Owned",
+      "score": 70,
+      "explanation": "Function takes ownership of parameter — caller cannot reuse value."
+    },
+    {
+      "id": "mutably-borrowed-parameter",
+      "label": "Mutably Borrowed Parameter (Warning)",
+      "conditions": "structure == FnDecl && ownership_mode == Borrowed && mutability == Mutable",
+      "score": 60,
+      "explanation": "Function takes mutable reference — caller cannot use value during call."
+    },
+    {
+      "id": "not-a-function",
+      "label": "Not a Function Declaration",
+      "conditions": "structure != FnDecl",
+      "score": 100,
+      "explanation": "Ownership pattern validation only applies to function declarations."
+    }
+  ]
+}

@@ -4,6 +4,7 @@
 //! by defining an EvaluationTarget type that wraps structural tokens with
 //! semantic annotations, then evaluates them against JEV criteria files.
 
+use crate::decision::condition::evaluate_condition;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -138,6 +139,17 @@ pub struct EvaluationTarget {
     /// Semantic tags from analyzers (Phase 1: empty).
     #[serde(default)]
     pub semantic_tags: HashMap<String, String>,
+
+    // Typed semantic fields (Phase 2: populated by analyzers)
+    /// Ownership mode detected by analyzer.
+    #[serde(default)]
+    pub ownership_mode: Option<OwnershipMode>,
+    /// Error handling pattern detected by analyzer.
+    #[serde(default)]
+    pub error_handling: Option<ErrorHandling>,
+    /// Mutability pattern detected by analyzer.
+    #[serde(default)]
+    pub mutability: Option<Mutability>,
 }
 
 impl EvaluationTarget {
@@ -149,19 +161,101 @@ impl EvaluationTarget {
             obs.push_str(&format!("{} - ", name));
         }
 
-        // Include semantic tags in observation for richer embedding context
-        if !self.semantic_tags.is_empty() {
-            let tags: Vec<String> = self
-                .semantic_tags
-                .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
-                .collect();
-            obs.push_str(&format!("({}) ", tags.join(", ")));
+        // Include typed semantic tags first (Phase 2)
+        let mut parts = Vec::new();
+        if let Some(om) = &self.ownership_mode {
+            parts.push(format!("ownership={}", om.as_str()));
+        }
+        if let Some(eh) = &self.error_handling {
+            parts.push(format!("error_handling={}", eh.as_str()));
+        }
+        if let Some(mt) = &self.mutability {
+            parts.push(format!("mutability={}", mt.as_str()));
+        }
+
+        // Include raw semantic tags for extensibility (Phase 1)
+        for (k, v) in &self.semantic_tags {
+            parts.push(format!("{}={}", k, v));
+        }
+
+        if !parts.is_empty() {
+            obs.push_str(&format!("({}) ", parts.join(", ")));
         }
 
         obs.push_str(&self.source);
         obs
     }
+
+    /// Resolve a field name to its string value for condition evaluation.
+    /// Handles both legacy string fields and Phase 2 typed semantic fields.
+    pub fn parse_value(&self, field: &str) -> Option<String> {
+        match field {
+            "structure" => Some(self.structure.as_str().to_string()),
+            "name" => self.name.clone(),
+            "ownership" | "ownership_mode" => self.ownership_mode.as_ref().map(|m| m.as_str().to_string()),
+            "error_handling" | "error_handling_mode" => self.error_handling.as_ref().map(|e| e.as_str().to_string()),
+            "mutability" | "mutability_mode" => self.mutability.as_ref().map(|m| m.as_str().to_string()),
+            _ => self.semantic_tags.get(field).cloned(),
+        }
+    }
+}
+
+/// Build an EvaluationTarget from a code region, populating typed semantic fields
+/// by analyzing the source text for ownership, error handling, and mutability patterns.
+pub fn build_target(
+    structure: SpanKind,
+    range: [usize; 2],
+    source: &str,
+    name: Option<&str>,
+) -> EvaluationTarget {
+    let mut target = EvaluationTarget {
+        structure,
+        range,
+        source: source.to_string(),
+        name: name.map(|s| s.to_string()),
+        semantic_tags: HashMap::new(),
+        ownership_mode: None,
+        error_handling: None,
+        mutability: None,
+    };
+
+    // Phase 2: Analyze source text for typed semantic fields
+
+    // Error handling patterns
+    if source.contains("unwrap()") {
+        target.error_handling = Some(ErrorHandling::Panicked);
+    } else if source.contains(".map_err(") || source.contains("with_context") {
+        target.error_handling = Some(ErrorHandling::Recovered);
+    } else if source.contains("return Err") || source.contains("?") {
+        target.error_handling = Some(ErrorHandling::Propagated);
+    }
+
+    // Ownership patterns
+    if source.contains("std::rc::Rc") || source.contains("Arc<") {
+        target.ownership_mode = Some(OwnershipMode::RefCounted);
+    } else if source.contains("Box<") {
+        target.ownership_mode = Some(OwnershipMode::Boxed);
+    }
+
+    // Mutability patterns
+    if source.contains("mut ") || source.contains(".push(") || source.contains(".insert(") {
+        target.mutability = Some(Mutability::Mutable);
+    } else {
+        target.mutability = Some(Mutability::Immutable);
+    }
+
+    // Also populate legacy string fields for backward compatibility
+    if let Some(eh) = &target.error_handling {
+        target.semantic_tags.insert("error_handling".to_string(), eh.as_str().to_string());
+    }
+    if let Some(om) = &target.ownership_mode {
+        target.semantic_tags.insert("ownership_mode".to_string(), om.as_str().to_string());
+    }
+    if let Some(mt) = &target.mutability {
+        target.semantic_tags.insert("mutability".to_string(), mt.as_str().to_string());
+    }
+
+    target
 }
 
 #[cfg(test)]
@@ -182,6 +276,9 @@ mod tests {
             source: "fn foo() {} ".to_string(),
             name: Some("foo".to_string()),
             semantic_tags: HashMap::new(),
+            ownership_mode: None,
+            error_handling: None,
+            mutability: None,
         };
 
         assert_eq!(target.structure, SpanKind::FnDecl);
@@ -199,11 +296,33 @@ mod tests {
             source: "fn foo() {} ".to_string(),
             name: Some("foo".to_string()),
             semantic_tags: tags,
+            ownership_mode: None,
+            error_handling: None,
+            mutability: None,
         };
 
         let obs = target.to_observation();
         assert!(obs.starts_with("[FnDecl] foo"));
         assert!(obs.contains("ownership=Owned"));
         assert!(obs.contains("fn foo() {} "));
+    }
+
+    #[test]
+    fn test_observation_string_with_typed_tags() {
+        let target = EvaluationTarget {
+            structure: SpanKind::FnDecl,
+            range: [0, 100],
+            source: "fn foo() {} ".to_string(),
+            name: Some("foo".to_string()),
+            semantic_tags: HashMap::new(),
+            ownership_mode: Some(OwnershipMode::Borrowed),
+            error_handling: Some(ErrorHandling::Propagated),
+            mutability: Some(Mutability::Immutable),
+        };
+
+        let obs = target.to_observation();
+        assert!(obs.contains("ownership=Borrowed"));
+        assert!(obs.contains("error_handling=Propagated"));
+        assert!(obs.contains("mutability=Immutable"));
     }
 }

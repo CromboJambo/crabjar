@@ -147,13 +147,25 @@ fn resolve_value(target: &EvaluationTarget, value: &str) -> String {
         }
     }
 
-    // Field name — resolve against target
+    // Field name — resolve against target (typed fields first, then semantic_tags)
     match value {
         "structure" => target.structure.as_str().to_string(),
         "name" => target.name.clone().unwrap_or("null".to_string()),
-        "ownership_mode" => resolve_semantic_tag(target, "ownership_mode"),
-        "error_handling" => resolve_semantic_tag(target, "error_handling"),
-        "mutability" => resolve_semantic_tag(target, "mutability"),
+        "ownership_mode" => target
+            .ownership_mode
+            .as_ref()
+            .map(|om| om.as_str().to_string())
+            .unwrap_or_else(|| resolve_semantic_tag(target, "ownership_mode")),
+        "error_handling" => target
+            .error_handling
+            .as_ref()
+            .map(|eh| eh.as_str().to_string())
+            .unwrap_or_else(|| resolve_semantic_tag(target, "error_handling")),
+        "mutability" => target
+            .mutability
+            .as_ref()
+            .map(|mt| mt.as_str().to_string())
+            .unwrap_or_else(|| resolve_semantic_tag(target, "mutability")),
         _ => value.to_string(),
     }
 }
@@ -173,6 +185,7 @@ fn is_numeric(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decision::structural::{ErrorHandling, Mutability, OwnershipMode};
 
     fn make_target(structure: SpanKind, name: Option<&str>) -> EvaluationTarget {
         let mut tags = HashMap::new();
@@ -183,6 +196,28 @@ mod tests {
             source: "fn foo() {} ".to_string(),
             name: name.map(|s| s.to_string()),
             semantic_tags: tags,
+            ownership_mode: None,
+            error_handling: None,
+            mutability: None,
+        }
+    }
+
+    fn make_target_with_tags(
+        structure: SpanKind,
+        name: Option<&str>,
+        ownership: Option<OwnershipMode>,
+        error_handling: Option<ErrorHandling>,
+        mutability: Option<Mutability>,
+    ) -> EvaluationTarget {
+        EvaluationTarget {
+            structure,
+            range: [0, 100],
+            source: "fn foo() {} ".to_string(),
+            name: name.map(|s| s.to_string()),
+            semantic_tags: HashMap::new(),
+            ownership_mode: ownership,
+            error_handling,
+            mutability,
         }
     }
 
@@ -235,9 +270,14 @@ mod tests {
             source: "fn foo() {} ".to_string(),
             name: None,
             semantic_tags: HashMap::new(),
+            ownership_mode: None,
+            error_handling: None,
+            mutability: None,
         };
         assert!(evaluate_condition(&target, "name == null"));
         assert!(evaluate_condition(&target, "error_handling == null"));
+        assert!(evaluate_condition(&target, "ownership_mode == null"));
+        assert!(evaluate_condition(&target, "mutability == null"));
     }
 
     #[test]
@@ -245,6 +285,48 @@ mod tests {
         let target = make_target(SpanKind::FnDecl, Some("foo"));
         assert!(evaluate_condition(&target, "10 > 5"));
         assert!(!evaluate_condition(&target, "10 < 5"));
+    }
+
+    #[test]
+    fn test_typed_field_access() {
+        // Test that typed fields take precedence over semantic_tags map
+        let target = make_target_with_tags(
+            SpanKind::FnDecl,
+            Some("foo"),
+            Some(OwnershipMode::Borrowed),
+            Some(ErrorHandling::Propagated),
+            Some(Mutability::Immutable),
+        );
+
+        assert!(evaluate_condition(&target, "ownership_mode == Borrowed"));
+        assert!(evaluate_condition(&target, "error_handling == Propagated"));
+        assert!(evaluate_condition(&target, "mutability == Immutable"));
+
+        // Test complex condition with typed fields
+        assert!(evaluate_condition(
+            &target,
+            "structure == FnDecl && ownership_mode == Borrowed && error_handling == Propagated"
+        ));
+    }
+
+    #[test]
+    fn test_typed_field_fallback_to_map() {
+        // When typed field is None, fall back to semantic_tags map
+        let mut tags = HashMap::new();
+        tags.insert("error_handling".to_string(), "Handled".to_string());
+        let target = EvaluationTarget {
+            structure: SpanKind::FnDecl,
+            range: [0, 100],
+            source: "fn foo() {} ".to_string(),
+            name: Some("foo".to_string()),
+            semantic_tags: tags,
+            ownership_mode: None,
+            error_handling: None, // Typed field is None
+            mutability: None,
+        };
+
+        // Should fall back to map value "Handled"
+        assert!(evaluate_condition(&target, "error_handling == Handled"));
     }
 
     #[test]
