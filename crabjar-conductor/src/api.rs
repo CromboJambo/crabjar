@@ -53,6 +53,8 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/decide/evaluate", post(evaluate_decision_handler))
         .route("/decide/evaluate/{id}", get(get_evaluation_status))
         .route("/jev/evaluate", post(evaluate_structural_handler))
+        .route("/jev/postprocess", post(postprocess_decision_handler))
+        .route("/jev/feedback", post(record_feedback_handler))
         .route("/schema/propose", post(propose_schema_change_handler))
         .route(
             "/interface/propose",
@@ -792,6 +794,53 @@ struct EvaluateStructuralRequest {
     criteria_path: String,
 }
 
+/// Request for post-processing a JEV decision.
+#[derive(Debug, Deserialize)]
+struct PostProcessRequest {
+    /// The evaluation target.
+    target: crate::decision::structural::EvaluationTarget,
+    /// The option ID that was selected.
+    option_id: String,
+    /// Path to the JEV criteria file.
+    criteria_path: String,
+}
+
+/// POST /jev/postprocess - Validate a JEV decision against structural rules.
+async fn postprocess_decision_handler(
+    Json(req): Json<PostProcessRequest>,
+) -> Json<serde_json::Value> {
+    let result = crate::decision::postprocessor::validate_decision(
+        &req.target,
+        &req.option_id,
+        &req.criteria_path,
+    );
+
+    Json(json!({
+        "success": true,
+        "validation": {
+            "valid": result.valid,
+            "issues": result.issues,
+            "confidence_adjustment": result.confidence_adjustment
+        }
+    }))
+}
+
+/// POST /jev/feedback - Record feedback on a JEV decision for reflection.
+async fn record_feedback_handler(
+    Json(req): Json<crate::decision::postprocessor::DecisionFeedback>,
+) -> Json<serde_json::Value> {
+    match crate::decision::postprocessor::record_feedback(&req) {
+        Ok(_) => Json(json!({
+            "success": true,
+            "message": "Feedback recorded"
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "error": e
+        }))
+    }
+}
+
 /// POST /jev/evaluate - Evaluate a structural code region against JEV criteria.
 async fn evaluate_structural_handler(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
@@ -807,6 +856,7 @@ async fn evaluate_structural_handler(
 
     // Fall back to embedding-based JEV evaluation
     let observation = target.to_observation();
+    let post_criteria_path = criteria_path.clone();
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         let rt = tokio::runtime::Handle::current();
@@ -815,14 +865,28 @@ async fn evaluate_structural_handler(
     .await;
 
     match result {
-        Ok(Ok(decision)) => Json(json!({
-            "success": true,
-            "evaluation": {
-                "option": decision.option,
-                "rationale": decision.rationale,
-                "confidence": decision.confidence
-            }
-        })),
+        Ok(Ok(decision)) => {
+            // Phase 3: Post-process the decision for validation
+            let post_process = crate::decision::postprocessor::validate_decision(
+                &target,
+                &decision.option,
+                &post_criteria_path,
+            );
+
+            Json(json!({
+                "success": true,
+                "evaluation": {
+                    "option": decision.option,
+                    "rationale": decision.rationale,
+                    "confidence": decision.confidence + post_process.confidence_adjustment,
+                    "post_processed": true,
+                    "validation": {
+                        "valid": post_process.valid,
+                        "issues": post_process.issues
+                    }
+                }
+            }))
+        },
         Ok(Err(e)) => Json(json!({
             "success": false,
             "error": format!("Decision evaluation failed: {}", e)

@@ -9,6 +9,7 @@ pub mod cache;
 pub mod condition;
 pub mod evaluate;
 pub mod policy;
+pub mod postprocessor;
 pub mod rule_extraction;
 pub mod structural;
 
