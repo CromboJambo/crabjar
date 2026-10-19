@@ -9,6 +9,7 @@ pub mod cache;
 pub mod evaluate;
 pub mod policy;
 pub mod rule_extraction;
+pub mod structural;
 
 use crate::state_store::StateStore;
 

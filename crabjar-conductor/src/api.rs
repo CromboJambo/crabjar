@@ -52,6 +52,7 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/metrics/cache", get(get_cache_stats))
         .route("/decide/evaluate", post(evaluate_decision_handler))
         .route("/decide/evaluate/{id}", get(get_evaluation_status))
+        .route("/jev/evaluate", post(evaluate_structural_handler))
         .route("/schema/propose", post(propose_schema_change_handler))
         .route("/interface/propose", post(propose_interface_optimization_handler))
         .route("/route/decide", post(decide_routing_handler))
@@ -757,6 +758,56 @@ struct EvaluateDecisionResponse {
     confidence: f64,
     model: Option<String>,
     rationale: String,
+}
+
+// ─── Structural Region Evaluation (Phase 1) ──────────────────────
+
+/// Request for structural region evaluation via JEV.
+#[derive(Debug, Deserialize)]
+struct EvaluateStructuralRequest {
+    /// The code region to evaluate (tokens or source with range).
+    target: crate::decision::structural::EvaluationTarget,
+    /// Path to the JEV criteria file.
+    criteria_path: String,
+}
+
+/// POST /jev/evaluate - Evaluate a structural code region against JEV criteria.
+async fn evaluate_structural_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(req): Json<EvaluateStructuralRequest>,
+) -> Json<serde_json::Value> {
+    let target = req.target;
+    let criteria_path = req.criteria_path;
+
+    // Convert structural target to observation string
+    let observation = target.to_observation();
+
+    // Use the decision gate's evaluate method (same path as /decide/evaluate)
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        let rt = tokio::runtime::Handle::current();
+        rt.block_on(c.evaluate_decision(&observation, &criteria_path))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(decision)) => Json(json!({
+            "success": true,
+            "evaluation": {
+                "option": decision.option,
+                "rationale": decision.rationale,
+                "confidence": decision.confidence
+            }
+        })),
+        Ok(Err(e)) => Json(json!({
+            "success": false,
+            "error": format!("Decision evaluation failed: {}", e)
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "error": format!("Task join error: {}", e)
+        }))
+    }
 }
 
 /// POST /decide/evaluate - Evaluate a decision via JEV semantic matching.
