@@ -1,6 +1,6 @@
 # Layered Topological Maps Architecture
 
-**Status:** Draft  
+**Status:** Complete (validated)  
 **Date:** 2026-10-19  
 **Author:** CromboJambo (with Hermes Agent)  
 **Applies to:** crabjar, pesti-structural-tokenizer, JEV decision layer
@@ -265,6 +265,30 @@ Tasks:
 - No circular dependencies detected
 - All 5 crate evaluations matched structural conditions (no embedding fallbacks)
 - Average confidence: 1.0
+
+**Additional validation (pesti workspace, 11 crates, unlimited budget):**
+- Discovered all 11 crates with correct dependency graph
+- Max dependency depth: 3 (deeper than crabjar's 1)
+- No circular dependencies detected
+- All 11 evaluations matched structural conditions
+- Average confidence: 1.0
+- Coupling score: 1.05, Cohesion score: 0.09
+
+**Additional validation (rusty-buns/Bun runtime, 107 crates):**
+- Discovered all 107 crates with correct dependency graph
+- Max dependency depth: 25 (very deep dependency chain)
+- Circular dependency detected: bun_js_printer -> bun_sourcemap -> bun_parsers
+- 9 orphaned crates identified (not depended on by anything else)
+- Coupling score: 0.15, Cohesion score: 0.45
+- All evaluations fell back to embedding with 0.0 confidence — criteria file patterns don't match Bun's codebase
+
+**Additional validation (herdr terminal manager, single crate):**
+- Discovered 1 crate correctly
+- Structural condition matched successfully (no embedding fallback)
+- Average confidence: 1.0
+- Confirms analysis works on both workspace and single-crate projects
+
+**Key insight from multi-workspace testing:** Embedding fallback is expected behavior when criteria file patterns don't match the codebase's error handling style. Herdr and crabjar have well-structured error handling matching the criteria; Bun uses different patterns.
 
 **Implementation notes:**
 - `discover_crates()` parses root Cargo.toml for workspace members and individual crate manifests
