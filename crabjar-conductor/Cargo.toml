@@ -54,6 +54,7 @@ reqwest = { version = "0.12", features = ["json", "blocking"], default-features 
 
 # Crabjar dependencies
 crabjar-guard = { path = "../guard" }
+universal-structure = { path = "../universal-structure" }
 
 # Authentication
 jsonwebtoken = "9.3"

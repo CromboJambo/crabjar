@@ -151,11 +151,6 @@ fn resolve_value(target: &EvaluationTarget, value: &str) -> String {
     match value {
         "structure" => target.structure.as_str().to_string(),
         "name" => target.name.clone().unwrap_or("null".to_string()),
-        "ownership_mode" => target
-            .ownership_mode
-            .as_ref()
-            .map(|om| om.as_str().to_string())
-            .unwrap_or_else(|| resolve_semantic_tag(target, "ownership_mode")),
         "error_handling" => target
             .error_handling
             .as_ref()
@@ -166,7 +161,8 @@ fn resolve_value(target: &EvaluationTarget, value: &str) -> String {
             .as_ref()
             .map(|mt| mt.as_str().to_string())
             .unwrap_or_else(|| resolve_semantic_tag(target, "mutability")),
-        _ => value.to_string(),
+        // Ownership is stored in semantic_tags (language-specific)
+        _ => resolve_semantic_tag(target, value),
     }
 }
 
@@ -185,7 +181,7 @@ fn is_numeric(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decision::structural::{ErrorHandling, Mutability, OwnershipMode};
+    use crate::decision::structural::{ErrorHandling, Mutability};
 
     fn make_target(structure: SpanKind, name: Option<&str>) -> EvaluationTarget {
         let mut tags = HashMap::new();
@@ -195,8 +191,8 @@ mod tests {
             range: [0, 100],
             source: "fn foo() {} ".to_string(),
             name: name.map(|s| s.to_string()),
+            language: Some("rust".to_string()),
             semantic_tags: tags,
-            ownership_mode: None,
             error_handling: None,
             mutability: None,
         }
@@ -205,7 +201,6 @@ mod tests {
     fn make_target_with_tags(
         structure: SpanKind,
         name: Option<&str>,
-        ownership: Option<OwnershipMode>,
         error_handling: Option<ErrorHandling>,
         mutability: Option<Mutability>,
     ) -> EvaluationTarget {
@@ -214,8 +209,8 @@ mod tests {
             range: [0, 100],
             source: "fn foo() {} ".to_string(),
             name: name.map(|s| s.to_string()),
+            language: Some("rust".to_string()),
             semantic_tags: HashMap::new(),
-            ownership_mode: ownership,
             error_handling,
             mutability,
         }
@@ -269,14 +264,13 @@ mod tests {
             range: [0, 100],
             source: "fn foo() {} ".to_string(),
             name: None,
+            language: Some("rust".to_string()),
             semantic_tags: HashMap::new(),
-            ownership_mode: None,
             error_handling: None,
             mutability: None,
         };
         assert!(evaluate_condition(&target, "name == null"));
         assert!(evaluate_condition(&target, "error_handling == null"));
-        assert!(evaluate_condition(&target, "ownership_mode == null"));
         assert!(evaluate_condition(&target, "mutability == null"));
     }
 
@@ -293,19 +287,17 @@ mod tests {
         let target = make_target_with_tags(
             SpanKind::FnDecl,
             Some("foo"),
-            Some(OwnershipMode::Borrowed),
             Some(ErrorHandling::Propagated),
             Some(Mutability::Immutable),
         );
 
-        assert!(evaluate_condition(&target, "ownership_mode == Borrowed"));
         assert!(evaluate_condition(&target, "error_handling == Propagated"));
         assert!(evaluate_condition(&target, "mutability == Immutable"));
 
         // Test complex condition with typed fields
         assert!(evaluate_condition(
             &target,
-            "structure == FnDecl && ownership_mode == Borrowed && error_handling == Propagated"
+            "structure == FnDecl && error_handling == Propagated"
         ));
     }
 
@@ -319,8 +311,8 @@ mod tests {
             range: [0, 100],
             source: "fn foo() {} ".to_string(),
             name: Some("foo".to_string()),
+            language: Some("rust".to_string()),
             semantic_tags: tags,
-            ownership_mode: None,
             error_handling: None, // Typed field is None
             mutability: None,
         };
@@ -346,11 +338,8 @@ mod tests {
         assert!(evaluate_condition(&target, "! structure == StructDecl"));
 
         // Test a different target (struct declaration)
-        let struct_target = make_target(SpanKind::StructDecl, Some("MyStruct"));
-        assert!(evaluate_condition(
-            &struct_target,
-            "structure == StructDecl"
-        ));
+        let struct_target = make_target(SpanKind::ClassDecl, Some("MyStruct"));
+        assert!(evaluate_condition(&struct_target, "structure == ClassDecl"));
         assert!(!evaluate_condition(&struct_target, "structure == FnDecl"));
     }
 }

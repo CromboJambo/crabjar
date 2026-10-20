@@ -36,8 +36,8 @@ pub fn validate_decision(
     }
 
     // Rule 2: Struct declarations should have ownership analysis
-    if target.structure == SpanKind::StructDecl {
-        if target.ownership_mode.is_none() && target.semantic_tags.get("ownership_mode").is_none() {
+    if target.structure == SpanKind::ClassDecl {
+        if target.semantic_tags.get("ownership_mode").is_none() {
             issues.push("Struct declaration lacks ownership analysis".to_string());
             confidence_adjustment -= 0.05;
         }
@@ -125,8 +125,8 @@ mod tests {
             range: [0, 100],
             source: "fn foo() -> Result<()> {} ".to_string(),
             name: Some("foo".to_string()),
+            language: Some("rust".to_string()),
             semantic_tags: HashMap::new(),
-            ownership_mode: None,
             error_handling: Some(crate::decision::structural::ErrorHandling::Propagated),
             mutability: None,
         };
@@ -143,8 +143,8 @@ mod tests {
             range: [0, 100],
             source: "fn foo() {} ".to_string(),
             name: Some("foo".to_string()),
+            language: Some("rust".to_string()),
             semantic_tags: HashMap::new(),
-            ownership_mode: None,
             error_handling: None,
             mutability: None,
         };
@@ -181,6 +181,10 @@ mod tests {
         }
 
         let suggestions = reflect_on_feedback(&feedbacks);
-        assert!(suggestions.iter().any(|s| s.contains("low-accuracy-option")));
+        assert!(
+            suggestions
+                .iter()
+                .any(|s| s.contains("low-accuracy-option"))
+        );
     }
 }
