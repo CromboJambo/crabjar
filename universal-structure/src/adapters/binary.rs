@@ -24,13 +24,11 @@ impl BinaryAdapter {
 
     /// Parse an ELF binary and extract its structural information.
     pub fn parse_elf(&self) -> Result<BinaryStructure, String> {
-        let contents = std::fs::read(&self.path).map_err(|e| {
-            format!("Failed to read binary {}: {}", self.path, e)
-        })?;
+        let contents = std::fs::read(&self.path)
+            .map_err(|e| format!("Failed to read binary {}: {}", self.path, e))?;
 
-        let obj = object::File::parse(&contents[..]).map_err(|e| {
-            format!("Failed to parse ELF file {}: {}", self.path, e)
-        })?;
+        let obj = object::File::parse(&contents[..])
+            .map_err(|e| format!("Failed to parse ELF file {}: {}", self.path, e))?;
 
         let mut structure = BinaryStructure {
             path: self.path.clone(),
@@ -98,10 +96,11 @@ impl BinaryAdapter {
             let mut fn_span = Span::new(SpanKind::FnDecl);
             fn_span.source = format!("fn {} (size={})", func.name, func.size);
             fn_span.open_token = Some(
-                crate::StructuralToken::new(SpanKind::FnDecl, &func.name, [
-                    func.address,
-                    func.address + func.size,
-                ])
+                crate::StructuralToken::new(
+                    SpanKind::FnDecl,
+                    &func.name,
+                    [func.address, func.address + func.size],
+                )
                 .with_tag("binary_address", format!("{:#x}", func.address))
                 .with_tag("binary_size", func.size.to_string()),
             );
@@ -348,10 +347,7 @@ impl BinaryDiff {
             lines.push(format!("Modified functions: {}", modified.join(", ")));
         }
         if !self.added_imports.is_empty() {
-            lines.push(format!(
-                "Added imports: {}",
-                self.added_imports.join(", ")
-            ));
+            lines.push(format!("Added imports: {}", self.added_imports.join(", ")));
         }
         if !self.removed_imports.is_empty() {
             lines.push(format!(
