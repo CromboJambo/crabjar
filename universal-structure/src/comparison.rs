@@ -5,11 +5,12 @@
 
 use crate::{SpanKind, SpanTree};
 use serde::{Deserialize, Serialize};
+use std::fmt::Write;
 
 /// Comparison metrics for a single aspect of code architecture.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComparisonMetric {
-    /// Name of the metric (e.g., "error_handling_coverage").
+    /// Name of the metric (e.g., `error_handling_coverage`).
     pub name: String,
     /// Value for language A.
     pub value_a: f64,
@@ -37,6 +38,7 @@ pub struct ComparisonReport {
 }
 
 impl ComparisonReport {
+    #[must_use]
     pub fn new(name_a: &str, language_a: &str, name_b: &str, language_b: &str) -> Self {
         Self {
             name_a: name_a.to_string(),
@@ -57,6 +59,7 @@ impl ComparisonReport {
     }
 
     /// Generate a human-readable summary of the comparison.
+    #[must_use]
     pub fn summary(&self) -> String {
         let mut result = format!(
             "# Cross-Language Comparison: {} ({}) vs {} ({})\n\n",
@@ -84,16 +87,22 @@ impl ComparisonReport {
                 "equal".to_string()
             };
 
-            result.push_str(&format!(
-                "- **{}**: {} = {:.2}, {} = {:.2} — {}\n",
-                metric.name, self.name_a, metric.value_a, self.name_b, metric.value_b, better
-            ));
+            writeln!(
+                result,
+                "- **{metric_name}**: {name_a} = {value_a:.2}, {name_b} = {value_b:.2} — {better}",
+                metric_name = metric.name,
+                name_a = self.name_a,
+                value_a = metric.value_a,
+                name_b = self.name_b,
+                value_b = metric.value_b,
+            )
+            .unwrap();
         }
 
         if !self.findings.is_empty() {
             result.push_str("\n## Findings\n\n");
             for finding in &self.findings {
-                result.push_str(&format!("- {}\n", finding));
+                writeln!(result, "- {finding}").unwrap();
             }
         }
 
@@ -103,7 +112,10 @@ impl ComparisonReport {
 
 /// Count total functions in a span tree.
 fn count_functions(tree: &SpanTree) -> usize {
-    tree.spans.iter().filter(|s| s.kind == SpanKind::FnDecl).count()
+    tree.spans
+        .iter()
+        .filter(|s| s.kind == SpanKind::FnDecl)
+        .count()
 }
 
 /// Count error handling patterns (try/catch, throws) in a span tree.
@@ -115,6 +127,7 @@ fn count_error_handling(tree: &SpanTree) -> usize {
 }
 
 /// Compute the ratio of error handling patterns to functions.
+#[allow(clippy::cast_precision_loss)]
 fn error_handling_coverage(tree: &SpanTree) -> f64 {
     let total_functions = count_functions(tree);
     if total_functions == 0 {
@@ -127,6 +140,7 @@ fn error_handling_coverage(tree: &SpanTree) -> f64 {
 }
 
 /// Compute the ratio of async patterns detected.
+#[allow(clippy::cast_precision_loss)]
 fn async_pattern_ratio(tree: &SpanTree) -> f64 {
     let total_functions = count_functions(tree);
     if total_functions == 0 {
@@ -146,6 +160,7 @@ fn async_pattern_ratio(tree: &SpanTree) -> f64 {
 }
 
 /// Compute the average nesting depth of functions.
+#[allow(clippy::cast_precision_loss)]
 fn avg_nesting_depth(tree: &SpanTree) -> f64 {
     let functions = tree.spans.iter().filter(|s| s.kind == SpanKind::FnDecl);
     let mut total_depth = 0;
@@ -164,6 +179,7 @@ fn avg_nesting_depth(tree: &SpanTree) -> f64 {
 }
 
 /// Compare two codebases and generate a comparison report.
+#[must_use]
 pub fn compare_trees(tree_a: &SpanTree, tree_b: &SpanTree) -> ComparisonReport {
     let mut report = ComparisonReport::new(
         &tree_a.source,
@@ -234,8 +250,8 @@ pub fn compare_trees(tree_a: &SpanTree, tree_b: &SpanTree) -> ComparisonReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::adapters::javascript::JavaScriptAdapter;
     use crate::LanguageAdapter;
+    use crate::adapters::javascript::JavaScriptAdapter;
 
     #[test]
     fn test_error_handling_coverage() {
