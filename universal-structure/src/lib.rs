@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod adapters;
+pub mod comparison;
 
 /// Trait for language-specific adapters that convert native tokenizer output
 /// to universal structural tokens.
