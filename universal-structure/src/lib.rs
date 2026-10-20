@@ -9,6 +9,26 @@ use std::collections::HashMap;
 
 pub mod adapters;
 
+/// Trait for language-specific adapters that convert native tokenizer output
+/// to universal structural tokens.
+pub trait LanguageAdapter {
+    /// Return the name of this adapter (e.g., "rust", "javascript").
+    fn name(&self) -> &str;
+
+    /// Tokenize source code and adapt to universal SpanTree representation.
+    fn tokenize_and_adapt(&self, source: &str) -> SpanTree;
+}
+
+/// Universal span tree with language metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpanTree {
+    pub spans: Vec<Span>,
+    pub source: String,
+    pub language: String,
+    #[serde(default)]
+    pub semantic_tags: HashMap<String, String>,
+}
+
 /// Universal span kind covering major language constructs across all languages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SpanKind {
