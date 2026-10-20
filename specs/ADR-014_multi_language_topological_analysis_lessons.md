@@ -13,6 +13,8 @@ We completed a four-phase project to extend crabjar's code analysis capabilities
 3. ELF binary analysis adapter using the `object` crate
 4. Cross-language comparison infrastructure
 
+This work builds on an early sibling seed of the same concept: `cargo-declared` (/home/crombo/projects/archive/cargo-declared), which audits the gap between declared and compiled dependencies in Rust projects. That project established the pattern of comparing two representations (declared vs compiled) to find discrepancies — the same architectural approach used here for cross-language and binary analysis.
+
 This ADR captures the key lessons learned during implementation that should inform future work on language adapters, binary analysis, and cross-language tooling.
 
 ## Lessons Learned
