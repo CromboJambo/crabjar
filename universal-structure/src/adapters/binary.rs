@@ -175,6 +175,7 @@ impl BinaryAdapter {
                 ]),
                 error_handling: None,
                 mutability: None,
+                ownership_mode: None,
             });
         }
 

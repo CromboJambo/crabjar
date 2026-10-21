@@ -129,6 +129,7 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling: Some(crate::decision::structural::ErrorHandling::Propagated),
             mutability: None,
+            ownership_mode: None,
         };
 
         let result = validate_decision(&target, "well-structured-function", "test.json");
@@ -147,6 +148,7 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling: None,
             mutability: None,
+            ownership_mode: None,
         };
 
         let result = validate_decision(&target, "simple-function", "test.json");

@@ -10,27 +10,7 @@
 use crate::decision::condition::evaluate_condition;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-pub use universal_structure::{ErrorHandling, EvaluationTarget, Mutability, SpanKind};
-
-/// Semantic annotation for ownership (Rust-specific).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum OwnershipMode {
-    Owned,
-    Borrowed,
-    RefCounted,
-    Boxed,
-}
-
-impl OwnershipMode {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            OwnershipMode::Owned => "Owned",
-            OwnershipMode::Borrowed => "Borrowed",
-            OwnershipMode::RefCounted => "RefCounted",
-            OwnershipMode::Boxed => "Boxed",
-        }
-    }
-}
+pub use universal_structure::{ErrorHandling, EvaluationTarget, Mutability, OwnershipMode, SpanKind};
 
 /// Build an EvaluationTarget from a code region, populating typed semantic fields
 /// by analyzing the source text for ownership, error handling, and mutability patterns.
@@ -49,6 +29,7 @@ pub fn build_target(
         semantic_tags: HashMap::new(),
         error_handling: None,
         mutability: None,
+        ownership_mode: None,
     };
 
     // Phase 2: Analyze source text for typed semantic fields
@@ -62,15 +43,11 @@ pub fn build_target(
         target.error_handling = Some(ErrorHandling::Propagated);
     }
 
-    // Ownership patterns (Rust-specific, stored in semantic_tags)
+    // Ownership patterns (Rust-specific)
     if source.contains("std::rc::Rc") || source.contains("Arc<") {
-        target
-            .semantic_tags
-            .insert("ownership_mode".to_string(), "RefCounted".to_string());
+        target.ownership_mode = Some(OwnershipMode::RefCounted);
     } else if source.contains("Box<") {
-        target
-            .semantic_tags
-            .insert("ownership_mode".to_string(), "Boxed".to_string());
+        target.ownership_mode = Some(OwnershipMode::Boxed);
     }
 
     // Mutability patterns
@@ -116,6 +93,7 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling: None,
             mutability: None,
+            ownership_mode: None,
         };
 
         assert_eq!(target.structure, SpanKind::FnDecl);
@@ -136,6 +114,7 @@ mod tests {
             semantic_tags: tags,
             error_handling: None,
             mutability: None,
+            ownership_mode: None,
         };
 
         let obs = target.to_observation();
@@ -155,11 +134,36 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling: Some(ErrorHandling::Propagated),
             mutability: Some(Mutability::Immutable),
+            ownership_mode: None,
         };
 
         let obs = target.to_observation();
         assert!(obs.contains("error_handling=Propagated"));
         assert!(obs.contains("mutability=Immutable"));
+    }
+
+    #[test]
+    fn test_build_target_ownership() {
+        let target = build_target(
+            SpanKind::LetStmt,
+            [0, 50],
+            "let x: Box<i32> = Box::new(42);",
+            None,
+        );
+
+        assert_eq!(target.ownership_mode, Some(OwnershipMode::Boxed));
+    }
+
+    #[test]
+    fn test_build_target_ownership_rc() {
+        let target = build_target(
+            SpanKind::LetStmt,
+            [0, 50],
+            "let x = std::rc::Rc::new(42);",
+            None,
+        );
+
+        assert_eq!(target.ownership_mode, Some(OwnershipMode::RefCounted));
     }
 
     #[test]

@@ -10,6 +10,10 @@ use std::collections::HashMap;
 pub mod adapters;
 pub mod comparison;
 
+// Re-export key types for convenience
+pub use self::adapters::{BinaryAdapter, CAdapter, CppAdapter, GoAdapter, JavaScriptAdapter, PythonAdapter, RustAdapter};
+pub use self::comparison::compare_trees;
+
 /// Trait for language-specific adapters that convert native tokenizer output
 /// to universal structural tokens.
 pub trait LanguageAdapter {
@@ -49,6 +53,7 @@ pub enum SpanKind {
     LitFloat,   // Floating point literal
     LitStr,     // String literal
     LitBool,    // Boolean literal
+    LitChar,    // Character literal
     Ident,      // Identifier
     Keyword,    // Language keyword
     Punct,      // Punctuation
@@ -106,6 +111,7 @@ impl SpanKind {
             SpanKind::LitFloat => "LitFloat",
             SpanKind::LitStr => "LitStr",
             SpanKind::LitBool => "LitBool",
+            SpanKind::LitChar => "LitChar",
             SpanKind::Ident => "Ident",
             SpanKind::Keyword => "Keyword",
             SpanKind::Punct => "Punct",
@@ -381,6 +387,26 @@ impl Mutability {
     }
 }
 
+/// Ownership mode annotation (Rust-specific patterns).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OwnershipMode {
+    Owned,
+    Borrowed,
+    RefCounted,
+    Boxed,
+}
+
+impl OwnershipMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            OwnershipMode::Owned => "Owned",
+            OwnershipMode::Borrowed => "Borrowed",
+            OwnershipMode::RefCounted => "RefCounted",
+            OwnershipMode::Boxed => "Boxed",
+        }
+    }
+}
+
 /// A code region that can be evaluated by JEV.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationTarget {
@@ -404,6 +430,8 @@ pub struct EvaluationTarget {
     pub error_handling: Option<ErrorHandling>,
     #[serde(default)]
     pub mutability: Option<Mutability>,
+    #[serde(default)]
+    pub ownership_mode: Option<OwnershipMode>,
 }
 
 impl EvaluationTarget {
@@ -422,6 +450,9 @@ impl EvaluationTarget {
         }
         if let Some(mt) = &self.mutability {
             parts.push(format!("mutability={}", mt.as_str()));
+        }
+        if let Some(om) = &self.ownership_mode {
+            parts.push(format!("ownership_mode={}", om.as_str()));
         }
 
         // Include raw semantic tags for extensibility
@@ -448,6 +479,9 @@ impl EvaluationTarget {
             }
             "mutability" | "mutability_mode" => {
                 self.mutability.as_ref().map(|m| m.as_str().to_string())
+            }
+            "ownership_mode" => {
+                self.ownership_mode.as_ref().map(|o| o.as_str().to_string())
             }
             _ => self.semantic_tags.get(field).cloned(),
         }
@@ -521,6 +555,7 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling: Some(ErrorHandling::Propagated),
             mutability: Some(Mutability::Immutable),
+            ownership_mode: None,
         };
 
         let obs = target.to_observation();
@@ -528,6 +563,24 @@ mod tests {
         assert!(obs.contains("error_handling=Propagated"));
         assert!(obs.contains("mutability=Immutable"));
         assert!(obs.contains("fn foo() {} "));
+    }
+
+    #[test]
+    fn test_evaluation_target_observation_ownership() {
+        let target = EvaluationTarget {
+            structure: SpanKind::FnDecl,
+            range: [0, 100],
+            source: "fn foo() {} ".to_string(),
+            name: Some("foo".to_string()),
+            language: Some("rust".to_string()),
+            semantic_tags: HashMap::new(),
+            error_handling: None,
+            mutability: None,
+            ownership_mode: Some(OwnershipMode::Owned),
+        };
+
+        let obs = target.to_observation();
+        assert!(obs.contains("ownership_mode=Owned"));
     }
 
     #[test]
@@ -541,6 +594,7 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling: None,
             mutability: None,
+            ownership_mode: Some(OwnershipMode::Owned),
         };
 
         assert_eq!(
@@ -553,6 +607,10 @@ mod tests {
             Some("javascript".to_string())
         );
         assert_eq!(target.parse_value("unknown"), None);
+        assert_eq!(
+            target.parse_value("ownership_mode"),
+            Some("Owned".to_string())
+        );
     }
 
     #[test]

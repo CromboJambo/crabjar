@@ -181,7 +181,7 @@ fn is_numeric(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decision::structural::{ErrorHandling, Mutability};
+    use crate::decision::structural::{ErrorHandling, Mutability, OwnershipMode};
 
     fn make_target(structure: SpanKind, name: Option<&str>) -> EvaluationTarget {
         let mut tags = HashMap::new();
@@ -195,6 +195,7 @@ mod tests {
             semantic_tags: tags,
             error_handling: None,
             mutability: None,
+            ownership_mode: None,
         }
     }
 
@@ -203,6 +204,7 @@ mod tests {
         name: Option<&str>,
         error_handling: Option<ErrorHandling>,
         mutability: Option<Mutability>,
+        ownership_mode: Option<OwnershipMode>,
     ) -> EvaluationTarget {
         EvaluationTarget {
             structure,
@@ -213,6 +215,7 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling,
             mutability,
+            ownership_mode,
         }
     }
 
@@ -268,6 +271,7 @@ mod tests {
             semantic_tags: HashMap::new(),
             error_handling: None,
             mutability: None,
+            ownership_mode: None,
         };
         assert!(evaluate_condition(&target, "name == null"));
         assert!(evaluate_condition(&target, "error_handling == null"));
@@ -289,6 +293,7 @@ mod tests {
             Some("foo"),
             Some(ErrorHandling::Propagated),
             Some(Mutability::Immutable),
+            None,
         );
 
         assert!(evaluate_condition(&target, "error_handling == Propagated"));
@@ -315,6 +320,7 @@ mod tests {
             semantic_tags: tags,
             error_handling: None, // Typed field is None
             mutability: None,
+            ownership_mode: None,
         };
 
         // Should fall back to map value "Handled"

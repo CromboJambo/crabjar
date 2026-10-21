@@ -13,6 +13,9 @@ fn test_structural_condition_evaluation() {
         source: "fn foo() -> Result<()> {} ".to_string(),
         name: Some("foo".to_string()),
         semantic_tags: tags,
+        error_handling: None,
+        mutability: None,
+        ownership_mode: None,
     };
 
     // Evaluate against the structural-function-evaluation criteria
