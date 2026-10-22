@@ -64,10 +64,7 @@ pub fn extract_rules(
 }
 
 /// Promote a candidate rule to the persistent rule store.
-pub fn promote_rule(
-    store: &StateStore,
-    rule: &CandidateRule,
-) -> anyhow::Result<i64> {
+pub fn promote_rule(store: &StateStore, rule: &CandidateRule) -> anyhow::Result<i64> {
     info!(
         "Promoting rule {} for criteria {} (confidence: {:.2}, occurrences: {})",
         rule.pattern_id, rule.criteria_file, rule.avg_confidence, rule.occurrence_count
@@ -86,11 +83,7 @@ pub fn promote_rule(
 }
 
 /// Check if a promoted rule exists for the given pattern and criteria.
-pub fn has_rule(
-    store: &StateStore,
-    pattern_id: &str,
-    criteria_file: &str,
-) -> anyhow::Result<bool> {
+pub fn has_rule(store: &StateStore, pattern_id: &str, criteria_file: &str) -> anyhow::Result<bool> {
     Ok(store.has_rule(pattern_id, criteria_file)?)
 }
 

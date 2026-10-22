@@ -764,7 +764,10 @@ impl StateStore {
     }
 
     /// Get all promoted rules for a specific criteria file.
-    pub fn get_promoted_rules(&self, criteria_file: &str) -> Result<Vec<PromotedRule>, rusqlite::Error> {
+    pub fn get_promoted_rules(
+        &self,
+        criteria_file: &str,
+    ) -> Result<Vec<PromotedRule>, rusqlite::Error> {
         let mut stmt = self.db.prepare(
             "SELECT id, pattern_id, recommended_option, avg_confidence, occurrence_count, promoted_at FROM decision_rules WHERE criteria_file = ? ORDER BY promoted_at DESC",
         )?;
@@ -792,7 +795,11 @@ impl StateStore {
     }
 
     /// Get the recommended option for a given pattern and criteria.
-    pub fn get_rule_option(&self, pattern_id: &str, criteria_file: &str) -> Result<Option<String>, rusqlite::Error> {
+    pub fn get_rule_option(
+        &self,
+        pattern_id: &str,
+        criteria_file: &str,
+    ) -> Result<Option<String>, rusqlite::Error> {
         self.db.query_row(
             "SELECT recommended_option FROM decision_rules WHERE pattern_id = ? AND criteria_file = ?",
             params![pattern_id, criteria_file],

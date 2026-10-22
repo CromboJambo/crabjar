@@ -64,7 +64,8 @@ async fn main() -> Result<()> {
 
     // Configure JEV decision gate (required for automated fleet decisions)
     use crabjar_conductor::decision::{BackendConfig, DecisionPolicy};
-    let jev_url = args.jev_url
+    let jev_url = args
+        .jev_url
         .or_else(|| std::env::var("CRABJAR_JEV_API_URL").ok())
         .unwrap_or_else(|| "http://localhost:8080".to_string());
     let backend_config = BackendConfig {

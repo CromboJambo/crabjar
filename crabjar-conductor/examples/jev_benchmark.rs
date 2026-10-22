@@ -1,9 +1,9 @@
 //! Benchmark for crabjar-conductor JEV decision evaluation endpoint.
 //! Measures latency and throughput of the embedding-based semantic matching approach.
 
-use std::time::{Duration, Instant};
 use reqwest::Client;
 use serde_json::json;
+use std::time::{Duration, Instant};
 
 const CONDUCTOR_URL: &str = "http://localhost:8091";
 
@@ -11,13 +11,16 @@ const CONDUCTOR_URL: &str = "http://localhost:8091";
 async fn main() {
     println!("=== Crabjar-Conductor JEV Decision Evaluation Benchmark ===");
     println!("Conductor URL: {}", CONDUCTOR_URL);
-    
+
     let jwt = std::env::var("CONDUCTOR_JWT")
         .expect("Set CONDUCTOR_JWT environment variable with a valid JWT token");
-    
+
     println!();
 
-    let client = Client::builder().timeout(Duration::from_secs(30)).build().unwrap();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .unwrap();
 
     // Phase 1: Single synchronous decision evaluation
     println!("Phase 1: Single synchronous decision evaluation...");
@@ -40,9 +43,15 @@ async fn main() {
     let start_wait = Instant::now();
     loop {
         tokio::time::sleep(Duration::from_millis(500)).await;
-        match get_evaluation_status(&client, &jwt, &eval_id).await.unwrap() {
+        match get_evaluation_status(&client, &jwt, &eval_id)
+            .await
+            .unwrap()
+        {
             Some(_) => {
-                println!("  Background evaluation completed in {:?}", start_wait.elapsed());
+                println!(
+                    "  Background evaluation completed in {:?}",
+                    start_wait.elapsed()
+                );
                 break;
             }
             None => continue,
@@ -69,7 +78,11 @@ async fn main() {
     println!("Each decision requires an HTTP call to the embedding backend.");
 }
 
-async fn evaluate_decision(client: &Client, jwt: &str, background: bool) -> Result<serde_json::Value, String> {
+async fn evaluate_decision(
+    client: &Client,
+    jwt: &str,
+    background: bool,
+) -> Result<serde_json::Value, String> {
     let body = json!({
         "observation": "Worker ftw3 GPU utilization at 95% for 10 minutes",
         "criteria_file": "worker_health.json",
@@ -85,7 +98,10 @@ async fn evaluate_decision(client: &Client, jwt: &str, background: bool) -> Resu
         .map_err(|e| format!("Request failed: {}", e))?;
 
     let status = response.status();
-    let body = response.json::<serde_json::Value>().await.map_err(|e| format!("JSON parse failed: {}", e))?;
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("JSON parse failed: {}", e))?;
 
     if !status.is_success() {
         return Err(format!("HTTP {}: {}", status, body));
@@ -96,7 +112,7 @@ async fn evaluate_decision(client: &Client, jwt: &str, background: bool) -> Resu
 
 async fn evaluate_decision_background(client: &Client, jwt: &str) -> Result<String, String> {
     let result = evaluate_decision(client, jwt, true).await?;
-    
+
     // Extract evaluation_id from response
     if let Some(eval_id) = result.get("evaluation_id") {
         Ok(eval_id.as_str().unwrap_or("").to_string())
@@ -105,7 +121,11 @@ async fn evaluate_decision_background(client: &Client, jwt: &str) -> Result<Stri
     }
 }
 
-async fn get_evaluation_status(client: &Client, jwt: &str, eval_id: &str) -> Result<Option<serde_json::Value>, String> {
+async fn get_evaluation_status(
+    client: &Client,
+    jwt: &str,
+    eval_id: &str,
+) -> Result<Option<serde_json::Value>, String> {
     let response = client
         .get(format!("{}/decide/evaluate/{}", CONDUCTOR_URL, eval_id))
         .header("Authorization", format!("Bearer {}", jwt))
@@ -118,8 +138,11 @@ async fn get_evaluation_status(client: &Client, jwt: &str, eval_id: &str) -> Res
         return Ok(None);
     }
 
-    let body = response.json::<serde_json::Value>().await.map_err(|e| format!("JSON parse failed: {}", e))?;
-    
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("JSON parse failed: {}", e))?;
+
     if !status.is_success() {
         return Err(format!("HTTP {}: {}", status, body));
     }

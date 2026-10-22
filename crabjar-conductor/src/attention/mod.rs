@@ -28,7 +28,10 @@ pub struct AttentionThresholds {
 
 impl Default for AttentionThresholds {
     fn default() -> Self {
-        Self { low: 30.0, high: 70.0 }
+        Self {
+            low: 30.0,
+            high: 70.0,
+        }
     }
 }
 
@@ -113,7 +116,9 @@ impl HybridDecisionLayer {
         let ts = timestamp.unwrap_or_else(|| Utc::now().timestamp());
 
         // Stage 1: Attention triage (fast, rule-based)
-        let attention_score = self.calculate_attention(obs_id, source, content, ts).await?;
+        let attention_score = self
+            .calculate_attention(obs_id, source, content, ts)
+            .await?;
         debug!(
             obs_id = %obs_id,
             attention_score = attention_score,
@@ -260,11 +265,8 @@ impl HybridDecisionLayer {
     pub async fn get_attention_stats(&self) -> Result<AttentionStats> {
         let conn = self.mirror_log_conn.lock().await;
 
-        let total_events: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM events",
-            [],
-            |row| row.get(0),
-        )?;
+        let total_events: i64 =
+            conn.query_row("SELECT COUNT(*) FROM events", [], |row| row.get(0))?;
 
         let active_events: i64 = conn.query_row(
             "SELECT COUNT(*) FROM decay WHERE last_accessed > unixepoch() - 86400 * 7",
@@ -338,14 +340,20 @@ mod tests {
         let (layer, _db_path, _dir) = create_test_layer();
 
         // New item should have high attention score
-        let decision = layer.process_observation(
-            "test-obs-1",
-            "alert",
-            "Test observation content",
-            Some(Utc::now().timestamp()),
-        ).await.unwrap();
+        let decision = layer
+            .process_observation(
+                "test-obs-1",
+                "alert",
+                "Test observation content",
+                Some(Utc::now().timestamp()),
+            )
+            .await
+            .unwrap();
 
-        assert!(decision.attention_score > 70.0, "New alert should score high");
+        assert!(
+            decision.attention_score > 70.0,
+            "New alert should score high"
+        );
     }
 
     #[tokio::test]
@@ -354,14 +362,20 @@ mod tests {
 
         // Old item (30 days ago) should have low attention score
         let old_ts = Utc::now().timestamp() - (30 * 24 * 60 * 60);
-        let decision = layer.process_observation(
-            "test-obs-2",
-            "journal",
-            "Old observation content",
-            Some(old_ts),
-        ).await.unwrap();
+        let decision = layer
+            .process_observation(
+                "test-obs-2",
+                "journal",
+                "Old observation content",
+                Some(old_ts),
+            )
+            .await
+            .unwrap();
 
-        assert!(decision.attention_score < 30.0, "Old journal item should score low");
+        assert!(
+            decision.attention_score < 30.0,
+            "Old journal item should score low"
+        );
     }
 
     #[tokio::test]
@@ -380,7 +394,10 @@ mod tests {
         ).await.unwrap();
 
         // Should be in the Log range (between low and high thresholds)
-        assert!(matches!(decision.action, HybridAction::Log), 
-                "Expected Log action but got: {:?}", decision.action);
+        assert!(
+            matches!(decision.action, HybridAction::Log),
+            "Expected Log action but got: {:?}",
+            decision.action
+        );
     }
 }

@@ -10,8 +10,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::structural::{build_target, EvaluationTarget};
 use super::evaluate::evaluate_structural_conditions;
+use super::structural::{EvaluationTarget, build_target};
 
 /// Information about a single crate in the workspace.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,7 +197,10 @@ fn build_dependency_graph(crates: &mut [CrateInfo]) {
 
     // Apply edges
     for (dep_index, dependent_name) in edges {
-        if !crates[dep_index].reverse_dependencies.contains(&dependent_name) {
+        if !crates[dep_index]
+            .reverse_dependencies
+            .contains(&dependent_name)
+        {
             crates[dep_index].reverse_dependencies.push(dependent_name);
         }
     }
@@ -211,7 +214,12 @@ fn calculate_max_depth(crates: &[CrateInfo]) -> usize {
         .map(|(i, c)| (c.name.clone(), i))
         .collect();
 
-    fn depth_of(crate_info: &CrateInfo, crates: &[CrateInfo], name_to_index: &HashMap<String, usize>, visited: &mut HashSet<usize>) -> usize {
+    fn depth_of(
+        crate_info: &CrateInfo,
+        crates: &[CrateInfo],
+        name_to_index: &HashMap<String, usize>,
+        visited: &mut HashSet<usize>,
+    ) -> usize {
         if visited.contains(&name_to_index[&crate_info.name]) {
             return 0;
         }
@@ -268,7 +276,15 @@ fn detect_circular_dependencies(crates: &[CrateInfo]) -> Vec<Vec<String>> {
         for dep in &crates[idx].dependencies {
             if let Some(&dep_idx) = name_to_index.get(dep) {
                 if !visited[dep_idx] {
-                    dfs(dep_idx, crates, name_to_index, visited, rec_stack, path, cycles);
+                    dfs(
+                        dep_idx,
+                        crates,
+                        name_to_index,
+                        visited,
+                        rec_stack,
+                        path,
+                        cycles,
+                    );
                 } else if rec_stack[dep_idx] {
                     // Found a cycle
                     let cycle_start = path.iter().position(|&p| p == dep_idx).unwrap();
@@ -287,7 +303,15 @@ fn detect_circular_dependencies(crates: &[CrateInfo]) -> Vec<Vec<String>> {
 
     for i in 0..crates.len() {
         if !visited[i] {
-            dfs(i, crates, &name_to_index, &mut visited, &mut rec_stack, &mut path, &mut cycles);
+            dfs(
+                i,
+                crates,
+                &name_to_index,
+                &mut visited,
+                &mut rec_stack,
+                &mut path,
+                &mut cycles,
+            );
         }
     }
 
@@ -458,12 +482,15 @@ pub fn analyze_workspace(
 
         evaluation_summary.per_crate_results.insert(
             crate_info.name.clone(),
-            crate_info.evaluation_result.clone().unwrap_or(EvaluationResult {
-                option: "unevaluated".to_string(),
-                confidence: 0.0,
-                rationale: "No structural conditions matched".to_string(),
-                method: "none".to_string(),
-            }),
+            crate_info
+                .evaluation_result
+                .clone()
+                .unwrap_or(EvaluationResult {
+                    option: "unevaluated".to_string(),
+                    confidence: 0.0,
+                    rationale: "No structural conditions matched".to_string(),
+                    method: "none".to_string(),
+                }),
         );
     }
 
@@ -479,7 +506,8 @@ pub fn analyze_workspace(
         .collect();
 
     let elapsed_seconds = start_time.elapsed().as_secs();
-    let budget_exhausted = budget.max_crates > 0 && evaluation_summary.total_evaluations >= budget.max_crates;
+    let budget_exhausted =
+        budget.max_crates > 0 && evaluation_summary.total_evaluations >= budget.max_crates;
     let total_crates = crates.len();
     let total_evaluations = evaluation_summary.total_evaluations;
 
@@ -527,7 +555,7 @@ version = "0.1.0"
 "#,
         )
         .unwrap();
-        
+
         println!("Wrote root Cargo.toml");
 
         // crates/core/Cargo.toml
@@ -595,7 +623,7 @@ test-api = { path = "../api" }
     #[test]
     fn test_discover_crates() {
         let workspace = create_test_workspace();
-        
+
         // Debug: check if root Cargo.toml exists and can be read
         let root_toml = workspace.join("Cargo.toml");
         println!("Root toml exists: {}", root_toml.exists());
@@ -603,7 +631,7 @@ test-api = { path = "../api" }
             let content = fs::read_to_string(&root_toml).unwrap();
             println!("Root toml content length: {}", content.len());
         }
-        
+
         let crates = discover_crates(&workspace);
         println!("Discovered {} crates", crates.len());
         for c in &crates {

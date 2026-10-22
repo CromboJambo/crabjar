@@ -14,6 +14,9 @@ pub mod rule_extraction;
 pub mod structural;
 pub mod workspace;
 
+#[cfg(test)]
+mod condition_integration_test;
+
 pub use workspace::{AnalysisBudget, CrateInfo, EvaluationResult, WorkspaceAnalysis};
 
 use crate::state_store::StateStore;

@@ -56,6 +56,9 @@ reqwest = { version = "0.12", features = ["json", "blocking"], default-features 
 crabjar-guard = { path = "../guard" }
 universal-structure = { path = "../universal-structure" }
 
+# Pesti semantic analyzers for code understanding
+pesti-structural-tokenizer = { path = "/home/crombo/projects/active/pesti/crates/pesti-structural-tokenizer" }
+
 # Authentication
 jsonwebtoken = "9.3"
 

@@ -8,9 +8,100 @@
 //! layer (universal-structure crate) for cross-language compatibility.
 
 use crate::decision::condition::evaluate_condition;
+use pesti_structural_tokenizer::semantic::{analyze_errors, analyze_mutability, analyze_ownership};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use universal_structure::{ErrorHandling, EvaluationTarget, Mutability, OwnershipMode, SpanKind};
+
+/// Run pesti semantic analyzers on source text and populate typed fields.
+fn annotate_target(source: &str, target: &mut EvaluationTarget) {
+    // Ownership analysis via pesti's analyzer (detects borrow patterns)
+    let ownership_anns = analyze_ownership(source);
+    for (_id, ann) in ownership_anns {
+        match ann.mode {
+            pesti_structural_tokenizer::semantic::OwnershipMode::Owned => {
+                if target.ownership_mode.is_none() {
+                    target.ownership_mode = Some(OwnershipMode::Owned);
+                }
+            }
+            pesti_structural_tokenizer::semantic::OwnershipMode::Borrowed
+            | pesti_structural_tokenizer::semantic::OwnershipMode::MutablyBorrowed => {
+                target.ownership_mode = Some(OwnershipMode::Borrowed);
+            }
+        }
+    }
+
+    // Box/Arc detection (type annotation patterns not covered by ownership analyzer)
+    if source.contains("Box<") || source.contains("Box::new(") {
+        target.ownership_mode = Some(OwnershipMode::Boxed);
+    }
+    if source.contains("std::rc::Rc")
+        || source.contains("Arc<")
+        || source.contains("std::sync::Arc")
+    {
+        target.ownership_mode = Some(OwnershipMode::RefCounted);
+    }
+
+    // &mut parameter detection for function signatures (borrowed mutable reference)
+    if source.contains(": &mut ") {
+        target.ownership_mode = Some(OwnershipMode::Borrowed);
+    } else if source.contains(": &") && target.ownership_mode.is_none() {
+        target.ownership_mode = Some(OwnershipMode::Borrowed);
+    }
+
+    // Error handling analysis via pesti's analyzer
+    let error_anns = analyze_errors(source);
+    for (_id, ann) in error_anns {
+        match ann.handling {
+            pesti_structural_tokenizer::semantic::ErrorHandling::Propagated => {
+                target.error_handling = Some(ErrorHandling::Propagated);
+            }
+            pesti_structural_tokenizer::semantic::ErrorHandling::Unwrapped
+            | pesti_structural_tokenizer::semantic::ErrorHandling::Expected => {
+                target.error_handling = Some(ErrorHandling::Panicked);
+            }
+            pesti_structural_tokenizer::semantic::ErrorHandling::Matched => {
+                target.error_handling = Some(ErrorHandling::Recovered);
+            }
+            pesti_structural_tokenizer::semantic::ErrorHandling::Ignored => {
+                target.error_handling = Some(ErrorHandling::Ignored);
+            }
+            _ => {}
+        }
+    }
+
+    // Return Err detection (not covered by pesti's error analyzer)
+    if source.contains("return Err") || source.contains("Err(") {
+        target.error_handling = Some(ErrorHandling::Propagated);
+    }
+
+    // Mutability analysis via pesti's analyzer
+    let mutability_anns = analyze_mutability(source);
+    for (_id, ann) in mutability_anns {
+        if ann.mutable {
+            target.mutability = Some(Mutability::Mutable);
+        } else if target.mutability.is_none() {
+            target.mutability = Some(Mutability::Immutable);
+        }
+    }
+
+    // &mut reference detection for function parameters (not covered by pesti)
+    if source.contains(": &mut ") && target.mutability.is_none() {
+        target.mutability = Some(Mutability::Mutable);
+    }
+
+    // Populate legacy string fields for backward compatibility
+    if let Some(eh) = &target.error_handling {
+        target
+            .semantic_tags
+            .insert("error_handling".to_string(), eh.as_str().to_string());
+    }
+    if let Some(mt) = &target.mutability {
+        target
+            .semantic_tags
+            .insert("mutability".to_string(), mt.as_str().to_string());
+    }
+}
 
 /// Build an EvaluationTarget from a code region, populating typed semantic fields
 /// by analyzing the source text for ownership, error handling, and mutability patterns.
@@ -32,42 +123,8 @@ pub fn build_target(
         ownership_mode: None,
     };
 
-    // Phase 2: Analyze source text for typed semantic fields
-
-    // Error handling patterns
-    if source.contains("unwrap()") {
-        target.error_handling = Some(ErrorHandling::Panicked);
-    } else if source.contains(".map_err(") || source.contains("with_context") {
-        target.error_handling = Some(ErrorHandling::Recovered);
-    } else if source.contains("return Err") || source.contains("?") {
-        target.error_handling = Some(ErrorHandling::Propagated);
-    }
-
-    // Ownership patterns (Rust-specific)
-    if source.contains("std::rc::Rc") || source.contains("Arc<") {
-        target.ownership_mode = Some(OwnershipMode::RefCounted);
-    } else if source.contains("Box<") {
-        target.ownership_mode = Some(OwnershipMode::Boxed);
-    }
-
-    // Mutability patterns
-    if source.contains("mut ") || source.contains(".push(") || source.contains(".insert(") {
-        target.mutability = Some(Mutability::Mutable);
-    } else {
-        target.mutability = Some(Mutability::Immutable);
-    }
-
-    // Also populate legacy string fields for backward compatibility
-    if let Some(eh) = &target.error_handling {
-        target
-            .semantic_tags
-            .insert("error_handling".to_string(), eh.as_str().to_string());
-    }
-    if let Some(mt) = &target.mutability {
-        target
-            .semantic_tags
-            .insert("mutability".to_string(), mt.as_str().to_string());
-    }
+    // Phase 2: Run pesti semantic analyzers on the source text
+    annotate_target(source, &mut target);
 
     target
 }

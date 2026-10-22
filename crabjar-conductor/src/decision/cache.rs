@@ -4,9 +4,9 @@
 //! API calls. Similar observations against the same criteria file are hashed
 //! and cached, providing significant latency improvements for recurring patterns.
 
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use sha2::{Digest, Sha256};
 
 use super::evaluate::DecisionResult;
 
@@ -92,10 +92,13 @@ impl DecisionCache {
             }
         }
 
-        self.entries.insert(key, CacheEntry {
-            result,
-            inserted_at: Instant::now(),
-        });
+        self.entries.insert(
+            key,
+            CacheEntry {
+                result,
+                inserted_at: Instant::now(),
+            },
+        );
     }
 
     /// Get cache hit rate as a percentage (0.0 - 100.0)

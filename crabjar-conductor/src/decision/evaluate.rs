@@ -279,7 +279,9 @@ pub async fn evaluate_structural_target(
 
     // Fall back to embedding-based JEV evaluation
     let observation = target.to_observation();
-    evaluator.evaluate(&observation, criteria_path, state_store).await
+    evaluator
+        .evaluate(&observation, criteria_path, state_store)
+        .await
 }
 
 /// Evaluate structural conditions directly against the target.

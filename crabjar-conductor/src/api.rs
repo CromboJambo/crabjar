@@ -837,7 +837,7 @@ async fn record_feedback_handler(
         Err(e) => Json(json!({
             "success": false,
             "error": e
-        }))
+        })),
     }
 }
 
@@ -886,7 +886,7 @@ async fn evaluate_structural_handler(
                     }
                 }
             }))
-        },
+        }
         Ok(Err(e)) => Json(json!({
             "success": false,
             "error": format!("Decision evaluation failed: {}", e)

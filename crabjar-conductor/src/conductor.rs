@@ -39,23 +39,41 @@ impl Conductor {
     /// Create a new conductor with an in-memory database (for testing).
     pub fn new(config: ConductorConfig) -> Result<Self> {
         let store = StateStore::open(":memory:")?;
-        Ok(Self { store, config, decision_gate: None, hybrid_layer: None })
+        Ok(Self {
+            store,
+            config,
+            decision_gate: None,
+            hybrid_layer: None,
+        })
     }
 
     /// Create a conductor with a specific database path.
     pub fn with_db(config: ConductorConfig, db_path: &str) -> Result<Self> {
         let store = StateStore::open(db_path)?;
-        Ok(Self { store, config, decision_gate: None, hybrid_layer: None })
+        Ok(Self {
+            store,
+            config,
+            decision_gate: None,
+            hybrid_layer: None,
+        })
     }
 
     /// Configure JEV decision gate for automated fleet decisions.
-    pub fn with_decision_gate(&mut self, backend_config: BackendConfig, policy: Option<DecisionPolicy>) {
+    pub fn with_decision_gate(
+        &mut self,
+        backend_config: BackendConfig,
+        policy: Option<DecisionPolicy>,
+    ) {
         let evaluator = crate::decision::evaluate::JevEvaluator::new(backend_config);
         self.decision_gate = Some(DecisionGate::new(evaluator, policy));
     }
 
     /// Configure hybrid attention + JEV decision layer.
-    pub fn with_hybrid_decision_layer(&mut self, backend_config: BackendConfig, policy: Option<crate::attention::HybridDecisionPolicy>) {
+    pub fn with_hybrid_decision_layer(
+        &mut self,
+        backend_config: BackendConfig,
+        policy: Option<crate::attention::HybridDecisionPolicy>,
+    ) {
         let evaluator = crate::decision::evaluate::JevEvaluator::new(backend_config.clone());
         let gate = DecisionGate::new(evaluator, None::<crate::decision::DecisionPolicy>);
 
@@ -68,7 +86,10 @@ impl Conductor {
                 Err(e) => {
                     warn!(error = %e, "Failed to configure hybrid decision layer, falling back to JEV-only");
                     let evaluator2 = crate::decision::evaluate::JevEvaluator::new(backend_config);
-                    self.decision_gate = Some(DecisionGate::new(evaluator2, None::<crate::decision::DecisionPolicy>));
+                    self.decision_gate = Some(DecisionGate::new(
+                        evaluator2,
+                        None::<crate::decision::DecisionPolicy>,
+                    ));
                 }
             }
         } else {
@@ -100,9 +121,7 @@ impl Conductor {
 
     /// Get JEV decision cache statistics (for monitoring and metrics).
     pub fn cache_stats(&self) -> Option<CacheStats> {
-        self.decision_gate
-            .as_ref()
-            .map(|gate| gate.cache_stats())
+        self.decision_gate.as_ref().map(|gate| gate.cache_stats())
     }
 
     /// Extract candidate rules from decision history.
@@ -111,7 +130,11 @@ impl Conductor {
         criteria_file: &str,
         min_occurrences: i64,
     ) -> anyhow::Result<Vec<crate::decision::rule_extraction::CandidateRule>> {
-        let rules = crate::decision::rule_extraction::extract_rules(&self.store, criteria_file, min_occurrences)?;
+        let rules = crate::decision::rule_extraction::extract_rules(
+            &self.store,
+            criteria_file,
+            min_occurrences,
+        )?;
         Ok(rules)
     }
 
@@ -141,19 +164,27 @@ impl Conductor {
     ) -> anyhow::Result<crate::decision::evaluate::DecisionResult> {
         // If hybrid layer is configured, use the two-stage pipeline
         if let Some(hybrid) = &self.hybrid_layer {
-            return hybrid.process_observation(
-                uuid::Uuid::new_v4().to_string().as_str(),
-                "conductor",
-                observation,
-                None,
-            ).await.map(|decision| {
-                // Extract JEV result if available, otherwise create a default
-                decision.jev_result.unwrap_or_else(|| crate::decision::evaluate::DecisionResult {
-                    option: "ignore".to_string(),
-                    rationale: format!("Filtered by attention layer (score: {:.0})", decision.attention_score),
-                    confidence: 0.95,
-                })
-            });
+            return hybrid
+                .process_observation(
+                    uuid::Uuid::new_v4().to_string().as_str(),
+                    "conductor",
+                    observation,
+                    None,
+                )
+                .await
+                .map(|decision| {
+                    // Extract JEV result if available, otherwise create a default
+                    decision.jev_result.unwrap_or_else(|| {
+                        crate::decision::evaluate::DecisionResult {
+                            option: "ignore".to_string(),
+                            rationale: format!(
+                                "Filtered by attention layer (score: {:.0})",
+                                decision.attention_score
+                            ),
+                            confidence: 0.95,
+                        }
+                    })
+                });
         }
 
         // Fall back to plain JEV evaluation
@@ -174,9 +205,12 @@ impl Conductor {
         // Pre-execution readiness check via JEV decision gate
         if let Some(gate) = &self.decision_gate {
             let fleet_state = self.get_fleet_state_summary();
-            match tokio::runtime::Handle::current().block_on(
-                gate.evaluate_pre_execution(&description, &fleet_state, None, Some(&self.store))
-            ) {
+            match tokio::runtime::Handle::current().block_on(gate.evaluate_pre_execution(
+                &description,
+                &fleet_state,
+                None,
+                Some(&self.store),
+            )) {
                 Ok(result) => {
                     info!(
                         goal_description = %description,

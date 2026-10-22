@@ -161,7 +161,12 @@ fn resolve_value(target: &EvaluationTarget, value: &str) -> String {
             .as_ref()
             .map(|mt| mt.as_str().to_string())
             .unwrap_or_else(|| resolve_semantic_tag(target, "mutability")),
-        // Ownership is stored in semantic_tags (language-specific)
+        "ownership_mode" => target
+            .ownership_mode
+            .as_ref()
+            .map(|om| om.as_str().to_string())
+            .unwrap_or_else(|| resolve_semantic_tag(target, "ownership_mode")),
+        // Legacy: ownership stored in semantic_tags (language-specific)
         _ => resolve_semantic_tag(target, value),
     }
 }
