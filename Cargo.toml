@@ -52,7 +52,7 @@ members = [
     # GPU-accelerated agent dashboard (proof-of-concept)
     "crates/crabjar-gpui",
     # SSH bastion host using russh (transparent proxy, no client app needed)
-    "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker",
+    "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker", "crabjar-durable-objects",
  "crabjar-analyze", "crabjar-review", "crabjar-mcp-tool-registry", "crabjar-skills",    "crabjar-tool-binding",    "crabjar-github-client",
     "crabjar-clawhub-client",
     "crabjar-skill-scanner",
@@ -272,5 +272,6 @@ clap_mangen = { workspace = true }
 tempfile.workspace = true
 crabjar-host-core = { path = "host/host-core" }
 crabjar-host-agent = { path = "host/host-agent" }
+universal-structure = { path = "universal-structure" }
 insta = { version = "1.43", features = ["json"] }
 
