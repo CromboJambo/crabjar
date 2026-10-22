@@ -5,8 +5,8 @@
   "version": "1.0.0",
   "options": [
     {
-      "id": "well-handled-function",
-      "label": "Well-Handled Function",
+      "id": "propagates-errors",
+      "label": "Propagates Errors (Good)",
       "conditions": "structure == FnDecl && error_handling == Propagated",
       "score": 95,
       "explanation": "Function properly propagates errors to caller using Result type."
@@ -19,7 +19,7 @@
       "explanation": "Function handles errors internally with fallback logic."
     },
     {
-      "id": "ignored-errors",
+      "id": "ignores-errors",
       "label": "Errors Ignored (Warning)",
       "conditions": "structure == FnDecl && error_handling == Ignored",
       "score": 40,

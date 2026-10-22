@@ -19,8 +19,8 @@
       "explanation": "Function takes ownership of parameter — caller cannot reuse value."
     },
     {
-      "id": "mutably-borrowed-parameter",
-      "label": "Mutably Borrowed Parameter (Warning)",
+      "id": "borrowed-mutable",
+      "label": "Borrowed Mutable Parameter (Warning)",
       "conditions": "structure == FnDecl && ownership_mode == Borrowed && mutability == Mutable",
       "score": 60,
       "explanation": "Function takes mutable reference — caller cannot use value during call."

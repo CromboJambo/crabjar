@@ -53,7 +53,7 @@ The budget system (max_tokens, min_node_bytes) designed for Rust analysis works 
 
 1. **Keep regex-based parsing for adapters:** Full parser libraries add complexity and dependencies without proportional benefit for structural analysis.
 2. **Use SymbolKind::Text for function detection in binaries:** This is the correct heuristic for ELF symbol tables.
-3. **Design comparison metrics at architectural level:** Avoid language-specific syntax in cross-language evaluation criteria.
+3. **Design comparison metrics at architectural level:** Avoid language-specific syntax in cross-language evaluation criteria.our 
 
 ## Future Work
 
