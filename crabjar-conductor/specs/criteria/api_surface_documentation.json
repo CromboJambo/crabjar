@@ -1,0 +1,28 @@
+{
+  "name": "api_surface_documentation",
+  "description": "Check that public API functions have proper documentation comments and are appropriately named.",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "documented-public-api",
+      "description": "Public function with documentation comment (doc tag present)",
+      "conditions": "structure == FnDecl && doc != null"
+    },
+    {
+      "id": "named-function",
+      "description": "Function has an explicit name (not anonymous closure)",
+      "conditions": "structure == FnDecl && name != null"
+    },
+    {
+      "id": "undocumented-public-api",
+      "description": "Public-facing function missing documentation comment",
+      "conditions": "structure == FnDecl && doc == null && name != null"
+    }
+  ],
+  "evaluation_factors": [
+    "Presence of doc comments",
+    "Function naming conventions",
+    "Public vs private visibility",
+    "Parameter documentation"
+  ]
+}

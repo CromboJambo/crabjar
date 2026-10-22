@@ -13,7 +13,10 @@ use std::time::SystemTime;
 
 fn get_db_path() -> String {
     let home = env::home_dir().unwrap_or_else(|| "/tmp".into());
-    home.join(".crabjar").join("jev_evidence.db").to_string_lossy().to_string()
+    home.join(".crabjar")
+        .join("jev_evidence.db")
+        .to_string_lossy()
+        .to_string()
 }
 
 /// Evaluate an observation against decision criteria with caching and learning loop.
@@ -523,7 +526,9 @@ fn parse_time_range(range: &str) -> Result<(i64, String), String> {
 }
 
 /// Handle promote-rule subcommand — promote high-confidence decisions to deterministic rules.
-pub fn handle_promote_rule(decision_id: Option<i64>) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+pub fn handle_promote_rule(
+    decision_id: Option<i64>,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     if decision_id.is_none() {
         return Ok(json!({
             "success": false,
@@ -575,7 +580,7 @@ pub fn handle_promote_rule(decision_id: Option<i64>) -> Result<serde_json::Value
                 "status": "promoted",
                 "note": "Rule promotion logged. In full implementation, this would create a deterministic rule file."
             }))
-        },
+        }
         None => Ok(json!({
             "success": false,
             "type": "decision_error",
@@ -586,7 +591,9 @@ pub fn handle_promote_rule(decision_id: Option<i64>) -> Result<serde_json::Value
 }
 
 /// Handle learnings subcommand — show learned invocation patterns by component.
-pub fn handle_learnings(component: Option<&str>) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+pub fn handle_learnings(
+    component: Option<&str>,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let db_path = get_db_path();
     let store = EvidenceStore::open(&db_path)?;
 
@@ -595,11 +602,13 @@ pub fn handle_learnings(component: Option<&str>) -> Result<serde_json::Value, Bo
         let method_stats = store.method_stats()?;
         let formatted: Vec<serde_json::Value> = method_stats
             .iter()
-            .map(|(method, count, avg_conf)| json!({
-                "component": method,
-                "decisions": count,
-                "avg_confidence": avg_conf
-            }))
+            .map(|(method, count, avg_conf)| {
+                json!({
+                    "component": method,
+                    "decisions": count,
+                    "avg_confidence": avg_conf
+                })
+            })
             .collect();
 
         return Ok(json!({
@@ -626,15 +635,17 @@ pub fn handle_learnings(component: Option<&str>) -> Result<serde_json::Value, Bo
 
     let formatted: Vec<serde_json::Value> = records
         .iter()
-        .map(|r| json!({
-            "id": r.id,
-            "observation_preview": r.observation_preview,
-            "decision_option": r.decision_option,
-            "confidence": r.confidence,
-            "method": r.method,
-            "computation_time_ms": r.computation_time_ms,
-            "outcome": r.outcome
-        }))
+        .map(|r| {
+            json!({
+                "id": r.id,
+                "observation_preview": r.observation_preview,
+                "decision_option": r.decision_option,
+                "confidence": r.confidence,
+                "method": r.method,
+                "computation_time_ms": r.computation_time_ms,
+                "outcome": r.outcome
+            })
+        })
         .collect();
 
     Ok(json!({

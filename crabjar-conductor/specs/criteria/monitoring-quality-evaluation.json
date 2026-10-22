@@ -1,0 +1,34 @@
+{
+  "name": "monitoring-quality-evaluation",
+  "description": "JEV criteria for evaluating optimal monitoring improvement actions based on configuration data, alert metrics, and historical improvement outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "reduce_alert_thresholds",
+      "description": "Reduce alert thresholds to catch issues earlier"
+    },
+    {
+      "id": "add_new_monitoring_rules",
+      "description": "Add new monitoring rules to improve coverage"
+    },
+    {
+      "id": "improve_alert_aggregation",
+      "description": "Improve alert aggregation to reduce noise and false positives"
+    },
+    {
+      "id": "optimize_monitoring_frequency",
+      "description": "Optimize monitoring frequency for better signal-to-noise ratio"
+    },
+    {
+      "id": "implement_intelligent_alerting",
+      "description": "Implement intelligent alerting with machine learning-based anomaly detection"
+    }
+  ],
+  "evaluation_factors": [
+    "Monitoring configuration completeness, alert noise level, and last incident recency",
+    "User feedback scores and satisfaction ratings for current monitoring quality",
+    "Historical success rates for each improvement action in similar monitoring scenarios",
+    "Time sensitivity and potential impact on users during monitoring improvement process",
+    "Risk of introducing new issues with more invasive monitoring approaches"
+  ]
+}

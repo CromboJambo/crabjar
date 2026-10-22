@@ -1,0 +1,29 @@
+{
+  "id": "api-surface-documentation",
+  "name": "API Surface Documentation",
+  "description": "Check that public API functions have proper documentation.",
+  "version": "1.0.0",
+  "options": [
+    {
+      "id": "documented-public-function",
+      "label": "Documented Public Function (Good)",
+      "conditions": "structure == FnDecl && documentation == Documented",
+      "score": 95,
+      "explanation": "Public function has proper documentation — good API hygiene."
+    },
+    {
+      "id": "undocumented-public-function",
+      "label": "Undocumented Public Function (Warning)",
+      "conditions": "structure == FnDecl && documentation != Documented",
+      "score": 30,
+      "explanation": "Public function lacks documentation — API users won't know how to use it."
+    },
+    {
+      "id": "not-a-function",
+      "label": "Not a Function Declaration",
+      "conditions": "structure != FnDecl",
+      "score": 100,
+      "explanation": "API documentation evaluation only applies to function declarations."
+    }
+  ]
+}

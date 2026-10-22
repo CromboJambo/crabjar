@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "name": "model-selection",
+  "description": "Route inference requests to optimal model based on task complexity and characteristics",
+  "options": [
+    {
+      "id": "small-q4",
+      "description": "Simple factual query, classification, sentiment analysis, or short text generation under 100 tokens. Fast response needed. model: Qwen2.5-0.5B-Instruct-Q4_K_M"
+    },
+    {
+      "id": "medium-q4",
+      "description": "Moderate complexity reasoning, code completion, summarization, or medium-length generation (100-500 tokens). Balance of quality and speed. model: Qwen2.5-7B-Instruct-Q4_K_M"
+    },
+    {
+      "id": "large-q4",
+      "description": "Complex multi-step reasoning, long-context analysis (>500 tokens), high-quality creative generation, or nuanced understanding required. Quality over speed. model: Qwen2.5-72B-Instruct-Q4_K_M"
+    }
+  ],
+  "threshold": 0.75,
+  "metadata": {
+    "created": "2026-10-17",
+    "owner": "crabjar-team",
+    "purpose": "pesti-runner model routing via JEV semantic matching"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "disaster-recovery-evaluation",
+  "description": "JEV criteria for evaluating optimal disaster recovery actions based on failure scenarios, system state, and historical recovery outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "restore_from_backup",
+      "description": "Restore system from most recent backup"
+    },
+    {
+      "id": "failover_to_replica",
+      "description": "Fail over to replicated standby system"
+    },
+    {
+      "id": "manual_repair",
+      "description": "Perform manual repair of affected components"
+    },
+    {
+      "id": "rollback_to_previous_version",
+      "description": "Roll back to previous known-good version"
+    },
+    {
+      "id": "redeploy_from_scratch",
+      "description": "Rebuild and redeploy system from scratch"
+    }
+  ],
+  "evaluation_factors": [
+    "Type and scope of failure scenario",
+    "Current system state including backup age and replication status",
+    "Historical success rates for each recovery action in similar situations",
+    "Time sensitivity and impact on users during recovery process",
+    "Data loss potential with different recovery approaches"
+  ]
+}

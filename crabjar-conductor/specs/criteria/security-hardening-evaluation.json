@@ -1,0 +1,34 @@
+{
+  "name": "security-hardening-evaluation",
+  "description": "JEV criteria for evaluating optimal security hardening actions based on vulnerability data, system posture, and historical remediation outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "apply_patch",
+      "description": "Apply the available patch to fix the vulnerability"
+    },
+    {
+      "id": "upgrade_component",
+      "description": "Upgrade the affected component to a newer version"
+    },
+    {
+      "id": "add_compensating_control",
+      "description": "Add compensating security controls (firewall rules, WAF, etc.)"
+    },
+    {
+      "id": "isolate_affected_system",
+      "description": "Temporarily isolate the affected system from network traffic"
+    },
+    {
+      "id": "accept_risk_temporarily",
+      "description": "Document and accept the risk, plan remediation for later"
+    }
+  ],
+  "evaluation_factors": [
+    "Vulnerability severity, exploit availability, and days since discovery",
+    "Current system posture including version, patch status, and affected dependencies",
+    "Historical success rates for each remediation action in similar situations",
+    "Time sensitivity and potential impact on users during remediation process",
+    "Risk of introducing new issues with more invasive remediation approaches"
+  ]
+}

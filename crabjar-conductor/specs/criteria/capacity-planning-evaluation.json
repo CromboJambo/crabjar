@@ -1,0 +1,34 @@
+{
+  "name": "capacity-planning-evaluation",
+  "description": "JEV criteria for evaluating optimal capacity adjustments based on resource usage trends and historical prediction accuracy",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "scale_up_instances",
+      "description": "Increase the number of running instances to handle growing demand"
+    },
+    {
+      "id": "upgrade_instance_type",
+      "description": "Change to larger instance types with more CPU and memory resources"
+    },
+    {
+      "id": "add_memory_only",
+      "description": "Increase memory allocation without changing CPU or instance count"
+    },
+    {
+      "id": "enable_auto_scaling",
+      "description": "Configure automatic scaling policies to dynamically adjust capacity based on real-time demand"
+    },
+    {
+      "id": "optimize_resource_allocation",
+      "description": "Rebalance resource allocation across services to improve overall utilization efficiency"
+    }
+  ],
+  "evaluation_factors": [
+    "Current and historical resource usage trends (CPU, memory, disk)",
+    "Growth rate patterns and seasonality indicators",
+    "Historical accuracy of capacity predictions for similar situations",
+    "Risk of over-provisioning vs under-provisioning resources",
+    "Cost implications of different capacity adjustment strategies"
+  ]
+}

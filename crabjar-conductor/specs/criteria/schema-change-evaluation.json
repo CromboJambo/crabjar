@@ -1,0 +1,38 @@
+{
+  "name": "schema-change-evaluation",
+  "description": "JEV criteria for evaluating proposed schema changes and their cross-service efficiency impact",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "approve-low-risk",
+      "description": "Approve: low-risk change with clear efficiency benefit (e.g., adding index, nullable column)",
+      "efficiency_impact": "positive",
+      "risk_level": "low"
+    },
+    {
+      "id": "approve-medium-risk",
+      "description": "Approve: moderate-risk change requiring coordinated migration across services",
+      "efficiency_impact": "positive",
+      "risk_level": "medium"
+    },
+    {
+      "id": "reject-high-risk",
+      "description": "Reject: high-risk change with potential for significant compatibility breakage or performance regression",
+      "efficiency_impact": "negative",
+      "risk_level": "high"
+    },
+    {
+      "id": "defer-more-data",
+      "description": "Defer: insufficient data to predict impact; recommend A/B testing or gradual rollout",
+      "efficiency_impact": "unknown",
+      "risk_level": "unknown"
+    }
+  ],
+  "evaluation_factors": [
+    "Historical schema change outcomes for similar patterns",
+    "Cross-service dependency analysis",
+    "Serialization overhead impact",
+    "Query performance implications",
+    "Migration complexity and rollback feasibility"
+  ]
+}

@@ -178,6 +178,24 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: SessionCommand,
     },
+
+    /// Fleet orchestration via crabjar-conductor
+    Fleet {
+        #[command(subcommand)]
+        command: FleetCommand,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum FleetCommand {
+    /// Submit kanban task as goal to conductor
+    SubmitKanbanTask {
+        task_id: String,
+        #[arg(long, default_value = "http://localhost:8080")]
+        conductor_url: String,
+        #[arg(long, default_value = "")]
+        token: String,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]

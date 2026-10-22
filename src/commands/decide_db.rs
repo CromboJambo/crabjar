@@ -237,7 +237,10 @@ impl EvidenceStore {
     }
 
     /// Get decisions that could be promoted to rules (high confidence, repeated patterns).
-    pub fn promotion_candidates(&self, limit: usize) -> Result<Vec<DecisionRecord>, Box<dyn std::error::Error>> {
+    pub fn promotion_candidates(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<DecisionRecord>, Box<dyn std::error::Error>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, observation_preview, observation_hash, decision_option, confidence,
                     method, components_invoked, computation_time_ms, outcome, created_at

@@ -15,6 +15,7 @@ categories.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
 object = "0.36"
+pesti-structural-tokenizer = { path = "/home/crombo/projects/active/pesti/crates/pesti-structural-tokenizer" }
 
 [lints]
 workspace = true

@@ -1,0 +1,30 @@
+{
+  "name": "upgrade-impact-evaluation",
+  "description": "JEV criteria for evaluating service upgrade impact on dependent services and overall fleet stability",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "approve-low-risk",
+      "description": "Upgrade has minimal expected impact on dependent services based on historical compatibility data"
+    },
+    {
+      "id": "approve-medium-risk",
+      "description": "Upgrade has moderate expected impact but manageable with careful sequencing and monitoring"
+    },
+    {
+      "id": "reject-high-risk",
+      "description": "Upgrade has high expected impact on dependent services or historical data shows frequent compatibility issues"
+    },
+    {
+      "id": "defer-more-data",
+      "description": "Insufficient historical data to accurately assess upgrade risk; recommend additional testing or gradual rollout"
+    }
+  ],
+  "evaluation_factors": [
+    "Historical compatibility between service versions",
+    "Frequency of compatibility issues in similar upgrades",
+    "Impact on dependent services' functionality",
+    "Availability of rollback mechanisms",
+    "Testing coverage for version combinations"
+  ]
+}

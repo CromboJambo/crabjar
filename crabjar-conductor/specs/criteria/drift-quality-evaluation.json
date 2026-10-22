@@ -1,0 +1,34 @@
+{
+  "name": "drift-quality-evaluation",
+  "description": "JEV criteria for evaluating optimal configuration drift remediation actions based on system state, impact, and historical outcomes",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "revert_to_baseline",
+      "description": "Revert the system to its last known good baseline configuration"
+    },
+    {
+      "id": "update_expected_baseline",
+      "description": "Update the expected baseline to match the current configuration"
+    },
+    {
+      "id": "manual_review",
+      "description": "Flag for manual review before taking automated action"
+    },
+    {
+      "id": "auto_remediate_with_validation",
+      "description": "Automatically remediate and validate system behavior before committing"
+    },
+    {
+      "id": "incremental_rollback",
+      "description": "Roll back changes incrementally to isolate the problematic modification"
+    }
+  ],
+  "evaluation_factors": [
+    "Drift severity, impact on services, and last incident recency",
+    "User feedback scores and satisfaction ratings for current configuration state",
+    "Historical success rates for each remediation action in similar drift scenarios",
+    "Time sensitivity and potential impact on users during remediation process",
+    "Risk of introducing new issues with more invasive drift approaches"
+  ]
+}
