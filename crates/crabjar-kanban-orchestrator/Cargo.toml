@@ -1,0 +1,45 @@
+[package]
+name = "crabjar-kanban-orchestrator"
+version = "0.1.0"
+edition = "2024"
+description = "Maps orchestrator inputs to hermes agent kanban operations"
+
+[[bin]]
+name = "crabjar-kanban-orc"
+path = "src/main.rs"
+
+[dependencies]
+# Crabjar workspace crates
+crabjar-guard = { path = "../../guard" }
+crabjar-tool-registry = { path = "../../tool_registry" }
+agent-context = { path = "../../memory" }
+
+# HTTP server
+axum = { workspace = true, features = ["ws"] }
+tokio = { workspace = true, features = ["full"] }
+tower-http = { workspace = true, features = ["cors"] }
+
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Database
+rusqlite = { workspace = true, features = ["bundled"] }
+
+# Async utilities
+futures-util = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+fastrand = "2.3"
+
+[dev-dependencies]
+tempfile = "3.14"
