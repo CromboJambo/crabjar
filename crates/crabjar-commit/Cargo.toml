@@ -1,0 +1,11 @@
+[package]
+name = "crabjar-commit"
+version = "0.1.0"
+edition = "2024"
+description = "Crabjar commit message generation from git diffs"
+
+[dependencies]
+crabjar-git = { path = "../crabjar-git" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
