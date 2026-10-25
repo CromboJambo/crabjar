@@ -41,13 +41,26 @@ Key subsystems:
 - **`guard/`**: Execution gate, trust layers, scope isolation. The canonical example of the module-splitting convention.
 - **`memory/`**: Agent-context SQLite storage + state-docs querier (`memory/src/state_docs/`).
 - **`host/`**: 8 host crates (core, system, observe, agent, webview, mqtt, graph, screen).
-- **`orchestrator/`**: Axum SSE server + unified inference backend (LM Studio, MistralRs).
+- **`orchestrator/`**: Axum SSE server + unified inference backend (unsloth + llama-servers). Agents connect to persistent llama-servers on fleet machines; unsloth provides UI/capabilities on jambo. Model eviction/replacement supported — agents can swap loaded models based on bandwidth/context needs.
 - **`zed-acp-bridge/`** + **`zed-acp-server/`**: Zed Agent Protocol bridge (Wasm + stdio).
 - **`crabjar-architecture/`**: Mechanical dependency boundary enforcement (8-layer model).
 - **`apps/teams/`**: Teams plugin (reference application).
 - **`src/skill-*`**: Skill crates (script-runner, reference-store).
 
 For crate-level details, use `ls` on the crate directory or read its `AGENTS.md`.
+
+## Development Prioritization
+
+Progress vs theater filter for crabjar development:
+
+**The North Star:** Does this move crabjar closer to being a drop-in replacement for Hermes Agent? If yes → progress. If no → theater (unless it unblocks something that does).
+
+**For any tool/lib/MCP/API/feature asking for attention:**
+1. Does crabjar currently fail because it lacks this? If yes → progress. If no → theater.
+2. Does this make a specific existing crabjar feature work better/faster/smaller? If yes → measure it. If no → theater.
+3. Is someone actually waiting on crabjar to do X that only this enables? If yes → progress. If no → theater.
+
+**The filter isn't philosophical — it's:** What specific crabjar capability is blocked without this? If you can't name it, it's theater.
 
 ## The Glass (Abstraction Boundary)
 

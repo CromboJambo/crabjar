@@ -16,7 +16,9 @@ fn test_checkpoint_store_open_and_create() {
 
     // Create a checkpoint
     let payload = json!({"step": 42, "data": vec![1, 2, 3]});
-    let id = store.create_checkpoint("task-1", payload.clone(), None).unwrap();
+    let id = store
+        .create_checkpoint("task-1", payload.clone(), None)
+        .unwrap();
 
     assert!(!id.is_empty());
 
@@ -34,9 +36,13 @@ fn test_latest_checkpoint() {
     let store = CheckpointStore::open(&db_path).unwrap();
 
     // Create multiple checkpoints for same task
-    store.create_checkpoint("task-1", json!({"step": 1}), None).unwrap();
+    store
+        .create_checkpoint("task-1", json!({"step": 1}), None)
+        .unwrap();
     std::thread::sleep(Duration::from_millis(10));
-    store.create_checkpoint("task-1", json!({"step": 2}), None).unwrap();
+    store
+        .create_checkpoint("task-1", json!({"step": 2}), None)
+        .unwrap();
 
     // Get latest
     let latest = store.get_latest_checkpoint("task-1").unwrap().unwrap();
@@ -51,10 +57,16 @@ fn test_list_checkpoints() {
     let store = CheckpointStore::open(&db_path).unwrap();
 
     // Create checkpoints for different tasks
-    store.create_checkpoint("task-1", json!({"step": 1}), None).unwrap();
-    store.create_checkpoint("task-2", json!({"step": 1}), None).unwrap();
+    store
+        .create_checkpoint("task-1", json!({"step": 1}), None)
+        .unwrap();
+    store
+        .create_checkpoint("task-2", json!({"step": 1}), None)
+        .unwrap();
     std::thread::sleep(Duration::from_millis(10));
-    store.create_checkpoint("task-1", json!({"step": 2}), None).unwrap();
+    store
+        .create_checkpoint("task-1", json!({"step": 2}), None)
+        .unwrap();
 
     // List checkpoints for task-1
     let checkpoints = store.list_checkpoints("task-1").unwrap();

@@ -1,24 +1,25 @@
 //! SQLite-backed checkpoint metadata store.
 
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use uuid::Uuid;
 
 use crate::config::CheckpointConfig;
 use crate::error::{CheckpointError, CheckpointResult};
 
 /// Metadata for a single checkpoint.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct CheckpointMeta {
     pub id: String,
     pub task_id: String,
+    #[serde(with = "chrono::serde::ts_seconds")]
     pub created_at: DateTime<Utc>,
     pub size_bytes: i64,
     pub status: CheckpointStatus,
 }
 
 /// Status of a checkpoint.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum CheckpointStatus {
     Active,
     Pruned,
@@ -55,7 +56,8 @@ impl CheckpointStore {
         let db = Connection::open(&path)?;
 
         // Initialize schema
-        db.execute_batch("CREATE TABLE IF NOT EXISTS checkpoints (
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS checkpoints (
             id TEXT PRIMARY KEY,
             task_id TEXT NOT NULL,
             created_at TEXT NOT NULL,
@@ -63,14 +65,49 @@ impl CheckpointStore {
             status TEXT NOT NULL DEFAULT 'active',
             payload_path TEXT,
             error_message TEXT
-        );")?;
+        );",
+        )?;
 
-        db.execute_batch("CREATE INDEX IF NOT EXISTS idx_checkpoints_task ON checkpoints(task_id);")?;
-        db.execute_batch("CREATE INDEX IF NOT EXISTS idx_checkpoints_status ON checkpoints(status);")?;
+        db.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_task ON checkpoints(task_id);",
+        )?;
+        db.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_status ON checkpoints(status);",
+        )?;
 
         Ok(Self {
             db,
             config: CheckpointConfig::new(path.as_ref().to_string_lossy()),
+        })
+    }
+
+    /// Create a checkpoint store with custom configuration
+    pub fn new(config: &CheckpointConfig) -> CheckpointResult<Self> {
+        let db = Connection::open(&config.db_path)?;
+
+        // Initialize schema
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS checkpoints (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'active',
+            payload_path TEXT,
+            error_message TEXT
+        );",
+        )?;
+
+        db.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_task ON checkpoints(task_id);",
+        )?;
+        db.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_checkpoints_status ON checkpoints(status);",
+        )?;
+
+        Ok(Self {
+            db,
+            config: config.clone(),
         })
     }
 
@@ -98,7 +135,9 @@ impl CheckpointStore {
 
     /// Get checkpoint metadata by ID.
     pub fn get_checkpoint(&self, id: &str) -> CheckpointResult<Option<CheckpointMeta>> {
-        let mut stmt = self.db.prepare("SELECT id, task_id, created_at, size_bytes, status FROM checkpoints WHERE id = ?")?;
+        let mut stmt = self.db.prepare(
+            "SELECT id, task_id, created_at, size_bytes, status FROM checkpoints WHERE id = ?",
+        )?;
         let mut rows = stmt.query(params![id])?;
 
         loop {
@@ -182,7 +221,10 @@ impl CheckpointStore {
         let checkpoints = self.list_checkpoints(task_id)?;
         let mut pruned = 0;
 
-        for cp in checkpoints.iter().skip(self.config.retention_count as usize) {
+        for cp in checkpoints
+            .iter()
+            .skip(self.config.retention_count as usize)
+        {
             self.db.execute(
                 "UPDATE checkpoints SET status = 'pruned' WHERE id = ?",
                 params![cp.id],

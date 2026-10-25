@@ -100,10 +100,10 @@ impl LanguageAdapter for LeanAdapter {
                 });
             }
 
-            // Detect inductive types
+            // Detect inductive types (map to ClassDecl per universal schema)
             if trimmed.starts_with("inductive ") {
                 spans.push(Span {
-                    kind: SpanKind::EnumDecl,
+                    kind: SpanKind::ClassDecl,
                     open_token: Some(line.to_string()),
                     body: Vec::new(),
                     close_token: None,
@@ -114,7 +114,7 @@ impl LanguageAdapter for LeanAdapter {
             // Detect import statements
             if trimmed.starts_with("import ") {
                 spans.push(Span {
-                    kind: SpanKind::ImportStmt,
+                    kind: SpanKind::ImportStatement,
                     open_token: Some(line.to_string()),
                     body: Vec::new(),
                     close_token: None,
@@ -148,7 +148,9 @@ mod tests {
     #[test]
     fn test_tokenize_theorem_declaration() {
         let adapter = LeanAdapter::new();
-        let tree = adapter.tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl\nend proof");
+        let tree = adapter.tokenize_and_adapt(
+            "theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl\nend proof",
+        );
 
         // Should identify a theorem declaration
         let has_fn_decl = tree.spans.iter().any(|s| s.kind == SpanKind::FnDecl);
@@ -158,7 +160,9 @@ mod tests {
     #[test]
     fn test_tokenize_definition() {
         let adapter = LeanAdapter::new();
-        let tree = adapter.tokenize_and_adapt("def factorial (n : Nat) : Nat :=\nif n = 0 then 1 else n * factorial (n - 1)");
+        let tree = adapter.tokenize_and_adapt(
+            "def factorial (n : Nat) : Nat :=\nif n = 0 then 1 else n * factorial (n - 1)",
+        );
 
         // Should identify a definition
         let has_let_stmt = tree.spans.iter().any(|s| s.kind == SpanKind::LetStmt);
@@ -188,33 +192,50 @@ mod tests {
     #[test]
     fn test_detect_theorems() {
         let adapter = LeanAdapter::new();
-        let tree = adapter.tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
+        let tree = adapter
+            .tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
 
-        assert_eq!(tree.semantic_tags.get("has_theorems"), Some(&"true".to_string()));
+        assert_eq!(
+            tree.semantic_tags.get("has_theorems"),
+            Some(&"true".to_string())
+        );
     }
 
     #[test]
     fn test_detect_proofs() {
         let adapter = LeanAdapter::new();
-        let tree = adapter.tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
+        let tree = adapter
+            .tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
 
-        assert_eq!(tree.semantic_tags.get("has_proofs"), Some(&"true".to_string()));
+        assert_eq!(
+            tree.semantic_tags.get("has_proofs"),
+            Some(&"true".to_string())
+        );
     }
 
     #[test]
     fn test_detect_tactics() {
         let adapter = LeanAdapter::new();
-        let tree = adapter.tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
+        let tree = adapter
+            .tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
 
-        assert_eq!(tree.semantic_tags.get("uses_tactics"), Some(&"true".to_string()));
+        assert_eq!(
+            tree.semantic_tags.get("uses_tactics"),
+            Some(&"true".to_string())
+        );
     }
 
     #[test]
     fn test_detect_type_annotations() {
         let adapter = LeanAdapter::new();
-        let tree = adapter.tokenize_and_adapt("def factorial (n : Nat) : Nat :=\nif n = 0 then 1 else n * factorial (n - 1)");
+        let tree = adapter.tokenize_and_adapt(
+            "def factorial (n : Nat) : Nat :=\nif n = 0 then 1 else n * factorial (n - 1)",
+        );
 
-        assert_eq!(tree.semantic_tags.get("has_type_annotations"), Some(&"true".to_string()));
+        assert_eq!(
+            tree.semantic_tags.get("has_type_annotations"),
+            Some(&"true".to_string())
+        );
     }
 
     #[test]
@@ -223,8 +244,11 @@ mod tests {
         let lean_adapter = LeanAdapter::new();
         let rust_adapter = crate::adapters::rust::RustAdapter::new();
 
-        let lean_tree = lean_adapter.tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
-        let rust_tree = rust_adapter.tokenize_and_adapt("fn process_data(input: &[u8]) -> Result<String, Error> { Ok(String::new()) }");
+        let lean_tree = lean_adapter
+            .tokenize_and_adapt("theorem add_zero (n : Nat) : n + 0 = n :=\nproof\nexact rfl");
+        let rust_tree = rust_adapter.tokenize_and_adapt(
+            "fn process_data(input: &[u8]) -> Result<String, Error> { Ok(String::new()) }",
+        );
 
         // Both should identify a function/theorem declaration
         let lean_has_fn = lean_tree.spans.iter().any(|s| s.kind == SpanKind::FnDecl);

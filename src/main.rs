@@ -15,7 +15,7 @@ mod tool_registry_cli;
 use bitwarden::commands::handle_bitwarden_command;
 mod commands;
 use crabjar_lib::{
-    AttemptsCommand, BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
+    ApprovalCommand, AttemptsCommand, BackendCommand, BitwardenCommand, DoctorCommand, DotfileCommand, GuardCommand,
     HabitatCommand, KnowledgeCommand, McpCommand, MetricsCommand, SlowFriendCommand, ToolCommand,
 };
 use crabjar_slow_friend::action::ActionClass;
@@ -277,6 +277,11 @@ async fn main() {
                 token,
             } => handle_fleet_submit_kanban_task(&task_id, &conductor_url, &token).await,
         },
+        Some(CliCommand::Checkpoint { command }) => {
+            commands::checkpoint::handle_checkpoint_command(command)
+                .unwrap_or_else(|err| error_response(&err.to_string(), true))
+        }
+        Some(CliCommand::Approval { command }) => commands::approval::handle_approval_command(command),
         None => {
             print_json(&error_response("missing command", true));
             std::process::exit(1);
@@ -831,24 +836,22 @@ async fn handle_fleet_submit_kanban_task(
 
     match task {
         None => {
-            return error_response(
-                &format!("kanban task '{}' not found", task_id),
-                true,
-            );
+            return error_response(&format!("kanban task '{}' not found", task_id), true);
         }
         Some(task) => {
             // Build goal description from task details
-            let status_info = format!(
-                "status: {}, priority: {}",
-                task.status, task.priority
-            );
+            let status_info = format!("status: {}, priority: {}", task.status, task.priority);
 
             let assignee_info = match &task.assignee {
                 Some(a) if !a.is_empty() => format!("assignee: {}", a),
                 _ => String::new(),
             };
 
-            let suffix = if assignee_info.is_empty() { "" } else { &format!(" {}", assignee_info) };
+            let suffix = if assignee_info.is_empty() {
+                ""
+            } else {
+                &format!(" {}", assignee_info)
+            };
             let goal_description = format!(
                 "Hermes kanban task '{}' ({}){}",
                 task.title, status_info, suffix
@@ -897,9 +900,15 @@ async fn submit_goal_to_conductor(
         request = request.header("Authorization", format!("Bearer {}", token));
     }
 
-    let response = request.send().await.map_err(|e| format!("HTTP request failed: {}", e))?;
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
     let status = response.status();
-    let body_text = response.text().await.map_err(|e| format!("failed to read response: {}", e))?;
+    let body_text = response
+        .text()
+        .await
+        .map_err(|e| format!("failed to read response: {}", e))?;
 
     if !status.is_success() {
         return Err(format!(

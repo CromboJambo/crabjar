@@ -1,0 +1,15 @@
+[package]
+name = "crabjar-commit-cli"
+version = "0.1.0"
+edition = "2024"
+description = "Crabjar commit message generation CLI tool"
+
+[[bin]]
+name = "crabjar-commit"
+path = "src/main.rs"
+
+[dependencies]
+crabjar-git = { path = "../crabjar-git" }
+crabjar-commit = { path = "../crabjar-commit" }
+clap = { workspace = true }
+serde_json = { workspace = true }

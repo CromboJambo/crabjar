@@ -51,12 +51,21 @@ members = [
     "crabjar-plugin", "slow-friend",
     # GPU-accelerated agent dashboard (proof-of-concept)
     "crates/crabjar-gpui",
+    # Git operations for crabjar IDE (diff, status, add, commit via libgit2)
+    "crates/crabjar-git",
+    # Commit message generation from git diffs
+    "crates/crabjar-commit",
+    # CLI tool for commit message generation and staging
+    "crates/crabjar-commit-cli",
+    # Kanban orchestrator — maps inputs to hermes agent kanban operations
+    "crates/crabjar-kanban-orchestrator",
     # SSH bastion host using russh (transparent proxy, no client app needed)
     "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker", "crabjar-durable-objects",
  "crabjar-analyze", "crabjar-review", "crabjar-mcp-tool-registry", "crabjar-skills",    "crabjar-tool-binding",    "crabjar-github-client",
     "crabjar-clawhub-client",
     "crabjar-skill-scanner",
-    "crabjar-trust-manager", "universal-structure",
+    "crabjar-trust-manager",    "universal-structure",
+    "crates/email-smtp",
 ]
 
 resolver = "2"
@@ -244,6 +253,7 @@ crabjar-github-client = { path = "crabjar-github-client" }
 crabjar-clawhub-client = { path = "crabjar-clawhub-client" }
 crabjar-skill-scanner = { path = "crabjar-skill-scanner" }
 crabjar-trust-manager = { path = "crabjar-trust-manager" }
+crabjar-durable-objects = { path = "crabjar-durable-objects" }
 dirs.workspace = true
 
 # Database

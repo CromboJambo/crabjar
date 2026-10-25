@@ -96,7 +96,11 @@ impl CppAdapter {
                 }
 
                 // Number literals
-                if ch.is_ascii_digit() || (ch == '.' && chars.peek().is_some() && chars.peek().unwrap().is_ascii_digit()) {
+                if ch.is_ascii_digit()
+                    || (ch == '.'
+                        && chars.peek().is_some()
+                        && chars.peek().unwrap().is_ascii_digit())
+                {
                     let mut num = String::new();
                     num.push(ch);
                     while let Some(&c) = chars.peek() {
@@ -124,19 +128,99 @@ impl CppAdapter {
 
                     // Check if it's a keyword (C++ keywords include C keywords plus more)
                     let keywords = [
-                        "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor",
-                        "bool", "break", "case", "catch", "char", "char8_t", "char16_t", "char32_t",
-                        "class", "compl", "concept", "const", "consteval", "constexpr", "constinit",
-                        "const_cast", "continue", "co_await", "co_return", "co_yield", "decltype",
-                        "default", "delete", "do", "double", "dynamic_cast", "else", "enum",
-                        "explicit", "export", "extern", "false", "float", "for", "friend",
-                        "goto", "if", "import", "inline", "int", "long", "module", "mutable",
-                        "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator",
-                        "or", "or_eq", "private", "protected", "public", "register", "reinterpret_cast",
-                        "requires", "return", "short", "signed", "sizeof", "static", "static_assert",
-                        "static_cast", "struct", "switch", "template", "this", "thread_local",
-                        "throw", "true", "try", "typedef", "typeid", "typename", "union", "unsigned",
-                        "using", "virtual", "void", "volatile", "while", "xor", "xor_eq",
+                        "alignas",
+                        "alignof",
+                        "and",
+                        "and_eq",
+                        "asm",
+                        "auto",
+                        "bitand",
+                        "bitor",
+                        "bool",
+                        "break",
+                        "case",
+                        "catch",
+                        "char",
+                        "char8_t",
+                        "char16_t",
+                        "char32_t",
+                        "class",
+                        "compl",
+                        "concept",
+                        "const",
+                        "consteval",
+                        "constexpr",
+                        "constinit",
+                        "const_cast",
+                        "continue",
+                        "co_await",
+                        "co_return",
+                        "co_yield",
+                        "decltype",
+                        "default",
+                        "delete",
+                        "do",
+                        "double",
+                        "dynamic_cast",
+                        "else",
+                        "enum",
+                        "explicit",
+                        "export",
+                        "extern",
+                        "false",
+                        "float",
+                        "for",
+                        "friend",
+                        "goto",
+                        "if",
+                        "import",
+                        "inline",
+                        "int",
+                        "long",
+                        "module",
+                        "mutable",
+                        "namespace",
+                        "new",
+                        "noexcept",
+                        "not",
+                        "not_eq",
+                        "nullptr",
+                        "operator",
+                        "or",
+                        "or_eq",
+                        "private",
+                        "protected",
+                        "public",
+                        "register",
+                        "reinterpret_cast",
+                        "requires",
+                        "return",
+                        "short",
+                        "signed",
+                        "sizeof",
+                        "static",
+                        "static_assert",
+                        "static_cast",
+                        "struct",
+                        "switch",
+                        "template",
+                        "this",
+                        "thread_local",
+                        "throw",
+                        "true",
+                        "try",
+                        "typedef",
+                        "typeid",
+                        "typename",
+                        "union",
+                        "unsigned",
+                        "using",
+                        "virtual",
+                        "void",
+                        "volatile",
+                        "while",
+                        "xor",
+                        "xor_eq",
                     ];
 
                     if keywords.contains(&word.as_str()) {
@@ -393,10 +477,11 @@ impl LanguageAdapter for CppAdapter {
                     if let CppTok::Punctuation(p) = &tokens[i + 1] {
                         if p == "(" {
                             // Look back for return type (identifier or keyword)
-                            let has_return_type = i > 0 && matches!(
-                                &tokens[i - 1],
-                                CppTok::Keyword(_) | CppTok::Identifier(_)
-                            );
+                            let has_return_type = i > 0
+                                && matches!(
+                                    &tokens[i - 1],
+                                    CppTok::Keyword(_) | CppTok::Identifier(_)
+                                );
 
                             if has_return_type {
                                 spans.push(Span {
@@ -481,7 +566,10 @@ mod tests {
         let adapter = CppAdapter::new();
         let tree = adapter.tokenize_and_adapt("#include <vector>");
 
-        let has_import = tree.spans.iter().any(|s| s.kind == SpanKind::ImportStatement);
+        let has_import = tree
+            .spans
+            .iter()
+            .any(|s| s.kind == SpanKind::ImportStatement);
         assert!(has_import);
     }
 

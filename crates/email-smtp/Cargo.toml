@@ -1,0 +1,24 @@
+[package]
+name = "crabjar-email-smtp"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+description = "SMTP email sending with XOAUTH2 authentication for crabjar"
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+base64 = { workspace = true }
+crabjar-host-core = { path = "../../host/host-core" }
+
+# SMTP transport
+lettre = { version = "0.11", features = ["tokio1-native-tls", "smtp-transport"] }
+
+[lints]
+workspace = true

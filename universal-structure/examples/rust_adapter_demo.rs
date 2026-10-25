@@ -1,4 +1,4 @@
-use universal_structure::{compare_trees, JavaScriptAdapter, LanguageAdapter, RustAdapter};
+use universal_structure::{JavaScriptAdapter, LanguageAdapter, RustAdapter, compare_trees};
 
 fn main() {
     // Test Rust adapter with real-world-like code

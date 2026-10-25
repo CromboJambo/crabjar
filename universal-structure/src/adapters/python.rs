@@ -73,7 +73,9 @@ impl PythonAdapter {
                         if c == quote {
                             if is_triple {
                                 // Check for closing triple quote
-                                if chars.peek() == Some(&quote) && chars.clone().nth(1) == Some(quote) {
+                                if chars.peek() == Some(&quote)
+                                    && chars.clone().nth(1) == Some(quote)
+                                {
                                     chars.next();
                                     chars.next();
                                     break;
@@ -118,11 +120,11 @@ impl PythonAdapter {
 
                     // Check if it's a keyword
                     let keywords = [
-                        "def", "class", "import", "from", "as", "if", "elif", "else",
-                        "for", "while", "return", "try", "except", "finally", "raise",
-                        "with", "yield", "async", "await", "pass", "break", "continue",
-                        "in", "not", "and", "or", "is", "lambda", "global", "nonlocal",
-                        "del", "assert", "True", "False", "None",
+                        "def", "class", "import", "from", "as", "if", "elif", "else", "for",
+                        "while", "return", "try", "except", "finally", "raise", "with", "yield",
+                        "async", "await", "pass", "break", "continue", "in", "not", "and", "or",
+                        "is", "lambda", "global", "nonlocal", "del", "assert", "True", "False",
+                        "None",
                     ];
 
                     if keywords.contains(&word.as_str()) {
@@ -231,7 +233,11 @@ impl LanguageAdapter for PythonAdapter {
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("{} def {}", if is_async { "async" } else { "" }, name),
+                                source: format!(
+                                    "{} def {}",
+                                    if is_async { "async" } else { "" },
+                                    name
+                                ),
                             });
                         }
                     }
@@ -373,7 +379,10 @@ mod tests {
         let adapter = PythonAdapter::new();
         let tree = adapter.tokenize_and_adapt("import os");
 
-        let has_import = tree.spans.iter().any(|s| s.kind == SpanKind::ImportStatement);
+        let has_import = tree
+            .spans
+            .iter()
+            .any(|s| s.kind == SpanKind::ImportStatement);
         assert!(has_import);
     }
 

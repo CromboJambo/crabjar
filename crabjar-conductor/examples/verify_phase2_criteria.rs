@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 // Import from conductor decision module (same crate)
 use crabjar_conductor::decision::condition::evaluate_condition;
-use crabjar_conductor::decision::structural::{build_target, SpanKind};
+use crabjar_conductor::decision::structural::{SpanKind, build_target};
 
 fn test_error_handling_criteria() {
     println!("=== error_handling_adequacy.json ===");
@@ -19,7 +19,10 @@ fn test_error_handling_criteria() {
         Some("foo"),
     );
 
-    assert!(evaluate_condition(&target, "structure == FnDecl && error_handling == Propagated"));
+    assert!(evaluate_condition(
+        &target,
+        "structure == FnDecl && error_handling == Propagated"
+    ));
     println!("✓ Propagated error handling detected");
 
     // Target with panicked error handling (unwrap)
@@ -30,7 +33,10 @@ fn test_error_handling_criteria() {
         Some("bar"),
     );
 
-    assert!(evaluate_condition(&target2, "structure == FnDecl && error_handling == Panicked"));
+    assert!(evaluate_condition(
+        &target2,
+        "structure == FnDecl && error_handling == Panicked"
+    ));
     println!("✓ Panicked error handling detected (unwrap)");
 }
 
@@ -69,24 +75,30 @@ fn test_api_doc_criteria() {
     println!("\n=== api_surface_documentation.json ===");
 
     // Function with name (should match "named-function")
-    let mut target = build_target(
-        SpanKind::FnDecl,
-        [0, 50],
-        "fn foo() {}",
-        Some("foo"),
-    );
+    let mut target = build_target(SpanKind::FnDecl, [0, 50], "fn foo() {}", Some("foo"));
 
-    assert!(evaluate_condition(&target, "structure == FnDecl && name != null"));
+    assert!(evaluate_condition(
+        &target,
+        "structure == FnDecl && name != null"
+    ));
     println!("✓ Named function detected");
 
     // Simulate documented function by adding doc tag
-    target.semantic_tags.insert("doc".to_string(), "/// This is documented".to_string());
-    assert!(evaluate_condition(&target, "structure == FnDecl && doc != null"));
+    target
+        .semantic_tags
+        .insert("doc".to_string(), "/// This is documented".to_string());
+    assert!(evaluate_condition(
+        &target,
+        "structure == FnDecl && doc != null"
+    ));
     println!("✓ Documented function detected (via semantic tag)");
 
     // Undocumented named function
     let target2 = build_target(SpanKind::FnDecl, [0, 50], "fn bar() {}", Some("bar"));
-    assert!(evaluate_condition(&target2, "structure == FnDecl && doc == null && name != null"));
+    assert!(evaluate_condition(
+        &target2,
+        "structure == FnDecl && doc == null && name != null"
+    ));
     println!("✓ Undocumented public API detected");
 }
 

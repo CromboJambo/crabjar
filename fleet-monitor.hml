@@ -1,0 +1,12 @@
+layout([
+  { type: "row", children: [
+    { type: "col", size: 0.5, children: [
+      { type: "pane", title: "Worker Logs", command: "tail -f /tmp/worker_formula.log" },
+      { type: "pane", title: "Conductor Log", command: "tail -f /opt/crabjar/conductor/conductor.log" }
+    ]},
+    { type: "col", size: 0.5, children: [
+      { type: "pane", title: "Git Status", command: "cd ~/projects/experiments/tabular-work && git status --short" },
+      { type: "pane", title: "Recent Commits", command: "cd ~/projects/experiments/tabular-work && git log --oneline -5" }
+    ]}
+  ]}]
+);

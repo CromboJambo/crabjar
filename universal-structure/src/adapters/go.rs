@@ -96,7 +96,11 @@ impl GoAdapter {
                 }
 
                 // Number literals
-                if ch.is_ascii_digit() || (ch == '.' && chars.peek().is_some() && chars.peek().unwrap().is_ascii_digit()) {
+                if ch.is_ascii_digit()
+                    || (ch == '.'
+                        && chars.peek().is_some()
+                        && chars.peek().unwrap().is_ascii_digit())
+                {
                     let mut num = String::new();
                     num.push(ch);
                     while let Some(&c) = chars.peek() {
@@ -124,9 +128,30 @@ impl GoAdapter {
 
                     // Go keywords
                     let keywords = [
-                        "break", "case", "chan", "const", "continue", "default", "defer", "else",
-                        "fallthrough", "for", "func", "go", "goto", "if", "import", "interface",
-                        "map", "package", "range", "return", "select", "struct", "switch", "type",
+                        "break",
+                        "case",
+                        "chan",
+                        "const",
+                        "continue",
+                        "default",
+                        "defer",
+                        "else",
+                        "fallthrough",
+                        "for",
+                        "func",
+                        "go",
+                        "goto",
+                        "if",
+                        "import",
+                        "interface",
+                        "map",
+                        "package",
+                        "range",
+                        "return",
+                        "select",
+                        "struct",
+                        "switch",
+                        "type",
                         "var",
                     ];
 
@@ -431,7 +456,10 @@ mod tests {
         let adapter = GoAdapter::new();
         let tree = adapter.tokenize_and_adapt("import \"fmt\"");
 
-        let has_import = tree.spans.iter().any(|s| s.kind == SpanKind::ImportStatement);
+        let has_import = tree
+            .spans
+            .iter()
+            .any(|s| s.kind == SpanKind::ImportStatement);
         assert!(has_import);
     }
 
@@ -456,7 +484,8 @@ mod tests {
     #[test]
     fn test_tokenize_interface_definition() {
         let adapter = GoAdapter::new();
-        let tree = adapter.tokenize_and_adapt("type Reader interface { Read([]byte) (int, error) }");
+        let tree =
+            adapter.tokenize_and_adapt("type Reader interface { Read([]byte) (int, error) }");
 
         let has_interface = tree.spans.iter().any(|s| s.kind == SpanKind::TraitItem);
         assert!(has_interface);

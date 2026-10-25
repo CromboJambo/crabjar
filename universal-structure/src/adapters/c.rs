@@ -97,7 +97,11 @@ impl CAdapter {
                 }
 
                 // Number literals
-                if ch.is_ascii_digit() || (ch == '.' && chars.peek().is_some() && chars.peek().unwrap().is_ascii_digit()) {
+                if ch.is_ascii_digit()
+                    || (ch == '.'
+                        && chars.peek().is_some()
+                        && chars.peek().unwrap().is_ascii_digit())
+                {
                     let mut num = String::new();
                     num.push(ch);
                     while let Some(&c) = chars.peek() {
@@ -125,11 +129,43 @@ impl CAdapter {
 
                     // Check if it's a keyword
                     let keywords = [
-                        "auto", "break", "case", "char", "const", "continue", "default", "do",
-                        "double", "else", "enum", "extern", "float", "for", "goto", "if",
-                        "inline", "int", "long", "register", "restrict", "return", "short",
-                        "signed", "sizeof", "static", "struct", "switch", "typedef", "union",
-                        "unsigned", "void", "volatile", "while", "_Bool", "_Complex", "_Imaginary",
+                        "auto",
+                        "break",
+                        "case",
+                        "char",
+                        "const",
+                        "continue",
+                        "default",
+                        "do",
+                        "double",
+                        "else",
+                        "enum",
+                        "extern",
+                        "float",
+                        "for",
+                        "goto",
+                        "if",
+                        "inline",
+                        "int",
+                        "long",
+                        "register",
+                        "restrict",
+                        "return",
+                        "short",
+                        "signed",
+                        "sizeof",
+                        "static",
+                        "struct",
+                        "switch",
+                        "typedef",
+                        "union",
+                        "unsigned",
+                        "void",
+                        "volatile",
+                        "while",
+                        "_Bool",
+                        "_Complex",
+                        "_Imaginary",
                     ];
 
                     if keywords.contains(&word.as_str()) {
@@ -348,10 +384,8 @@ impl LanguageAdapter for CAdapter {
                     if let CTok::Punctuation(p) = &tokens[i + 1] {
                         if p == "(" {
                             // Look back for return type (identifier or keyword)
-                            let has_return_type = i > 0 && matches!(
-                                &tokens[i - 1],
-                                CTok::Keyword(_) | CTok::Identifier(_)
-                            );
+                            let has_return_type = i > 0
+                                && matches!(&tokens[i - 1], CTok::Keyword(_) | CTok::Identifier(_));
 
                             if has_return_type {
                                 spans.push(Span {
@@ -417,7 +451,10 @@ mod tests {
         let adapter = CAdapter::new();
         let tree = adapter.tokenize_and_adapt("#include <stdio.h>");
 
-        let has_import = tree.spans.iter().any(|s| s.kind == SpanKind::ImportStatement);
+        let has_import = tree
+            .spans
+            .iter()
+            .any(|s| s.kind == SpanKind::ImportStatement);
         assert!(has_import);
     }
 
