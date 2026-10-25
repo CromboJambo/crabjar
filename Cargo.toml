@@ -61,7 +61,8 @@ members = [
     "crates/crabjar-kanban-orchestrator",
     # SSH bastion host using russh (transparent proxy, no client app needed)
     "crates/ssh-bastion", "vm/vm-core", "crabjar-conductor", "crabjar-worker", "crabjar-durable-objects",
- "crabjar-analyze", "crabjar-review", "crabjar-mcp-tool-registry", "crabjar-skills",    "crabjar-tool-binding",    "crabjar-github-client",
+ "crabjar-analyze", "crabjar-review", "crabjar-mcp-tool-registry",    "crabjar-web-search",
+    "crabjar-skills",    "crabjar-tool-binding",    "crabjar-github-client",
     "crabjar-clawhub-client",
     "crabjar-skill-scanner",
     "crabjar-trust-manager",    "universal-structure",

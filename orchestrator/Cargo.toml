@@ -47,6 +47,9 @@ agent-context = { path = "../memory" }
 # Tool registry
 crabjar-tool-registry = { path = "../tool_registry" }
 
+# Web search tooling (P1-1)
+crabjar-web-search = { path = "../crabjar-web-search" }
+
 # Local LLM inference (placeholder — llm-runner moved to PESTI portable execution substrate)
 # The native runner was removed; inference now delegates to external LLM servers.
 futures.workspace = true

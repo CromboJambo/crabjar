@@ -1,0 +1,15 @@
+[package]
+name = "crabjar-web-search"
+version = "0.1.0"
+edition = "2021"
+description = "Web search tooling for crabjar agents"
+license.workspace = true
+
+[dependencies]
+reqwest = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+urlencoding = "2.1"

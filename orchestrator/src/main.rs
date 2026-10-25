@@ -803,8 +803,56 @@ async fn execute_tool_call(
 
             Ok(output)
         }
+        "web_search" => {
+            if args.len() < 1 {
+                return Err("Error: web_search requires at least 1 argument (query)".to_string());
+            }
+            let query = &args[0];
+
+            // Security layer: check command before execution with provenance.
+            guard_tool_call("web_search", &[query.clone()], "orchestrator-ws")?;
+
+            info!("Executing web search for query: {}", query);
+
+            // Use crabjar-web-search crate to perform the search
+            match crabjar_web_search::search(query, None).await {
+                Ok(response) => {
+                    info!("Web search returned {} results", response.results.len());
+                    format_results(&response)
+                }
+                Err(e) => Err(format!("Web search error: {}", e)),
+            }
+        }
         _ => Ok(format!("Unknown tool: {}", function_name)),
     }
+}
+
+/// Format search results into a readable string for the user.
+fn format_results(response: &crabjar_web_search::SearchResponse) -> Result<String, String> {
+    if response.results.is_empty() {
+        return Ok("No search results found.".to_string());
+    }
+
+    let mut output = String::new();
+    output.push_str(&format!("Found {} search results:\n\n", response.results.len()));
+
+    for (i, result) in response.results.iter().enumerate() {
+        output.push_str(&format!("{}. {}\n", i + 1, result.title));
+        output.push_str(&format!("   URL: {}\n", result.url));
+        if let Some(desc) = &result.description {
+            if !desc.is_empty() {
+                output.push_str(&format!("   Description: {}\n", desc));
+            }
+        }
+        if let Some(snippet) = &result.snippet {
+            if !snippet.is_empty() {
+                output.push_str(&format!("   Snippet: {}\n", snippet));
+            }
+        }
+        output.push('\n');
+    }
+
+    Ok(output)
 }
 
 /// Shared state for Axum handlers.
