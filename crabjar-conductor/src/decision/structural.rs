@@ -11,7 +11,9 @@ use crate::decision::condition::evaluate_condition;
 use pesti_structural_tokenizer::semantic::{analyze_errors, analyze_mutability, analyze_ownership};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-pub use universal_structure::{ErrorHandling, EvaluationTarget, Mutability, OwnershipMode, SpanKind};
+pub use universal_structure::{
+    ErrorHandling, EvaluationTarget, Mutability, OwnershipMode, SpanKind,
+};
 
 /// Run pesti semantic analyzers on source text and populate typed fields.
 fn annotate_target(source: &str, target: &mut EvaluationTarget) {
