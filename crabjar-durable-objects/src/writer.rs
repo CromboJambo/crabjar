@@ -20,11 +20,7 @@ impl CheckpointWriter {
     }
 
     /// Write a checkpoint for the given task with serialized state.
-    pub fn write_checkpoint(
-        &self,
-        task_id: &str,
-        state: Value,
-    ) -> CheckpointResult<String> {
+    pub fn write_checkpoint(&self, task_id: &str, state: Value) -> CheckpointResult<String> {
         // Serialize state to JSON
         let payload = state.to_string();
 
@@ -56,6 +52,7 @@ impl CheckpointWriter {
         let payload = state.to_string();
         fs::write(path, &payload)?;
 
-        self.store.create_checkpoint(task_id, Value::String(payload), Some(path))
+        self.store
+            .create_checkpoint(task_id, Value::String(payload), Some(path))
     }
 }

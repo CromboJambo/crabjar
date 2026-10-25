@@ -30,13 +30,13 @@
 //! ```
 
 pub mod config;
+pub mod error;
+pub mod reader;
 pub mod store;
 pub mod writer;
-pub mod reader;
-pub mod error;
 
 pub use config::CheckpointConfig;
+pub use error::{CheckpointError, CheckpointResult};
+pub use reader::CheckpointReader;
 pub use store::CheckpointStore;
 pub use writer::CheckpointWriter;
-pub use reader::CheckpointReader;
-pub use error::{CheckpointError, CheckpointResult};
