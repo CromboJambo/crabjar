@@ -6,7 +6,7 @@
 //! - Confidence drift detection
 //! - Cache persistence across process restarts
 
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 

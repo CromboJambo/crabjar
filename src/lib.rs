@@ -184,6 +184,77 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: FleetCommand,
     },
+
+    /// Durable object checkpointing (resume from last checkpoint)
+    Checkpoint {
+        #[command(subcommand)]
+        command: CheckpointCommand,
+    },
+
+    /// Decision provenance and approval workflow
+    Approval {
+        #[command(subcommand)]
+        command: ApprovalCommand,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum ApprovalCommand {
+    /// List pending approvals
+    List {
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        app_name: Option<String>,
+        #[arg(long)]
+        impact_level: Option<String>,
+    },
+    /// Approve a change
+    Approve {
+        change_id: String,
+    },
+    /// Reject a change with reason
+    Reject {
+        change_id: String,
+        #[arg(short, long)]
+        reason: String,
+    },
+    /// View approval history/audit trail
+    History {
+        change_id: Option<String>,
+        #[arg(long)]
+        actor: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum CheckpointCommand {
+    /// Create a checkpoint for a task
+    Create {
+        task_id: String,
+        #[arg(long)]
+        state_file: Option<String>,
+        #[arg(long)]
+        message: Option<String>,
+    },
+    /// List checkpoints for a task
+    List {
+        task_id: String,
+        #[arg(short, long, default_value = "10")]
+        limit: usize,
+    },
+    /// Get the latest checkpoint for a task
+    Latest { task_id: String },
+    /// Show checkpoint details (including state)
+    Show { id: String },
+    /// Prune old checkpoints beyond retention policy
+    Prune {
+        task_id: Option<String>,
+        #[arg(long)]
+        keep_count: Option<usize>,
+        #[arg(long)]
+        max_age_days: Option<u32>,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]

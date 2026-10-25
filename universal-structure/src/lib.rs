@@ -11,7 +11,9 @@ pub mod adapters;
 pub mod comparison;
 
 // Re-export key types for convenience
-pub use self::adapters::{BinaryAdapter, CAdapter, CppAdapter, GoAdapter, JavaScriptAdapter, PythonAdapter, RustAdapter};
+pub use self::adapters::{
+    BinaryAdapter, CAdapter, CppAdapter, GoAdapter, JavaScriptAdapter, PythonAdapter, RustAdapter,
+};
 pub use self::comparison::compare_trees;
 
 /// Trait for language-specific adapters that convert native tokenizer output
@@ -480,9 +482,7 @@ impl EvaluationTarget {
             "mutability" | "mutability_mode" => {
                 self.mutability.as_ref().map(|m| m.as_str().to_string())
             }
-            "ownership_mode" => {
-                self.ownership_mode.as_ref().map(|o| o.as_str().to_string())
-            }
+            "ownership_mode" => self.ownership_mode.as_ref().map(|o| o.as_str().to_string()),
             _ => self.semantic_tags.get(field).cloned(),
         }
     }

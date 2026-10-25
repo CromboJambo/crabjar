@@ -2,8 +2,8 @@
 //! Shows how Python code is tokenized, adapted to universal structural tokens,
 //! and compared across languages with Rust and JavaScript equivalents.
 
-use universal_structure::{compare_trees, LanguageAdapter, PythonAdapter};
 use universal_structure::adapters::{JavaScriptAdapter, RustAdapter};
+use universal_structure::{LanguageAdapter, PythonAdapter, compare_trees};
 
 fn main() {
     println!("=== Python LanguageAdapter Demo ===\n");
@@ -164,19 +164,28 @@ impl DataProcessor {
     let py_rust = compare_trees(&py_tree, &rust_tree);
     println!("Python vs Rust:");
     for metric in &py_rust.metrics {
-        println!("  {}: {:.2} vs {:.2}", metric.name, metric.value_a, metric.value_b);
+        println!(
+            "  {}: {:.2} vs {:.2}",
+            metric.name, metric.value_a, metric.value_b
+        );
     }
 
     let py_js = compare_trees(&py_tree, &js_tree);
     println!("\nPython vs JavaScript:");
     for metric in &py_js.metrics {
-        println!("  {}: {:.2} vs {:.2}", metric.name, metric.value_a, metric.value_b);
+        println!(
+            "  {}: {:.2} vs {:.2}",
+            metric.name, metric.value_a, metric.value_b
+        );
     }
 
     let rust_js = compare_trees(&rust_tree, &js_tree);
     println!("\nRust vs JavaScript:");
     for metric in &rust_js.metrics {
-        println!("  {}: {:.2} vs {:.2}", metric.name, metric.value_a, metric.value_b);
+        println!(
+            "  {}: {:.2} vs {:.2}",
+            metric.name, metric.value_a, metric.value_b
+        );
     }
 
     println!("\n=== Demo Complete ===");

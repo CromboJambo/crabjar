@@ -2,8 +2,8 @@
 //! Python, C, C++, and Go analyzed through respective LanguageAdapters.
 
 use universal_structure::{
-    compare_trees, CAdapter, CppAdapter, GoAdapter, JavaScriptAdapter, LanguageAdapter,
-    PythonAdapter, RustAdapter,
+    CAdapter, CppAdapter, GoAdapter, JavaScriptAdapter, LanguageAdapter, PythonAdapter,
+    RustAdapter, compare_trees,
 };
 
 fn main() {
@@ -106,8 +106,7 @@ func processData(values []int) int {
             "{} vs {}: {:.0}%",
             lang_a,
             lang_b,
-            report.metrics.iter().fold(0.0, |acc, m| acc + m.value_a)
-                / report.metrics.len() as f64
+            report.metrics.iter().fold(0.0, |acc, m| acc + m.value_a) / report.metrics.len() as f64
                 * 100.0
         );
     }

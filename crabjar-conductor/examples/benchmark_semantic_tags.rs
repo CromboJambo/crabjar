@@ -49,11 +49,7 @@ fn make_function_target(
 }
 
 /// Benchmark a single condition evaluation across many targets.
-fn benchmark_condition(
-    name: &str,
-    condition: &str,
-    targets: &[EvaluationTarget],
-) -> Duration {
+fn benchmark_condition(name: &str, condition: &str, targets: &[EvaluationTarget]) -> Duration {
     let start = Instant::now();
 
     for target in targets {
@@ -78,7 +74,12 @@ fn main() {
             _ => None,
         };
 
-        targets.push(make_function_target(&format!("func_{}", i), has_error_handling, is_mutable, ownership));
+        targets.push(make_function_target(
+            &format!("func_{}", i),
+            has_error_handling,
+            is_mutable,
+            ownership,
+        ));
     }
 
     println!("Generated {} synthetic function targets", NUM_TARGETS);
@@ -95,7 +96,10 @@ fn main() {
     println!("Benchmark: Simple structural condition");
     println!("  Condition: {}", cond_simple);
     println!("  Targets: {}", NUM_TARGETS);
-    println!("  Avg time ({} runs): {} ns", RUNS_PER_BENCHMARK, avg_simple_ns);
+    println!(
+        "  Avg time ({} runs): {} ns",
+        RUNS_PER_BENCHMARK, avg_simple_ns
+    );
     println!();
 
     // Benchmark 2: Semantic tag condition (fast path)
@@ -109,11 +113,15 @@ fn main() {
     println!("Benchmark: Semantic tag condition (fast path)");
     println!("  Condition: {}", cond_semantic);
     println!("  Targets: {}", NUM_TARGETS);
-    println!("  Avg time ({} runs): {} ns", RUNS_PER_BENCHMARK, avg_semantic_ns);
+    println!(
+        "  Avg time ({} runs): {} ns",
+        RUNS_PER_BENCHMARK, avg_semantic_ns
+    );
     println!();
 
     // Benchmark 3: Complex condition with multiple tags
-    let cond_complex = "structure == FnDecl && error_handling == Propagated && mutability == Immutable";
+    let cond_complex =
+        "structure == FnDecl && error_handling == Propagated && mutability == Immutable";
     let mut total_complex = Duration::ZERO;
     for _ in 0..RUNS_PER_BENCHMARK {
         total_complex += benchmark_condition("complex", cond_complex, &targets);
@@ -123,7 +131,10 @@ fn main() {
     println!("Benchmark: Complex multi-tag condition");
     println!("  Condition: {}", cond_complex);
     println!("  Targets: {}", NUM_TARGETS);
-    println!("  Avg time ({} runs): {} ns", RUNS_PER_BENCHMARK, avg_complex_ns);
+    println!(
+        "  Avg time ({} runs): {} ns",
+        RUNS_PER_BENCHMARK, avg_complex_ns
+    );
     println!();
 
     // Calculate speedup vs embedding fallback (~700ms per decision)
@@ -132,8 +143,14 @@ fn main() {
 
     println!("=== Comparison with Embedding Fallback ===");
     println!();
-    println!("Embedding fallback (simulated): {} ms per decision", embedding_fallback_ms);
-    println!("Embedding total for {} targets: {} ms", NUM_TARGETS, embedding_total_ms);
+    println!(
+        "Embedding fallback (simulated): {} ms per decision",
+        embedding_fallback_ms
+    );
+    println!(
+        "Embedding total for {} targets: {} ms",
+        NUM_TARGETS, embedding_total_ms
+    );
     println!();
 
     let simple_speedup = (embedding_total_ms as f64 * 1_000_000.0) / (avg_simple_ns as f64);
@@ -145,10 +162,13 @@ fn main() {
     println!();
 
     // Verify performance benefit
-    let fast_path_benefit = avg_simple_ns < (embedding_fallback_ms as u64) * NUM_TARGETS as u64 * 1_000_000;
+    let fast_path_benefit =
+        avg_simple_ns < (embedding_fallback_ms as u64) * NUM_TARGETS as u64 * 1_000_000;
     println!("Verification:");
     if fast_path_benefit {
-        println!("  ✓ Fast-path rules using semantic tags are measurably faster than embedding fallback");
+        println!(
+            "  ✓ Fast-path rules using semantic tags are measurably faster than embedding fallback"
+        );
         println!("  ✓ Expected: <1ms vs ~700ms per decision");
     } else {
         println!("  ✗ Fast-path not measurably faster (unexpected)");

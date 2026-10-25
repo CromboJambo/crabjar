@@ -5,8 +5,8 @@
 //! to the universal structural token representation with language-specific tags.
 
 use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
-use std::collections::HashMap;
 use pesti_structural_tokenizer::{StructuralTokenizer, TokenKind};
+use std::collections::HashMap;
 
 /// Rust adapter implementing the LanguageAdapter trait using pesti-structural-tokenizer.
 pub struct RustAdapter {
@@ -174,7 +174,9 @@ mod tests {
     #[test]
     fn test_tokenize_function_declaration() {
         let adapter = RustAdapter::new();
-        let tree = adapter.tokenize_and_adapt("fn process_data(input: &[u8]) -> Result<String, Error> { Ok(String::new()) }");
+        let tree = adapter.tokenize_and_adapt(
+            "fn process_data(input: &[u8]) -> Result<String, Error> { Ok(String::new()) }",
+        );
 
         // Should identify a function declaration
         let has_fn_decl = tree.spans.iter().any(|s| s.kind == SpanKind::FnDecl);
@@ -203,7 +205,8 @@ mod tests {
     #[test]
     fn test_tokenize_trait_declaration() {
         let adapter = RustAdapter::new();
-        let tree = adapter.tokenize_and_adapt("pub trait Processor { fn process(&self, data: &[u8]); }");
+        let tree =
+            adapter.tokenize_and_adapt("pub trait Processor { fn process(&self, data: &[u8]); }");
 
         let has_class_decl = tree.spans.iter().any(|s| s.kind == SpanKind::ClassDecl);
         assert!(has_class_decl);
@@ -221,10 +224,18 @@ mod tests {
     #[test]
     fn test_detect_ownership_patterns() {
         let adapter = RustAdapter::new();
-        let tree = adapter.tokenize_and_adapt("fn process(data: &Vec<u8>) -> Box<String> { Box::new(String::new()) }");
+        let tree = adapter.tokenize_and_adapt(
+            "fn process(data: &Vec<u8>) -> Box<String> { Box::new(String::new()) }",
+        );
 
-        assert_eq!(tree.semantic_tags.get("ownership_pattern"), Some(&"references".to_string()));
-        assert_eq!(tree.semantic_tags.get("heap_allocation"), Some(&"box".to_string()));
+        assert_eq!(
+            tree.semantic_tags.get("ownership_pattern"),
+            Some(&"references".to_string())
+        );
+        assert_eq!(
+            tree.semantic_tags.get("heap_allocation"),
+            Some(&"box".to_string())
+        );
     }
 
     #[test]
@@ -232,16 +243,26 @@ mod tests {
         let adapter = RustAdapter::new();
         let tree = adapter.tokenize_and_adapt("fn process<T>(item: T) where T: Clone + Debug { }");
 
-        assert_eq!(tree.semantic_tags.get("has_where_clause"), Some(&"true".to_string()));
+        assert_eq!(
+            tree.semantic_tags.get("has_where_clause"),
+            Some(&"true".to_string())
+        );
     }
 
     #[test]
     fn test_detect_async_patterns() {
         let adapter = RustAdapter::new();
-        let tree = adapter.tokenize_and_adapt("async fn fetch_data(url: &str) -> String { String::new().await }");
+        let tree = adapter
+            .tokenize_and_adapt("async fn fetch_data(url: &str) -> String { String::new().await }");
 
-        assert_eq!(tree.semantic_tags.get("has_async"), Some(&"true".to_string()));
-        assert_eq!(tree.semantic_tags.get("has_await"), Some(&"true".to_string()));
+        assert_eq!(
+            tree.semantic_tags.get("has_async"),
+            Some(&"true".to_string())
+        );
+        assert_eq!(
+            tree.semantic_tags.get("has_await"),
+            Some(&"true".to_string())
+        );
     }
 
     #[test]
