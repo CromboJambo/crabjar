@@ -208,7 +208,3 @@ VERSION=$(curl -s https://api.github.com/repos/<owner>/<repo>/releases/latest | 
 # Download and extract pre-built binary
 curl -L "https://github.com/<owner>/<repo>/releases/download/v${VERSION}/<binary>-x86_64-unknown-linux-musl.tar.gz" | tar xz -C ~/.cargo/bin
 ```
-
-## LLM Runner
-
-Experimental (in `llm-workspace/`). CPU fallback kernels operational; GPU path stubbed; K-family dequantization unimplemented. See `llmrunner.md` for gap analysis.
