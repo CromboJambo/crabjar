@@ -1,0 +1,21 @@
+[package]
+name = "crabjar-compress"
+publish = true
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Deterministic, content-aware tool result compression for AI agents. Zero-LLM, zero-dependency pipeline that reduces token count 60-95% while preserving semantic fidelity."
+repository.workspace = true
+documentation.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+regex.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+insta = { version = "1.43", features = ["json"] }
+tempfile.workspace = true

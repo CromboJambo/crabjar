@@ -65,7 +65,8 @@ members = [
     "crabjar-skills",    "crabjar-tool-binding",    "crabjar-github-client",
     "crabjar-clawhub-client",
     "crabjar-skill-scanner",
-    "crabjar-trust-manager",    "universal-structure",
+    "crabjar-trust-manager",    "crabjar-compress",
+    "universal-structure",
     "crates/email-smtp",
 ]
 
