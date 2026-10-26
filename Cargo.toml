@@ -66,6 +66,7 @@ members = [
     "crabjar-clawhub-client",
     "crabjar-skill-scanner",
     "crabjar-trust-manager",    "crabjar-compress",
+    "crabjar-compress-mcp",
     "universal-structure",
     "crates/email-smtp",
 ]
@@ -101,6 +102,9 @@ async-trait = "0.1"
 futures = "0.3"
 tokio = { version = "1.51.1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["time"] }
+
+# Serialization
+schemars = "0.8"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

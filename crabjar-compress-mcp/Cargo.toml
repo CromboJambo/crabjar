@@ -1,0 +1,14 @@
+[package]
+name = "crabjar-compress-mcp"
+version = "0.12.0"
+edition = "2024"
+description = "MCP server wrapping crabjar-compress for Hermes integration"
+
+[dependencies]
+rmcp = { version = "3.5", features = ["server"] }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+anyhow = "1.0"
+crabjar-compress = { path = "../crabjar-compress" }
