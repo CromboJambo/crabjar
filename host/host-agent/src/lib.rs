@@ -11,6 +11,8 @@ pub mod loop_engine;
 pub mod model_routing;
 pub mod planner;
 pub mod reflector;
+pub mod semantic_compression;
+pub mod structural_compression;
 pub mod verifier;
 pub mod work_item_store;
 
@@ -22,5 +24,7 @@ pub use loop_engine::{AgentLoop, LoopResult};
 pub use model_routing::{LoopPhase, ModelRouter, PhaseBackendKind, PhaseBuilder, PhaseConfig};
 pub use planner::Planner;
 pub use reflector::Reflector;
+pub use semantic_compression::{compress_observations, SemanticCompressionResult};
+pub use structural_compression::{CompressedCode, compress_code};
 pub use verifier::Verifier;
 pub use work_item_store::WorkItemStore;

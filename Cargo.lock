@@ -2124,7 +2124,7 @@ dependencies = [
  "crabjar-guard",
  "crabjar-review",
  "jsonwebtoken",
- "pesti-structural-tokenizer",
+ "pesti-structural-tokenizer 0.1.3",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
@@ -2273,6 +2273,7 @@ dependencies = [
  "crabjar-host-observe",
  "crabjar-podman",
  "crabjar-tool-registry",
+ "pesti-structural-tokenizer 0.1.2",
  "reqwest 0.13.5",
  "rusqlite",
  "serde",
@@ -2637,6 +2638,19 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tracing",
+]
+
+[[package]]
+name = "crabjar-web-search"
+version = "0.1.0"
+dependencies = [
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "urlencoding",
 ]
 
 [[package]]
@@ -6602,6 +6616,7 @@ dependencies = [
  "crabjar-guard",
  "crabjar-telemetry",
  "crabjar-tool-registry",
+ "crabjar-web-search",
  "futures",
  "futures-util",
  "reqwest 0.13.5",
@@ -6909,6 +6924,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed93ba1a9ffcca32130a5188701c81c0c49cf00d4b7c5007d5148951d743adcb"
 dependencies = [
  "pest",
+]
+
+[[package]]
+name = "pesti-structural-tokenizer"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56e0218b75e8ae412d8992ea4fa8dd8755745920968e2efe506e69401645ff4f"
+dependencies = [
+ "serde",
+ "serde_json",
+ "syn 2.0.119",
+ "thiserror 2.0.21",
+ "tiktoken-rs",
+ "tracing",
 ]
 
 [[package]]
@@ -10512,7 +10541,7 @@ name = "universal-structure"
 version = "0.12.0"
 dependencies = [
  "object 0.36.7",
- "pesti-structural-tokenizer",
+ "pesti-structural-tokenizer 0.1.3",
  "serde",
  "serde_json",
 ]
@@ -10541,6 +10570,12 @@ dependencies = [
  "serde",
  "serde_derive",
 ]
+
+[[package]]
+name = "urlencoding"
+version = "2.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
 
 [[package]]
 name = "usvg"

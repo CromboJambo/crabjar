@@ -14,6 +14,9 @@
 use crabjar_host_core::work_item::Observation;
 use std::collections::HashMap;
 
+use crate::semantic_compression::compress_observations;
+use crate::structural_compression::compress_code;
+
 /// Configuration for context compression.
 #[derive(Debug, Clone)]
 pub struct CompressionConfig {
@@ -138,7 +141,7 @@ impl ContextCompressor {
         result
     }
 
-    /// Summarize older observations by grouping them by stage/kind.
+    /// Summarize older observations by grouping them by stage/kind and applying semantic clustering.
     fn summarize(&self, observations: &[Observation]) -> Vec<String> {
         // Group by stage
         let mut by_stage: HashMap<&str, Vec<&Observation>> = HashMap::new();
@@ -168,17 +171,22 @@ impl ContextCompressor {
                     break;
                 }
 
-                let details: Vec<_> = kind_obs
+                // Apply semantic clustering to merge similar observations
+                let kind_obs_owned: Vec<Observation> = kind_obs.iter().map(|o| (*o).clone()).collect();
+                let cluster_result = compress_observations(&kind_obs_owned);
+
+                // Generate details from clustered observations
+                let details: Vec<_> = cluster_result
+                    .compressed
                     .iter()
                     .filter_map(|o| {
                         let trimmed = o.details.trim();
-                        if trimmed.len() > 200 {
-                            Some(format!("... {}", &trimmed[..200]))
-                        } else if trimmed.is_empty() {
-                            None
-                        } else {
-                            Some(trimmed.to_string())
+                        if trimmed.is_empty() {
+                            return None;
                         }
+                        // Apply structural compression to code-heavy content
+                        let compressed = self.compress_observation(trimmed);
+                        Some(compressed)
                     })
                     .collect();
 
@@ -186,10 +194,22 @@ impl ContextCompressor {
                     continue;
                 }
 
+                // If clustering merged observations, note the reduction
+                let cluster_note = if cluster_result.cluster_count < kind_obs.len() {
+                    format!(
+                        " ({} similar merged into {})",
+                        kind_obs.len(),
+                        cluster_result.cluster_count
+                    )
+                } else {
+                    String::new()
+                };
+
                 summaries.push(format!(
-                    "- **{}** ({} items): {}",
+                    "- **{}** ({} items){}: {}",
                     stage,
                     kind,
+                    cluster_note,
                     details
                         .iter()
                         .map(|d| if d.len() > 80 { &d[..80] } else { d })
@@ -200,6 +220,40 @@ impl ContextCompressor {
         }
 
         summaries
+    }
+
+    /// Compress a single observation's details using structural tokenization.
+    /// For code-heavy content, this preserves declarations and control flow while
+    /// eliding large function bodies.
+    fn compress_observation(&self, text: &str) -> String {
+        // Heuristic: if the text contains code-like patterns (fn, struct, impl, etc.)
+        // and is long enough to benefit from compression, use structural compression.
+        let has_code_patterns = text.contains("fn ")
+            || text.contains("struct ")
+            || text.contains("impl ")
+            || text.contains("let ")
+            || text.contains("return ");
+
+        if !has_code_patterns || text.len() < 100 {
+            // Not code-heavy or too short to benefit — simple truncation
+            return if text.len() > 200 {
+                format!("... {}", &text[..200])
+            } else {
+                text.to_string()
+            };
+        }
+
+        // Use structural compression with budget
+        let result = compress_code(text, 30);
+        if result.was_compressed() {
+            return format!("[compressed code: {} elisions]", result.elided_count);
+        }
+        // No compression happened — fall back to simple truncation
+        if text.len() > 200 {
+            format!("... {}", &text[..200])
+        } else {
+            text.to_string()
+        }
     }
 
     /// Convert observations to a string representation.
@@ -381,5 +435,82 @@ mod tests {
     fn test_compression_disabled_config() {
         let config = CompressionConfig::disabled();
         assert!(!config.enabled);
+    }
+
+    #[test]
+    fn test_structural_compression_for_code_observations() {
+        let config = CompressionConfig {
+            recent_count: 3,
+            max_summaries: 5,
+            ..CompressionConfig::default()
+        };
+        let compressor = ContextCompressor::new(config);
+
+        // Create observations with code-heavy content that should trigger structural compression
+        let large_function = "fn process_large_data(items: Vec<i32>) -> i32 {
+            let mut sum = 0;
+            for item in items {
+                sum += item;
+            }
+            return sum * 2;
+        }";
+
+        // Place code observation early enough to be in "older" bucket (indices 0-11 with recent_count=3)
+        let obs: Vec<_> = (0..15)
+            .map(|i| {
+                if i == 5 {
+                    make_obs("execute", "tool", large_function)
+                } else {
+                    make_obs(
+                        "observe",
+                        "state",
+                        &format!("observation {} — some regular text", i),
+                    )
+                }
+            })
+            .collect();
+
+        let compressed = compressor.compress(&obs);
+
+        // Should have summarized older observations including the code-heavy one
+        assert!(compressed.contains("Summary of earlier"));
+        // The code observation should have been structurally compressed
+        // (not just truncated to first 200 chars)
+        assert!(!compressed.contains("let mut sum = 0"));
+    }
+
+    #[test]
+    fn test_non_code_observations_use_simple_truncation() {
+        let config = CompressionConfig {
+            recent_count: 3,
+            max_summaries: 5,
+            ..CompressionConfig::default()
+        };
+        let compressor = ContextCompressor::new(config);
+
+        // Long non-code text
+        let long_text = "This is a long observation with no code patterns. It's just regular text that goes on and on without any Rust-like keywords that would trigger structural compression.";
+
+        let obs_code = make_obs("execute", "tool", long_text);
+
+        let obs: Vec<_> = (0..15)
+            .map(|i| {
+                if i == 12 {
+                    return obs_code.clone();
+                }
+                make_obs(
+                    "observe",
+                    "state",
+                    &format!("observation {} — some regular text", i),
+                )
+            })
+            .collect();
+
+        let compressed = compressor.compress(&obs);
+
+        // Non-code observations use simple truncation
+        assert!(compressed.contains("Summary of earlier"));
+        // Should truncate but not apply structural compression markers
+        assert!(!compressed.contains("[compressed code:"));
     }
 }
