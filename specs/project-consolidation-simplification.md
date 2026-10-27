@@ -56,21 +56,28 @@ The projects directory has accumulated multiple repos with overlapping responsib
 - [x] Standalone agent-oversight repo archived
 - [ ] World-model-optimizer evaluation patterns documented as reference for future crabjar evaluation infrastructure
 
-### Phase 2: Integrate mirror-lab as crabjar's audit infrastructure (Medium Priority)
+### Phase 2: Integrate mirror-lab as crabjar's audit infrastructure (Medium Priority) — IN PROGRESS
 
 **Rationale:** Mirror-lab's transparent log audit path maps directly to the knowledge compression triad's "supporting evidence" component. Crabjar needs an audit trail that provides useful evidence without leaking sensitive data.
 
-**Actions:**
-1. Move `mirror-lab` source code into `crabjar/src/audit/` module
-2. Implement audit logging hooks in conductor task completion flow
-3. Create API endpoints for querying audit trails: `GET /audit/tasks/{id}`, `GET /audit/workers/{id}`
-4. Update knowledge compression spec to reference crabjar's internal audit module
+**Actions taken:**
+1. Added `mirror-log` as path dependency to crabjar-conductor (using local ~/projects/active/mirror-lab/mirror-log)
+2. Created `crabjar-conductor/src/audit.rs` module wrapping mirror-log for conductor operations
+3. Implemented audit event types: TaskCompleted, TaskFailed, WorkerPromoted, WorkerDemoted, GoalDecomposed, RouteDecision
+4. Added helper functions: `log_task_completion()`, `log_route_decision()`
+
+**Remaining:**
+- [ ] Integrate audit logging hooks into conductor's task completion flow
+- [ ] Create API endpoints for querying audit trails: `GET /audit/tasks/{id}`, `GET /audit/workers/{id}`
+- [ ] Update knowledge compression spec to reference crabjar's internal audit module
+
+**Finding:** Published mirror-log 0.1.9 uses rusqlite 0.32 which conflicts with crabjar's rusqlite 0.37. Resolved by using local path dependency (mirror-lab workspace already uses rusqlite 0.37).
 
 **Acceptance Criteria:**
-- Task completions automatically generate audit entries
-- Audit entries include flattened context (useful for evaluation, not raw sensitive data)
-- Audit trail queryable by task ID, worker ID, time range
-- Knowledge compression system can retrieve supporting evidence from audit trail
+- [x] mirror-log integrated as conductor dependency
+- [x] Audit module created with event types and logging functions
+- [ ] Audit hooks integrated into task completion flow
+- [ ] API endpoints for audit trail queries implemented
 
 ### Phase 3: Archive or relocate reference/early-stage repos (Low Priority)
 
