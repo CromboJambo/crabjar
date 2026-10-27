@@ -28,7 +28,7 @@ Declared in `Cargo.toml` `[workspace.members]`:
 - `host/host-mqtt` — MQTT host
 - `host/host-graph` — graph utilities
 - `host/host-screen` — screen capture
-- `crabjar-conductor` — fleet coordination layer (orchestrates workers across machines)
+- `crabjar-conductor` — fleet coordination layer (orchestrates workers across machines) with integrated audit logging via mirror-log
 - `crabjar-review` — code review pipeline with deterministic pre-processing, agent review units, post-processor, and GitHub integration
 - `analyze-har` — HAR file analyzer (network traffic, credential detection)
 - `analyze-js` — JavaScript analyzer (dependency graph, API calls, obfuscation)
@@ -72,7 +72,7 @@ Nested crates under `src/` use `src/<crate>/src/` pattern (not flat `src/<crate>
 | `host/host-mqtt` | MQTT host |
 | `host/host-graph` | Graph utilities |
 | `host/host-screen` | Screen capture |
-|| `crabjar-conductor` | Fleet coordination layer (orchestrates workers across machines) |
+|| `crabjar-conductor` | Fleet coordination layer (orchestrates workers across machines) with integrated audit logging via mirror-log |
 || `crabjar-review` | Code review pipeline with deterministic pre-processing, agent review units, post-processor, and GitHub integration |
 || `analyze-har` | HAR file analyzer (network traffic, credential detection) |
 | `analyze-js` | JavaScript analyzer (dependency graph, API calls, obfuscation) |

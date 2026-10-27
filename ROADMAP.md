@@ -35,6 +35,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ crabjar-conductor deployed to ftw3:8091 with pesti-server orchestrator integration (dinit service, SQLite state store)
 - ✅ 27B post-trained model integrated as default provider (DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF)
 - ✅ crabjar-review code review pipeline complete (Phases 1-4 + conductor integration) — deterministic pre-processing, agent review units, post-processor with position validation/deduplication, GitHub PR integration, benchmark suite with precision/recall/F1 metrics
+- ✅ Project consolidation completed (Phases 1-4) — agent-oversight archived, mirror-lab audit module integrated into crabjar-conductor, reference/early-stage repos reorganized, clear project boundaries defined for all active projects
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control

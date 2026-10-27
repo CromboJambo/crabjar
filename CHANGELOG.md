@@ -2,6 +2,36 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## October 26, 2026 — Project Consolidation & Audit Infrastructure (Phases 1-4)
+
+### Phase 1: Absorb agent-oversight into crabjar
+- Archived `agent-oversight` repo to `~/projects/archive/` after analysis revealed Rust component was a stub ("Hello, world!") with meaningful work in world-model-optimizer Python suite
+- Identified world-model-optimizer as reference material for future crabjar evaluation infrastructure
+
+### Phase 2: Integrate mirror-lab audit module into crabjar-conductor
+- Added `mirror-log` path dependency to crabjar-conductor/Cargo.toml (not published to crates.io)
+- Created `crabjar-conductor/src/audit.rs` (161 lines) implementing ConductorAuditLog with Connection-based mirror-log API
+- Audit event types: TaskCompleted, TaskFailed, WorkerPromoted, WorkerDemoted, GoalDecomposed, RouteDecision
+- Fixed 7 pre-existing compilation errors in `universal-structure/src/adapters/lean.rs` (SpanKind enum variant mismatches, missing StructuralToken import)
+- Verified conductor compiles successfully with audit module integrated
+
+### Phase 3: Reorganize reference/early-stage repos
+- Moved `hermes-source` to `~/projects/reference/` (kshitijk4poor's fork, learning source not active development)
+- Moved `crepuscularity` to `~/projects/reference/` (language/runtime learning project)
+- Moved `pesti-backup-old-checkout` to `~/projects/archive/` (superseded by active pesti with newer commits)
+
+### Phase 4: Define clear project boundaries
+- Updated crabjar/AGENTS.md with explicit scope statement and not-in-scope list
+- Updated home-lab/AGENTS.md with explicit scope statement and not-in-scope list
+- Created pesti/AGENTS.md with explicit scope statement and not-in-scope list
+- Updated mirror-lab/AGENTS.md with explicit scope statement and not-in-scope list
+- Created ~/projects/README.md documenting the purpose of each top-level directory
+
+### New Specs Created
+- `specs/evidence-based-promotion.md` — 4-phase promotion system using JEV evaluation, guard trust layers, and conductor routing decisions
+- `specs/knowledge-compression-triad.md` — Formalized pattern: compressed knowledge + supporting evidence + detailed specialist record
+- `specs/project-consolidation-simplification.md` — 3-phase consolidation plan with acceptance criteria
+
 ## October 16, 2026 — Remote Skill Discovery Complete (Phases 8-11) + Test Infrastructure
 
 ### Phase 11: Trust Management & Cache
