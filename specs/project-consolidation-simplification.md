@@ -42,20 +42,19 @@ The projects directory has accumulated multiple repos with overlapping responsib
 
 ## Consolidation Plan
 
-### Phase 1: Absorb agent-oversight into crabjar (High Priority)
+### Phase 1: Absorb agent-oversight into crabjar (High Priority) — COMPLETED
 
 **Rationale:** Evidence-based promotion and agent oversight share the same core responsibility — evaluating agent performance. Maintaining them separately creates artificial boundaries and duplicated evaluation logic.
 
-**Actions:**
-1. Move `agent-oversight` source code into `crabjar/src/commands/oversight.rs` (or similar)
-2. Integrate oversight API endpoints into crabjar-conductor's existing HTTP server
-3. Update conductor's task routing to consider oversight metrics alongside trust levels
-4. Archive the standalone `agent-oversight` repo
+**Finding:** The agent-oversight Rust component (`src/main.rs`) was a stub ("Hello, world!"). The meaningful work is in `world-model-optimizer/`, a Python-based benchmarking/evaluation suite with environment capture packages (appworld, bird-sql, crmarena, gaia2, swe-bench, etc.).
+
+**Actions taken:**
+1. Archived standalone `agent-oversight` repo to `~/projects/archive/`
+2. Noted that world-model-optimizer Python suite could be referenced later for evaluation infrastructure needs in crabjar's promotion system
 
 **Acceptance Criteria:**
-- All agent-oversight functionality accessible through crabjar CLI and API
-- No duplicate evaluation logic between crabjar and agent-oversight
-- Agent oversight metrics integrated into promotion decision-making
+- [x] Standalone agent-oversight repo archived
+- [ ] World-model-optimizer evaluation patterns documented as reference for future crabjar evaluation infrastructure
 
 ### Phase 2: Integrate mirror-lab as crabjar's audit infrastructure (Medium Priority)
 
