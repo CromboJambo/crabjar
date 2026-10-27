@@ -79,18 +79,17 @@ The projects directory has accumulated multiple repos with overlapping responsib
 - [ ] Audit hooks integrated into task completion flow
 - [ ] API endpoints for audit trail queries implemented
 
-### Phase 3: Archive or relocate reference/early-stage repos (Low Priority)
+### Phase 3: Archive or relocate reference/early-stage repos (Low Priority) — COMPLETED
 
 **Rationale:** Reference and early-stage repos clutter the active projects directory and create confusion about what's being actively developed.
 
-**Actions:**
-1. Move `hermes-source` to `~/projects/reference/` (learning source, not active development)
-2. Move `crepuscularity` to `~/projects/reference/` (language/runtime learning)
-3. Move `pesti-backup-old-checkout` to `~/projects/archive/` (old version, superseded)
-4. Evaluate remaining early-stage repos:
-   - **Agendarator:** If not actively developed, move to `~/projects/archive/` or merge into home-lab if relevant
-   - **user_coarses:** If education content for crabjar users, consider moving to `crabjar/docs/tutorials/`
-   - **experiments:** Keep as-is but add README documenting purpose of each experiment
+**Actions taken:**
+1. Moved `hermes-source` to `~/projects/reference/` (learning source, not active development)
+2. Moved `crepuscularity` to `~/projects/reference/` (language/runtime learning)
+3. Moved `pesti-backup-old-checkout` to `~/projects/archive/` (old version, superseded by active pesti)
+
+**Remaining:**
+- [ ] Evaluate remaining early-stage repos: Agendarator, user_coarses, experiments
 
 **Acceptance Criteria:**
 - Active projects directory contains only actively developed projects
