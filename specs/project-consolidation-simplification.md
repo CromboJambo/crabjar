@@ -89,7 +89,9 @@ The projects directory has accumulated multiple repos with overlapping responsib
 3. Moved `pesti-backup-old-checkout` to `~/projects/archive/` (old version, superseded by active pesti)
 
 **Remaining:**
-- [ ] Evaluate remaining early-stage repos: Agendarator, user_coarses, experiments
+- [ ] Evaluate Agendarator (last updated Oct 18, 2026) — may still be active
+- [ ] Evaluate user_coarses (last updated Oct 18, 2026) — may still be active
+- [ ] Investigate teams-for-linux (not a git repo) and brave.com (browser installation) — determine if they belong in projects/ at all
 
 **Acceptance Criteria:**
 - Active projects directory contains only actively developed projects
