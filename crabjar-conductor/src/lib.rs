@@ -22,6 +22,7 @@
 
 pub mod api;
 pub mod attention;
+pub mod audit;
 pub mod auth;
 pub mod conductor;
 pub mod decision;
