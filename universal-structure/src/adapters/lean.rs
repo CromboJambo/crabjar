@@ -2,7 +2,7 @@
 //!
 //! Recognizes theorem declarations, proof terms, type annotations, and tactic blocks.
 
-use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
+use crate::{LanguageAdapter, Span, SpanKind, SpanTree, StructuralToken};
 use std::collections::HashMap;
 
 /// Lean language adapter implementing the LanguageAdapter trait.
@@ -20,8 +20,8 @@ impl LeanAdapter {
             "lemma" => Some(SpanKind::FnDecl),
             "definition" | "def" => Some(SpanKind::LetStmt),
             "structure" | "struct" => Some(SpanKind::ClassDecl),
-            "inductive" => Some(SpanKind::EnumDecl),
-            "import" => Some(SpanKind::ImportStmt),
+            "inductive" => Some(SpanKind::ClassDecl),
+            "import" => Some(SpanKind::ImportStatement),
             _ => None,
         }
     }
@@ -71,7 +71,11 @@ impl LanguageAdapter for LeanAdapter {
             if trimmed.starts_with("theorem ") || trimmed.starts_with("lemma ") {
                 spans.push(Span {
                     kind: SpanKind::FnDecl,
-                    open_token: Some(line.to_string()),
+                    open_token: Some(StructuralToken::new(
+                        SpanKind::Keyword,
+                        line.to_string(),
+                        [0, 0],
+                    )),
                     body: Vec::new(),
                     close_token: None,
                     source: line.to_string(),
@@ -82,7 +86,11 @@ impl LanguageAdapter for LeanAdapter {
             if trimmed.starts_with("def ") || trimmed.starts_with("definition ") {
                 spans.push(Span {
                     kind: SpanKind::LetStmt,
-                    open_token: Some(line.to_string()),
+                    open_token: Some(StructuralToken::new(
+                        SpanKind::Keyword,
+                        line.to_string(),
+                        [0, 0],
+                    )),
                     body: Vec::new(),
                     close_token: None,
                     source: line.to_string(),
@@ -93,7 +101,11 @@ impl LanguageAdapter for LeanAdapter {
             if trimmed.starts_with("structure ") || trimmed.starts_with("struct ") {
                 spans.push(Span {
                     kind: SpanKind::ClassDecl,
-                    open_token: Some(line.to_string()),
+                    open_token: Some(StructuralToken::new(
+                        SpanKind::Keyword,
+                        line.to_string(),
+                        [0, 0],
+                    )),
                     body: Vec::new(),
                     close_token: None,
                     source: line.to_string(),
@@ -104,7 +116,11 @@ impl LanguageAdapter for LeanAdapter {
             if trimmed.starts_with("inductive ") {
                 spans.push(Span {
                     kind: SpanKind::ClassDecl,
-                    open_token: Some(line.to_string()),
+                    open_token: Some(StructuralToken::new(
+                        SpanKind::Keyword,
+                        line.to_string(),
+                        [0, 0],
+                    )),
                     body: Vec::new(),
                     close_token: None,
                     source: line.to_string(),
@@ -115,7 +131,11 @@ impl LanguageAdapter for LeanAdapter {
             if trimmed.starts_with("import ") {
                 spans.push(Span {
                     kind: SpanKind::ImportStatement,
-                    open_token: Some(line.to_string()),
+                    open_token: Some(StructuralToken::new(
+                        SpanKind::Keyword,
+                        line.to_string(),
+                        [0, 0],
+                    )),
                     body: Vec::new(),
                     close_token: None,
                     source: line.to_string(),
@@ -184,9 +204,9 @@ mod tests {
         let adapter = LeanAdapter::new();
         let tree = adapter.tokenize_and_adapt("inductive Bool\n  | true\n  | false");
 
-        // Should identify an inductive type declaration
-        let has_enum_decl = tree.spans.iter().any(|s| s.kind == SpanKind::EnumDecl);
-        assert!(has_enum_decl);
+        // Should identify an inductive type declaration (mapped to ClassDecl per universal schema)
+        let has_class_decl = tree.spans.iter().any(|s| s.kind == SpanKind::ClassDecl);
+        assert!(has_class_decl);
     }
 
     #[test]

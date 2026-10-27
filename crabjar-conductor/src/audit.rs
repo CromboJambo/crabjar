@@ -6,14 +6,13 @@
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use mirror_log::{LogEntry, LogStore};
-use serde::{Deserialize, Serialize};
+use rusqlite::Connection;
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use uuid::Uuid;
 
 /// Audit event types for conductor operations.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum AuditEventType {
     TaskCompleted,
     TaskFailed,
@@ -24,7 +23,7 @@ pub enum AuditEventType {
 }
 
 /// Flattened context for an audit event — useful for evaluation without raw sensitive data.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct AuditContext {
     /// Task or operation identifier.
     pub task_id: Option<String>,
@@ -40,52 +39,79 @@ pub struct AuditContext {
 
 /// Audit logger that wraps mirror-log for conductor operations.
 pub struct ConductorAuditLogger {
-    store: Arc<Mutex<LogStore>>,
+    conn: Arc<Mutex<Connection>>,
 }
 
 impl ConductorAuditLogger {
     /// Create a new audit logger with the specified database path.
     pub fn new(db_path: &str) -> Result<Self> {
-        let store = LogStore::open(db_path).context("Failed to open audit log store")?;
+        let conn = Connection::open(db_path).context("Failed to open audit log database")?;
+        
+        // Initialize mirror-log tables if they don't exist
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS events (\n\
+             id TEXT PRIMARY KEY,\n\
+             timestamp INTEGER NOT NULL,\n\
+             source TEXT NOT NULL,\n\
+             content TEXT NOT NULL,\n\
+             meta TEXT,\n\
+             ingested_at INTEGER NOT NULL,\n\
+             content_hash TEXT\n\
+             );\n\
+             CREATE TABLE IF NOT EXISTS active_events (\n\
+             id TEXT PRIMARY KEY REFERENCES events(id),\n\
+             timestamp INTEGER NOT NULL,\n\
+             source TEXT NOT NULL,\n\
+             content TEXT NOT NULL,\n\
+             meta TEXT,\n\
+             ingested_at INTEGER NOT NULL,\n\
+             content_hash TEXT\n\
+             );",
+        )
+        .context("Failed to initialize audit log tables")?;
+
         Ok(Self {
-            store: Arc::new(Mutex::new(store)),
+            conn: Arc::new(Mutex::new(conn)),
         })
     }
 
     /// Log an audit event with flattened context.
-    pub async fn log_event(&self, event_type: AuditEventType, context: AuditContext) -> Result<Uuid> {
-        let store = self.store.lock().await;
+    pub async fn log_event(&self, event_type: AuditEventType, context: AuditContext) -> Result<String> {
+        let conn = self.conn.lock().await;
 
-        let entry = LogEntry {
-            id: Uuid::new_v4(),
-            timestamp: Utc::now(),
-            source: "crabjar-conductor".to_string(),
-            event_type: format!("{:?}", event_type).to_lowercase(),
-            payload: serde_json::to_string(&context)?,
-            tags: vec!["audit".to_string()],
-        };
+        let payload = json!({
+            "event_type": format!("{:?}", event_type).to_lowercase(),
+            "timestamp": Utc::now().to_rfc3339(),
+            "source": "crabjar-conductor",
+            "task_id": context.task_id,
+            "worker_id": context.worker_id,
+            "outcome": context.outcome,
+            "duration_ms": context.duration_ms,
+            "metadata": context.metadata,
+        });
 
-        let entry_id = store.append(entry)?;
-        Ok(entry_id)
+        let text = payload.to_string();
+
+        mirror_log::append(&conn, "crabjar-conductor", &text, None)
+            .context("Failed to append audit event")
     }
 
     /// Query audit events by task ID.
-    pub async fn query_by_task(&self, task_id: &str) -> Result<Vec<LogEntry>> {
-        let store = self.store.lock().await;
-        // Filter entries by task_id in payload (simplified — real implementation would use tags or structured queries)
-        Ok(vec![]) // Placeholder — mirror-log query API needs investigation
+    pub async fn query_by_task(&self, task_id: &str) -> Result<Vec<mirror_log::Event>> {
+        let conn = self.conn.lock().await;
+        mirror_log::view::search(&conn, task_id).context("Failed to search audit events")
     }
 
     /// Query audit events by worker ID.
-    pub async fn query_by_worker(&self, worker_id: &str) -> Result<Vec<LogEntry>> {
-        let store = self.store.lock().await;
-        Ok(vec![]) // Placeholder
+    pub async fn query_by_worker(&self, worker_id: &str) -> Result<Vec<mirror_log::Event>> {
+        let conn = self.conn.lock().await;
+        mirror_log::view::search(&conn, worker_id).context("Failed to search audit events")
     }
 
     /// Get recent audit events (for debugging/monitoring).
-    pub async fn recent_events(&self, limit: usize) -> Result<Vec<LogEntry>> {
-        let store = self.store.lock().await;
-        Ok(store.recent(limit))
+    pub async fn recent_events(&self, limit: usize) -> Result<Vec<mirror_log::Event>> {
+        let conn = self.conn.lock().await;
+        mirror_log::view::recent(&conn, limit as i64).context("Failed to get recent audit events")
     }
 }
 
@@ -96,13 +122,13 @@ pub async fn log_task_completion(
     worker_id: String,
     outcome: String,
     duration_ms: u64,
-) -> Result<Uuid> {
+) -> Result<String> {
     let context = AuditContext {
         task_id: Some(task_id),
         worker_id: Some(worker_id.clone()),
         outcome,
         duration_ms: Some(duration_ms),
-        metadata: serde_json::json!({}),
+        metadata: json!({}),
     };
 
     logger.log_event(AuditEventType::TaskCompleted, context).await
@@ -114,13 +140,13 @@ pub async fn log_route_decision(
     task_id: String,
     worker_id: String,
     reason: String,
-) -> Result<Uuid> {
+) -> Result<String> {
     let context = AuditContext {
         task_id: Some(task_id),
         worker_id: Some(worker_id.clone()),
         outcome: format!("routed: {}", reason),
         duration_ms: None,
-        metadata: serde_json::json!({}),
+        metadata: json!({}),
     };
 
     logger.log_event(AuditEventType::RouteDecision, context).await
@@ -136,7 +162,6 @@ mod tests {
         let dir = tempdir()?;
         let db_path = dir.path().join("audit.db").to_str().unwrap();
         let logger = ConductorAuditLogger::new(db_path)?;
-        assert!(logger.store.lock().await.is_open());
         Ok(())
     }
 
@@ -155,7 +180,7 @@ mod tests {
         )
         .await?;
 
-        assert_ne!(entry_id, Uuid::nil());
+        assert_ne!(entry_id, "");
         Ok(())
     }
 }
