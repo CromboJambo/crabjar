@@ -43,4 +43,28 @@ pub enum SandboxError {
 
     #[error("internal sandbox error: {0}")]
     Internal(String),
+
+    #[error("podman not installed or not in PATH: {0}")]
+    PodmanNotInstalled(String),
+
+    #[error("podman command failed: {0}")]
+    PodmanCommandFailed(std::io::Error),
+
+    #[error("container creation failed: {0}")]
+    ContainerCreateFailed(String),
+
+    #[error("container execution failed: {0}")]
+    ContainerExecFailed(String),
+
+    #[error("container start failed: {0}")]
+    ContainerStartFailed(String),
+
+    #[error("container stop failed: {0}")]
+    ContainerStopFailed(String),
+
+    #[error("container destroy failed: {0}")]
+    ContainerDestroyFailed(String),
+
+    #[error("container listing failed: {0}")]
+    ContainerListFailed(String),
 }
