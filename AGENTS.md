@@ -1,5 +1,16 @@
 # Repository Guidelines
 
+## Project Scope
+
+**In scope:** Multi-agent orchestration framework with execution gating, trust layers, semantic decision-making (JEV), knowledge compression, and evidence-based worker promotion. Drop-in replacement for Hermes Agent.
+
+**Not in scope:**
+- LLM inference engine (that's pesti/llm-workspace)
+- Infrastructure-as-code / machine provisioning (that's home-lab/mirror-lab)
+- Fleet monitoring/orchestration (that's herdr)
+- Educational content for users (that's user_coarses)
+- Personal responsibility scheduling (that's Agendarator)
+
 ## Build & Test
 
 Use `just` for workflows:
