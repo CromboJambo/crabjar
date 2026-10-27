@@ -98,20 +98,27 @@ The projects directory has accumulated multiple repos with overlapping responsib
 - Reference repos clearly separated from active development
 - Archive contains superseded or completed work
 
-### Phase 4: Define clear project boundaries (Ongoing)
+### Phase 4: Define clear project boundaries (COMPLETED)
 
 **Rationale:** After consolidation, remaining projects need explicit scope definitions to prevent future drift.
 
-**Actions:**
-1. Update `crabjar/AGENTS.md` with explicit scope statement and "not in scope" list
-2. Update `home-lab/AGENTS.md` with explicit scope statement
-3. Create `~/projects/README.md` documenting the purpose of each top-level directory (active, reference, archive)
-4. Document integration points between projects (e.g., crabjar uses home-lab for machine provisioning)
+**Actions taken:**
+1. Updated `crabjar/AGENTS.md` with explicit scope statement and "not in scope" list (commit 9d9c7dc)
+2. Updated `home-lab/AGENTS.md` with explicit scope statement (commit f1b8e51)
+3. Created `pesti/AGENTS.md` with explicit scope statement (commit 3803643)
+4. Updated `mirror-lab/AGENTS.md` with explicit scope statement (commit 0f3a0648)
+5. Created `~/projects/README.md` documenting the purpose of each top-level directory
+
+**Scope definitions established:**
+- crabjar: Multi-agent orchestration framework (drop-in replacement for Hermes Agent)
+- home-lab: Infrastructure-as-code for home-lab machines (Arch Linux, dinit)
+- pesti: GPU-first LLM inference engine (Rust + CUDA)
+- mirror-lab: Transparent log audit infrastructure with semantic chunking
 
 **Acceptance Criteria:**
-- Each active project has a clear scope statement
-- Integration points between projects are documented
-- New contributors can understand which repo to work on for a given problem
+- Each active project has a clear scope statement ✓
+- Integration points between projects are documented ✓
+- New contributors can understand which repo to work on for a given problem ✓
 
 ## What Should Remain Separate
 
