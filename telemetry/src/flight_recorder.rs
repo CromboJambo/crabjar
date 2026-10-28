@@ -54,6 +54,33 @@ impl<'a> FlightRecorder<'a> {
         Ok(self)
     }
 
+    /// Record a guard decision via OpenTelemetry (no-op if OTel not enabled).
+    #[cfg(feature = "otel")]
+    pub fn record_guard_decision(
+        &self,
+        session_id: &str,
+        action_type: &str,
+        decision: &str,
+        trust_layer: i32,
+        confidence: f64,
+    ) {
+        if let Some(otel) = &self.otel {
+            otel.record_guard_decision(session_id, action_type, decision, trust_layer, confidence);
+        }
+    }
+
+    /// Record a guard decision (no-op when OTel feature is disabled).
+    #[cfg(not(feature = "otel"))]
+    pub fn record_guard_decision(
+        &self,
+        _session_id: &str,
+        _action_type: &str,
+        _decision: &str,
+        _trust_layer: i32,
+        _confidence: f64,
+    ) {
+    }
+
     /// Initialize the flight recorder database.
     pub fn init(&self) -> Result<(), FlightRecorderError> {
         init_db(self.conn)

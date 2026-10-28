@@ -977,6 +977,27 @@ async fn handle_exec(
         cwd.to_string()
     };
 
+    // Telemetry layer: initialize flight recorder BEFORE guard check
+    // so we can record the guard decision itself
+    let flight_db_path = project_root.join("telemetry/flight.db");
+    let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
+    let mut flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
+        &flight_conn,
+        "exec-session",
+    );
+    flight_recorder.init()?;
+
+    // Enable OTel export if endpoint provided (CLI flag or env var)
+    let otel_endpoint = std::env::var("CRABJAR_OTEL_ENDPOINT").unwrap_or_else(|_| String::new());
+    let effective_otel = if !otel_endpoint.is_empty() {
+        otel_endpoint
+    } else {
+        otel_endpoint.to_string()
+    };
+    if !effective_otel.is_empty() {
+        flight_recorder = flight_recorder.with_otel(&effective_otel)?;
+    }
+
     // Guard layer: gate check before execution
     let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard/guard.db"))
         .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").expect("guard db fallback"));
@@ -1022,6 +1043,17 @@ async fn handle_exec(
         Some(reason.to_string()),
     );
 
+    // Record guard decision via OTel telemetry
+    let decision_str = match &status {
+        crabjar_guard::ActionStatus::Denied => "denied",
+        crabjar_guard::ActionStatus::Pending => "pending",
+        crabjar_guard::ActionStatus::TrustApproved => "approved",
+        crabjar_guard::ActionStatus::Executed | crabjar_guard::ActionStatus::Interrupted => {
+            "executed"
+        }
+    };
+    flight_recorder.record_guard_decision("exec-session", "exec", decision_str, 3, 0.9);
+
     match status {
         crabjar_guard::ActionStatus::Denied => Ok(json!({
             "success": false,
@@ -1053,27 +1085,6 @@ async fn handle_exec(
             }))
         }
         crabjar_guard::ActionStatus::TrustApproved => {
-            // Telemetry layer: persistent flight recorder
-            let flight_db_path = project_root.join("telemetry/flight.db");
-            let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
-            let mut flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
-                &flight_conn,
-                "exec-session",
-            );
-            flight_recorder.init()?;
-
-            // Enable OTel export if endpoint provided (CLI flag or env var)
-            let otel_endpoint =
-                std::env::var("CRABJAR_OTEL_ENDPOINT").unwrap_or_else(|_| String::new());
-            let effective_otel = if !otel_endpoint.is_empty() {
-                otel_endpoint
-            } else {
-                otel_endpoint.to_string()
-            };
-            if !effective_otel.is_empty() {
-                flight_recorder = flight_recorder.with_otel(&effective_otel)?;
-            }
-
             // Tool registry: discover and validate tools before execution
             let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
             let tool_registry_conn: Option<rusqlite::Connection> =
