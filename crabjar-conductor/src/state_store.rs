@@ -555,10 +555,10 @@ impl StateStore {
 
     pub fn heartbeat(&self, worker_id: &str) -> Result<(), rusqlite::Error> {
         let now = Utc::now().to_rfc3339();
-        
+
         // Check for idle decay first
         self.apply_idle_decay(worker_id)?;
-        
+
         // Update status and last heartbeat
         self.db.execute(
             "UPDATE workers SET status = 'online', last_heartbeat = ? WHERE id = ?",
@@ -583,11 +583,14 @@ impl StateStore {
     /// Apply idle decay: if worker hasn't been active in >30 days, drop trust level.
     fn apply_idle_decay(&self, worker_id: &str) -> Result<(), rusqlite::Error> {
         // Get last heartbeat and current trust level
-        let row = self.db.query_row(
-            "SELECT last_heartbeat, trust_level FROM workers WHERE id = ?",
-            params![worker_id],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, u8>(1)?)),
-        ).optional()?;
+        let row = self
+            .db
+            .query_row(
+                "SELECT last_heartbeat, trust_level FROM workers WHERE id = ?",
+                params![worker_id],
+                |r| Ok((r.get::<_, String>(0)?, r.get::<_, u8>(1)?)),
+            )
+            .optional()?;
 
         if let Some((last_hb, current_level)) = row {
             if last_hb.is_empty() {
@@ -600,7 +603,7 @@ impl StateStore {
                     // Convert parsed time to UTC for subtraction
                     let last_utc = last_time.with_timezone(&Utc);
                     let elapsed = (now - last_utc).num_days();
-                    
+
                     if elapsed > 30 && current_level > 0 {
                         // Idle for >30 days, drop one trust level
                         self.db.execute(

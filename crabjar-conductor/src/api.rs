@@ -51,6 +51,7 @@ pub fn routes(conductor: ConductorState) -> Router {
     let public_app: Router = Router::new()
         .route("/metrics/cache", get(get_cache_stats))
         .route("/workers/register", post(register_worker))
+        .route("/workers/login", post(worker_login_handler))
         .route("/workers/poll", post(worker_poll_handler))
         .route("/workers/heartbeat", post(worker_heartbeat_public))
         .route("/decide/evaluate", post(evaluate_decision_handler))
@@ -309,6 +310,38 @@ async fn register_worker(
             "worker_id": worker.id,
             "name": worker.name,
             "auth_token": token
+        })),
+        Ok(Err(e)) => Json(json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+        Err(e) => Json(json!({
+            "status": "error",
+            "message": format!("task join error: {}", e)
+        })),
+    }
+}
+
+async fn worker_login_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let name = body["name"].as_str().unwrap_or("").to_string();
+    let ssh_key = body["ssh_key"].as_str().map(|s| s.to_string());
+
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        c.worker_login(&name, ssh_key)
+    })
+    .await;
+
+    match result {
+        Ok(Ok((worker, token))) => Json(json!({
+            "status": "authenticated",
+            "worker_id": worker.id,
+            "name": worker.name,
+            "auth_token": token,
+            "trust_level": worker.trust_level
         })),
         Ok(Err(e)) => Json(json!({
             "status": "error",
@@ -2329,7 +2362,7 @@ async fn worker_heartbeat_public(
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     let worker_id = body["worker_id"].as_str().unwrap_or("").to_string();
-    
+
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.worker_heartbeat(&worker_id)

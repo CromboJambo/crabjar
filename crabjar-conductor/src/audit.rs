@@ -46,7 +46,7 @@ impl ConductorAuditLogger {
     /// Create a new audit logger with the specified database path.
     pub fn new(db_path: &str) -> Result<Self> {
         let conn = Connection::open(db_path).context("Failed to open audit log database")?;
-        
+
         // Initialize mirror-log tables if they don't exist
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS events (\n\
@@ -76,7 +76,11 @@ impl ConductorAuditLogger {
     }
 
     /// Log an audit event with flattened context.
-    pub async fn log_event(&self, event_type: AuditEventType, context: AuditContext) -> Result<String> {
+    pub async fn log_event(
+        &self,
+        event_type: AuditEventType,
+        context: AuditContext,
+    ) -> Result<String> {
         let conn = self.conn.lock().await;
 
         let payload = json!({
@@ -131,7 +135,9 @@ pub async fn log_task_completion(
         metadata: json!({}),
     };
 
-    logger.log_event(AuditEventType::TaskCompleted, context).await
+    logger
+        .log_event(AuditEventType::TaskCompleted, context)
+        .await
 }
 
 /// Log a route decision event.
@@ -149,7 +155,9 @@ pub async fn log_route_decision(
         metadata: json!({}),
     };
 
-    logger.log_event(AuditEventType::RouteDecision, context).await
+    logger
+        .log_event(AuditEventType::RouteDecision, context)
+        .await
 }
 
 #[cfg(test)]
@@ -160,15 +168,18 @@ mod tests {
     #[tokio::test]
     async fn test_audit_logger_creation() -> Result<()> {
         let dir = tempdir()?;
-        let db_path = dir.path().join("audit.db").to_str().unwrap();
+        let binding = dir.path().join("audit.db");
+        let db_path = binding.to_str().unwrap();
         let logger = ConductorAuditLogger::new(db_path)?;
+        drop(logger);
         Ok(())
     }
 
     #[tokio::test]
     async fn test_log_task_completion() -> Result<()> {
         let dir = tempdir()?;
-        let db_path = dir.path().join("audit.db").to_str().unwrap();
+        let binding = dir.path().join("audit.db");
+        let db_path = binding.to_str().unwrap();
         let logger = ConductorAuditLogger::new(db_path)?;
 
         let entry_id = log_task_completion(

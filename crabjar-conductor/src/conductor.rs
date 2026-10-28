@@ -471,7 +471,9 @@ impl Conductor {
 
         // Worker not found — register a new one (auto-registration on first login)
         info!(name = %name, "Auto-registering worker on first login");
-        let result = self.store.register_worker(name.to_string(), vec![], ssh_key)?;
+        let result = self
+            .store
+            .register_worker(name.to_string(), vec![], ssh_key)?;
         Ok(result)
     }
 
@@ -832,9 +834,7 @@ mod tests {
             .unwrap();
 
         // Login with the same name should return the existing worker
-        let (logged_in_worker, new_token) = conductor
-            .worker_login("login-worker", None)
-            .unwrap();
+        let (logged_in_worker, new_token) = conductor.worker_login("login-worker", None).unwrap();
 
         assert_eq!(logged_in_worker.id, worker.id);
         assert!(!new_token.is_empty()); // Should have a valid token
@@ -848,9 +848,7 @@ mod tests {
             Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
 
         // Login with a name that doesn't exist yet should auto-register
-        let (worker, token) = conductor
-            .worker_login("new-worker", None)
-            .unwrap();
+        let (worker, token) = conductor.worker_login("new-worker", None).unwrap();
 
         assert_eq!(worker.name, "new-worker");
         assert!(!token.is_empty());
@@ -870,9 +868,16 @@ mod tests {
 
         // Register workers with different trust levels
         let (trusted, _) = conductor
-            .register_worker("trusted-worker".to_string(), vec!["compute".to_string()], None)
+            .register_worker(
+                "trusted-worker".to_string(),
+                vec!["compute".to_string()],
+                None,
+            )
             .unwrap();
-        conductor.store.set_worker_trust_level(&trusted.id, 2).unwrap();
+        conductor
+            .store
+            .set_worker_trust_level(&trusted.id, 2)
+            .unwrap();
 
         let (untrusted, _) = conductor
             .register_worker("new-worker".to_string(), vec!["compute".to_string()], None)
@@ -880,7 +885,10 @@ mod tests {
         // Trust level is 0 by default — insufficient for auto-assignment
 
         // Create a goal and task requiring trust level 1+
-        let goal = conductor.store.create_goal("Sensitive task".to_string()).unwrap();
+        let goal = conductor
+            .store
+            .create_goal("Sensitive task".to_string())
+            .unwrap();
         let task = conductor
             .store
             .create_task(&goal.id, "handle sensitive data".to_string())
@@ -911,7 +919,10 @@ mod tests {
                 None,
             )
             .unwrap();
-        conductor.store.set_worker_trust_level(&worker.id, 1).unwrap();
+        conductor
+            .store
+            .set_worker_trust_level(&worker.id, 1)
+            .unwrap();
 
         // Create task requiring any NVIDIA GPU
         let goal = conductor.store.create_goal("GPU task".to_string()).unwrap();
@@ -938,7 +949,11 @@ mod tests {
 
         // Register worker at trust level 0
         let (worker, _) = conductor
-            .register_worker("threshold-worker".to_string(), vec!["compute".to_string()], None)
+            .register_worker(
+                "threshold-worker".to_string(),
+                vec!["compute".to_string()],
+                None,
+            )
             .unwrap();
         assert_eq!(worker.trust_level, 0);
 
@@ -972,7 +987,10 @@ mod tests {
         let (worker, _) = conductor
             .register_worker("fail-worker".to_string(), vec!["compute".to_string()], None)
             .unwrap();
-        conductor.store.set_worker_trust_level(&worker.id, 2).unwrap();
+        conductor
+            .store
+            .set_worker_trust_level(&worker.id, 2)
+            .unwrap();
 
         // Complete some tasks to establish a baseline
         for i in 0..5 {
@@ -989,7 +1007,10 @@ mod tests {
 
         // Fail enough tasks to exceed 50% failure rate (6 failures vs 5 successes)
         for i in 0..6 {
-            let goal = conductor.store.create_goal(format!("Fail goal {}", i)).unwrap();
+            let goal = conductor
+                .store
+                .create_goal(format!("Fail goal {}", i))
+                .unwrap();
             let task = conductor
                 .store
                 .create_task(&goal.id, "echo fail".to_string())
@@ -1016,7 +1037,10 @@ mod tests {
         let (worker, _) = conductor
             .register_worker("idle-worker".to_string(), vec!["compute".to_string()], None)
             .unwrap();
-        conductor.store.set_worker_trust_level(&worker.id, 2).unwrap();
+        conductor
+            .store
+            .set_worker_trust_level(&worker.id, 2)
+            .unwrap();
 
         // Simulate idle time by backdating last_heartbeat to >30 days ago
         let now = chrono::Utc::now();
@@ -1048,7 +1072,11 @@ mod tests {
 
         // Register worker at trust level 0
         let (worker, original_token) = conductor
-            .register_worker("token-worker".to_string(), vec!["compute".to_string()], None)
+            .register_worker(
+                "token-worker".to_string(),
+                vec!["compute".to_string()],
+                None,
+            )
             .unwrap();
         assert_eq!(worker.trust_level, 0);
 

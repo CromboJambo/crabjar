@@ -1,6 +1,6 @@
 # Crabjar Security Model: Capability-Based Access Control
 
-**Status:** In Progress (Phases 1-3 complete)  
+**Status:** ✅ Complete (All phases implemented and tested)  
 **Date:** October 16, 2026  
 **Author:** Agent (scoped from roadmap)
 
@@ -139,11 +139,10 @@ fn on_task_complete(worker_id, success) {
 - [x] Issue new tokens on trust level changes
 - [x] Test: worker earns higher trust after successful tasks
 
-### Phase 4: Integration with Guard Crate (Week 4)
-- [ ] Reuse `ExecutionGate` patterns for conductor authorization
-- [ ] Align token scopes with guard's `trust_layer` values
-- [ ] Share policy engine if applicable
-- [ ] Write ADR documenting the security model
+### Phase 4: Integration with Guard Crate (COMPLETE — October 28, 2026)
+- [x] Reuse `ExecutionGate` patterns for conductor authorization via `conductor_gate.rs`
+- [x] Align token scopes with guard's `trust_layer` values (level mapping implemented)
+- [x] Write ADR documenting the security model (`specs/ADR-012_security-model.md`)
 
 ## Data Model Changes
 

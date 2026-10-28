@@ -24,6 +24,7 @@ pub mod api;
 pub mod attention;
 pub mod audit;
 pub mod auth;
+pub mod conductor_gate;
 pub mod conductor;
 pub mod decision;
 pub mod gate;
