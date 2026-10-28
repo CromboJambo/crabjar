@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "name": "retry-decision",
+  "description": "Determine whether to retry a failed operation or give up based on error type and attempt count",
+  "options": [
+    {
+      "id": "retry",
+      "description": "Retry the operation - the error is likely transient or recoverable"
+    },
+    {
+      "id": "give_up",
+      "description": "Stop retrying - the error is persistent or further attempts are unlikely to succeed"
+    }
+  ],
+  "threshold": 0.80,
+  "evaluation_factors": [
+    "Nature of the error (transient vs permanent)",
+    "Number of previous attempts",
+    "Time elapsed since first attempt",
+    "Cost of additional retries",
+    "Expected probability of success on next attempt"
+  ],
+  "metadata": {
+    "created": "2026-10-27",
+    "owner": "crabjar-team",
+    "purpose": "Bounded retry decisions via JEV semantic matching"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "name": "priority-ranking",
+  "description": "Determine which task should be prioritized highest based on urgency, impact, and dependencies",
+  "options": [
+    {
+      "id": "task_1",
+      "description": "First task in the provided list"
+    },
+    {
+      "id": "task_2",
+      "description": "Second task in the provided list"
+    },
+    {
+      "id": "task_3",
+      "description": "Third task in the provided list"
+    }
+  ],
+  "threshold": 0.75,
+  "evaluation_factors": [
+    "Urgency and time sensitivity of each task",
+    "Impact on users or business operations",
+    "Dependencies between tasks",
+    "Complexity and effort required",
+    "Alignment with strategic goals"
+  ],
+  "metadata": {
+    "created": "2026-10-27",
+    "owner": "crabjar-team",
+    "purpose": "Bounded priority ranking via JEV semantic matching"
+  }
+}
