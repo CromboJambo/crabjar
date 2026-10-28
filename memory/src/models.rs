@@ -8,6 +8,8 @@ pub enum KnowledgeKind {
     Pattern,
     Example,
     Context,
+    Rule,
+    Procedure,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -17,6 +19,23 @@ pub enum Source {
     Agent,
     System,
     External,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Evidence {
+    pub supporting_examples: Vec<String>,
+    pub counterexamples: Vec<String>,
+    pub accuracy: f64,
+}
+
+impl Default for Evidence {
+    fn default() -> Self {
+        Self {
+            supporting_examples: Vec::new(),
+            counterexamples: Vec::new(),
+            accuracy: 1.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +49,10 @@ pub struct KnowledgeEntry {
     pub source_type: String,
     pub source_id: String,
     pub provenance_id: String,
+    // Knowledge compression triad fields
+    pub confidence: f64,
+    pub evidence: Evidence,
+    pub source_observations: Vec<String>,
 }
 
 impl KnowledgeEntry {
@@ -44,6 +67,9 @@ impl KnowledgeEntry {
             source_type: String::new(),
             source_id: String::new(),
             provenance_id: String::new(),
+            confidence: 1.0,
+            evidence: Evidence::default(),
+            source_observations: Vec::new(),
         }
     }
 
@@ -73,6 +99,42 @@ impl KnowledgeEntry {
             obj.insert("stale_after".into(), val);
         }
         self
+    }
+
+    pub fn confidence(mut self, confidence: f64) -> Self {
+        self.confidence = confidence;
+        self
+    }
+
+    pub fn with_evidence(mut self, evidence: Evidence) -> Self {
+        self.evidence = evidence;
+        self
+    }
+
+    pub fn add_supporting_example(mut self, example_id: impl Into<String>) -> Self {
+        self.evidence.supporting_examples.push(example_id.into());
+        self
+    }
+
+    pub fn add_counterexample(mut self, example_id: impl Into<String>) -> Self {
+        self.evidence.counterexamples.push(example_id.into());
+        self
+    }
+
+    pub fn with_source_observations(mut self, obs_ids: Vec<impl Into<String>>) -> Self {
+        self.source_observations = obs_ids.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Recalculate accuracy based on evidence counts.
+    pub fn update_accuracy(&mut self) {
+        let total = self.evidence.supporting_examples.len() + self.evidence.counterexamples.len();
+        if total > 0 {
+            self.evidence.accuracy =
+                self.evidence.supporting_examples.len() as f64 / total as f64;
+        } else {
+            self.evidence.accuracy = 1.0;
+        }
     }
 }
 

@@ -3,6 +3,7 @@
 use crate::auth;
 use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
 use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assign};
+use crate::promotion::PromotionManager;
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
 use tracing::{debug, error, info, warn};
@@ -33,28 +34,35 @@ pub struct Conductor {
     config: ConductorConfig,
     decision_gate: Option<DecisionGate>,
     hybrid_layer: Option<crate::attention::HybridDecisionLayer>,
+    promotion_manager: PromotionManager,
 }
 
 impl Conductor {
     /// Create a new conductor with an in-memory database (for testing).
     pub fn new(config: ConductorConfig) -> Result<Self> {
         let store = StateStore::open(":memory:")?;
+        let db_conn = Connection::open(":memory:")?;
+        let promotion_manager = PromotionManager::new(db_conn)?;
         Ok(Self {
             store,
             config,
             decision_gate: None,
             hybrid_layer: None,
+            promotion_manager,
         })
     }
 
     /// Create a conductor with a specific database path.
     pub fn with_db(config: ConductorConfig, db_path: &str) -> Result<Self> {
         let store = StateStore::open(db_path)?;
+        let db_conn = Connection::open(db_path)?;
+        let promotion_manager = PromotionManager::new(db_conn)?;
         Ok(Self {
             store,
             config,
             decision_gate: None,
             hybrid_layer: None,
+            promotion_manager,
         })
     }
 

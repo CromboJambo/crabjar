@@ -32,6 +32,12 @@ members = [
     "crates/terminal",
     # Training dataset extraction (harvest stage of the MoC training harness)
     "crates/train-extract",
+    # Training data preprocessing: secret stripping
+    "crates/train-secret-stripper",
+    # Training data deduplication engine with occurrence tracking
+    "crates/train-dedup",
+    # File watcher daemon for training data pipeline
+    "crates/train-filewatcher",
     # Host apps
     "apps/teams",
     "apps/terrarium",

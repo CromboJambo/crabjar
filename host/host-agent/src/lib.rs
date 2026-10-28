@@ -24,7 +24,7 @@ pub use loop_engine::{AgentLoop, LoopResult};
 pub use model_routing::{LoopPhase, ModelRouter, PhaseBackendKind, PhaseBuilder, PhaseConfig};
 pub use planner::Planner;
 pub use reflector::Reflector;
-pub use semantic_compression::{compress_observations, SemanticCompressionResult};
+pub use semantic_compression::{CompressedKnowledge, CompressionEvidence, compress_observations, SemanticCompressionResult};
 pub use structural_compression::{CompressedCode, compress_code};
 pub use verifier::Verifier;
 pub use work_item_store::WorkItemStore;

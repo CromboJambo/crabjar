@@ -189,6 +189,11 @@ pub struct StateStore {
 }
 
 impl StateStore {
+    /// Get a reference to the underlying database connection.
+    pub fn db(&self) -> &rusqlite::Connection {
+        &self.db
+    }
+
     /// Open or create a state store at the given path.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, rusqlite::Error> {
         let db = Connection::open(path)?;

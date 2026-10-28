@@ -86,10 +86,12 @@ fn format_knowledge_entry(entry: &KnowledgeEntry) -> Vec<Sample> {
     };
 
     let kind_label = match entry.kind {
-        agent_context::KnowledgeKind::Instruction => "rule",
+        agent_context::KnowledgeKind::Instruction => "instruction",
         agent_context::KnowledgeKind::Pattern => "pattern",
         agent_context::KnowledgeKind::Example => "example",
         agent_context::KnowledgeKind::Context => "context",
+        agent_context::KnowledgeKind::Rule => "rule",
+        agent_context::KnowledgeKind::Procedure => "procedure",
     };
 
     let instruction = format!(

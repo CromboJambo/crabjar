@@ -14,7 +14,7 @@
 use crabjar_host_core::work_item::Observation;
 use std::collections::HashMap;
 
-use crate::semantic_compression::compress_observations;
+use crate::semantic_compression::{compress_observations, CompressedKnowledge};
 use crate::structural_compression::compress_code;
 
 /// Configuration for context compression.
@@ -90,7 +90,7 @@ impl ContextCompressor {
         Self::new(CompressionConfig::default())
     }
 
-    /// Compress observations into a context string.
+    /// Compress observations into a context string and derive knowledge items.
     ///
     /// Strategy:
     /// 1. If compression is disabled or observation count < recent_count, return raw
@@ -98,6 +98,7 @@ impl ContextCompressor {
     /// 3. Group remaining observations by stage/kind
     /// 4. Generate summaries for each group
     /// 5. Enforce token budget
+    /// 6. Derive knowledge items from clustered observations (triad pattern)
     pub fn compress(&self, observations: &[Observation]) -> String {
         if !self.config.enabled {
             return Self::observations_to_string(observations);
@@ -113,7 +114,7 @@ impl ContextCompressor {
         let mut result = String::new();
 
         // Add summaries of older observations
-        let summaries = self.summarize(older);
+        let (summaries, _knowledge) = self.summarize(older);
         if !summaries.is_empty() {
             result.push_str("## Summary of earlier observations:\n");
             for summary in &summaries {
@@ -141,19 +142,56 @@ impl ContextCompressor {
         result
     }
 
+    /// Compress observations and return both the compressed string and derived knowledge items.
+    pub fn compress_with_knowledge(&self, observations: &[Observation]) -> (String, Vec<CompressedKnowledge>) {
+        if !self.config.enabled || observations.len() <= self.config.recent_count {
+            return (Self::observations_to_string(observations), Vec::new());
+        }
+
+        let recent = &observations[observations.len() - self.config.recent_count..];
+        let older = &observations[..observations.len() - self.config.recent_count];
+
+        let mut result = String::new();
+        let (summaries, knowledge) = self.summarize(older);
+
+        if !summaries.is_empty() {
+            result.push_str("## Summary of earlier observations:\n");
+            for summary in &summaries {
+                result.push_str(summary);
+                result.push('\n');
+            }
+            result.push('\n');
+        }
+
+        result.push_str("## Recent observations:\n");
+        result.push_str(&Self::observations_to_string(recent));
+
+        // Enforce token budget
+        let estimated_tokens = result.len() / 4;
+        if estimated_tokens > self.config.max_tokens {
+            let target_len = self.config.max_tokens * 4;
+            if result.len() > target_len {
+                result.truncate(target_len);
+                result.push_str("\n[truncated — context budget exceeded]");
+            }
+        }
+
+        (result, knowledge)
+    }
+
     /// Summarize older observations by grouping them by stage/kind and applying semantic clustering.
-    fn summarize(&self, observations: &[Observation]) -> Vec<String> {
+    fn summarize(&self, observations: &[Observation]) -> (Vec<String>, Vec<CompressedKnowledge>) {
         // Group by stage
         let mut by_stage: HashMap<&str, Vec<&Observation>> = HashMap::new();
         for obs in observations {
             by_stage.entry(obs.stage.as_str()).or_default().push(obs);
         }
 
-        // Convert to sorted vec for deterministic output
         let mut stages: Vec<_> = by_stage.into_iter().collect();
         stages.sort_by_key(|(stage, _)| stage.to_string());
 
         let mut summaries = Vec::new();
+        let mut all_knowledge = Vec::new();
 
         for (stage, obs_list) in stages.into_iter() {
             if summaries.len() >= self.config.max_summaries {
@@ -174,6 +212,9 @@ impl ContextCompressor {
                 // Apply semantic clustering to merge similar observations
                 let kind_obs_owned: Vec<Observation> = kind_obs.iter().map(|o| (*o).clone()).collect();
                 let cluster_result = compress_observations(&kind_obs_owned);
+
+                // Collect knowledge items derived from this cluster group
+                all_knowledge.extend(cluster_result.knowledge);
 
                 // Generate details from clustered observations
                 let details: Vec<_> = cluster_result
@@ -219,7 +260,7 @@ impl ContextCompressor {
             }
         }
 
-        summaries
+        (summaries, all_knowledge)
     }
 
     /// Compress a single observation's details using structural tokenization.

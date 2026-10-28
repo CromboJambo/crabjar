@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 
 /// Current schema version. Increment when adding new tables/columns.
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
     conn.execute(
@@ -23,6 +23,7 @@ pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         return Ok(());
     }
 
+    // Version 1: original tables
     conn.execute(
         "CREATE TABLE IF NOT EXISTS knowledge_entries (
             id INTEGER PRIMARY KEY,
@@ -49,10 +50,40 @@ pub fn migrate(conn: &Connection) -> Result<(), rusqlite::Error> {
         [],
     )?;
 
-    conn.execute(
-        "INSERT INTO schema_versions (version, applied_at) VALUES (?, datetime('now'))",
-        [SCHEMA_VERSION],
-    )?;
+    // Version 2: Knowledge compression triad fields
+    if current_version < 2 {
+        conn.execute(
+            "ALTER TABLE knowledge_entries ADD COLUMN confidence REAL NOT NULL DEFAULT 1.0",
+            [],
+        )?;
+        conn.execute(
+            "ALTER TABLE knowledge_entries ADD COLUMN evidence TEXT NOT NULL DEFAULT '{}'",
+            [],
+        )?;
+        conn.execute(
+            "ALTER TABLE knowledge_entries ADD COLUMN source_observations TEXT NOT NULL DEFAULT '[]'",
+            [],
+        )?;
+
+        // Knowledge compression metadata table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS knowledge_compression (
+                id INTEGER PRIMARY KEY,
+                knowledge_id INTEGER NOT NULL REFERENCES knowledge_entries(id),
+                compression_type TEXT NOT NULL,
+                original_count INTEGER NOT NULL DEFAULT 0,
+                compressed_count INTEGER NOT NULL DEFAULT 0,
+                confidence REAL NOT NULL DEFAULT 1.0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "INSERT INTO schema_versions (version, applied_at) VALUES (?, datetime('now'))",
+            [SCHEMA_VERSION],
+        )?;
+    }
 
     Ok(())
 }

@@ -28,12 +28,14 @@ pub mod conductor_gate;
 pub mod conductor;
 pub mod decision;
 pub mod gate;
+pub mod promotion;
 pub mod state_store;
 pub mod task_scheduler;
 pub mod worker_registry;
 
 // Re-export core types for ergonomic use
 pub use conductor::{Conductor, ConductorConfig};
+pub use promotion::PromotionManager;
 pub use state_store::Worker;
 pub use state_store::{Goal, StateStore, Task};
 pub use task_scheduler::TaskScheduler;

@@ -3,6 +3,11 @@
 //! Groups similar observations together based on embedding similarity, then summarizes
 //! clusters with a representative observation + count. Uses 768-dim hash embeddings
 //! (no HTTP dependency) for offline/edge use cases.
+//!
+//! Implements the knowledge compression triad pattern:
+//! - Compressed form: rule/procedure derived from clustered observations
+//! - Supporting evidence: examples where the rule worked vs failed
+//! - Source traceability: links back to original observation IDs
 
 use crabjar_host_core::work_item::Observation;
 
@@ -12,28 +17,24 @@ const SIMILARITY_THRESHOLD: f64 = 0.85;
 /// Dimensionality of hash embeddings.
 const EMBEDDING_DIM: usize = 768;
 
+/// Minimum cluster size to promote to a rule.
+const MIN_CLUSTER_SIZE: usize = 2;
+
 /// Compute a hash-based embedding for an observation string.
-/// Uses multiple hash functions to create distinct vectors for different inputs.
 fn embed(text: &str) -> Vec<f64> {
     let mut emb = vec![0.0f64; EMBEDDING_DIM];
 
-    // Use a simple but effective hashing approach:
-    // For each byte, compute multiple hash values and distribute across dimensions
     for (i, byte) in text.bytes().enumerate() {
-        // Primary hash: direct index
         let idx1 = i % EMBEDDING_DIM;
         emb[idx1] += byte as f64;
 
-        // Secondary hash: different stride to spread out values
         let idx2 = ((i * 7) + (byte as usize)) % EMBEDDING_DIM;
         emb[idx2] += (byte as f64) * 0.5;
 
-        // Tertiary hash: XOR-based
         let idx3 = ((i ^ byte as usize) * 13) % EMBEDDING_DIM;
         emb[idx3] += (byte as f64) * 0.25;
     }
 
-    // L2 normalize to unit vector
     let norm = l2_norm(&emb);
     if norm > 0.0 {
         for v in emb.iter_mut() {
@@ -43,12 +44,10 @@ fn embed(text: &str) -> Vec<f64> {
     emb
 }
 
-/// Compute L2 norm of a vector.
 fn l2_norm(v: &[f64]) -> f64 {
     v.iter().map(|x| x * x).sum::<f64>().sqrt()
 }
 
-/// Compute cosine similarity between two vectors.
 fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
     let dot = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum::<f64>();
     let norm_a = l2_norm(a);
@@ -60,29 +59,24 @@ fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
 }
 
 /// Cluster observations based on semantic similarity.
-/// Returns clusters where each cluster is a list of observation indices.
 fn cluster_observations(observations: &[Observation]) -> Vec<Vec<usize>> {
     let n = observations.len();
     if n == 0 {
         return vec![];
     }
 
-    // Compute embeddings for all observations
     let embeddings: Vec<Vec<f64>> = observations
         .iter()
         .map(|obs| embed(obs.details.as_str()))
         .collect();
 
-    // Greedy clustering: each observation either joins an existing cluster or starts a new one
     let mut clusters: Vec<Vec<usize>> = vec![vec![0]];
 
     for i in 1..n {
         let mut best_cluster = None;
         let mut best_similarity = f64::MIN;
 
-        // Find the most similar existing cluster representative
         for (cluster_idx, cluster) in clusters.iter().enumerate() {
-            // Use first observation in cluster as representative
             let rep_idx = cluster[0];
             let sim = cosine_similarity(&embeddings[i], &embeddings[rep_idx]);
             if sim > best_similarity {
@@ -91,11 +85,9 @@ fn cluster_observations(observations: &[Observation]) -> Vec<Vec<usize>> {
             }
         }
 
-        // If similar enough to an existing cluster, join it
         if best_cluster.is_some() && best_similarity >= SIMILARITY_THRESHOLD {
             clusters[best_cluster.unwrap()].push(i);
         } else {
-            // Start new cluster
             clusters.push(vec![i]);
         }
     }
@@ -103,10 +95,46 @@ fn cluster_observations(observations: &[Observation]) -> Vec<Vec<usize>> {
     clusters
 }
 
-/// Semantic compression result.
+/// Evidence tracking for a piece of compressed knowledge.
+#[derive(Debug, Clone)]
+pub struct CompressionEvidence {
+    pub supporting_examples: Vec<String>,
+    pub counterexamples: Vec<String>,
+    pub accuracy: f64,
+}
+
+impl Default for CompressionEvidence {
+    fn default() -> Self {
+        Self {
+            supporting_examples: Vec::new(),
+            counterexamples: Vec::new(),
+            accuracy: 1.0,
+        }
+    }
+}
+
+/// A piece of compressed knowledge with triad components.
+#[derive(Debug, Clone)]
+pub struct CompressedKnowledge {
+    pub id: String,
+    /// The compressed form (rule/procedure)
+    pub content: String,
+    /// Type of compression (rule, procedure, model)
+    pub kind: String,
+    /// Confidence score based on cluster consistency
+    pub confidence: f64,
+    /// Supporting evidence
+    pub evidence: CompressionEvidence,
+    /// Source observation IDs that produced this knowledge
+    pub source_observations: Vec<String>,
+}
+
+/// Semantic compression result with triad components.
 pub struct SemanticCompressionResult {
     /// Compressed observations (one per cluster, with count)
     pub compressed: Vec<Observation>,
+    /// Knowledge items derived from clusters (triad-form)
+    pub knowledge: Vec<CompressedKnowledge>,
     /// Original observation count
     pub original_count: usize,
     /// Number of clusters formed
@@ -114,12 +142,14 @@ pub struct SemanticCompressionResult {
 }
 
 /// Apply semantic compression to observations using embedding similarity clustering.
+/// Produces both compressed observations and formal knowledge items with triad components.
 pub fn compress_observations(observations: &[Observation]) -> SemanticCompressionResult {
     let original_count = observations.len();
 
     if original_count <= 1 {
         return SemanticCompressionResult {
             compressed: observations.to_vec(),
+            knowledge: Vec::new(),
             original_count,
             cluster_count: original_count,
         };
@@ -128,31 +158,66 @@ pub fn compress_observations(observations: &[Observation]) -> SemanticCompressio
     // Cluster observations by semantic similarity
     let clusters = cluster_observations(observations);
 
-    // For each cluster, create a summarized observation using the representative (first) observation
-    let compressed: Vec<Observation> = clusters
-        .iter()
-        .map(|cluster| {
-            if cluster.len() == 1 {
-                // Single observation, return as-is
-                observations[cluster[0]].clone()
-            } else {
-                // Multiple similar observations — summarize with count
-                let representative = &observations[cluster[0]];
-                let mut summarized = representative.clone();
-                summarized.details = format!(
-                    "[{}] similar {} {}: {}",
-                    cluster.len(),
-                    representative.stage,
-                    representative.kind,
-                    representative.details
-                );
-                summarized
+    // For each cluster, create a summarized observation and derive knowledge if large enough
+    let mut compressed_obs = Vec::new();
+    let mut knowledge_items = Vec::new();
+
+    for (cluster_idx, cluster) in clusters.iter().enumerate() {
+        if cluster.len() == 1 {
+            // Single observation, return as-is
+            compressed_obs.push(observations[cluster[0]].clone());
+        } else {
+            // Multiple similar observations — summarize with count
+            let representative = &observations[cluster[0]];
+            let mut summarized = representative.clone();
+
+            // Collect source observation IDs
+            let source_ids: Vec<String> = cluster
+                .iter()
+                .map(|&i| observations[i].id.to_string())
+                .collect();
+
+            // Calculate confidence based on cluster size (larger = more confident)
+            let raw_confidence = 0.7 + (cluster.len() as f64 * 0.02);
+            let confidence = if raw_confidence > 0.95 { 0.95 } else { raw_confidence };
+
+            summarized.details = format!(
+                "[{}] similar {} {}: {}",
+                cluster.len(),
+                representative.stage,
+                representative.kind,
+                representative.details
+            );
+            compressed_obs.push(summarized);
+
+            // Derive knowledge item if cluster is large enough
+            if cluster.len() >= MIN_CLUSTER_SIZE {
+                let evidence = CompressionEvidence {
+                    supporting_examples: source_ids.clone(),
+                    counterexamples: Vec::new(),
+                    accuracy: 1.0,
+                };
+
+                let knowledge = CompressedKnowledge {
+                    id: format!("kn_{}_{}", cluster_idx, uuid::Uuid::new_v4().to_string()[..8].to_string()),
+                    content: format!(
+                        "If {} context with {} pattern, expect {} outcome",
+                        representative.stage, representative.kind, representative.details
+                    ),
+                    kind: "rule".to_string(),
+                    confidence,
+                    evidence,
+                    source_observations: source_ids,
+                };
+
+                knowledge_items.push(knowledge);
             }
-        })
-        .collect();
+        }
+    }
 
     SemanticCompressionResult {
-        compressed,
+        compressed: compressed_obs,
+        knowledge: knowledge_items,
         original_count,
         cluster_count: clusters.len(),
     }

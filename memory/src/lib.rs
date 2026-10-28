@@ -11,7 +11,7 @@ pub use context::{
     DEFAULT_CONTEXT_BUDGET, MAX_TOKENS_PER_FRAGMENT, P0_ALERT_TOKENS, estimate_tokens,
 };
 pub use error::{Error, Result};
-pub use models::{EventKind, KnowledgeEntry, KnowledgeKind, KnowledgeRow, Source};
+pub use models::{Evidence, EventKind, KnowledgeEntry, KnowledgeKind, KnowledgeRow, Source};
 pub use state_docs::StateDocQuerier;
 pub use state_docs::models::{
     Annotation, CodeBlock, ConfidenceAssessment, DocMetadata, Section, Table,
