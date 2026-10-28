@@ -452,6 +452,29 @@ impl Conductor {
         Ok(result)
     }
 
+    /// Authenticate a worker by name and SSH key, returning (worker, auth_token).
+    /// If the worker is not registered, this creates a new registration.
+    pub fn worker_login(&self, name: &str, ssh_key: Option<String>) -> Result<(Worker, String)> {
+        // Try to find existing worker by name
+        let workers = self.store.list_workers()?;
+        if let Some(existing) = workers.into_iter().find(|w| w.name == name) {
+            // Validate SSH key if provided and worker has one stored
+            if let Some(ref key) = ssh_key {
+                auth::validate_ssh_public_key(key)?;
+            }
+
+            // Refresh the token for the existing worker
+            let new_token = self.store.refresh_worker_token(&existing.id)?;
+            info!(worker_id = %existing.id, "Worker authenticated via login");
+            return Ok((existing, new_token));
+        }
+
+        // Worker not found — register a new one (auto-registration on first login)
+        info!(name = %name, "Auto-registering worker on first login");
+        let result = self.store.register_worker(name.to_string(), vec![], ssh_key)?;
+        Ok(result)
+    }
+
     /// Poll for tasks assigned to a specific worker.
     pub fn tasks_for_worker(&self, worker_id: &str) -> Result<Vec<Task>> {
         // Get the worker's capabilities and trust level
@@ -790,5 +813,268 @@ mod tests {
         // Actually at 1 success it's still below the threshold, so no upgrade yet
         let updated_worker = conductor.store.get_worker(&worker.id).unwrap().unwrap();
         assert_eq!(updated_worker.successful_tasks, 1);
+    }
+
+    #[test]
+    fn worker_login_existing_refreshes_token() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register a worker first
+        let (worker, _original_token) = conductor
+            .register_worker(
+                "login-worker".to_string(),
+                vec!["compute".to_string()],
+                None,
+            )
+            .unwrap();
+
+        // Login with the same name should return the existing worker
+        let (logged_in_worker, new_token) = conductor
+            .worker_login("login-worker", None)
+            .unwrap();
+
+        assert_eq!(logged_in_worker.id, worker.id);
+        assert!(!new_token.is_empty()); // Should have a valid token
+    }
+
+    #[test]
+    fn worker_login_new_auto_registers() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Login with a name that doesn't exist yet should auto-register
+        let (worker, token) = conductor
+            .worker_login("new-worker", None)
+            .unwrap();
+
+        assert_eq!(worker.name, "new-worker");
+        assert!(!token.is_empty());
+
+        // Verify the worker was registered
+        let workers = conductor.list_workers();
+        assert_eq!(workers.len(), 1);
+        assert_eq!(workers[0].name, "new-worker");
+    }
+
+    #[test]
+    fn task_assignment_validates_trust_level() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register workers with different trust levels
+        let (trusted, _) = conductor
+            .register_worker("trusted-worker".to_string(), vec!["compute".to_string()], None)
+            .unwrap();
+        conductor.store.set_worker_trust_level(&trusted.id, 2).unwrap();
+
+        let (untrusted, _) = conductor
+            .register_worker("new-worker".to_string(), vec!["compute".to_string()], None)
+            .unwrap();
+        // Trust level is 0 by default — insufficient for auto-assignment
+
+        // Create a goal and task requiring trust level 1+
+        let goal = conductor.store.create_goal("Sensitive task".to_string()).unwrap();
+        let task = conductor
+            .store
+            .create_task(&goal.id, "handle sensitive data".to_string())
+            .unwrap();
+        conductor.store.set_task_trust_level(&task.id, 1).unwrap();
+
+        // Only the trusted worker should be able to claim this task
+        let trusted_tasks = conductor.tasks_for_worker(&trusted.id).unwrap();
+        assert_eq!(trusted_tasks.len(), 1);
+        assert_eq!(trusted_tasks[0].id, task.id);
+
+        let untrusted_tasks = conductor.tasks_for_worker(&untrusted.id).unwrap();
+        assert_eq!(untrusted_tasks.len(), 0); // Trust level too low
+    }
+
+    #[test]
+    fn wildcard_capability_matching() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register worker with specific GPU
+        let (worker, _) = conductor
+            .register_worker(
+                "gpu-node".to_string(),
+                vec!["compute".to_string(), "gpu:nvidia:rtx4090".to_string()],
+                None,
+            )
+            .unwrap();
+        conductor.store.set_worker_trust_level(&worker.id, 1).unwrap();
+
+        // Create task requiring any NVIDIA GPU
+        let goal = conductor.store.create_goal("GPU task".to_string()).unwrap();
+        let task = conductor
+            .store
+            .create_task(&goal.id, "use nvidia gpu".to_string())
+            .unwrap();
+        conductor
+            .store
+            .set_task_capabilities(&task.id, &["gpu:nvidia:*".to_string()])
+            .unwrap();
+
+        // Worker with rtx4090 should match gpu:nvidia:*
+        let tasks = conductor.tasks_for_worker(&worker.id).unwrap();
+        assert_eq!(tasks.len(), 1);
+    }
+
+    #[test]
+    fn trust_level_upgrades_after_threshold() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register worker at trust level 0
+        let (worker, _) = conductor
+            .register_worker("threshold-worker".to_string(), vec!["compute".to_string()], None)
+            .unwrap();
+        assert_eq!(worker.trust_level, 0);
+
+        // Complete 5 successful tasks to reach the upgrade threshold
+        for i in 0..5 {
+            let goal = conductor.store.create_goal(format!("Goal {}", i)).unwrap();
+            let task = conductor
+                .store
+                .create_task(&goal.id, "echo success".to_string())
+                .unwrap();
+            conductor.store.assign_task(&task.id, &worker.id).unwrap();
+            conductor
+                .report_task_complete(&task.id, Some("success".to_string()))
+                .unwrap();
+        }
+
+        // After 5 successes, trust level should upgrade to 1
+        let updated_worker = conductor.store.get_worker(&worker.id).unwrap().unwrap();
+        assert_eq!(updated_worker.trust_level, 1);
+        assert_eq!(updated_worker.successful_tasks, 5);
+    }
+
+    #[test]
+    fn failed_task_decreases_trust_level() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register worker and manually set to trust level 2
+        let (worker, _) = conductor
+            .register_worker("fail-worker".to_string(), vec!["compute".to_string()], None)
+            .unwrap();
+        conductor.store.set_worker_trust_level(&worker.id, 2).unwrap();
+
+        // Complete some tasks to establish a baseline
+        for i in 0..5 {
+            let goal = conductor.store.create_goal(format!("Goal {}", i)).unwrap();
+            let task = conductor
+                .store
+                .create_task(&goal.id, "echo success".to_string())
+                .unwrap();
+            conductor.store.assign_task(&task.id, &worker.id).unwrap();
+            conductor
+                .report_task_complete(&task.id, Some("success".to_string()))
+                .unwrap();
+        }
+
+        // Fail enough tasks to exceed 50% failure rate (6 failures vs 5 successes)
+        for i in 0..6 {
+            let goal = conductor.store.create_goal(format!("Fail goal {}", i)).unwrap();
+            let task = conductor
+                .store
+                .create_task(&goal.id, "echo fail".to_string())
+                .unwrap();
+            conductor.store.assign_task(&task.id, &worker.id).unwrap();
+            conductor
+                .report_task_failed(&task.id, "error occurred".to_string())
+                .unwrap();
+        }
+
+        // Trust level should decrease from 2 to 1 (failure rate > 50%)
+        let updated_worker = conductor.store.get_worker(&worker.id).unwrap().unwrap();
+        assert_eq!(updated_worker.trust_level, 1);
+    }
+
+    #[test]
+    fn idle_decay_reduces_trust_level() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register worker and manually set to trust level 2
+        let (worker, _) = conductor
+            .register_worker("idle-worker".to_string(), vec!["compute".to_string()], None)
+            .unwrap();
+        conductor.store.set_worker_trust_level(&worker.id, 2).unwrap();
+
+        // Simulate idle time by backdating last_heartbeat to >30 days ago
+        let now = chrono::Utc::now();
+        let thirty_days = chrono::Duration::days(31);
+        let past = now - thirty_days;
+        conductor
+            .store
+            .update_worker_last_heartbeat(&worker.id, &past)
+            .unwrap();
+
+        // Heartbeat should trigger idle decay
+        conductor.worker_heartbeat(&worker.id).unwrap();
+
+        let updated_worker = conductor.store.get_worker(&worker.id).unwrap().unwrap();
+        assert_eq!(updated_worker.trust_level, 1);
+    }
+
+    #[test]
+    fn api_returns_new_token_on_trust_change() {
+        use crate::api;
+        use axum::body::Body;
+        use axum::http::{Request, StatusCode};
+        use serde_json::Value;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.db");
+        let conductor =
+            Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
+
+        // Register worker at trust level 0
+        let (worker, original_token) = conductor
+            .register_worker("token-worker".to_string(), vec!["compute".to_string()], None)
+            .unwrap();
+        assert_eq!(worker.trust_level, 0);
+
+        // Complete tasks to reach threshold and trigger upgrade
+        for i in 0..5 {
+            let goal = conductor.store.create_goal(format!("Goal {}", i)).unwrap();
+            let task = conductor
+                .store
+                .create_task(&goal.id, "echo success".to_string())
+                .unwrap();
+            conductor.store.assign_task(&task.id, &worker.id).unwrap();
+            conductor
+                .report_task_complete(&task.id, Some("success".to_string()))
+                .unwrap();
+        }
+
+        // Worker should now be at trust level 1
+        let updated_worker = conductor.store.get_worker(&worker.id).unwrap().unwrap();
+        assert_eq!(updated_worker.trust_level, 1);
+
+        // Login again — token should reflect new trust level
+        let (_, new_token) = conductor.worker_login("token-worker", None).unwrap();
+        assert_ne!(original_token, new_token);
+
+        // Verify the token's trust level claim via validate_token
+        let claims = auth::validate_token(&new_token).unwrap();
+        assert_eq!(claims.trust_level, 1);
     }
 }

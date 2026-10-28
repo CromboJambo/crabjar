@@ -1,6 +1,6 @@
 # Crabjar Security Model: Capability-Based Access Control
 
-**Status:** Draft  
+**Status:** In Progress (Phases 1-3 complete)  
 **Date:** October 16, 2026  
 **Author:** Agent (scoped from roadmap)
 
@@ -121,23 +121,23 @@ fn on_task_complete(worker_id, success) {
 
 ## Implementation Plan
 
-### Phase 1: Worker Authentication (Week 1)
-- [ ] Add SSH key verification to `/workers/register`
-- [ ] Implement token generation/validation middleware for all endpoints
-- [ ] Store worker tokens with expiration in SQLite
-- [ ] Test: worker can't claim tasks without valid token
+### Phase 1: Worker Authentication (COMPLETE — October 28, 2026)
+- [x] Add SSH key verification to `/workers/register`
+- [x] Implement token generation/validation middleware for all endpoints
+- [x] Store worker tokens with expiration in SQLite
+- [x] Test: worker can't claim tasks without valid token
 
-### Phase 2: Task-Level Capabilities (Week 2)
-- [ ] Add `required_capabilities` field to Task struct and schema migration
-- [ ] Implement capability matching logic (exact + wildcard)
-- [ ] Validate capabilities on task claim, not just assignment
-- [ ] Test: worker with wrong capabilities can't claim task
+### Phase 2: Task-Level Capabilities (COMPLETE — October 28, 2026)
+- [x] Add `required_capabilities` field to Task struct and schema migration
+- [x] Implement capability matching logic (exact + wildcard)
+- [x] Validate capabilities on task claim, not just assignment
+- [x] Test: worker with wrong capabilities can't claim task
 
-### Phase 3: Trust Level Annealing (Week 3)
-- [ ] Add `trust_level`, `successful_tasks`, `failed_tasks` to Worker struct
-- [ ] Implement annealing logic in conductor's task completion handling
-- [ ] Issue new tokens on trust level changes
-- [ ] Test: worker earns higher trust after successful tasks
+### Phase 3: Trust Level Annealing (COMPLETE — October 28, 2026)
+- [x] Add `trust_level`, `successful_tasks`, `failed_tasks` to Worker struct
+- [x] Implement annealing logic in conductor's task completion handling
+- [x] Issue new tokens on trust level changes
+- [x] Test: worker earns higher trust after successful tasks
 
 ### Phase 4: Integration with Guard Crate (Week 4)
 - [ ] Reuse `ExecutionGate` patterns for conductor authorization

@@ -58,6 +58,10 @@ pub struct Task {
     pub dependencies: Vec<String>,
     pub status: TaskStatus,
     pub result: Option<String>,
+    /// Phase 2: explicit capability requirements (e.g., ["gpu:nvidia:*"])
+    pub required_capabilities: Vec<String>,
+    /// Phase 2: minimum trust level required to execute this task
+    pub trust_level_required: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -146,6 +150,9 @@ fn row_to_goal(row: &Row<'_>) -> rusqlite::Result<Goal> {
 
 fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
     let deps_str: String = row.get(4)?;
+    let required_caps_str: String = row.get(7).unwrap_or_else(|_| "[]".to_string());
+    let trust_required: u8 = row.get(8).unwrap_or(0);
+
     Ok(Task {
         id: row.get(0)?,
         goal_id: row.get(1)?,
@@ -155,6 +162,9 @@ fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
             .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?,
         status: TaskStatus::from_str(&row.get::<_, String>(5)?),
         result: row.get(6)?,
+        required_capabilities: serde_json::from_str(&required_caps_str)
+            .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?,
+        trust_level_required: trust_required,
     })
 }
 
@@ -213,6 +223,7 @@ impl StateStore {
                 trust_level INTEGER NOT NULL DEFAULT 0,
                 successful_tasks INTEGER NOT NULL DEFAULT 0,
                 failed_tasks INTEGER NOT NULL DEFAULT 0,
+                last_heartbeat TEXT NOT NULL DEFAULT '',
                 auth_token TEXT UNIQUE,
                 token_expires_at TEXT
             );
@@ -306,6 +317,8 @@ impl StateStore {
             dependencies: vec![],
             status: TaskStatus::Pending,
             result: None,
+            required_capabilities: vec![],
+            trust_level_required: 0,
         };
 
         let deps_json = serde_json::to_string(&task.dependencies)
@@ -328,7 +341,7 @@ impl StateStore {
     pub fn get_task(&self, id: &str) -> Result<Option<Task>, rusqlite::Error> {
         self.db
             .query_row(
-                "SELECT id, goal_id, worker_id, command, dependencies, status, result FROM tasks WHERE id = ?",
+                "SELECT id, goal_id, worker_id, command, dependencies, status, result, required_capabilities, trust_level_required FROM tasks WHERE id = ?",
                 params![id],
                 row_to_task,
             )
@@ -337,7 +350,7 @@ impl StateStore {
 
     pub fn list_tasks_for_goal(&self, goal_id: &str) -> Result<Vec<Task>, rusqlite::Error> {
         let mut stmt = self.db.prepare(
-            "SELECT id, goal_id, worker_id, command, dependencies, status, result FROM tasks WHERE goal_id = ?",
+            "SELECT id, goal_id, worker_id, command, dependencies, status, result, required_capabilities, trust_level_required FROM tasks WHERE goal_id = ?",
         )?;
         let rows = stmt.query_map(params![goal_id], row_to_task)?;
         rows.collect()
@@ -429,7 +442,8 @@ impl StateStore {
     /// Get pending tasks that have no dependencies or whose dependencies are all completed.
     pub fn get_ready_tasks(&self) -> Result<Vec<Task>, rusqlite::Error> {
         let sql = r#"
-            SELECT t.id, t.goal_id, t.worker_id, t.command, t.dependencies, t.status, t.result
+            SELECT t.id, t.goal_id, t.worker_id, t.command, t.dependencies, t.status, t.result,
+                   t.required_capabilities, t.trust_level_required
             FROM tasks t
             WHERE t.status = 'pending'
               AND (
@@ -540,10 +554,67 @@ impl StateStore {
     }
 
     pub fn heartbeat(&self, worker_id: &str) -> Result<(), rusqlite::Error> {
+        let now = Utc::now().to_rfc3339();
+        
+        // Check for idle decay first
+        self.apply_idle_decay(worker_id)?;
+        
+        // Update status and last heartbeat
         self.db.execute(
-            "UPDATE workers SET status = 'online' WHERE id = ?",
-            params![worker_id],
+            "UPDATE workers SET status = 'online', last_heartbeat = ? WHERE id = ?",
+            params![now, worker_id],
         )?;
+        Ok(())
+    }
+
+    /// For testing: set the last heartbeat timestamp directly.
+    pub fn update_worker_last_heartbeat(
+        &self,
+        worker_id: &str,
+        time: &DateTime<Utc>,
+    ) -> Result<(), rusqlite::Error> {
+        self.db.execute(
+            "UPDATE workers SET last_heartbeat = ? WHERE id = ?",
+            params![time.to_rfc3339(), worker_id],
+        )?;
+        Ok(())
+    }
+
+    /// Apply idle decay: if worker hasn't been active in >30 days, drop trust level.
+    fn apply_idle_decay(&self, worker_id: &str) -> Result<(), rusqlite::Error> {
+        // Get last heartbeat and current trust level
+        let row = self.db.query_row(
+            "SELECT last_heartbeat, trust_level FROM workers WHERE id = ?",
+            params![worker_id],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, u8>(1)?)),
+        ).optional()?;
+
+        if let Some((last_hb, current_level)) = row {
+            if last_hb.is_empty() {
+                return Ok(()); // No heartbeat recorded yet
+            }
+
+            match DateTime::parse_from_rfc3339(&last_hb) {
+                Ok(last_time) => {
+                    let now = Utc::now();
+                    // Convert parsed time to UTC for subtraction
+                    let last_utc = last_time.with_timezone(&Utc);
+                    let elapsed = (now - last_utc).num_days();
+                    
+                    if elapsed > 30 && current_level > 0 {
+                        // Idle for >30 days, drop one trust level
+                        self.db.execute(
+                            "UPDATE workers SET trust_level = ? WHERE id = ?",
+                            params![current_level.saturating_sub(1), worker_id],
+                        )?;
+                    }
+                }
+                Err(_) => {
+                    // Invalid timestamp, skip decay
+                }
+            }
+        }
+
         Ok(())
     }
 
