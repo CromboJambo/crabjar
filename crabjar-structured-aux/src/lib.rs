@@ -9,6 +9,8 @@
 
 use async_trait::async_trait;
 use crabjar_plugin::{Plugin, PluginError, ToolDefinition, ToolResult};
+use std::collections::HashMap;
+use std::fs;
 use reqwest::Client;
 use serde_json;
 use std::env;
@@ -37,6 +39,7 @@ pub struct StructuredAuxPlugin {
     api_key: Option<String>,
     base_url: Option<String>,
     model: Option<String>,
+    criteria_path: String,
 }
 
 impl StructuredAuxPlugin {
@@ -46,6 +49,10 @@ impl StructuredAuxPlugin {
 
     /// Create with explicit configuration.
     pub fn with_config(base_url: Option<String>, model: Option<String>, api_key: Option<String>) -> Self {
+        // Determine criteria path from environment or default to local specs directory.
+        let criteria_path = env::var("STRUCTURED_AUX_CRITERIA_PATH")
+            .unwrap_or_else(|_| "/home/crombo/projects/active/crabjar/crabjar-structured-aux/specs/criteria".to_string());
+
         Self {
             name: PROVIDER_NAME.to_string(),
             version: "0.1.0".to_string(),
@@ -53,7 +60,75 @@ impl StructuredAuxPlugin {
             api_key,
             base_url,
             model,
+            criteria_path,
         }
+    }
+
+    /// Load a criteria file by decision type name.
+    fn load_criteria(&self, decision_type: &str) -> Result<serde_json::Value, PluginError> {
+        let path = format!("{}/{}.json", self.criteria_path, decision_type);
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                serde_json::from_str(&content).map_err(|e| PluginError::Execution {
+                    name: self.name.clone(),
+                    reason: format!("Failed to parse criteria {}: {}", path, e),
+                })
+            }
+            Err(e) => Err(PluginError::Execution {
+                name: self.name.clone(),
+                reason: format!("Failed to read criteria file {}: {}", path, e),
+            }),
+        }
+    }
+
+    /// Build a structured prompt from criteria and context.
+    fn build_structured_prompt(&self, criteria: &serde_json::Value, context: serde_json::Value) -> String {
+        let mut prompt = String::new();
+        
+        // Add decision description if available.
+        if let Some(description) = criteria.get("description").and_then(|v| v.as_str()) {
+            prompt.push_str(&format!("Decision: {}\n\n", description));
+        }
+
+        // Add evaluation factors as guidance.
+        if let Some(factors) = criteria.get("evaluation_factors").and_then(|v| v.as_array()) {
+            prompt.push_str("Consider these factors:\n");
+            for (i, factor) in factors.iter().enumerate() {
+                if let Some(factor_str) = factor.as_str() {
+                    prompt.push_str(&format!("{}. {}\n", i + 1, factor_str));
+                }
+            }
+            prompt.push('\n');
+        }
+
+        // Add the context/state.
+        prompt.push_str("Context:\n");
+        for (key, value) in context.as_object().unwrap_or(&serde_json::Map::new()) {
+            if let Some(val_str) = value.as_str() {
+                prompt.push_str(&format!("  {}: {}\n", key, val_str));
+            } else {
+                prompt.push_str(&format!("  {}: {}\n", key, value.to_string()));
+            }
+        }
+        prompt.push('\n');
+
+        // Add options.
+        if let Some(options) = criteria.get("options").and_then(|v| v.as_array()) {
+            prompt.push_str("Available options:\n");
+            for option in options.iter() {
+                if let (Some(id), Some(desc)) = (
+                    option.get("id").and_then(|v| v.as_str()),
+                    option.get("description").and_then(|v| v.as_str())
+                ) {
+                    prompt.push_str(&format!("[{}] {}\n", id, desc));
+                }
+            }
+        }
+
+        // Final instruction.
+        prompt.push_str("\nSelect the most appropriate option by its ID.");
+
+        prompt
     }
 
     /// Get the configured base URL, falling back to OpenRouter.
@@ -91,6 +166,7 @@ impl StructuredAuxPlugin {
         &self,
         state: serde_json::Value,
         questions: Vec<serde_json::Value>,
+        custom_prompt: Option<&str>,
     ) -> Result<serde_json::Value, PluginError> {
         let base_url = self.get_base_url();
         let model = self.get_model();
@@ -116,24 +192,30 @@ impl StructuredAuxPlugin {
         let mut messages = vec![
             serde_json::json!({
                 "role": "system",
-                "content": "You are a decision-making assistant. Given the state and available options, choose the most appropriate response. Return only the option name, nothing else."
+                "content": "You are a decision-making assistant. Given the state and available options, choose the most appropriate response. Return only the option name exactly as shown, nothing else."
             })
         ];
 
-        // Build user message with state and questions.
-        let mut user_content = format!("State: {}\n", state.to_string());
-        for q in &questions {
-            if let Some(name) = q.get("name").and_then(|v| v.as_str()) {
-                user_content.push_str(&format!("Question: {}\n", name));
-                if let Some(options) = q.get("options").and_then(|v| v.as_array()) {
-                    for opt in options.iter() {
-                        if let Some(opt_str) = opt.as_str() {
-                            user_content.push_str(&format!("  {}\n", opt_str));
+        // Use custom prompt if provided, otherwise build from state and questions.
+        let user_content = match custom_prompt {
+            Some(prompt) => prompt.to_string(),
+            None => {
+                let mut content = format!("State: {}\n", state.to_string());
+                for q in &questions {
+                    if let Some(name) = q.get("name").and_then(|v| v.as_str()) {
+                        content.push_str(&format!("Question: {}\n", name));
+                        if let Some(options) = q.get("options").and_then(|v| v.as_array()) {
+                            for opt in options.iter() {
+                                if let Some(opt_str) = opt.as_str() {
+                                    content.push_str(&format!("  {}\n", opt_str));
+                                }
+                            }
                         }
                     }
                 }
+                content
             }
-        }
+        };
 
         messages.push(serde_json::json!({
             "role": "user",
@@ -212,26 +294,29 @@ impl StructuredAuxPlugin {
         })
     }
 
-    /// Handle approval task.
+    /// Handle approval task using structured criteria.
     async fn handle_approval(&self, args: serde_json::Value) -> Result<ToolResult, PluginError> {
         let request = args.get("request").and_then(|v| v.as_str()).unwrap_or("");
         let policy = args.get("policy").and_then(|v| v.as_str()).unwrap_or("");
 
-        // Define bounded approval options.
-        let questions = vec![serde_json::json!({
-            "name": "verdict",
-            "options": ["approve", "deny", "needs_review"]
-        })];
+        // Load structured criteria for approval decisions.
+        let criteria = self.load_criteria("approval-decision")?;
 
-        let state = serde_json::json!({
+        // Build context for the decision.
+        let context = serde_json::json!({
             "request": request,
-            "guardian_policy": policy
+            "policy": policy
         });
 
-        let result = self.make_decision_call(state, questions).await?;
+        // Build structured prompt from criteria and context.
+        let prompt = self.build_structured_prompt(&criteria, context);
 
-        // Extract the verdict from the decision response.
+        // Make the decision call with the structured prompt.
+        let result = self.make_decision_call(serde_json::json!({}), vec![], Some(&prompt)).await?;
         let verdict = result.get("answer").and_then(|v| v.as_str()).unwrap_or("needs_review");
+        
+        // Clean up the response - strip brackets if present.
+        let verdict = verdict.trim().trim_start_matches('[').trim_end_matches(']').to_string();
 
         Ok(ToolResult {
             stdout: format!("{{\"verdict\":\"{}\"}}", verdict),
@@ -270,7 +355,7 @@ impl StructuredAuxPlugin {
             "available_tools": args.get("tools")
         });
 
-        let result = self.make_decision_call(state, questions).await?;
+        let result = self.make_decision_call(state, questions, None).await?;
 
         // Extract the tool selection from the decision response.
         let tool = result.get("answer").and_then(|v| v.as_str()).unwrap_or("");
@@ -283,23 +368,29 @@ impl StructuredAuxPlugin {
         })
     }
 
-    /// Handle risk assessment task.
+    /// Handle risk assessment task using structured criteria.
     async fn handle_risk(&self, args: serde_json::Value) -> Result<ToolResult, PluginError> {
         let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
         let context = args.get("context").and_then(|v| v.as_str()).unwrap_or("");
 
-        let questions = vec![serde_json::json!({
-            "name": "risk_level",
-            "options": ["low", "medium", "high", "critical"]
-        })];
+        // Load structured criteria for risk assessment.
+        let criteria = self.load_criteria("risk-assessment")?;
 
-        let state = serde_json::json!({
+        // Build context for the decision.
+        let decision_context = serde_json::json!({
             "action": action,
             "context": context
         });
 
-        let result = self.make_decision_call(state, questions).await?;
+        // Build structured prompt from criteria and context.
+        let prompt = self.build_structured_prompt(&criteria, decision_context);
+
+        // Make the decision call with the structured prompt.
+        let result = self.make_decision_call(serde_json::json!({}), vec![], Some(&prompt)).await?;
         let risk = result.get("answer").and_then(|v| v.as_str()).unwrap_or("medium");
+        
+        // Clean up the response - strip brackets if present.
+        let risk = risk.trim().trim_start_matches('[').trim_end_matches(']').to_string();
 
         Ok(ToolResult {
             stdout: format!("{{\"risk_level\":\"{}\"}}", risk),
@@ -336,7 +427,7 @@ impl StructuredAuxPlugin {
             "instruction": "Select the highest priority task"
         });
 
-        let result = self.make_decision_call(state, questions).await?;
+        let result = self.make_decision_call(state, questions, None).await?;
         let priority = result.get("answer").and_then(|v| v.as_str()).unwrap_or("");
 
         Ok(ToolResult {
@@ -347,23 +438,29 @@ impl StructuredAuxPlugin {
         })
     }
 
-    /// Handle retry decision task.
+    /// Handle retry decision task using structured criteria.
     async fn handle_retry(&self, args: serde_json::Value) -> Result<ToolResult, PluginError> {
         let error = args.get("error").and_then(|v| v.as_str()).unwrap_or("");
         let attempts = args.get("attempts").and_then(|v| v.as_i64()).unwrap_or(0);
 
-        let questions = vec![serde_json::json!({
-            "name": "should_retry",
-            "options": ["retry", "give_up"]
-        })];
+        // Load structured criteria for retry decisions.
+        let criteria = self.load_criteria("retry-decision")?;
 
-        let state = serde_json::json!({
+        // Build context for the decision.
+        let decision_context = serde_json::json!({
             "error": error,
             "attempts_made": attempts
         });
 
-        let result = self.make_decision_call(state, questions).await?;
+        // Build structured prompt from criteria and context.
+        let prompt = self.build_structured_prompt(&criteria, decision_context);
+
+        // Make the decision call with the structured prompt.
+        let result = self.make_decision_call(serde_json::json!({}), vec![], Some(&prompt)).await?;
         let decision = result.get("answer").and_then(|v| v.as_str()).unwrap_or("give_up");
+        
+        // Clean up the response - strip brackets if present.
+        let decision = decision.trim().trim_start_matches('[').trim_end_matches(']').to_string();
 
         Ok(ToolResult {
             stdout: format!("{{\"decision\":\"{}\"}}", decision),
@@ -401,7 +498,7 @@ impl StructuredAuxPlugin {
             "available_resources": resources_value
         });
 
-        let result = self.make_decision_call(state, questions).await?;
+        let result = self.make_decision_call(state, questions, None).await?;
         let resource = result.get("answer").and_then(|v| v.as_str()).unwrap_or("");
 
         Ok(ToolResult {
@@ -427,7 +524,7 @@ impl StructuredAuxPlugin {
             "instruction": "Compress this context into a compact summary preserving key facts."
         });
 
-        let result = self.make_decision_call(state, questions).await?;
+        let result = self.make_decision_call(state, questions, None).await?;
 
         // Extract the compressed text from the answer field.
         let compressed = result.get("answer").and_then(|v| v.as_str()).unwrap_or("");

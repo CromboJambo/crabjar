@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "name": "risk-assessment",
+  "description": "Assess the risk level of a proposed action based on its potential impact and context",
+  "options": [
+    {
+      "id": "low",
+      "description": "Minimal impact, easily reversible, affects non-critical systems or data"
+    },
+    {
+      "id": "medium",
+      "description": "Moderate impact, requires some review, affects operational but not critical systems"
+    },
+    {
+      "id": "high",
+      "description": "Significant impact, requires approval, affects production or user-facing systems"
+    },
+    {
+      "id": "critical",
+      "description": "Severe impact, irreversible or hard to roll back, affects core infrastructure or all users"
+    }
+  ],
+  "threshold": 0.75,
+  "evaluation_factors": [
+    "Scope of affected systems and users",
+    "Reversibility of the action",
+    "Criticality of impacted services",
+    "Potential for data loss or corruption",
+    "Time to detect and remediate if something goes wrong"
+  ],
+  "metadata": {
+    "created": "2026-10-27",
+    "owner": "crabjar-team",
+    "purpose": "Bounded risk assessment via JEV semantic matching"
+  }
+}

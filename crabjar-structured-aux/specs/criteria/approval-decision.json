@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "name": "approval-decision",
+  "description": "Evaluate whether a request should be approved, denied, or requires further review based on policy",
+  "options": [
+    {
+      "id": "approve",
+      "description": "Request meets all policy requirements and can proceed without further review"
+    },
+    {
+      "id": "deny",
+      "description": "Request violates policy or has clear blocking issues that prevent approval"
+    },
+    {
+      "id": "needs_review",
+      "description": "Request requires additional human review due to ambiguity, edge cases, or policy exceptions"
+    }
+  ],
+  "threshold": 0.80,
+  "evaluation_factors": [
+    "Compliance with stated policy",
+    "Clarity and completeness of the request",
+    "Potential for unintended consequences",
+    "Precedent and consistency with prior decisions",
+    "Urgency vs thoroughness tradeoff"
+  ],
+  "metadata": {
+    "created": "2026-10-27",
+    "owner": "crabjar-team",
+    "purpose": "Bounded approval decisions via JEV semantic matching"
+  }
+}

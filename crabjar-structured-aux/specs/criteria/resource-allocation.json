@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "name": "resource-allocation",
+  "description": "Select the optimal resource for a given request based on capabilities and availability",
+  "options": [
+    {
+      "id": "resource_1",
+      "description": "First resource in the provided list"
+    },
+    {
+      "id": "resource_2",
+      "description": "Second resource in the provided list"
+    },
+    {
+      "id": "resource_3",
+      "description": "Third resource in the provided list"
+    }
+  ],
+  "threshold": 0.75,
+  "evaluation_factors": [
+    "Match between request requirements and resource capabilities",
+    "Current availability and load of resources",
+    "Cost efficiency of the allocation",
+    "Historical performance of similar allocations",
+    "Scalability needs for future requests"
+  ],
+  "metadata": {
+    "created": "2026-10-27",
+    "owner": "crabjar-team",
+    "purpose": "Bounded resource allocation via JEV semantic matching"
+  }
+}
