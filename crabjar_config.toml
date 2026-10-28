@@ -1,0 +1,6 @@
+[plugins]
+enabled = ["structured-aux"]
+
+[plugins.structured-aux]
+api_url = "http://ftw3:8081/v1"
+model = "Qwen2.5-Coder-1.5B-Instruct"

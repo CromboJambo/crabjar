@@ -67,6 +67,7 @@ members = [
     "crabjar-skill-scanner",
     "crabjar-trust-manager",    "crabjar-compress",
     "crabjar-compress-mcp",
+    "crabjar-structured-aux",
     "universal-structure",
     "crates/email-smtp",
 ]

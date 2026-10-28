@@ -2595,6 +2595,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "crabjar-structured-aux"
+version = "0.12.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "crabjar-plugin",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "crabjar-telemetry"
 version = "0.12.2"
 dependencies = [

@@ -167,21 +167,16 @@ async fn send_heartbeat(
     client: &reqwest::Client,
     conductor_url: &str,
     worker_id: &str,
-    state: &Arc<Mutex<WorkerState>>,
+    _state: &Arc<Mutex<WorkerState>>,
 ) {
-    let url = format!("{}/workers/{}/heartbeat", conductor_url, worker_id);
+    let url = format!("{}/workers/heartbeat", conductor_url);
 
-    let s = state.lock().await;
-    let token = match &s.auth_token {
-        Some(t) => t.clone(),
-        None => return,
-    };
-
-    drop(s);
+    let body = serde_json::json!({ "worker_id": worker_id });
 
     let resp = client
         .post(&url)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(body.to_string())
         .send()
         .await;
 

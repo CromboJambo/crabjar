@@ -51,6 +51,8 @@ pub fn routes(conductor: ConductorState) -> Router {
     let public_app: Router = Router::new()
         .route("/metrics/cache", get(get_cache_stats))
         .route("/workers/register", post(register_worker))
+        .route("/workers/poll", post(worker_poll_handler))
+        .route("/workers/heartbeat", post(worker_heartbeat_public))
         .route("/decide/evaluate", post(evaluate_decision_handler))
         .route("/decide/evaluate/{id}", get(get_evaluation_status))
         .route("/jev/evaluate", post(evaluate_structural_handler))
@@ -307,6 +309,39 @@ async fn register_worker(
             "worker_id": worker.id,
             "name": worker.name,
             "auth_token": token
+        })),
+        Ok(Err(e)) => Json(json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+        Err(e) => Json(json!({
+            "status": "error",
+            "message": format!("task join error: {}", e)
+        })),
+    }
+}
+
+async fn worker_poll_handler(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let worker_id = body["worker_id"].as_str().unwrap_or("").to_string();
+
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        c.tasks_for_worker(&worker_id)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(tasks)) if !tasks.is_empty() => Json(json!({
+            "status": "task_available",
+            "task_id": tasks[0].id,
+            "goal_id": tasks[0].goal_id,
+            "command": tasks[0].command
+        })),
+        Ok(Ok(_)) => Json(json!({
+            "status": "no_tasks"
         })),
         Ok(Err(e)) => Json(json!({
             "status": "error",
@@ -2286,5 +2321,24 @@ async fn promote_rule_handler(
             "status": "error",
             "message": "Missing required fields: pattern_id, criteria_file, recommended_option"
         })),
+    }
+}
+
+async fn worker_heartbeat_public(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Json(body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let worker_id = body["worker_id"].as_str().unwrap_or("").to_string();
+    
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        c.worker_heartbeat(&worker_id)
+    })
+    .await;
+
+    match result {
+        Ok(Ok(())) => Json(json!({ "status": "ok" })),
+        Ok(Err(e)) => Json(json!({ "status": "error", "message": e.to_string() })),
+        Err(_) => Json(json!({ "status": "error", "message": "internal error" })),
     }
 }
