@@ -6,6 +6,7 @@ use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assi
 use crate::promotion::PromotionManager;
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
+use rusqlite::Connection;
 use tracing::{debug, error, info, warn};
 
 /// Configuration for the conductor service.
@@ -679,6 +680,11 @@ impl Conductor {
     /// Get the state store (for testing and API layer).
     pub fn store(&self) -> &StateStore {
         &self.store
+    }
+
+    /// Get the promotion manager (for evidence-based worker promotions).
+    pub fn promotion_manager(&self) -> &PromotionManager {
+        &self.promotion_manager
     }
 }
 

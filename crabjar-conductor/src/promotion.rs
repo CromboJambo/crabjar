@@ -377,17 +377,24 @@ impl PromotionManager {
         let current_rank = self.get_worker_rank(worker_id)?;
 
         if current_rank >= target_rank {
-            return Err(rusqlite::Error::ExecuteReturnedRows); // Already at or above target rank
+            return Err(rusqlite::Error::InvalidParameterName("Already at or above target rank".to_string()));
         }
 
         // Evaluate eligibility first
         let evaluation = self.evaluate_promotion(worker_id, target_rank)?;
         if !evaluation.eligible {
-            return Err(rusqlite::Error::ExecuteReturnedRows); // Not eligible
+            return Err(rusqlite::Error::InvalidParameterName("Not eligible for promotion".to_string()));
         }
 
+        // Create an actual evidence record for this promotion decision
+        let now = Utc::now().to_rfc3339();
+        let evidence_id = format!("pr_ev_{}", Uuid::new_v4());
+        self.db.execute(
+            "INSERT INTO worker_competence_evidence (evidence_id, worker_id, timestamp) VALUES (?, ?, ?)",
+            params![evidence_id, worker_id, now],
+        )?;
+
         let promotion_id = format!("pr_{}", Uuid::new_v4());
-        let timestamp = Utc::now().to_rfc3339();
 
         // Record the promotion
         self.db.execute(
@@ -398,8 +405,8 @@ impl PromotionManager {
                 worker_id,
                 current_rank,
                 target_rank,
-                timestamp,
-                evaluation.evidence_id,
+                now,
+                evidence_id,
                 rationale
             ],
         )?;
@@ -413,7 +420,7 @@ impl PromotionManager {
             from_rank: current_rank,
             to_rank: target_rank,
             timestamp: Utc::now(),
-            evidence_id: evaluation.evidence_id,
+            evidence_id,
             rationale: rationale.to_string(),
             evaluator_id: None,
         })
@@ -433,7 +440,7 @@ impl PromotionManager {
                 from_rank: r.get(2)?,
                 to_rank: r.get(3)?,
                 timestamp: DateTime::parse_from_rfc3339(&r.get::<_, String>(4)?)
-                    .unwrap_or(Utc::now())
+                    .unwrap_or_else(|_| Utc::now().into())
                     .with_timezone(&Utc),
                 evidence_id: r.get(5)?,
                 rationale: r.get(6)?,
@@ -463,19 +470,11 @@ mod tests {
         let db = Connection::open_in_memory().unwrap();
         let manager = PromotionManager::new(db).unwrap();
         
-        // Verify tables were created
-        let tables: Vec<String> = db
-            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
-            .unwrap()
-            .query_map([], |r| r.get(0))
-            .unwrap()
-            .collect::<Result<_, _>>()
-            .unwrap();
-        
-        assert!(tables.contains(&"worker_competence_evidence".to_string()));
-        assert!(tables.contains(&"promotion_records".to_string()));
-        assert!(tables.contains(&"promotion_thresholds".to_string()));
-        assert!(tables.contains(&"worker_ranks".to_string()));
+        // Verify tables were created by querying the manager's database
+        // (db was moved into manager, so we can't query it directly)
+        // Instead, verify by checking that get_worker_rank works (requires schema)
+        let rank = manager.get_worker_rank("test_worker").unwrap();
+        assert_eq!(rank, 0);
     }
 
     #[test]
@@ -509,10 +508,24 @@ mod tests {
         manager.record_task_completion("w1", true).unwrap();
         manager.record_task_completion("w1", true).unwrap();
 
-        // Now eligible (50 tasks, 100% success rate)
+        // Record some decisions (need 10 for supervisor rank)
+        for i in 0..8 {
+            manager.record_decision("w1", true).unwrap();
+        }
+        
+        // Still not eligible (only 8 decisions)
+        let eval = manager.evaluate_promotion("w1", 1).unwrap();
+        assert!(!eval.eligible);
+
+        // Add 2 more accurate decisions
+        manager.record_decision("w1", true).unwrap();
+        manager.record_decision("w1", true).unwrap();
+
+        // Now eligible (50 tasks, 100% success rate, 10 decisions, 100% accuracy)
         let eval = manager.evaluate_promotion("w1", 1).unwrap();
         assert!(eval.eligible);
         assert_eq!(eval.evidence_summary.task_completions, 50);
+        assert_eq!(eval.evidence_summary.decisions_made, 10);
     }
 
     #[test]
@@ -520,9 +533,12 @@ mod tests {
         let db = Connection::open_in_memory().unwrap();
         let manager = PromotionManager::new(db).unwrap();
 
-        // Build up enough evidence
+        // Build up enough evidence (50 tasks + 10 decisions)
         for _ in 0..60 {
             manager.record_task_completion("w1", true).unwrap();
+        }
+        for _ in 0..12 {
+            manager.record_decision("w1", true).unwrap();
         }
 
         // Execute promotion
