@@ -2,14 +2,21 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
-## October 31, 2026 — Web Search Tooling (P1-1 Drop-in Replacement Blocker)
+## October 31, 2026 — Web Search & Extraction Tooling (P1 Drop-in Replacement Blockers)
 
-### Implemented
+### Web Search (P1-1)
 - **crabjar-web-search crate** — Web search functionality via self-hosted SearXNG with Brave and DuckDuckGo fallbacks
 - **SearxngBackend** — Primary backend using self-hosted SearXNG instance (deployed on ftw3:8080)
 - **BraveBackend** — Fallback using Brave Search API with rate limiting
 - **DuckDuckGoBackend** — Final fallback using DuckDuckGo Instant Answers API (no key required)
 - Backend selection logic based on environment configuration
+
+### Web Content Extraction (P1-2)
+- **crabjar-web-extract crate** — Web content extraction using reqwest + scraper for HTML parsing
+- Clean text extraction with title detection, link URL preservation, and boilerplate removal
+- Character limit enforcement with truncation indicators
+- PDF detection by extension (extraction planned for future phase)
+- Integration test examples demonstrating end-to-end functionality
 
 ### Architecture Decision
 - Self-hosted SearXNG as primary backend eliminates external API dependency and provides privacy/control
@@ -22,9 +29,11 @@ All notable changes to crabjar, organized chronologically. Completed work moves 
 - Configuration stored in ~/searxng-settings.yml on ftw3
 
 ### Testing
-- Integration tests pass (2/2)
+- Integration tests pass for both web search and web extraction
 - End-to-end verification against live SearXNG instance successful
-- Example program demonstrates working web search integration
+- Example programs demonstrate working integration for both tools
+
+Both tools integrate with crabjar's orchestrator tool calling infrastructure, enabling agents to perform search→extract workflows autonomously.
 
 ## October 26, 2026 — Project Consolidation & Audit Infrastructure (Phases 1-4)
 
