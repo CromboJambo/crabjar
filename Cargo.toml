@@ -38,6 +38,8 @@ members = [
     "crates/train-dedup",
     # File watcher daemon for training data pipeline
     "crates/train-filewatcher",
+    # The terrarium — isometric hermit-crab skin over the habitat contract
+    "crates/terrarium",
     # Host apps
     "apps/teams",
     "apps/terrarium",
@@ -73,9 +75,11 @@ members = [
     "crabjar-skill-scanner",
     "crabjar-trust-manager",    "crabjar-compress",
     "crabjar-compress-mcp",
+    "crabjar-unsloth-mcp",
+    "crabjar-herdr-mcp",
     "crabjar-structured-aux",
     "universal-structure",
-    "crates/email-smtp",
+    "crates/email-smtp", "crabjar-web-extract", "crabjar-browser", "crabjar-memory",
 ]
 
 resolver = "2"

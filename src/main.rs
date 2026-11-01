@@ -6,6 +6,7 @@ mod bitwarden;
 mod crabjar_config;
 mod doctor;
 mod dotfile_manager;
+mod hermes_memory;
 mod knowledge_store;
 mod mcp_client_cli;
 mod metrics;
@@ -190,6 +191,7 @@ async fn main() {
         },
         Some(CliCommand::SlowFriend { command }) => handle_slow_friend_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
+        Some(CliCommand::Memory { command }) => handle_memory_command(command),
         Some(CliCommand::Learn {
             subcmd,
             min_invocations,
@@ -1796,6 +1798,60 @@ fn handle_slow_friend_command(
                         "status": "no_history"
                     }
                 }))
+            }
+        }
+    }
+}
+
+/// Handle memory commands (P2-1 Hermes compatibility layer)
+fn handle_memory_command(command: crabjar_lib::MemoryCommand) -> serde_json::Value {
+    let store = match hermes_memory::MemoryStore::new() {
+        Ok(s) => s,
+        Err(e) => return error_response(&e, false),
+    };
+
+    match command {
+        crabjar_lib::MemoryCommand::Add { target, content } => {
+            match store.add_entry(&target, &content) {
+                Ok(result) => json!({
+                    "success": true,
+                    "message": result.message,
+                    "usage": {
+                        "current_chars": result.current_chars,
+                        "max_chars": result.max_chars,
+                        "used_percent": result.used_percent
+                    }
+                }),
+                Err(e) => error_response(&e, false),
+            }
+        }
+        crabjar_lib::MemoryCommand::Patch { target, old_text, new_text } => {
+            match store.patch_entry(&target, &old_text, &new_text) {
+                Ok(result) => json!({
+                    "success": true,
+                    "message": result.message,
+                    "usage": {
+                        "current_chars": result.current_chars,
+                        "max_chars": result.max_chars,
+                        "used_percent": result.used_percent
+                    }
+                }),
+                Err(e) => error_response(&e, false),
+            }
+        }
+        crabjar_lib::MemoryCommand::Remove { target, old_text } => {
+            match store.remove_entry_by_substring(&target, &old_text) {
+                Ok(result) => json!({
+                    "success": true,
+                    "message": result.message,
+                    "removed": result.removed,
+                    "usage": {
+                        "current_chars": result.current_chars,
+                        "max_chars": result.max_chars,
+                        "used_percent": result.used_percent
+                    }
+                }),
+                Err(e) => error_response(&e, false),
             }
         }
     }

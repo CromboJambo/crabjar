@@ -165,6 +165,12 @@ pub enum CliCommand {
         command: SlowFriendCommand,
     },
 
+    /// Hermes-compatible memory tool (P2-1)
+    Memory {
+        #[command(subcommand)]
+        command: MemoryCommand,
+    },
+
     /// Learning loop: analyze skill invocations and suggest improvements
     Learn {
         #[arg(default_value = "analyze")]
@@ -195,6 +201,26 @@ pub enum CliCommand {
     Approval {
         #[command(subcommand)]
         command: ApprovalCommand,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum MemoryCommand {
+    /// Add a new memory entry
+    Add {
+        target: String,
+        content: String,
+    },
+    /// Patch an existing entry
+    Patch {
+        target: String,
+        old_text: String,
+        new_text: String,
+    },
+    /// Remove an entry by matching text within it
+    Remove {
+        target: String,
+        old_text: String,
     },
 }
 
