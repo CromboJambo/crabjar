@@ -57,6 +57,9 @@ crabjar-delegation = { path = "../crabjar-delegation" }
 # Directory detection for memory tool
 dirs.workspace = true
 
+# Time handling for clarify tool timeouts
+chrono.workspace = true
+
 # Local LLM inference (placeholder — llm-runner moved to PESTI portable execution substrate)
 # The native runner was removed; inference now delegates to external LLM servers.
 futures.workspace = true

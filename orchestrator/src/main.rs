@@ -2,10 +2,10 @@ use agent_context::state_docs::schema as state_schema;
 use agent_context::{Store, store::StoreError};
 use axum::{
     Router,
-    extract::Json,
-    extract::State,
+    Json,
+    extract::{Path, State},
     response::sse::{Event as SseEvent, Sse},
-    routing::post,
+    routing::{get, post},
 };
 use crabjar_delegation::Dispatcher;
 use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
@@ -16,7 +16,11 @@ use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use chrono::Utc;
+use rusqlite;
+
 mod backend;
+mod clarify;
 mod lm_studio_client;
 
 use backend::InferenceBackend;
@@ -946,6 +950,68 @@ async fn execute_tool_call(
 
             result
         }
+        // P1-5: Interactive clarify tooling
+        "clarify" => {
+            if args.is_empty() {
+                return Err("Error: clarify requires JSON arguments".to_string());
+            }
+
+            let input_json = &args[0];
+            let input: clarify::ClarifyInput = serde_json::from_str(input_json)
+                .map_err(|e| format!("Error parsing clarify arguments: {}", e))?;
+
+            info!("Executing clarify tool: question='{}'", input.question);
+
+            // Generate unique question ID
+            let question_id = uuid::Uuid::new_v4().to_string();
+
+            // Store the pending question in the knowledge store with specific tags
+            let entry = agent_context::KnowledgeEntry {
+                content: serde_json::to_string(&input)
+                    .map_err(|e| format!("Failed to serialize clarify input: {}", e))?,
+                kind: agent_context::KnowledgeKind::Context,
+                tags: vec![
+                    "clarify-pending".to_string(),
+                    format!("clarify-{}", question_id),
+                ],
+                metadata: serde_json::json!({
+                    "question_id": question_id,
+                    "status": "pending",
+                    "created_at": chrono::Utc::now().to_rfc3339()
+                }),
+                weight: 1.0,
+                source: agent_context::Source::Agent,
+                source_type: "clarify-tool".to_string(),
+                source_id: question_id.clone(),
+                provenance_id: format!("clarify-{}", question_id),
+                confidence: 1.0,
+                evidence: agent_context::Evidence {
+                    supporting_examples: vec![],
+                    counterexamples: vec![],
+                    accuracy: 1.0,
+                },
+                source_observations: vec![],
+            };
+
+            let store_lock = store.lock().unwrap();
+            match store_lock.insert(entry) {
+                Ok(id) => {
+                    info!("Clarify question stored: id={}, db_row={}", question_id, id);
+                }
+                Err(e) => {
+                    return Err(format!("Failed to persist clarify question: {}", e));
+                }
+            }
+            drop(store_lock);
+
+            // Return immediately with question ID — agent should poll for response
+            Ok(serde_json::json!({
+                "success": true,
+                "question_id": question_id,
+                "status": "pending",
+                "note": "Question sent to user. Poll /acp/clarify/status/:id for answer."
+            }).to_string())
+        }
         _ => Ok(format!("Unknown tool: {}", function_name)),
     }
 }
@@ -1104,6 +1170,237 @@ async fn search_logs(
     Ok(Json(AcpResponse::Output { data: output }))
 }
 
+// ---------------------------------------------------------------------------
+// P1-5: Interactive Clarify Tooling — API endpoints for TUI integration
+// ---------------------------------------------------------------------------
+
+/// Request body for submitting a clarify response.
+#[derive(Debug, Deserialize)]
+struct ClarifyResponseRequest {
+    /// The selected option value (for choice-based questions) or null.
+    #[serde(default)]
+    value: Option<String>,
+    /// Free-text response (for open-ended questions).
+    #[serde(default)]
+    text: Option<String>,
+}
+
+/// Submit a response to a pending clarify question.
+async fn clarify_response(
+    State(state): State<AppState>,
+    Path(question_id): Path<String>,
+    Json(payload): Json<ClarifyResponseRequest>,
+) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
+    info!(
+        "Received clarify response for question {}: value={:?}, text={:?}",
+        question_id, payload.value, payload.text
+    );
+
+    let store = state.store.lock().unwrap();
+
+    // Find the pending question by its specific tag
+    let entries = match store.query(
+        &[&format!("clarify-{}", question_id)],
+        1,
+        "",
+        "",
+        "",
+    ) {
+        Ok(entries) => entries,
+        Err(e) => {
+            error!("Failed to query clarify question {}: {}", question_id, e);
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    if entries.is_empty() {
+        return Err(axum::http::StatusCode::NOT_FOUND);
+    }
+
+    let row = &entries[0];
+
+    // Check if already answered
+    if let Some(status) = row.metadata.get("status").and_then(|v| v.as_str()) {
+        if status == "answered" {
+            return Err(axum::http::StatusCode::CONFLICT);
+        }
+    }
+
+    // Update the question entry with the response via raw SQL
+    let updated_metadata = serde_json::json!({
+        "question_id": question_id,
+        "status": "answered",
+        "response_value": payload.value.clone(),
+        "response_text": payload.text.clone(),
+        "created_at": row.metadata.get("created_at"),
+        "answered_at": chrono::Utc::now().to_rfc3339()
+    });
+
+    let metadata_str = match serde_json::to_string(&updated_metadata) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to serialize updated metadata: {}", e);
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let tags_str = serde_json::to_string(&vec![format!("clarify-{}", question_id)]).unwrap_or_default();
+
+    match store.conn.execute(
+        "UPDATE knowledge_entries SET metadata = ?, tags = ? WHERE id = ?",
+        rusqlite::params![metadata_str, tags_str, row.id],
+    ) {
+        Ok(_) => {
+            info!("Clarify question {} marked as answered", question_id);
+            Ok(Json(AcpResponse::Output {
+                data: format!("Response recorded for question {}", question_id),
+            }))
+        }
+        Err(e) => {
+            error!("Failed to update clarify question {}: {}", question_id, e);
+            Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+/// Check the status of a clarify question and retrieve the response if available.
+async fn clarify_status(
+    State(state): State<AppState>,
+    Path(question_id): Path<String>,
+) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
+    let store = state.store.lock().unwrap();
+
+    // Find the question by its specific tag
+    let entries = match store.query(
+        &[&format!("clarify-{}", question_id)],
+        1,
+        "",
+        "",
+        "",
+    ) {
+        Ok(entries) => entries,
+        Err(e) => {
+            error!("Failed to query clarify question {}: {}", question_id, e);
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    if entries.is_empty() {
+        return Err(axum::http::StatusCode::NOT_FOUND);
+    }
+
+    let row = &entries[0];
+
+    // Determine status from metadata
+    let status = row
+        .metadata
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("pending");
+
+    match status {
+        "answered" => {
+            let response_value = row
+                .metadata
+                .get("response_value")
+                .and_then(|v| v.as_str());
+            let response_text = row
+                .metadata
+                .get("response_text")
+                .and_then(|v| v.as_str());
+
+            Ok(Json(AcpResponse::Output {
+                data: serde_json::json!({
+                    "status": "answered",
+                    "question_id": question_id,
+                    "value": response_value,
+                    "text": response_text,
+                    "answered_at": row.metadata.get("answered_at").and_then(|v| v.as_str())
+                })
+                .to_string(),
+            }))
+        }
+        _ => {
+            // Check for timeout
+            let created_at = row
+                .metadata
+                .get("created_at")
+                .and_then(|v| v.as_str());
+
+            if let Some(createdAt) = created_at {
+                match chrono::DateTime::parse_from_rfc3339(createdAt) {
+                    Ok(dt) => {
+                        // Convert to UTC for comparison
+                        let dt_utc = dt.with_timezone(&chrono::Utc);
+                        let elapsed = chrono::Utc::now() - dt_utc;
+                        // Default timeout is 300 seconds (5 minutes)
+                        if elapsed.num_seconds() > 300 {
+                            return Ok(Json(AcpResponse::Output {
+                                data: serde_json::json!({
+                                    "status": "timed_out",
+                                    "question_id": question_id,
+                                    "elapsed_seconds": elapsed.num_seconds()
+                                })
+                                .to_string(),
+                            }));
+                        }
+                    }
+                    Err(_) => {}
+                }
+            }
+
+            Ok(Json(AcpResponse::Output {
+                data: serde_json::json!({
+                    "status": "pending",
+                    "question_id": question_id
+                })
+                .to_string(),
+            }))
+        }
+    }
+}
+
+/// List all pending (unanswered) clarify questions.
+async fn clarify_pending(
+    State(state): State<AppState>,
+) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
+    let store = state.store.lock().unwrap();
+
+    // Query for all entries tagged with "clarify-pending"
+    let entries = match store.query(&["clarify-pending"], 100, "", "", "") {
+        Ok(entries) => entries,
+        Err(e) => {
+            error!("Failed to query pending clarify questions: {}", e);
+            return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let questions: Vec<serde_json::Value> = entries
+        .iter()
+        .filter_map(|entry| {
+            // Parse the content back to ClarifyInput
+            match serde_json::from_str::<clarify::ClarifyInput>(&entry.content) {
+                Ok(input) => Some(serde_json::json!({
+                    "question_id": entry.metadata.get("question_id").and_then(|v| v.as_str()),
+                    "question": input.question,
+                    "options": input.options,
+                    "timeout_secs": input.timeout_secs,
+                    "created_at": entry.metadata.get("created_at").and_then(|v| v.as_str())
+                })),
+                Err(_) => None,
+            }
+        })
+        .collect();
+
+    Ok(Json(AcpResponse::Output {
+        data: serde_json::json!({
+            "pending_count": questions.len(),
+            "questions": questions
+        })
+        .to_string(),
+    }))
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing for structured logging.
@@ -1165,6 +1462,10 @@ async fn main() -> anyhow::Result<()> {
             axum::routing::get(subscribe_events),
         )
         .route("/acp/events/publish", post(publish_event))
+        // P1-5: Interactive Clarify Tooling — API endpoints for TUI integration
+        .route("/acp/clarify/response/:id", post(clarify_response))
+        .route("/acp/clarify/status/:id", get(clarify_status))
+        .route("/acp/clarify/pending", get(clarify_pending))
         .with_state(state);
 
     // Restrict CORS to localhost only (not permissive)
