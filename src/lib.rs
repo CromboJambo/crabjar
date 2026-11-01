@@ -171,6 +171,12 @@ pub enum CliCommand {
         command: MemoryCommand,
     },
 
+    /// Home Assistant application-layer tools (P2-2)
+    Ha {
+        #[command(subcommand)]
+        command: HaCommand,
+    },
+
     /// Learning loop: analyze skill invocations and suggest improvements
     Learn {
         #[arg(default_value = "analyze")]
@@ -222,6 +228,37 @@ pub enum MemoryCommand {
         target: String,
         old_text: String,
     },
+}
+
+/// Home Assistant application-layer tools (P2-2 drop-in replacement blocker)
+#[derive(Debug, Subcommand, Clone)]
+pub enum HaCommand {
+    /// Get the state of a single entity
+    GetState {
+        /// Entity ID (e.g. light.living_room)
+        entity_id: String,
+    },
+    /// List entities by domain or all
+    ListEntities {
+        /// Optional domain filter (light, switch, sensor, etc.)
+        #[arg(long)]
+        domain: Option<String>,
+    },
+    /// Call a service on an entity
+    CallService {
+        /// Service domain (light, switch, climate, etc.)
+        domain: String,
+        /// Service name (turn_on, turn_off, set_temperature, etc.)
+        service: String,
+        /// Optional entity ID to target
+        #[arg(long)]
+        entity_id: Option<String>,
+        /// Optional JSON data for the service call
+        #[arg(long)]
+        data: Option<String>,
+    },
+    /// List available services
+    ListServices,
 }
 
 #[derive(Debug, Subcommand, Clone)]

@@ -1,5 +1,7 @@
 use crate::error::{FlightRecorderError, TelemetryError};
 #[cfg(feature = "otel")]
+use crate::dagr_span_processor::{DagrEventEmitter, DagrSpanProcessor};
+#[cfg(feature = "otel")]
 use crate::otel_export::{OtelConfig, OtelExporter};
 use crate::schema::{
     CheckpointRow, FlightRecordRow, checkpoint_session, init_db, query_flight_records,
@@ -50,6 +52,31 @@ impl<'a> FlightRecorder<'a> {
         let exporter = OtelExporter::from_config(&config).map_err(|e| {
             FlightRecorderError::Internal(format!("Failed to create OTel exporter: {}", e))
         })?;
+        self.otel = Some(std::sync::Arc::new(exporter));
+        Ok(self)
+    }
+
+    /// Enable OpenTelemetry export with DAGR habitat event emission.
+    ///
+    /// When enabled, execution spans are converted to DAGR events and emitted
+    /// to the provided emitter (typically stderr for terrarium visualization).
+    #[cfg(feature = "otel")]
+    pub fn with_otel_and_dagr(
+        mut self,
+        endpoint: &str,
+        dagr_emitter: Box<dyn DagrEventEmitter>,
+    ) -> Result<Self, FlightRecorderError> {
+        let config = OtelConfig {
+            endpoint: endpoint.to_string(),
+            service_name: "crabjar".to_string(),
+        };
+
+        let dagr_processor = DagrSpanProcessor::new(dagr_emitter);
+
+        let exporter = OtelExporter::from_config_with_processor(&config, Some(dagr_processor))
+            .map_err(|e| {
+                FlightRecorderError::Internal(format!("Failed to create OTel exporter: {}", e))
+            })?;
         self.otel = Some(std::sync::Arc::new(exporter));
         Ok(self)
     }

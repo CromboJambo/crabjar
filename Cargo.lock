@@ -2235,6 +2235,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "crabjar-delegation"
+version = "0.12.2"
+dependencies = [
+ "chrono",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "crabjar-durable-objects"
 version = "0.12.2"
 dependencies = [
@@ -7246,6 +7260,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum 0.7.9",
+ "crabjar-delegation",
  "crabjar-guard",
  "crabjar-memory",
  "crabjar-telemetry",

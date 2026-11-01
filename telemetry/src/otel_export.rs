@@ -3,6 +3,7 @@
 //! Provides optional OTLP export of execution traces, metrics, and logs
 //! alongside the SQLite flight recorder (which remains the source of truth).
 
+use crate::dagr_span_processor::DagrSpanProcessor;
 use opentelemetry::{
     KeyValue, global,
     trace::{Span as _, SpanKind, Tracer as _, TracerProvider},
@@ -36,8 +37,11 @@ pub struct OtelExporter {
 }
 
 impl OtelExporter {
-    /// Create a new exporter from configuration.
-    pub fn from_config(config: &OtelConfig) -> Result<Self, String> {
+    /// Create a new exporter from configuration with optional DAGR span processor.
+    pub fn from_config_with_processor(
+        config: &OtelConfig,
+        dagr_processor: Option<DagrSpanProcessor>,
+    ) -> Result<Self, String> {
         // Set up trace context propagation
         global::set_text_map_propagator(TraceContextPropagator::new());
 
@@ -49,21 +53,31 @@ impl OtelExporter {
             .map_err(|e| format!("Failed to build OTLP span exporter: {}", e))?;
 
         // Build tracer provider with batch exporter and service name resource
-        let provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        let mut builder = opentelemetry_sdk::trace::SdkTracerProvider::builder()
             .with_batch_exporter(exporter)
             .with_resource(
                 Resource::builder()
                     .with_attributes([KeyValue::new("service.name", config.service_name.clone())])
                     .build(),
-            )
-            .build();
+            );
 
+        // Attach DAGR span processor if provided
+        if let Some(processor) = dagr_processor {
+            builder = builder.with_span_processor(processor);
+        }
+
+        let provider = builder.build();
         let tracer = provider.tracer("crabjar.telemetry");
 
         Ok(Self {
             tracer,
             _provider: Arc::new(provider),
         })
+    }
+
+    /// Create a new exporter from configuration (no DAGR processor).
+    pub fn from_config(config: &OtelConfig) -> Result<Self, String> {
+        Self::from_config_with_processor(config, None)
     }
 
     /// Record an execution event as a trace span.
@@ -80,7 +94,7 @@ impl OtelExporter {
     ) {
         let mut span = self
             .tracer
-            .span_builder(format!("crabjar.execution.{}", command))
+            .span_builder("crabjar.execution")
             .with_kind(SpanKind::Server)
             .with_attributes(vec![
                 KeyValue::new("session.id", session_id.to_string()),

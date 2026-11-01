@@ -533,6 +533,46 @@ pub enum SlowFriendCommand {
     },
 }
 
+/// Hermes-compatible memory tool subcommands
+#[derive(Debug, Subcommand, Clone)]
+pub enum MemoryCommand {
+    /// Add a new memory entry
+    Add {
+        /// Target store: "memory" (agent notes) or "user" (user profile)
+        #[arg(long, default_value = "memory")]
+        target: String,
+        /// Entry content
+        content: String,
+    },
+    /// Patch an existing memory entry
+    Patch {
+        /// Target store: "memory" or "user"
+        #[arg(long, default_value = "memory")]
+        target: String,
+        /// Substring to find (must be unique)
+        #[arg(long)]
+        old_text: String,
+        /// Replacement text
+        #[arg(long)]
+        content: String,
+    },
+    /// Remove a memory entry by substring match
+    Remove {
+        /// Target store: "memory" or "user"
+        #[arg(long, default_value = "memory")]
+        target: String,
+        /// Substring to find (must be unique)
+        #[arg(long)]
+        old_text: String,
+    },
+    /// List current memory entries with capacity info
+    List {
+        /// Target store: "memory" or "user"
+        #[arg(long, default_value = "memory")]
+        target: String,
+    },
+}
+
 /// Attempt graph subcommands (ADR-006)
 #[derive(Debug, Subcommand, Clone)]
 pub enum AttemptsCommand {

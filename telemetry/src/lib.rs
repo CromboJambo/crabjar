@@ -5,3 +5,6 @@ pub mod schema;
 
 #[cfg(feature = "otel")]
 pub mod otel_export;
+
+#[cfg(feature = "otel")]
+pub mod dagr_span_processor;

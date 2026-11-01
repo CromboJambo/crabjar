@@ -24,9 +24,11 @@ Upgrade crabjar terrarium from basic task visualization to a rich, Habblaud-styl
 
 ## Upgrade Phases
 
-### Phase 1: Rich Activity States (Foundation)
+### Phase 1: Rich Activity States (Foundation) — COMPLETE Oct 28, 2026
 
 **Goal:** Replace simple task status with Habblaud-style activity classification.
+
+**Status:** ✅ Implemented. Created `activity.rs` with 15-state `CrabActivity` enum and `ActivityInfo` struct. Integrated into simulator with derivation logic from effective_state + attempt_state + needs_user + shell_job_active + recent_activity. All 54 terrarium tests pass including 7 new activity state tests.
 
 **New CrabActivity enum:**
 ```rust
@@ -52,7 +54,7 @@ pub struct ActivityInfo {
 }
 ```
 
-**Implementation:** Extend `dagr_feed.rs` event types to include activity transitions. Each crab tracks its current activity and emits events when it changes.
+**Implementation:** Created `crates/terrarium/src/activity.rs` with enum and derivation logic. Extended Crab struct in simulator.rs to include activity state. Derivation function maps DAGR task states to rich crab activities with display info generation.
 
 ### Phase 2: Shell Job Visualization
 

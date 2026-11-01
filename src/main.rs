@@ -7,6 +7,7 @@ mod crabjar_config;
 mod doctor;
 mod dotfile_manager;
 mod hermes_memory;
+mod homeassistant;
 mod knowledge_store;
 mod mcp_client_cli;
 mod metrics;
@@ -192,6 +193,7 @@ async fn main() {
         Some(CliCommand::SlowFriend { command }) => handle_slow_friend_command(command)
             .unwrap_or_else(|err| error_response(&err.to_string(), true)),
         Some(CliCommand::Memory { command }) => handle_memory_command(command),
+        Some(CliCommand::Ha { command }) => handle_ha_command(command),
         Some(CliCommand::Learn {
             subcmd,
             min_invocations,
@@ -1850,6 +1852,61 @@ fn handle_memory_command(command: crabjar_lib::MemoryCommand) -> serde_json::Val
                         "max_chars": result.max_chars,
                         "used_percent": result.used_percent
                     }
+                }),
+                Err(e) => error_response(&e, false),
+            }
+        }
+    }
+}
+
+/// Handle Home Assistant commands (P2-2 Hermes compatibility layer)
+fn handle_ha_command(command: crabjar_lib::HaCommand) -> serde_json::Value {
+    match command {
+        crabjar_lib::HaCommand::GetState { entity_id } => {
+            match homeassistant::get_entity_state(&entity_id) {
+                Ok(state) => json!({
+                    "success": true,
+                    "message": format!("retrieved state for {}", entity_id),
+                    "data": {
+                        "entity_id": state.entity_id,
+                        "state": state.state,
+                        "attributes": state.attributes
+                    }
+                }),
+                Err(e) => error_response(&e, false),
+            }
+        }
+        crabjar_lib::HaCommand::ListEntities { domain } => {
+            match homeassistant::list_entities(domain.as_deref()) {
+                Ok(entities) => json!({
+                    "success": true,
+                    "message": format!("retrieved {} entities", entities.len()),
+                    "data": entities,
+                    "count": entities.len()
+                }),
+                Err(e) => error_response(&e, false),
+            }
+        }
+        crabjar_lib::HaCommand::CallService { domain, service, entity_id, data } => {
+            match homeassistant::call_service(&domain, &service, entity_id.as_deref(), data.as_deref()) {
+                Ok(message) => json!({
+                    "success": true,
+                    "message": message,
+                    "data": {
+                        "domain": domain,
+                        "service": service,
+                        "entity_id": entity_id
+                    }
+                }),
+                Err(e) => error_response(&e, false),
+            }
+        }
+        crabjar_lib::HaCommand::ListServices => {
+            match homeassistant::list_services() {
+                Ok(services) => json!({
+                    "success": true,
+                    "message": "retrieved available services",
+                    "data": services
                 }),
                 Err(e) => error_response(&e, false),
             }
