@@ -43,6 +43,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ Subagent delegation framework (P1-4 drop-in replacement blocker) — Hermes-compatible delegate_task tool with conductor API integration
 - ✅ Interactive clarify tooling (P1-5 drop-in replacement blocker) — Hermes-compatible clarify tool with structured questions, choice-based responses, and TUI integration via knowledge store persistence
 - ✅ Session management and search tooling (P1-6 drop-in replacement blocker) — Hermes-compatible session_search tool for searching conversation history by query or retrieving specific sessions by ID
+- ✅ Process management tooling (P1-7 drop-in replacement blocker) — Hermes-compatible process_manage tool for spawning, listing, killing, and inspecting background processes via conductor API
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control
