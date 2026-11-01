@@ -2,6 +2,30 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## October 31, 2026 — Web Search Tooling (P1-1 Drop-in Replacement Blocker)
+
+### Implemented
+- **crabjar-web-search crate** — Web search functionality via self-hosted SearXNG with Brave and DuckDuckGo fallbacks
+- **SearxngBackend** — Primary backend using self-hosted SearXNG instance (deployed on ftw3:8080)
+- **BraveBackend** — Fallback using Brave Search API with rate limiting
+- **DuckDuckGoBackend** — Final fallback using DuckDuckGo Instant Answers API (no key required)
+- Backend selection logic based on environment configuration
+
+### Architecture Decision
+- Self-hosted SearXNG as primary backend eliminates external API dependency and provides privacy/control
+- Multiple upstream engines available through single instance (Google, Bing, Brave, DuckDuckGo, etc.)
+- JSON API with structured results for easy parsing
+
+### Deployment
+- SearXNG instance deployed on ftw3 via podman at http://ftw3:8080
+- Custom settings enabling JSON format and multiple search engines
+- Configuration stored in ~/searxng-settings.yml on ftw3
+
+### Testing
+- Integration tests pass (2/2)
+- End-to-end verification against live SearXNG instance successful
+- Example program demonstrates working web search integration
+
 ## October 26, 2026 — Project Consolidation & Audit Infrastructure (Phases 1-4)
 
 ### Phase 1: Absorb agent-oversight into crabjar
