@@ -41,6 +41,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ OTel-DAGR-Terrarium Integration — OpenTelemetry telemetry pipeline to Grafana via DAGR events
 - ✅ Habblaud Terrarium Phase 1 — rich activity states (CrabActivity enum, derivation logic, display info)
 - ✅ Subagent delegation framework (P1-4 drop-in replacement blocker) — Hermes-compatible delegate_task tool with conductor API integration
+- ✅ Interactive clarify tooling (P1-5 drop-in replacement blocker) — Hermes-compatible clarify tool with structured questions, choice-based responses, and TUI integration via knowledge store persistence
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control
