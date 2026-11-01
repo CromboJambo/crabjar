@@ -22,6 +22,7 @@ use rusqlite;
 mod backend;
 mod clarify;
 mod lm_studio_client;
+mod session_search;
 
 use backend::InferenceBackend;
 use lm_studio_client::LmStudioClient;
@@ -1011,6 +1012,27 @@ async fn execute_tool_call(
                 "status": "pending",
                 "note": "Question sent to user. Poll /acp/clarify/status/:id for answer."
             }).to_string())
+        }
+        // P1-6: Session Management/Search
+        "session_search" => {
+            if args.is_empty() {
+                return Err("Error: session_search requires JSON arguments".to_string());
+            }
+
+            let input_json = &args[0];
+            let input: session_search::SessionSearchRequest = serde_json::from_str(input_json)
+                .map_err(|e| format!("Error parsing session_search arguments: {}", e))?;
+
+            info!("Executing session_search tool");
+
+            let response = session_search::execute_session_search(input).await;
+            match response {
+                Ok(result) => {
+                    Ok(serde_json::to_string(&result)
+                        .map_err(|e| format!("Failed to serialize session search result: {}", e))?)
+                }
+                Err(e) => Err(format!("Session search failed: {}", e)),
+            }
         }
         _ => Ok(format!("Unknown tool: {}", function_name)),
     }
