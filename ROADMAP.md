@@ -36,6 +36,11 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ 27B post-trained model integrated as default provider (DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF)
 - ✅ crabjar-review code review pipeline complete (Phases 1-4 + conductor integration) — deterministic pre-processing, agent review units, post-processor with position validation/deduplication, GitHub PR integration, benchmark suite with precision/recall/F1 metrics
 - ✅ Project consolidation completed (Phases 1-4) — agent-oversight archived, mirror-lab audit module integrated into crabjar-conductor, reference/early-stage repos reorganized, clear project boundaries defined for all active projects
+- ✅ Evidence-Based Worker Promotion System — promotion engine with evidence collection and scoring
+- ✅ Knowledge Compression Triad — token budget management + compression strategies
+- ✅ OTel-DAGR-Terrarium Integration — OpenTelemetry telemetry pipeline to Grafana via DAGR events
+- ✅ Habblaud Terrarium Phase 1 — rich activity states (CrabActivity enum, derivation logic, display info)
+- ✅ Subagent delegation framework (P1-4 drop-in replacement blocker) — Hermes-compatible delegate_task tool with conductor API integration
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control
