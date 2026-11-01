@@ -2,7 +2,7 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
-## October 31, 2026 — Web Search & Extraction Tooling (P1 Drop-in Replacement Blockers)
+## October 31, 2026 — Web Search, Extraction & Browser Automation (P1 Drop-in Replacement Blockers)
 
 ### Web Search (P1-1)
 - **crabjar-web-search crate** — Web search functionality via self-hosted SearXNG with Brave and DuckDuckGo fallbacks
@@ -17,6 +17,14 @@ All notable changes to crabjar, organized chronologically. Completed work moves 
 - Character limit enforcement with truncation indicators
 - PDF detection by extension (extraction planned for future phase)
 - Integration test examples demonstrating end-to-end functionality
+
+### Browser Automation (P1-3)
+- **crabjar-browser crate** — Browser automation via Playwright subprocess integration
+- Navigate to URLs and extract page content (title, body text)
+- JavaScript evaluation on live pages
+- Form filling and submission support
+- Screenshot capture with PNG format
+- Playwright installed via uv in dedicated virtual environment at ~/.hermes/tools/playwright-venv
 
 ### Architecture Decision
 - Self-hosted SearXNG as primary backend eliminates external API dependency and provides privacy/control
