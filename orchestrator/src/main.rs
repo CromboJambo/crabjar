@@ -22,6 +22,7 @@ use rusqlite;
 mod backend;
 mod clarify;
 mod lm_studio_client;
+mod process_management;
 mod session_search;
 
 use backend::InferenceBackend;
@@ -340,7 +341,7 @@ async fn handle_chat(
                 }
             };
 
-            let tool_result = execute_tool_call(&tc.tool, &args, Arc::clone(&state.store)).await;
+            let tool_result = execute_tool_call(&tc.tool, &args, Arc::clone(&state.store), Arc::clone(&state.process_registry)).await;
             results.push(format!(
                 "Tool '{}' executed: {}",
                 tc.tool,
@@ -530,6 +531,7 @@ async fn execute_tool_call(
     function_name: &str,
     args: &[String],
     store: Arc<std::sync::Mutex<Store>>,
+    process_registry: Arc<Mutex<process_management::ProcessRegistry>>,
 ) -> Result<String, String> {
     // --- Attempt tool registry resolution first ---
     let project_root = std::env::var("CRABJAR_ROOT")
@@ -1034,6 +1036,28 @@ async fn execute_tool_call(
                 Err(e) => Err(format!("Session search failed: {}", e)),
             }
         }
+        // P1-7: Process Management Tools
+        "process_manage" => {
+            if args.is_empty() {
+                return Err("Error: process_manage requires JSON arguments".to_string());
+            }
+
+            let input_json = &args[0];
+            let input: process_management::ProcessManageRequest = serde_json::from_str(input_json)
+                .map_err(|e| format!("Error parsing process_manage arguments: {}", e))?;
+
+            info!("Executing process_manage tool: action='{}'", input.action);
+
+            // Use the shared process registry passed from app state
+            let response = process_management::execute_process_management(input, &process_registry).await;
+            match response {
+                Ok(result) => {
+                    Ok(serde_json::to_string(&result)
+                        .map_err(|e| format!("Failed to serialize process management result: {}", e))?)
+                }
+                Err(e) => Err(format!("Process management failed: {}", e)),
+            }
+        }
         _ => Ok(format!("Unknown tool: {}", function_name)),
     }
 }
@@ -1078,6 +1102,7 @@ struct AppState {
     actor_scope: crabjar_guard::Scope,
     target_scope: crabjar_guard::Scope,
     event_channel: EventChannel,
+    process_registry: Arc<Mutex<process_management::ProcessRegistry>>,
 }
 
 /// Handler for recent_events — queries the knowledge store.
@@ -1469,6 +1494,7 @@ async fn main() -> anyhow::Result<()> {
         actor_scope,
         target_scope,
         event_channel: Arc::new(event_tx),
+        process_registry: Arc::new(Mutex::new(process_management::ProcessRegistry::new())),
     };
 
     // Define the Axum router with SSE and JSON endpoints.
