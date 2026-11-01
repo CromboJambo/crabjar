@@ -1,0 +1,26 @@
+[package]
+name = "crabjar-delegation"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+description = "Subagent delegation framework for crabjar — spawn isolated parallel subagents"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+reqwest.workspace = true
+
+[lints]
+workspace = true

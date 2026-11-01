@@ -7,6 +7,7 @@ use axum::{
     response::sse::{Event as SseEvent, Sse},
     routing::post,
 };
+use crabjar_delegation::Dispatcher;
 use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
 use futures_util::StreamExt;
 use futures_util::stream;
@@ -822,6 +823,128 @@ async fn execute_tool_call(
                 }
                 Err(e) => Err(format!("Web search error: {}", e)),
             }
+        }
+        "memory" => {
+            if args.is_empty() {
+                return Err("Error: memory requires JSON arguments".to_string());
+            }
+
+            // Parse the JSON input from the first argument
+            let input_json = &args[0];
+            let input: crabjar_memory::MemoryToolInput = serde_json::from_str(input_json)
+                .map_err(|e| format!("Error parsing memory tool arguments: {}", e))?;
+
+            info!("Executing memory tool: action={:?}, target={}", input.action, input.target);
+
+            // Determine memory directory (use ~/.hermes/memories/ for drop-in compatibility)
+            let home_dir = dirs::home_dir()
+                .ok_or("Error: could not determine home directory")?;
+            let memories_dir = home_dir.join(".hermes").join("memories");
+
+            // Create the tool and execute
+            let tool = crabjar_memory::MemoryTool::new(&memories_dir);
+            match tool.execute(input) {
+                Ok(response) => {
+                    info!("Memory operation completed: {}", response.message);
+                    serde_json::to_string_pretty(&response)
+                        .map_err(|e| format!("Error serializing memory response: {}", e))
+                }
+                Err(e) => Err(format!("Memory tool error: {}", e)),
+            }
+        }
+        "delegate_task" => {
+            if args.is_empty() {
+                return Err("Error: delegate_task requires JSON arguments".to_string());
+            }
+
+            let input_json = &args[0];
+            let input: crabjar_delegation::DelegationInput = serde_json::from_str(input_json)
+                .map_err(|e| format!("Error parsing delegate_task arguments: {}", e))?;
+
+            info!("Executing delegate_task: action={:?}, tasks={}", input.action, input.tasks.len());
+
+            // Create dispatcher with default config
+            let dispatcher = Dispatcher::new(None);
+
+            // Execute based on action type
+            let result = match input.action {
+                crabjar_delegation::DelegationAction::Spawn => {
+                    if input.tasks.is_empty() {
+                        return Err("Error: delegate_task spawn requires at least one task".to_string());
+                    }
+
+                    // Spawn each task
+                    let mut results = Vec::new();
+                    for task in &input.tasks {
+                        match dispatcher.execute_task(task.goal.clone(), task.context.clone()).await {
+                            Ok(task_id) => {
+                                info!("Spawned subagent task: {}", task_id);
+                                results.push(serde_json::json!({
+                                    "status": "spawned",
+                                    "task_id": task_id,
+                                    "goal": task.goal
+                                }));
+                            }
+                            Err(e) => {
+                                warn!("Failed to spawn task: {}", e);
+                                results.push(serde_json::json!({
+                                    "status": "error",
+                                    "goal": task.goal,
+                                    "error": e.to_string()
+                                }));
+                            }
+                        }
+                    }
+
+                    serde_json::to_string_pretty(&results)
+                        .map_err(|e| format!("Error serializing spawn results: {}", e))
+                }
+                crabjar_delegation::DelegationAction::List => {
+                    match dispatcher.list_tasks().await {
+                        Ok(tasks) => {
+                            let results: Vec<serde_json::Value> = tasks.iter().map(|t| {
+                                serde_json::json!({
+                                    "task_id": t.task_id,
+                                    "status": format!("{:?}", t.status),
+                                    "goal": &t.goal[..t.goal.len().min(100)],
+                                    "created_at": t.created_at.to_rfc3339()
+                                })
+                            }).collect();
+
+                            serde_json::to_string_pretty(&results)
+                                .map_err(|e| format!("Error serializing task list: {}", e))
+                        }
+                        Err(e) => Err(format!("Error listing tasks: {}", e)),
+                    }
+                }
+                crabjar_delegation::DelegationAction::Steer => {
+                    if input.subagent_id.is_none() || input.message.is_none() {
+                        return Err("Error: delegate_task steer requires subagent_id and message".to_string());
+                    }
+
+                    let task_id = input.subagent_id.unwrap();
+                    let message = input.message.unwrap();
+
+                    match dispatcher.steer_task(&task_id, &message).await {
+                        Ok(()) => Ok(format!("Steered task {}", task_id)),
+                        Err(e) => Err(format!("Error steering task: {}", e)),
+                    }
+                }
+                crabjar_delegation::DelegationAction::Stop => {
+                    if input.subagent_id.is_none() {
+                        return Err("Error: delegate_task stop requires subagent_id".to_string());
+                    }
+
+                    let task_id = input.subagent_id.unwrap();
+
+                    match dispatcher.stop_task(&task_id).await {
+                        Ok(()) => Ok(format!("Stopped task {}", task_id)),
+                        Err(e) => Err(format!("Error stopping task: {}", e)),
+                    }
+                }
+            };
+
+            result
         }
         _ => Ok(format!("Unknown tool: {}", function_name)),
     }

@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), conductor (fleet orchestration service with capability-based security model), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, file search engine (BM25/Tantivy 0.22), plugin system (WASM runtime), Zed ACP bridge, agent skills, and remote skill discovery infrastructure (GitHub client, ClawHub registry client, security scanner, trust manager). LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
+CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), conductor (fleet orchestration service with capability-based security model), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, file search engine (BM25/Tantivy 0.22), plugin system (WASM runtime), Zed ACP bridge, agent skills, remote skill discovery infrastructure (GitHub client, ClawHub registry client, security scanner, trust manager), and subagent delegation framework (Hermes-compatible delegate_task tool). LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
 
 ---
 
@@ -212,6 +212,16 @@ crabjar/
 │       ├── indexer.rs       # BM25 document indexing with LowerCaser tokenizer
 │       └── storage.rs       # SearchStorage (index CRUD, search, reload)
 
+│  Subagent delegation framework (P1-4)
+├── crabjar-delegation/      # Hermes-compatible delegate_task tool (spawns isolated subagents)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs           # Public API surface (DelegatedTask, DelegationRequest, etc.)
+│       ├── dispatcher.rs    # TaskDispatcher — submits goals to conductor, polls for results
+│       ├── aggregation.rs   # ResultAggregator — collects and combines subagent outputs
+│       ├── timeout.rs       # TaskTimeout — tracks task deadlines
+│       └── error.rs         # DelegationError enum
+│
 │  Host runtime
 ├── host/host-core/          # Event bus, plugin API, WorkItem model, config
 │   ├── Cargo.toml
@@ -385,6 +395,7 @@ crabjar/
 | `crabjar-clawhub-client` | ClawHub.io registry API integration (Phase 9) | Remote Discovery | Active |
 | `crabjar-skill-scanner` | Security scanning pipeline + checksum verification (Phase 10) | Remote Discovery | Active |
 | `crabjar-trust-manager` | Trust tier management, version-aware skill cache, update detection (Phase 11) | Remote Discovery | Active |
+| `crabjar-delegation` | Subagent delegation framework — Hermes-compatible delegate_task tool | Orchestration | Active |
 | `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement (8-layer model) | Governance | Active |
 | `file_search` | BM25-based file indexing and search (Tantivy 0.22) | Search | Active |
@@ -609,6 +620,7 @@ crabjar contains:
 - crabjar-clawhub-client (ClawHub.io registry API integration — Phase 9)
 - crabjar-skill-scanner (security scanning pipeline + checksum verification — Phase 10)
 - crabjar-trust-manager (trust tier management, skill cache, update detection — Phase 11)
+- crabjar-delegation (subagent delegation framework — Hermes-compatible delegate_task tool)
 - crabjar-architecture (mechanical dependency boundary enforcement, 8-layer model)
 - file_search (BM25-based file indexing with Tantivy 0.22)
 - crabjar-plugin (WASM runtime, lifecycle management — stub)
