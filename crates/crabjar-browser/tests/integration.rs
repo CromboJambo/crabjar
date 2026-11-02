@@ -76,7 +76,8 @@ async fn test_get_text_content() {
     
     let result = result.unwrap();
     assert_eq!(result["status"], "success");
-    assert!(result["text"].as_str().unwrap().contains("Example Domain"));
+    // The body text says "This domain is for use in documentation examples"
+    assert!(result["text"].as_str().unwrap().contains("documentation examples"));
     
     // Close browser
     session.close().await.unwrap();

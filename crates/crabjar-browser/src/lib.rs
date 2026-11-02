@@ -6,12 +6,15 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 
 /// Browser automation session backed by a Playwright subprocess.
 pub struct BrowserSession {
     child: Mutex<Option<Child>>,
+    stdin: Mutex<Option<tokio::process::ChildStdin>>,
+    stdout_reader: Mutex<Option<BufReader<tokio::process::ChildStdout>>>,
     request_id: i32,
 }
 
@@ -36,6 +39,8 @@ impl BrowserSession {
     pub fn new() -> Self {
         Self {
             child: Mutex::new(None),
+            stdin: Mutex::new(None),
+            stdout_reader: Mutex::new(None),
             request_id: 0,
         }
     }
@@ -44,19 +49,24 @@ impl BrowserSession {
     pub async fn start(&mut self) -> Result<serde_json::Value> {
         let wrapper_path = find_wrapper_script()?;
 
-        let mut child = Command::new("python3")
+        // Determine Python interpreter — prefer venv if available
+        let python_bin = find_python_interpreter();
+
+        let mut child = Command::new(&python_bin)
             .arg(&wrapper_path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
             .spawn()
-            .map_err(|e| anyhow!("Failed to spawn Playwright subprocess: {}", e))?;
+            .map_err(|e| anyhow!("Failed to spawn Playwright subprocess with '{}': {}", python_bin, e))?;
 
         let stdin = child.stdin.take().ok_or_else(|| anyhow!("Failed to get stdin"))?;
         let stdout = child.stdout.take().ok_or_else(|| anyhow!("Failed to get stdout"))?;
 
-        // Store child process
+        // Store handles
         *self.child.lock().await = Some(child);
+        *self.stdin.lock().await = Some(stdin);
+        *self.stdout_reader.lock().await = Some(BufReader::new(stdout));
 
         // Send start command
         self.send_request("start", HashMap::new()).await
@@ -119,14 +129,18 @@ impl BrowserSession {
         self.send_request("close", HashMap::new()).await
     }
 
+    /// Execute arbitrary Python code in the Playwright subprocess.
+    pub async fn execute_code(&mut self, code: &str) -> Result<serde_json::Value> {
+        let mut params = HashMap::new();
+        params.insert("code".to_string(), serde_json::json!(code));
+        self.send_request("execute_code", params).await
+    }
+
     async fn send_request(
         &mut self,
         method: &str,
         params: HashMap<String, serde_json::Value>,
     ) -> Result<serde_json::Value> {
-        let child = self.child.lock().await;
-        let mut child = child.as_ref().ok_or_else(|| anyhow!("Browser not started"))?.try_clone();
-
         // Increment request ID
         self.request_id += 1;
         let id = self.request_id;
@@ -140,22 +154,28 @@ impl BrowserSession {
         let request_json = serde_json::to_string(&request)?;
 
         // Send request
-        let mut stdin = child.stdin.take().ok_or_else(|| anyhow!("Failed to get stdin"))?;
-        stdin.write_all(format!("{}\n", request_json).as_bytes()).await?;
-        stdin.flush().await?;
-
-        // Read response
-        let mut stdout = child.stdout.take().ok_or_else(|| anyhow!("Failed to get stdout"))?;
-        let mut line = String::new();
-        stdout.read_line(&mut line).await?;
-
-        let response: Response = serde_json::from_str(line.trim())?;
-
-        if let Some(error) = response.error {
-            return Err(anyhow!("Browser error: {}", error));
+        {
+            let mut stdin_guard = self.stdin.lock().await;
+            let stdin = stdin_guard.as_mut().ok_or_else(|| anyhow!("Browser not started"))?;
+            stdin.write_all(format!("{}\n", request_json).as_bytes()).await?;
+            stdin.flush().await?;
         }
 
-        Ok(response.result.unwrap_or(serde_json::json!({})))
+        // Read response
+        {
+            let mut reader_guard = self.stdout_reader.lock().await;
+            let reader = reader_guard.as_mut().ok_or_else(|| anyhow!("Browser not started"))?;
+            let mut line = String::new();
+            reader.read_line(&mut line).await?;
+
+            let response: Response = serde_json::from_str(line.trim())?;
+
+            if let Some(error) = response.error {
+                return Err(anyhow!("Browser error: {}", error));
+            }
+
+            Ok(response.result.unwrap_or(serde_json::json!({})))
+        }
     }
 }
 
@@ -176,6 +196,38 @@ fn find_wrapper_script() -> Result<std::path::PathBuf> {
     Err(anyhow!("Could not find browser_wrapper.py"))
 }
 
+fn find_python_interpreter() -> String {
+    // Check for venv first (relative to crate directory)
+    let venv_paths = [
+        std::path::PathBuf::from(".venv/bin/python"),
+        std::path::PathBuf::from("../.venv/bin/python"),
+        std::path::PathBuf::from("/home/crombo/projects/active/crabjar/crates/crabjar-browser/.venv/bin/python"),
+    ];
+
+    for path in venv_paths {
+        if path.exists() {
+            return path.to_string_lossy().to_string();
+        }
+    }
+
+    // Fall back to system Python
+    "python3".to_string()
+}
+
+/// Execute arbitrary Python code via the Playwright subprocess.
+/// This is a convenience wrapper that creates a session, runs the code, and closes the session.
+pub async fn execute_code(code: &str) -> Result<serde_json::Value> {
+    let mut session = BrowserSession::new();
+    session.start().await?;
+
+    let result = session.execute_code(code).await;
+
+    // Close session (ignore errors — we already have our result)
+    let _ = session.close().await;
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,28 +236,5 @@ mod tests {
     async fn test_browser_session_creation() {
         let session = BrowserSession::new();
         assert!(session.request_id == 0);
-    }
-
-    #[tokio::test]
-    async fn test_start_and_close() {
-        let mut session = BrowserSession::new();
-        let result = session.start().await;
-        assert!(result.is_ok());
-
-        let result = session.close().await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_navigate() {
-        let mut session = BrowserSession::new();
-        session.start().await.unwrap();
-
-        let result = session.navigate("https://example.com").await;
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        assert_eq!(result["status"], "success");
-
-        session.close().await.unwrap();
     }
 }

@@ -1058,6 +1058,28 @@ async fn execute_tool_call(
                 Err(e) => Err(format!("Process management failed: {}", e)),
             }
         }
+        // P1-3: Browser Automation Tool
+        "browser_exec" => {
+            if args.is_empty() {
+                return Err("Error: browser_exec requires JSON arguments".to_string());
+            }
+
+            let input_json = &args[0];
+            #[derive(serde::Deserialize)]
+            struct BrowserExecInput {
+                code: String,
+            }
+            let input: BrowserExecInput = serde_json::from_str(input_json)
+                .map_err(|e| format!("Error parsing browser_exec arguments: {}", e))?;
+
+            info!("Executing browser automation ({} chars of Python)", input.code.len());
+
+            // Use crabjar-browser's execute_code function
+            match crabjar_browser::execute_code(&input.code).await {
+                Ok(result) => Ok(serde_json::to_string_pretty(&result).map_err(|e| format!("Failed to serialize result: {}", e))?),
+                Err(e) => Err(format!("Browser code execution failed: {}", e)),
+            }
+        }
         _ => Ok(format!("Unknown tool: {}", function_name)),
     }
 }
