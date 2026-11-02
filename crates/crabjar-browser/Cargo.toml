@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-browser"
-version = "0.12.4"
+version = "0.12.5"
 edition = "2024"
 description = "Browser automation via Playwright subprocess for crabjar execution pipeline"
 license = "MIT OR Apache-2.0"

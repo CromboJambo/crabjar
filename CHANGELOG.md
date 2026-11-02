@@ -2,6 +2,21 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 2, 2026 — v0.12.5: Browser Automation Integration (P1-3)
+
+### crabjar-browser Crate
+- **Playwright subprocess integration** via `browser_wrapper.py` JSON-RPC protocol over stdin/stdout
+- **BrowserSession API** — structured async methods for navigation, JavaScript evaluation, form filling, clicking, screenshots, content extraction
+- **Python interpreter detection** — automatically finds and uses venv with Playwright installed, falls back to system Python
+- **Integration tests** — 5 passing integration tests covering start/close, navigation, JS evaluation, text content, and screenshots
+
+### Orchestrator Integration
+- **browser_exec tool** — Hermes-compatible browser automation tool accepting JSON arguments with `code` field for arbitrary Python/Playwright execution
+- Full Playwright API surface exposed through the code parameter for maximum flexibility
+
+### Drop-in Replacement Status
+All P1 drop-in replacement blockers now complete (P1-1 through P1-8). crabjar provides feature parity with Hermes Agent's core tooling.
+
 ## November 2, 2026 — v0.12.4: OpenTelemetry Integration Complete
 
 ### OTel Telemetry Export (ADR-018)
