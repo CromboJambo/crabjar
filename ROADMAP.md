@@ -48,6 +48,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ Browser automation tooling (P1-3 drop-in replacement blocker) — Hermes-compatible browser_exec tool via crabjar-browser crate using Playwright subprocess wrapper; supports navigation, JavaScript evaluation, form filling, screenshots, and content extraction
 - ✅ Memory compat layer with mirror-log integration (P2-1 productivity improvement) — CrabJar's memory system provides identical tool schema and response format to Hermes' memory tool. Supports MEMORY.md/USER.md with same character budgets, batch operations, and §-delimited format. Optional mirror-log integration for provenance tracking and attention-based decision filtering.
 - ✅ Home Assistant application-layer tools (P2-2 productivity improvement) — four HA REST API tools: ha_get_state, ha_call_service, ha_list_entities, ha_list_services for home-lab management workflows
+- ✅ Expanded built-in skill ecosystem (P2-3 productivity improvement) — added 29 new skills across 4 categories: GitHub workflow (8), development workflow (10), productivity (6), and research (5). Total skills now 61. Established SKILL-STANDARDS.md documentation standards for consistent skill authoring.
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control
