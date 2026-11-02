@@ -17,6 +17,22 @@ All notable changes to crabjar, organized chronologically. Completed work moves 
 ### Drop-in Replacement Status
 All P1 drop-in replacement blockers now complete (P1-1 through P1-8). crabjar provides feature parity with Hermes Agent's core tooling.
 
+## November 2, 2026 — v0.12.5: Home Assistant Tools (P2-2)
+
+### crabjar-homeassistant Crate
+- **HA REST API client** — communicates with Home Assistant instances via HTTP REST API with Bearer token authentication
+- **Four Hermes-compatible tools:**
+  - `ha_get_state(entity_id)` — query entity state, attributes, last_updated, last_changed
+  - `ha_call_service(domain, service, data)` — trigger HA services (turn lights on, lock doors, etc.)
+  - `ha_list_entities(domain)` — list entities filtered by domain (light, switch, sensor, etc.)
+  - `ha_list_services()` — discover all available services and their domains
+- **Configuration** via environment variables: `CRABJAR_HA_URL` (default: http://localhost:8123), `CRABJAR_HA_TOKEN` (required)
+- **Unit tests** — 4 passing unit tests covering client construction and tool argument validation
+
+### Orchestrator Integration
+- All four HA tools registered in the orchestrator's tool dispatch loop
+- Agents can now manage Home Assistant instances with the same capability as Hermes agents using the homeassistant MCP server
+
 ## November 2, 2026 — v0.12.4: OpenTelemetry Integration Complete
 
 ### OTel Telemetry Export (ADR-018)
