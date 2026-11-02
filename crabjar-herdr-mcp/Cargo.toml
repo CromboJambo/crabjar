@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-herdr-mcp"
-version = "0.12.3"
+version = "0.12.4"
 edition = "2024"
 description = "MCP server wrapping herdr for fleet machine management and agent delegation"
 

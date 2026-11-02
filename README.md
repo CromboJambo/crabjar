@@ -269,7 +269,7 @@ Crabjar's contribution: trust layers, annealing, provenance chains, ephemeral VM
 
 ## Version
 
-0.12.3
+0.12.4
 
 ## Repository
 

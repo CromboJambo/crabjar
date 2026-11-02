@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-trust-manager"
-version = "0.12.3"
+version = "0.12.4"
 edition = "2024"
 description = "Trust tier management and skill cache for CrabJar remote skills"
 authors = ["CromboJambo"]

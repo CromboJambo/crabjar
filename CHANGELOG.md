@@ -2,6 +2,20 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 2, 2026 — v0.12.4: OpenTelemetry Integration Complete
+
+### OTel Telemetry Export (ADR-018)
+- **OtelExporter module** (`telemetry/src/otel_export.rs`) — OpenTelemetry exporter with `record_execution()`, `record_guard_decision()`, and `record_log()` methods
+- **DAGR Span Processor** (`telemetry/src/dagr_span_processor.rs`) — Custom span processor mapping OTel spans to DAGR habitat events for terrarium visualization (task_started/completed/failed, permission_requested, agent_online/offline)
+- **FlightRecorder Integration** — Optional OTel export via `with_otel()` and `with_otel_and_dagr()` builder methods; SQLite flight recorder remains local source of truth
+- **CLI Integration** — `CRABJAR_OTEL_ENDPOINT` environment variable enables OTLP export to configured collector endpoint
+
+### Architecture Decision
+Dual-backend telemetry: SQLite flight recorder for local audit + optional OpenTelemetry export for fleet-scale observability. Industry-standard OTLP protocol integration with Grafana/Jaeger compatibility.
+
+### Testing
+30 unit tests + 3 integration tests covering exporter construction, event recording, and DAGR span processing — all passing.
+
 ## November 2, 2026 — v0.12.3: Hermes Parity Milestone & Spec Archive
 
 ### Specs Archived (Completed)

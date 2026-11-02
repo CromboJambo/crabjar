@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-unsloth-mcp"
-version = "0.12.3"
+version = "0.12.4"
 edition = "2024"
 description = "MCP server wrapping Unsloth Studio for training data management and model fine-tuning"
 

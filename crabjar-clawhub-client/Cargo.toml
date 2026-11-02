@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-clawhub-client"
-version = "0.12.3"
+version = "0.12.4"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 authors = ["CrabJar Contributors"]
@@ -16,7 +16,7 @@ tracing = "0.1"
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 url = "2"
-crabjar-skill-scanner = { path = "../crabjar-skill-scanner", version = "0.12.3" }
+crabjar-skill-scanner = { path = "../crabjar-skill-scanner", version = "0.12.4" }
 tempfile = "3"
 semver = "1.0"
 sha2 = "0.10"

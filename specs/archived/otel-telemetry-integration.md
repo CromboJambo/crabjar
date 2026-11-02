@@ -1,7 +1,7 @@
 # Spec: OpenTelemetry Integration for Crabjar Telemetry
 
 **Date:** 2026-10-14  
-**Status:** Draft — implementation specification  
+**Status:** ✅ Complete (All phases implemented and tested) — November 2, 2026  
 **Trigger:** Comparison with harness revealed industry-standard OTel integration (239 files). crabjar's telemetry crate is a SQLite flight recorder with no external export. This spec wires in OTel as the industry go-to telemetry backend.
 
 ## Current State

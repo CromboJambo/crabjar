@@ -85,7 +85,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.12.3"
+version = "0.12.4"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 authors = ["CrabJar Contributors"]
