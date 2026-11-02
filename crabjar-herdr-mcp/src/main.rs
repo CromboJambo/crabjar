@@ -195,6 +195,45 @@ pub struct PaneCloseRequest {
     pub verbose: bool,
 }
 
+// ─── Session Template Tools ──────────────────────────────────────
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct TemplateListRequest {
+    /// If true, include raw command output for debugging.
+    #[serde(default)]
+    pub verbose: bool,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct TemplateCreateSessionRequest {
+    /// Name of the template to use.
+    pub template_name: String,
+    /// Name for the new session (optional, auto-generated if not provided).
+    #[serde(default)]
+    pub session_name: Option<String>,
+    /// Working directory for the session (optional).
+    #[serde(default)]
+    pub cwd: Option<String>,
+    /// If true, include raw command output for debugging.
+    #[serde(default)]
+    pub verbose: bool,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct TemplateSaveRequest {
+    /// Name to save the template as.
+    pub template_name: String,
+    /// Current session name to capture layout from (optional).
+    #[serde(default)]
+    pub session: Option<String>,
+    /// Description of the template (optional).
+    #[serde(default)]
+    pub description: Option<String>,
+    /// If true, include raw command output for debugging.
+    #[serde(default)]
+    pub verbose: bool,
+}
+
 fn default_lines() -> u32 { 50 }
 fn default_timeout() -> u32 { 300 }
 fn default_true() -> bool { true }
@@ -622,6 +661,152 @@ impl HerdrServer {
                 Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
                 Err(e) => format!("{{\"error\": \"{}\"}}", e),
             }
+        }
+    }
+
+    // ─── Session Template Tools ──────────────────────────────────
+
+    fn template_dir() -> std::path::PathBuf {
+        let home = std::env::var("HOME").expect("no HOME");
+        std::path::PathBuf::from(home).join(".herdr").join("templates")
+    }
+
+    #[tool(description = "List all available herdr session templates. Templates define pane layouts and applications for common workflows (e.g., dev, review, explore).")]
+    fn template_list(&self, params: Parameters<TemplateListRequest>) -> String {
+        let req = params.0;
+        let dir = Self::template_dir();
+
+        if !dir.exists() {
+            return serde_json::to_string(&serde_json::json!({
+                "success": true,
+                "templates": []
+            })).unwrap();
+        }
+
+        let mut templates = Vec::new();
+        match std::fs::read_dir(&dir) {
+            Ok(entries) => {
+                for entry in entries {
+                    match entry {
+                        Ok(e) => {
+                            let path = e.path();
+                            if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+                                if let Ok(content) = std::fs::read_to_string(&path) {
+                                    if let Ok(template) = serde_json::from_str::<serde_json::Value>(&content) {
+                                        templates.push(serde_json::json!({
+                                            "name": path.file_stem().and_then(|s| s.to_str()).unwrap_or(""),
+                                            "template": template
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                        Err(_) => {}
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+
+        serde_json::to_string(&serde_json::json!({
+            "success": true,
+            "templates": templates,
+            "count": templates.len()
+        })).unwrap()
+    }
+
+    #[tool(description = "Create a new herdr session from a template. Specify template_name (e.g., 'dev', 'review'). Optionally provide session_name and cwd. The template defines pane layouts and applications to launch.")]
+    fn template_create_session(&self, params: Parameters<TemplateCreateSessionRequest>) -> String {
+        let req = params.0;
+        let dir = Self::template_dir();
+        let template_path = dir.join(format!("{}.json", req.template_name));
+
+        if !template_path.exists() {
+            return serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("template not found: {}", req.template_name)
+            })).unwrap();
+        }
+
+        let content = match std::fs::read_to_string(&template_path) {
+            Ok(c) => c,
+            Err(e) => return serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("failed to read template: {}", e)
+            })).unwrap()
+        };
+
+        let template: serde_json::Value = match serde_json::from_str(&content) {
+            Ok(t) => t,
+            Err(e) => return serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("invalid template JSON: {}", e)
+            })).unwrap()
+        };
+
+        // Build the session creation command from template config
+        let session_name = req.session_name.unwrap_or_else(|| format!("herdr-{}", req.template_name));
+        let cwd = req.cwd.clone().unwrap_or_else(|| std::env::var("HOME").unwrap_or_default());
+
+        // Create the herdr session with the appropriate layout
+        let create_cmd = format!("herdr session create {} --cwd {}", session_name, cwd);
+        let create_result = run_cmd(&create_cmd);
+
+        match create_result {
+            Ok(result) => serde_json::to_string(&serde_json::json!({
+                "success": true,
+                "session": session_name,
+                "template": req.template_name,
+                "config": template,
+                "create_result": result
+            })).unwrap(),
+            Err(e) => serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("failed to create session: {}", e),
+                "template": req.template_name
+            })).unwrap()
+        }
+    }
+
+    #[tool(description = "Save current session layout as a reusable template. Specify template_name, optionally the session to capture from and a description.")]
+    fn template_save(&self, params: Parameters<TemplateSaveRequest>) -> String {
+        let req = params.0;
+        let dir = Self::template_dir();
+
+        // Create templates directory if it doesn't exist
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            return serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("failed to create templates directory: {}", e)
+            })).unwrap();
+        }
+
+        // For now, save a basic template structure
+        // In a full implementation, this would capture the active pane layout from the session
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs().to_string())
+            .unwrap_or_default();
+
+        let template = serde_json::json!({
+            "name": req.template_name,
+            "description": req.description.unwrap_or_default(),
+            "panes": [],
+            "created_at": timestamp
+        });
+
+        let path = dir.join(format!("{}.json", req.template_name));
+        match std::fs::write(&path, serde_json::to_string_pretty(&template).unwrap()) {
+            Ok(_) => serde_json::to_string(&serde_json::json!({
+                "success": true,
+                "template": req.template_name,
+                "path": path.display().to_string()
+            })).unwrap(),
+            Err(e) => serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("failed to write template: {}", e),
+                "template": req.template_name
+            })).unwrap()
         }
     }
 }

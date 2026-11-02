@@ -2,6 +2,7 @@
 
 use crate::auth::{AuthError, validate_token};
 use crate::conductor::Conductor;
+use crate::fleet_status::FleetStatusTracker;
 use axum::{
     Json, Router,
     extract::{Request, State},
@@ -49,6 +50,7 @@ async fn get_evaluation_status(
 pub fn routes(conductor: ConductorState) -> Router {
     // Public routes (no auth required)
     let public_app: Router = Router::new()
+        .route("/fleet/status", get(get_fleet_status))
         .route("/metrics/cache", get(get_cache_stats))
         .route("/workers/register", post(register_worker))
         .route("/workers/login", post(worker_login_handler))
@@ -104,10 +106,10 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         // Evidence-based promotion endpoints
-        .route("/promotion/evaluate/:worker_id", get(evaluate_promotion_endpoint))
-        .route("/promotion/execute/:worker_id", post(execute_promotion_endpoint))
-        .route("/promotion/history/:worker_id", get(get_promotion_history_endpoint))
-        .route("/promotion/metrics/:worker_id", get(get_worker_metrics_endpoint))
+        .route("/promotion/evaluate/{worker_id}", get(evaluate_promotion_endpoint))
+        .route("/promotion/execute/{worker_id}", post(execute_promotion_endpoint))
+        .route("/promotion/history/{worker_id}", get(get_promotion_history_endpoint))
+        .route("/promotion/metrics/{worker_id}", get(get_worker_metrics_endpoint))
         .with_state(Arc::clone(&conductor));
 
     // Protected routes (JWT auth required)
@@ -699,6 +701,19 @@ fn simulate_bundle_review(
     }
 
     findings
+}
+
+/// Get fleet status snapshot.
+async fn get_fleet_status(
+    State(conductor): State<ConductorState>,
+) -> Json<serde_json::Value> {
+    let conductor = conductor.lock().await;
+    let status = conductor.fleet_status.get_status().await;
+
+    Json(json!({
+        "success": true,
+        "fleet_status": status
+    }))
 }
 
 /// Get JEV decision cache statistics (public metrics endpoint).

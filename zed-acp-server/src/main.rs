@@ -1,70 +1,97 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
-use zed_acp_server::{AcpAgentServer, AcpResponse, ZedRequest};
+use zed_acp_server::{AcpAgentServer, AcpResponse, AcpRequest};
 
 #[derive(Debug, Deserialize)]
-struct AcpRequest {
-    method: String,
-    params: serde_json::Value,
+struct JsonRpcMessage {
+    jsonrpc: Option<String>,
+    id: Option<serde_json::Value>,
+    method: Option<String>,
+    params: Option<serde_json::Value>,
+    result: Option<serde_json::Value>,
+    error: Option<serde_json::Value>,
 }
 
-fn parse_request(line: &str) -> Result<AcpRequest, anyhow::Error> {
-    serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Failed to parse request: {}", e))
+fn parse_message(line: &str) -> Result<JsonRpcMessage, anyhow::Error> {
+    serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Failed to parse JSON-RPC message: {}", e))
 }
 
-fn map_method(request: AcpRequest) -> Result<ZedRequest, anyhow::Error> {
-    let method = request.method.as_str();
-    let params = request.params;
-
+fn map_method(id: serde_json::Value, method: &str, params: serde_json::Value) -> Result<AcpRequest, anyhow::Error> {
     match method {
+        "initialize" => {
+            let protocol_version = params
+                .get("protocolVersion")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as u32)
+                .unwrap_or(1);
+            let client_capabilities = params.get("clientCapabilities").cloned().unwrap_or(json!({}));
+            let client_info = params.get("clientInfo").cloned();
+            Ok(AcpRequest::Initialize {
+                id,
+                protocol_version,
+                client_capabilities,
+                client_info,
+            })
+        }
         "session/new" => {
             let cwd = params
                 .get("cwd")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("missing cwd in session/new"))?;
-            Ok(ZedRequest::NewSession {
+            let mcp_servers = params
+                .get("mcpServers")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            Ok(AcpRequest::SessionNew {
+                id,
                 cwd: cwd.to_string(),
+                mcp_servers,
             })
         }
         "session/load" => {
             let session_id = params
-                .get("session_id")
+                .get("sessionId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("missing session_id in session/load"))?;
+                .ok_or_else(|| anyhow::anyhow!("missing sessionId in session/load"))?;
             let cwd = params
                 .get("cwd")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("missing cwd in session/load"))?;
-            Ok(ZedRequest::LoadSession {
+            Ok(AcpRequest::SessionLoad {
+                id,
                 session_id: session_id.to_string(),
                 cwd: cwd.to_string(),
             })
         }
         "session/close" => {
             let session_id = params
-                .get("session_id")
+                .get("sessionId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("missing session_id in session/close"))?;
-            Ok(ZedRequest::CloseSession {
+                .ok_or_else(|| anyhow::anyhow!("missing sessionId in session/close"))?;
+            Ok(AcpRequest::SessionClose {
+                id,
                 session_id: session_id.to_string(),
             })
         }
-        "session/list" => Ok(ZedRequest::ListSessions),
-        "prompt" => {
+        "session/list" => Ok(AcpRequest::SessionList { id }),
+        "session/prompt" => {
             let session_id = params
-                .get("session_id")
+                .get("sessionId")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("missing session_id in prompt"))?;
-            let message = params
-                .get("message")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("missing message in prompt"))?;
-            Ok(ZedRequest::Prompt {
+                .ok_or_else(|| anyhow::anyhow!("missing sessionId in session/prompt"))?;
+            let prompt = params
+                .get("prompt")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            Ok(AcpRequest::SessionPrompt {
+                id,
                 session_id: session_id.to_string(),
-                message: message.to_string(),
+                prompt,
             })
         }
         "tool_call" => {
@@ -79,7 +106,8 @@ fn map_method(request: AcpRequest) -> Result<ZedRequest, anyhow::Error> {
             let arguments = params
                 .get("arguments")
                 .ok_or_else(|| anyhow::anyhow!("missing arguments in tool_call"))?;
-            Ok(ZedRequest::ToolCall {
+            Ok(AcpRequest::ToolCall {
+                id,
                 session_id: session_id.to_string(),
                 function_name: function_name.to_string(),
                 arguments: arguments.clone(),
@@ -90,7 +118,8 @@ fn map_method(request: AcpRequest) -> Result<ZedRequest, anyhow::Error> {
                 .get("auth_method")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("missing auth_method in authenticate"))?;
-            Ok(ZedRequest::Authenticate {
+            Ok(AcpRequest::Authenticate {
+                id,
                 auth_method: auth_method.to_string(),
             })
         }
@@ -126,14 +155,53 @@ async fn main() -> anyhow::Result<()> {
             continue;
         }
 
-        let request = parse_request(&line)?;
-        let zed_request = map_method(request)?;
+        let msg = parse_message(&line)?;
 
-        let response = server.handle_request(zed_request).await;
+        // Handle responses (id present, no method) - ignore from client
+        if msg.id.is_some() && msg.method.is_none() {
+            info!("Received client response: {:?}", msg.id);
+            continue;
+        }
+
+        // Handle notifications (no id, has method) - log but don't respond
+        if msg.id.is_none() && msg.method.is_some() {
+            info!("Received notification: {}", msg.method.as_ref().unwrap());
+            continue;
+        }
+
+        // Handle requests (id present, has method)
+        let Some(id) = msg.id else {
+            continue;
+        };
+        let Some(method) = msg.method else {
+            anyhow::bail!("message has id but no method");
+        };
+        let params = msg.params.unwrap_or(json!({}));
+
+        let acp_request = map_method(id.clone(), &method, params)?;
+        let response = server.handle_request(acp_request).await;
         let response_json = match response {
-            Ok(AcpResponse::Result { value }) => json!({ "type": "result", "value": value }),
-            Ok(AcpResponse::Error { message }) => json!({ "type": "error", "message": message }),
-            Err(e) => json!({ "type": "error", "message": format!("ACP server error: {}", e) }),
+            Ok(AcpResponse::Result { id, result }) => json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": result
+            }),
+            Ok(AcpResponse::Error { id, code, message }) => json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "error": {
+                    "code": code,
+                    "message": message
+                }
+            }),
+            Err(e) => json!({
+                "jsonrpc": "2.0",
+                "id": null,
+                "error": {
+                    "code": -32603,
+                    "message": format!("ACP server error: {}", e)
+                }
+            }),
         };
 
         let output = serde_json::to_string(&response_json)

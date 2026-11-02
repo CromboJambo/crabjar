@@ -79,7 +79,7 @@ members = [
     "crabjar-herdr-mcp",
     "crabjar-structured-aux",
     "universal-structure",
-    "crates/email-smtp", "crabjar-web-extract", "crabjar-browser", "crabjar-memory", "crabjar-delegation", "crabjar-cron",
+    "crates/email-smtp", "crabjar-web-extract", "crabjar-browser", "crabjar-memory", "crabjar-delegation", "crabjar-cron", "crabjar-deploy",
 ]
 
 resolver = "2"

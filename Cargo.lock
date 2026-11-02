@@ -2235,6 +2235,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "crabjar-cron"
+version = "0.12.2"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "dirs 6.0.0",
+ "reqwest 0.13.5",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "crabjar-delegation"
 version = "0.12.2"
 dependencies = [
@@ -2247,6 +2263,10 @@ dependencies = [
  "tracing",
  "uuid",
 ]
+
+[[package]]
+name = "crabjar-deploy"
+version = "0.12.2"
 
 [[package]]
 name = "crabjar-durable-objects"

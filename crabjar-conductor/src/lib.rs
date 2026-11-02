@@ -27,6 +27,7 @@ pub mod auth;
 pub mod conductor_gate;
 pub mod conductor;
 pub mod decision;
+pub mod fleet_status;
 pub mod gate;
 pub mod promotion;
 pub mod state_store;

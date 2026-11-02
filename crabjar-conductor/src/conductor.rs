@@ -36,6 +36,7 @@ pub struct Conductor {
     decision_gate: Option<DecisionGate>,
     hybrid_layer: Option<crate::attention::HybridDecisionLayer>,
     promotion_manager: PromotionManager,
+    fleet_status: FleetStatusTracker,
 }
 
 impl Conductor {
