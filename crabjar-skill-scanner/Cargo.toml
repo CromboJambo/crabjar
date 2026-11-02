@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-skill-scanner"
-version = "0.12.0"
+version = "0.12.3"
 edition = "2024"
 description = "Security scanning pipeline for CrabJar skills — checksum verification, pattern analysis, and risk assessment"
 authors = ["CromboJambo"]

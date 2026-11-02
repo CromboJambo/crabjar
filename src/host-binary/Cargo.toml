@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-host"
-version = "0.12.0"
+version = "0.12.3"
 edition = "2024"
 license.workspace = true
 description = "CrabJar host runtime — CLI entry point and Mission Control (Ratatui)"

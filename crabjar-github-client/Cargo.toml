@@ -1,6 +1,6 @@
 [package]
 name = "crabjar-github-client"
-version = "0.12.0"
+version = "0.12.3"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 authors = ["CrabJar Contributors"]

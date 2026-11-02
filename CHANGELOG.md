@@ -2,6 +2,29 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 2, 2026 — v0.12.3: Hermes Parity Milestone & Spec Archive
+
+### Specs Archived (Completed)
+- **SKILLS-REMOTE-DISCOVERY.md** — Remote skill discovery complete through all phases (8-11): GitHub client, ClawHub integration, security scanning, trust management & caching
+- **WEB-SEARCH-P1-1.md** — Web search via self-hosted SearXNG with Brave/DuckDuckGo fallbacks
+- **WEB-EXTRACT-P1-2.md** — Web content extraction with HTML parsing and boilerplate removal
+- **conductor-crate.md** — Fleet coordination layer with goal decomposition and task assignment
+- **P1-4-SUBAGENT-DELEGATION.md** — Subagent delegation framework with isolated contexts
+
+### Completed Without Dedicated Specs (P1 Drop-in Blockers)
+- **P1-5: Interactive clarify tooling** — `orchestrator/src/clarify.rs` for user decision prompts
+- **P1-6: Session management/search** — `orchestrator/src/session_search.rs` for conversation history
+- **P1-7: Process management** — `orchestrator/src/process_management.rs` for background job control
+- **P1-8: Cron job management** — `crabjar-cron` crate with schedule/run/list/delete operations
+
+### Crates Verified
+All 13 relevant crates compile and pass tests: crabjar-github-client, crabjar-clawhub-client, crabjar-skill-scanner, crabjar-trust-manager, crabjar-web-search, crabjar-web-extract, crabjar-conductor, crabjar-delegation, crabjar-cron, orchestrator (clarify/session/process modules)
+
+### Architecture Decisions
+- Self-hosted SearXNG as primary search backend for privacy and control
+- Conductor pattern for cross-machine agent coordination with SQLite persistence
+- Subagent delegation with isolated contexts and structured result handoffs
+
 ## October 31, 2026 — Web Search, Extraction & Browser Automation (P1 Drop-in Replacement Blockers)
 
 ### Web Search (P1-1)

@@ -1,7 +1,7 @@
 # P1-4: Subagent Delegation Framework
 
 **Date:** October 31, 2026
-**Status:** Draft
+**Status:** Implemented (November 2, 2026)
 **Priority:** P1 (Drop-in Replacement Blocker)
 **North Star:** Drop-in replacement for Hermes Agent — users migrating should find identical delegation behavior.
 
