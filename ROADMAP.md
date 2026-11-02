@@ -45,6 +45,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ Session management and search tooling (P1-6 drop-in replacement blocker) — Hermes-compatible session_search tool for searching conversation history by query or retrieving specific sessions by ID
 - ✅ Process management tooling (P1-7 drop-in replacement blocker) — Hermes-compatible process_manage tool for spawning, listing, killing, and inspecting background processes via conductor API
 - ✅ Cron job management tooling (P1-8 drop-in replacement blocker) — Hermes-compatible cronjob_manage tool with SQLite persistence, cron schedule parsing, background scheduler, and conductor API integration for recurring task scheduling and execution
+- ✅ Browser automation tooling (P1-3 drop-in replacement blocker) — Hermes-compatible browser_exec tool via crabjar-browser crate using Playwright subprocess wrapper; supports navigation, JavaScript evaluation, form filling, screenshots, and content extraction
 
 **Upcoming:**
 - [ ] Develop security model with capability-based access control
