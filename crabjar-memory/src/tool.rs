@@ -2,11 +2,21 @@
 //!
 //! Provides the same tool schema and response format as Hermes Agent's
 //! memory tool, enabling drop-in replacement for agents.
+//!
+//! Optional mirror-log integration provides provenance tracking and
+//! attention-based decision filtering for memory operations.
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "mirror-log")]
+use std::sync::Arc;
+
 use super::error::{MemoryError, MemoryResult};
 use super::store::{MemoryStore, MemoryTarget};
+#[cfg(feature = "mirror-log")]
+use super::mirror_log::{
+    log_batch_applied, log_entry_added, log_entry_patched, log_entry_removed, MemoryAuditLogger,
+};
 
 /// Tool operation types.
 #[derive(Debug, Clone, Deserialize)]
@@ -88,6 +98,8 @@ impl MemoryToolResponse {
 /// Hermes-compatible memory tool.
 pub struct MemoryTool {
     store: MemoryStore,
+    #[cfg(feature = "mirror-log")]
+    audit_logger: Option<Arc<MemoryAuditLogger>>,
 }
 
 impl MemoryTool {
@@ -95,7 +107,16 @@ impl MemoryTool {
     pub fn new(base_dir: impl Into<std::path::PathBuf>) -> Self {
         MemoryTool {
             store: MemoryStore::new(base_dir),
+            #[cfg(feature = "mirror-log")]
+            audit_logger: None,
         }
+    }
+
+    /// Attach an optional mirror-log audit logger for provenance tracking.
+    #[cfg(feature = "mirror-log")]
+    pub fn with_audit_logger(mut self, logger: Arc<MemoryAuditLogger>) -> Self {
+        self.audit_logger = Some(logger);
+        self
     }
 
     /// Parse target string into MemoryTarget enum.
@@ -160,6 +181,72 @@ impl MemoryTool {
         }
     }
 
+    /// Execute a memory tool call (async version that supports audit logging).
+    #[cfg(feature = "mirror-log")]
+    pub async fn execute_async(&self, input: MemoryToolInput) -> MemoryResult<MemoryToolResponse> {
+        let target = Self::parse_target(&input.target)?;
+
+        // Handle batch operations
+        if let Some(operations) = &input.operations {
+            return self.execute_batch_async(&target, operations).await;
+        }
+
+        // Single operation
+        match input.action {
+            Some(MemoryAction::Add) => {
+                let content = input.content.ok_or_else(|| {
+                    MemoryError::InvalidParams("content is required for add action".to_string())
+                })?;
+
+                match self.store.add_entry(&target, content.clone()) {
+                    Ok(()) => {
+                        if let Some(logger) = &self.audit_logger {
+                            let _ = log_entry_added(logger, &input.target, &content).await;
+                        }
+                        MemoryToolResponse::ok("Added memory entry", &self.store, &target)
+                    }
+                    Err(e) => MemoryToolResponse::err(&e, &self.store, &target),
+                }
+            }
+            Some(MemoryAction::Patch) => {
+                let content = input.content.ok_or_else(|| {
+                    MemoryError::InvalidParams("content is required for patch action".to_string())
+                })?;
+                let old_text = input.old_text.ok_or_else(|| {
+                    MemoryError::InvalidParams("old_text is required for patch action".to_string())
+                })?;
+
+                match self.store.patch_entry(&target, &old_text, &content) {
+                    Ok(()) => {
+                        if let Some(logger) = &self.audit_logger {
+                            let _ = log_entry_patched(logger, &input.target, &old_text, &content).await;
+                        }
+                        MemoryToolResponse::ok("Patched memory entry", &self.store, &target)
+                    }
+                    Err(e) => MemoryToolResponse::err(&e, &self.store, &target),
+                }
+            }
+            Some(MemoryAction::Remove) => {
+                let old_text = input.old_text.ok_or_else(|| {
+                    MemoryError::InvalidParams("old_text is required for remove action".to_string())
+                })?;
+
+                match self.store.remove_entry(&target, &old_text) {
+                    Ok(()) => {
+                        if let Some(logger) = &self.audit_logger {
+                            let _ = log_entry_removed(logger, &input.target, &old_text).await;
+                        }
+                        MemoryToolResponse::ok("Removed memory entry", &self.store, &target)
+                    }
+                    Err(e) => MemoryToolResponse::err(&e, &self.store, &target),
+                }
+            }
+            None => Err(MemoryError::InvalidParams(
+                "action is required when operations array is not provided".to_string(),
+            )),
+        }
+    }
+
     /// Execute batch operations atomically.
     fn execute_batch(
         &self,
@@ -215,6 +302,75 @@ impl MemoryTool {
 
         // Write final state
         self.store.write_entries(target, &entries)?;
+
+        MemoryToolResponse::ok(
+            &format!("Applied {} operations", operations.len()),
+            &self.store,
+            target,
+        )
+    }
+
+    /// Execute batch operations atomically (async version with audit logging).
+    #[cfg(feature = "mirror-log")]
+    async fn execute_batch_async(
+        &self,
+        target: &MemoryTarget,
+        operations: &[MemoryOperation],
+    ) -> MemoryResult<MemoryToolResponse> {
+        // Read current state
+        let mut entries = self.store.read_entries(target)?;
+
+        // Apply all operations in memory first (atomic)
+        for op in operations {
+            match &op.action {
+                MemoryAction::Add => {
+                    if let Some(content) = &op.content {
+                        if !entries.iter().any(|e| e == content) {
+                            entries.push(content.clone());
+                        }
+                    }
+                }
+                MemoryAction::Patch => {
+                    if let (Some(old_text), Some(new_text)) = (&op.old_text, &op.content) {
+                        for entry in &mut entries {
+                            if entry.contains(old_text) {
+                                *entry = entry.replace(old_text, new_text);
+                                break;
+                            }
+                        }
+                    }
+                }
+                MemoryAction::Remove => {
+                    if let Some(old_text) = &op.old_text {
+                        entries.retain(|e| !e.contains(old_text));
+                    }
+                }
+            }
+        }
+
+        // Check capacity of final state
+        let serialized = super::parser::serialize_entries(&entries);
+        let cap = target.capacity();
+        if serialized.chars().count() > cap.max_chars {
+            return MemoryToolResponse::err(
+                &MemoryError::Full {
+                    current_chars: serialized.chars().count(),
+                    max_chars: cap.max_chars,
+                    would_exceed_by: serialized.chars().count() - cap.max_chars,
+                    closest_entries: entries.clone(),
+                },
+                &self.store,
+                target,
+            );
+        }
+
+        // Write final state
+        self.store.write_entries(target, &entries)?;
+
+        // Log batch operation
+        if let Some(logger) = &self.audit_logger {
+            let _ = log_batch_applied(logger, &target.filename(), operations.len()).await;
+        }
 
         MemoryToolResponse::ok(
             &format!("Applied {} operations", operations.len()),
