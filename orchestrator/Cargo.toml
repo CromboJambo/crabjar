@@ -56,6 +56,7 @@ crabjar-delegation = { path = "../crabjar-delegation" }
 
 # Browser automation tooling (P1-3)
 crabjar-browser = { path = "../crates/crabjar-browser" }
+crabjar-homeassistant = { path = "../crates/crabjar-homeassistant" }
 
 # Directory detection for memory tool
 dirs.workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "crabjar-homeassistant"
+version = "0.12.5"
+edition = "2024"
+description = "Home Assistant REST API client and tools for crabjar execution pipeline"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+reqwest = { workspace = true, features = ["json"] }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+urlencoding = "2.1.3"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
