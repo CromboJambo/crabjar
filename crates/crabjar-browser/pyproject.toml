@@ -1,0 +1,12 @@
+[project]
+name = "crabjar-browser-playwright"
+version = "0.12.4"
+description = "Playwright wrapper for crabjar browser automation"
+requires-python = ">=3.10"
+dependencies = [
+    "playwright>=1.49.0",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
