@@ -46,6 +46,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ Process management tooling (P1-7 drop-in replacement blocker) — Hermes-compatible process_manage tool for spawning, listing, killing, and inspecting background processes via conductor API
 - ✅ Cron job management tooling (P1-8 drop-in replacement blocker) — Hermes-compatible cronjob_manage tool with SQLite persistence, cron schedule parsing, background scheduler, and conductor API integration for recurring task scheduling and execution
 - ✅ Browser automation tooling (P1-3 drop-in replacement blocker) — Hermes-compatible browser_exec tool via crabjar-browser crate using Playwright subprocess wrapper; supports navigation, JavaScript evaluation, form filling, screenshots, and content extraction
+- ✅ Memory compat layer with mirror-log integration (P2-1 productivity improvement) — CrabJar's memory system provides identical tool schema and response format to Hermes' memory tool. Supports MEMORY.md/USER.md with same character budgets, batch operations, and §-delimited format. Optional mirror-log integration for provenance tracking and attention-based decision filtering.
 - ✅ Home Assistant application-layer tools (P2-2 productivity improvement) — four HA REST API tools: ha_get_state, ha_call_service, ha_list_entities, ha_list_services for home-lab management workflows
 
 **Upcoming:**
