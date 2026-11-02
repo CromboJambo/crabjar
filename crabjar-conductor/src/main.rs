@@ -74,6 +74,13 @@ async fn main() -> Result<()> {
     };
     conductor.with_decision_gate(backend_config, Some(DecisionPolicy::default()));
 
+    // Load registered decision capabilities from manifests
+    let decisions_dir = std::env::var("CRABJAR_DECISIONS_DIR")
+        .unwrap_or_else(|_| "/opt/crabjar/decisions".to_string());
+    if let Err(e) = conductor.load_decision_capabilities(&decisions_dir) {
+        tracing::warn!("Failed to load decision capabilities from {}: {}", decisions_dir, e);
+    }
+
     // Wrap in Arc<Mutex<>> for shared state across API handlers
     use tokio::sync::Mutex;
     let conductor_state: api::ConductorState = Arc::new(Mutex::new(conductor));

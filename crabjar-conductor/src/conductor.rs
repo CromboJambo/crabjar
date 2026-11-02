@@ -2,8 +2,10 @@
 
 use crate::auth;
 use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
+use crate::fleet_status::FleetStatusTracker;
 use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assign};
 use crate::promotion::PromotionManager;
+use crate::sandbox::SandboxManager;
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
 use rusqlite::Connection;
@@ -37,6 +39,7 @@ pub struct Conductor {
     hybrid_layer: Option<crate::attention::HybridDecisionLayer>,
     promotion_manager: PromotionManager,
     fleet_status: FleetStatusTracker,
+    sandbox_manager: SandboxManager,
 }
 
 impl Conductor {
@@ -51,6 +54,8 @@ impl Conductor {
             decision_gate: None,
             hybrid_layer: None,
             promotion_manager,
+            fleet_status: FleetStatusTracker::default(),
+            sandbox_manager: SandboxManager::default(),
         })
     }
 
@@ -65,6 +70,8 @@ impl Conductor {
             decision_gate: None,
             hybrid_layer: None,
             promotion_manager,
+            fleet_status: FleetStatusTracker::default(),
+            sandbox_manager: SandboxManager::default(),
         })
     }
 
@@ -76,6 +83,23 @@ impl Conductor {
     ) {
         let evaluator = crate::decision::evaluate::JevEvaluator::new(backend_config);
         self.decision_gate = Some(DecisionGate::new(evaluator, policy));
+    }
+
+    /// Load registered decision capabilities from manifest files.
+    pub fn load_decision_capabilities(&mut self, decisions_dir: &str) -> Result<usize, String> {
+        if let Some(gate) = &mut self.decision_gate {
+            gate.load_decision_capabilities(decisions_dir)
+        } else {
+            Err("Decision gate not configured; call with_decision_gate() first".to_string())
+        }
+    }
+
+    /// List all registered decision capabilities as JSON values.
+    pub fn list_decision_capabilities(&self) -> serde_json::Value {
+        self.decision_gate
+            .as_ref()
+            .map(|gate| gate.registry().to_json())
+            .unwrap_or_else(|| serde_json::json!({"count": 0, "capabilities": []}))
     }
 
     /// Configure hybrid attention + JEV decision layer.
@@ -686,6 +710,16 @@ impl Conductor {
     /// Get the promotion manager (for evidence-based worker promotions).
     pub fn promotion_manager(&self) -> &PromotionManager {
         &self.promotion_manager
+    }
+
+    /// Get the sandbox manager (for ephemeral worker environment provisioning).
+    pub fn sandbox_manager(&self) -> &SandboxManager {
+        &self.sandbox_manager
+    }
+
+    /// Get the fleet status tracker.
+    pub fn fleet_status(&self) -> &FleetStatusTracker {
+        &self.fleet_status
     }
 }
 
