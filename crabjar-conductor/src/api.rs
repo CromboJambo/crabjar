@@ -1,5 +1,11 @@
 //! HTTP API endpoints for the conductor service.
 
+pub mod sandboxes;
+pub mod goals;
+pub mod tasks;
+pub mod jev;
+pub mod decisions;
+
 use crate::auth::{AuthError, validate_token};
 use crate::conductor::Conductor;
 use crate::fleet_status::FleetStatusTracker;
@@ -19,6 +25,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+pub mod workers;
+pub mod promotion;
 
 /// In-memory store for background evaluation results (dev/testing).
 static BG_EVALUATIONS: OnceLock<Arc<Mutex<HashMap<String, serde_json::Value>>>> = OnceLock::new();
@@ -76,17 +85,17 @@ pub fn routes(conductor: ConductorState) -> Router {
     let public_app: Router = Router::new()
         .route("/fleet/status", get(get_fleet_status))
         .route("/metrics/cache", get(get_cache_stats))
-        .route("/workers/register", post(register_worker))
-        .route("/workers/login", post(worker_login_handler))
-        .route("/workers/poll", post(worker_poll_handler))
-        .route("/workers/heartbeat", post(worker_heartbeat_public))
+        .route("/workers/register", post(workers::register_worker))
+        .route("/workers/login", post(workers::worker_login_handler))
+        .route("/workers/poll", post(workers::worker_poll_handler))
+        .route("/workers/heartbeat", post(workers::worker_heartbeat_public))
         .route("/evaluations/decision", post(evaluate_decision_handler))
         // Sandbox management endpoints (Phase 1)
-        .route("/sandboxes", post(create_sandbox_handler))
-        .route("/sandboxes", get(list_sandboxes_handler))
-        .route("/sandboxes/:id", get(get_sandbox_handler))
-        .route("/sandboxes/:id", delete(destroy_sandbox_handler))
-        .route("/sandboxes/:id/worker", post(assign_worker_to_sandbox_handler))
+        .route("/sandboxes", post(sandboxes::create_sandbox_handler))
+        .route("/sandboxes", get(sandboxes::list_sandboxes_handler))
+        .route("/sandboxes/:id", get(sandboxes::get_sandbox_handler))
+        .route("/sandboxes/:id", delete(sandboxes::destroy_sandbox_handler))
+        .route("/sandboxes/:id/worker", post(sandboxes::assign_worker_to_sandbox_handler))
         .route("/decide/evaluate/{id}", get(get_evaluation_status))
         .route("/decisions/capabilities", get(list_decision_capabilities))
         .route("/jev/evaluate", post(evaluate_structural_handler))
@@ -137,24 +146,24 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/rules/extract", post(extract_rules_handler))
         .route("/rules/promote", post(promote_rule_handler))
         // Sandbox provisioning (Phase 1: Basic Sandbox Provisioning)
-        .route("/sandboxes", post(create_sandbox_handler))
-        .route("/sandboxes", get(list_sandboxes_handler))
-        .route("/sandboxes/{id}", get(get_sandbox_handler))
-        .route("/sandboxes/{id}", delete(destroy_sandbox_handler))
-        .route("/sandboxes/{id}/assign", post(assign_worker_to_sandbox_handler))
+        .route("/sandboxes", post(sandboxes::create_sandbox_handler))
+        .route("/sandboxes", get(sandboxes::list_sandboxes_handler))
+        .route("/sandboxes/{id}", get(sandboxes::get_sandbox_handler))
+        .route("/sandboxes/{id}", delete(sandboxes::destroy_sandbox_handler))
+        .route("/sandboxes/{id}/assign", post(sandboxes::assign_worker_to_sandbox_handler))
         // Evidence-based promotion endpoints
-        .route("/promotion/evaluate/{worker_id}", get(evaluate_promotion_endpoint))
-        .route("/promotion/execute/{worker_id}", post(execute_promotion_endpoint))
-        .route("/promotion/history/{worker_id}", get(get_promotion_history_endpoint))
-        .route("/promotion/metrics/{worker_id}", get(get_worker_metrics_endpoint))
+        .route("/promotion/evaluate/{worker_id}", get(promotion::evaluate_promotion_endpoint))
+        .route("/promotion/execute/{worker_id}", post(promotion::execute_promotion_endpoint))
+        .route("/promotion/history/{worker_id}", get(promotion::get_promotion_history_endpoint))
+        .route("/promotion/metrics/{worker_id}", get(promotion::get_worker_metrics_endpoint))
         .with_state(Arc::clone(&conductor));
 
     // Protected routes (JWT auth required)
     let protected_app: Router = Router::new()
         .route("/goals", post(submit_goal))
         .route("/goals/{id}", get(get_goal))
-        .route("/workers", get(list_workers))
-        .route("/tasks/for-worker/{worker_id}", get(tasks_for_worker))
+        .route("/workers", get(workers::list_workers))
+        .route("/tasks/for-worker/{worker_id}", get(workers::tasks_for_worker))
         .route("/tasks/{id}/result", post(report_task_result))
         .route("/review", post(submit_review))
         .layer(middleware::from_fn(jwt_auth_middleware))
@@ -296,192 +305,6 @@ async fn get_goal(
         })),
         Err(e) => Json(json!({
             "goal_id": goal_id_for_response,
-            "status": "error",
-            "message": format!("task join error: {}", e)
-        })),
-    }
-}
-
-async fn list_workers(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-) -> Json<serde_json::Value> {
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.list_workers()
-    })
-    .await;
-
-    match result {
-        Ok(workers) => Json(json!({
-            "workers": workers.iter().map(|w| json!({
-                "id": w.id,
-                "name": w.name,
-                "status": w.status,
-                "capabilities": w.capabilities
-            })).collect::<Vec<_>>()
-        })),
-        Err(e) => Json(json!({
-            "status": "error",
-            "message": format!("task join error: {}", e)
-        })),
-    }
-}
-
-async fn register_worker(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    Json(body): Json<serde_json::Value>,
-) -> Json<serde_json::Value> {
-    let name = body["name"].as_str().unwrap_or("unknown").to_string();
-    let capabilities: Vec<String> = body["capabilities"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-    let ssh_key = body["ssh_key"].as_str().map(|s| s.to_string());
-
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.register_worker(name, capabilities, ssh_key)
-    })
-    .await;
-
-    match result {
-        Ok(Ok((worker, token))) => Json(json!({
-            "status": "registered",
-            "worker_id": worker.id,
-            "name": worker.name,
-            "auth_token": token
-        })),
-        Ok(Err(e)) => Json(json!({
-            "status": "error",
-            "message": e.to_string()
-        })),
-        Err(e) => Json(json!({
-            "status": "error",
-            "message": format!("task join error: {}", e)
-        })),
-    }
-}
-
-async fn worker_login_handler(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    Json(body): Json<serde_json::Value>,
-) -> Json<serde_json::Value> {
-    let name = body["name"].as_str().unwrap_or("").to_string();
-    let ssh_key = body["ssh_key"].as_str().map(|s| s.to_string());
-
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.worker_login(&name, ssh_key)
-    })
-    .await;
-
-    match result {
-        Ok(Ok((worker, token))) => Json(json!({
-            "status": "authenticated",
-            "worker_id": worker.id,
-            "name": worker.name,
-            "auth_token": token,
-            "trust_level": worker.trust_level
-        })),
-        Ok(Err(e)) => Json(json!({
-            "status": "error",
-            "message": e.to_string()
-        })),
-        Err(e) => Json(json!({
-            "status": "error",
-            "message": format!("task join error: {}", e)
-        })),
-    }
-}
-
-async fn worker_poll_handler(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    Json(body): Json<serde_json::Value>,
-) -> Json<serde_json::Value> {
-    let worker_id = body["worker_id"].as_str().unwrap_or("").to_string();
-
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.tasks_for_worker(&worker_id)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(tasks)) if !tasks.is_empty() => Json(json!({
-            "status": "task_available",
-            "task_id": tasks[0].id,
-            "goal_id": tasks[0].goal_id,
-            "command": tasks[0].command
-        })),
-        Ok(Ok(_)) => Json(json!({
-            "status": "no_tasks"
-        })),
-        Ok(Err(e)) => Json(json!({
-            "status": "error",
-            "message": e.to_string()
-        })),
-        Err(e) => Json(json!({
-            "status": "error",
-            "message": format!("task join error: {}", e)
-        })),
-    }
-}
-
-async fn worker_heartbeat(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let worker_id = id.0;
-
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.worker_heartbeat(&worker_id)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(())) => Json(json!({ "status": "ok" })),
-        Ok(Err(e)) => Json(json!({
-            "status": "error",
-            "message": e.to_string()
-        })),
-        Err(e) => Json(json!({
-            "status": "error",
-            "message": format!("task join error: {}", e)
-        })),
-    }
-}
-
-async fn tasks_for_worker(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let worker_id = id.0;
-
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.tasks_for_worker(&worker_id)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(tasks)) => Json(json!({
-            "tasks": tasks.iter().map(|t| json!({
-                "id": t.id,
-                "goal_id": t.goal_id,
-                "command": t.command,
-                "status": t.status
-            })).collect::<Vec<_>>()
-        })),
-        Ok(Err(e)) => Json(json!({
-            "status": "error",
-            "message": e.to_string()
-        })),
-        Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
         })),
@@ -971,7 +794,7 @@ async fn evaluate_structural_handler(
     Json(req): Json<EvaluateStructuralRequest>,
 ) -> Json<serde_json::Value> {
     let target = req.target;
-    let criteria_path = req.criteria_path;
+    let criteria_path = req.criteria_path.clone();
 
     // First, try direct structural condition evaluation
     if let Some(result) = evaluate_structural_conditions(&target, &criteria_path) {
@@ -1066,8 +889,8 @@ async fn evaluate_decision_handler(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     Json(req): Json<EvaluateDecisionRequest>,
 ) -> Json<serde_json::Value> {
-    let observation = req.observation;
-    let criteria_file = req.criteria_file;
+    let observation = req.observation.clone();
+    let criteria_file = req.criteria_file.clone();
 
     // If background flag is set, spawn async task and return ID immediately
     if req.background {
@@ -2414,326 +2237,6 @@ async fn promote_rule_handler(
     }
 }
 
-async fn worker_heartbeat_public(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    Json(body): Json<serde_json::Value>,
-) -> Json<serde_json::Value> {
-    let worker_id = body["worker_id"].as_str().unwrap_or("").to_string();
-
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.worker_heartbeat(&worker_id)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(())) => Json(json!({ "status": "ok" })),
-        Ok(Err(e)) => Json(json!({ "status": "error", "message": e.to_string() })),
-        Err(_) => Json(json!({ "status": "error", "message": "internal error" })),
-    }
-}
-
 // ─── Evidence-Based Promotion Handlers ──────────────────────────────
 
-/// GET /promotion/evaluate/:worker_id - Evaluate promotion eligibility.
-async fn evaluate_promotion_endpoint(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    worker_id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        // Default to evaluating for rank 1 (supervisor)
-        c.promotion_manager().evaluate_promotion(&worker_id, 1)
-    })
-    .await;
 
-    match result {
-        Ok(Ok(evaluation)) => Json(json!({
-            "success": true,
-            "eligible": evaluation.eligible,
-            "current_rank": evaluation.current_rank,
-            "target_rank": evaluation.target_rank,
-            "evidence_summary": {
-                "task_completions": evaluation.evidence_summary.task_completions,
-                "success_count": evaluation.evidence_summary.success_count,
-                "failure_count": evaluation.evidence_summary.failure_count,
-                "decisions_made": evaluation.evidence_summary.decisions_made,
-                "accurate_decisions": evaluation.evidence_summary.accurate_decisions
-            },
-            "thresholds_met": evaluation.thresholds_met.iter().map(|c| json!({
-                "criterion": c.criterion,
-                "required": c.required,
-                "actual": c.actual,
-                "met": c.met
-            })).collect::<Vec<_>>()
-        })),
-        Ok(Err(e)) => Json(json!({
-            "success": false,
-            "error": format!("Evaluation failed: {}", e)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-/// POST /promotion/execute/:worker_id - Execute promotion for eligible worker.
-async fn execute_promotion_endpoint(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    worker_id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        let rationale = "Automatic evidence-based promotion";
-        // Default to promoting to rank 1 (supervisor)
-        c.promotion_manager().execute_promotion(&worker_id, 1, rationale)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(record)) => Json(json!({
-            "success": true,
-            "promotion_id": record.promotion_id,
-            "worker_id": record.worker_id,
-            "from_rank": record.from_rank,
-            "to_rank": record.to_rank,
-            "timestamp": record.timestamp.to_rfc3339(),
-            "rationale": record.rationale
-        })),
-        Ok(Err(e)) => Json(json!({
-            "success": false,
-            "error": format!("Promotion failed: {}", e)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-/// GET /promotion/history/:worker_id - Get promotion history for worker.
-async fn get_promotion_history_endpoint(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    worker_id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.promotion_manager().get_promotion_history(&worker_id)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(records)) => Json(json!({
-            "success": true,
-            "promotions": records.iter().map(|r| json!({
-                "promotion_id": r.promotion_id,
-                "from_rank": r.from_rank,
-                "to_rank": r.to_rank,
-                "timestamp": r.timestamp.to_rfc3339(),
-                "rationale": r.rationale
-            })).collect::<Vec<_>>()
-        })),
-        Ok(Err(e)) => Json(json!({
-            "success": false,
-            "error": format!("History retrieval failed: {}", e)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-/// GET /promotion/metrics/:worker_id - Get competence metrics for worker.
-async fn get_worker_metrics_endpoint(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    worker_id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.promotion_manager().get_worker_metrics(&worker_id)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(metrics)) => Json(json!({
-            "success": true,
-            "worker_id": metrics.worker_id,
-            "task_completions": metrics.task_completions,
-            "success_count": metrics.success_count,
-            "failure_count": metrics.failure_count,
-            "decisions_made": metrics.decisions_made,
-            "accurate_decisions": metrics.accurate_decisions,
-            "knowledge_contributions": metrics.knowledge_contributions
-        })),
-        Ok(Err(e)) => Json(json!({
-            "success": false,
-            "error": format!("Metrics retrieval failed: {}", e)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-// Sandbox provisioning handlers (Phase 1)
-
-async fn create_sandbox_handler(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    body: Json<SandboxConfig>,
-) -> Json<serde_json::Value> {
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.sandbox_manager().create_sandbox(body.0)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(state)) => Json(json!({
-            "success": true,
-            "sandbox_id": state.container_id,
-            "container_id": state.container_id,
-            "created_at": state.created_at
-        })),
-        Ok(Err(e)) => Json(json!({
-            "success": false,
-            "error": format!("Sandbox creation failed: {}", e)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-async fn list_sandboxes_handler(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-) -> Json<serde_json::Value> {
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.sandbox_manager().list_sandboxes()
-    })
-    .await;
-
-    match result {
-        Ok(sandboxes) => Json(json!({
-            "success": true,
-            "count": sandboxes.len(),
-            "sandboxes": sandboxes.iter().map(|s| json!({
-                "sandbox_id": s.container_id,
-                "image": s.config.image,
-                "network_mode": s.config.network_mode,
-                "worker_id": s.worker_id,
-                "created_at": s.created_at
-            })).collect::<Vec<_>>()
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-async fn get_sandbox_handler(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let sandbox_id = id.0.clone();
-    let sandbox_id_for_closure = sandbox_id.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.sandbox_manager().get_sandbox(&sandbox_id_for_closure)
-    })
-    .await;
-
-    match result {
-        Ok(Some(state)) => Json(json!({
-            "success": true,
-            "sandbox_id": state.container_id,
-            "container_id": state.container_id,
-            "image": state.config.image,
-            "network_mode": state.config.network_mode,
-            "worker_id": state.worker_id,
-            "created_at": state.created_at
-        })),
-        Ok(None) => Json(json!({
-            "success": false,
-            "error": format!("Sandbox {} not found", sandbox_id)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-async fn destroy_sandbox_handler(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    id: axum::extract::Path<String>,
-) -> Json<serde_json::Value> {
-    let sandbox_id = id.0.clone();
-    let sandbox_id_for_closure = sandbox_id.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.sandbox_manager().destroy_sandbox(&sandbox_id_for_closure)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(())) => Json(json!({
-            "success": true,
-            "sandbox_id": sandbox_id,
-            "message": "Sandbox destroyed"
-        })),
-        Ok(Err(e)) => Json(json!({
-            "success": false,
-            "error": format!("Sandbox destruction failed: {}", e)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
-
-async fn assign_worker_to_sandbox_handler(
-    axum::extract::State(conductor): axum::extract::State<ConductorState>,
-    id: axum::extract::Path<String>,
-    body: Json<serde_json::Value>,
-) -> Json<serde_json::Value> {
-    let worker_id = match body["worker_id"].as_str() {
-        Some(wid) => wid.to_string(),
-        None => return Json(json!({
-            "success": false,
-            "error": "Missing worker_id in request body"
-        })),
-    };
-
-    let sandbox_id = id.0.clone();
-    let sandbox_id_for_closure = sandbox_id.clone();
-    let worker_id_for_closure = worker_id.clone();
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
-        c.sandbox_manager().assign_worker(&sandbox_id_for_closure, &worker_id_for_closure)
-    })
-    .await;
-
-    match result {
-        Ok(Ok(())) => Json(json!({
-            "success": true,
-            "sandbox_id": sandbox_id,
-            "worker_id": worker_id,
-            "message": "Worker assigned to sandbox"
-        })),
-        Ok(Err(e)) => Json(json!({
-            "success": false,
-            "error": format!("Worker assignment failed: {}", e)
-        })),
-        Err(e) => Json(json!({
-            "success": false,
-            "error": format!("Task join error: {}", e)
-        })),
-    }
-}
