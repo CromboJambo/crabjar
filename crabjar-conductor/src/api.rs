@@ -2640,9 +2640,11 @@ async fn get_sandbox_handler(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     id: axum::extract::Path<String>,
 ) -> Json<serde_json::Value> {
+    let sandbox_id = id.0.clone();
+    let sandbox_id_for_closure = sandbox_id.clone();
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
-        c.sandbox_manager().get_sandbox(&id.0)
+        c.sandbox_manager().get_sandbox(&sandbox_id_for_closure)
     })
     .await;
 
@@ -2658,7 +2660,7 @@ async fn get_sandbox_handler(
         })),
         Ok(None) => Json(json!({
             "success": false,
-            "error": format!("Sandbox {} not found", id.0)
+            "error": format!("Sandbox {} not found", sandbox_id)
         })),
         Err(e) => Json(json!({
             "success": false,
@@ -2672,9 +2674,10 @@ async fn destroy_sandbox_handler(
     id: axum::extract::Path<String>,
 ) -> Json<serde_json::Value> {
     let sandbox_id = id.0.clone();
+    let sandbox_id_for_closure = sandbox_id.clone();
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
-        c.sandbox_manager().destroy_sandbox(&sandbox_id)
+        c.sandbox_manager().destroy_sandbox(&sandbox_id_for_closure)
     })
     .await;
 
@@ -2709,10 +2712,11 @@ async fn assign_worker_to_sandbox_handler(
     };
 
     let sandbox_id = id.0.clone();
+    let sandbox_id_for_closure = sandbox_id.clone();
     let worker_id_for_closure = worker_id.clone();
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
-        c.sandbox_manager().assign_worker(&sandbox_id, &worker_id_for_closure)
+        c.sandbox_manager().assign_worker(&sandbox_id_for_closure, &worker_id_for_closure)
     })
     .await;
 
