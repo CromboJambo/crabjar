@@ -12,6 +12,10 @@ harness = false
 name = "memory_profile"
 harness = false
 
+[[bench]]
+name = "high_risk_latency"
+harness = false
+
 [dependencies]
 crabjar-guard = { path = "../guard" }
 tracing = "0.1"
