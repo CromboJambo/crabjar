@@ -10,6 +10,7 @@ pub mod condition;
 pub mod evaluate;
 pub mod policy;
 pub mod postprocessor;
+pub mod registry;
 pub mod rule_extraction;
 pub mod structural;
 pub mod workspace;
@@ -24,6 +25,7 @@ use crate::state_store::StateStore;
 pub use cache::{CacheStats, DecisionCache};
 pub use evaluate::{BackendConfig, DecisionResult, JevEvaluator};
 pub use policy::DecisionPolicy;
+pub use registry::{DecisionCapability, DecisionRegistry};
 
 /// Decision gate types in the goal lifecycle
 #[derive(Debug, Clone, PartialEq)]
@@ -47,17 +49,44 @@ pub struct GateResult {
 pub struct DecisionGate {
     evaluator: JevEvaluator,
     policy: Option<DecisionPolicy>,
+    registry: DecisionRegistry,
 }
 
 impl DecisionGate {
     /// Create a new decision gate with optional policy configuration
     pub fn new(evaluator: JevEvaluator, policy: Option<DecisionPolicy>) -> Self {
-        Self { evaluator, policy }
+        Self {
+            evaluator,
+            policy,
+            registry: DecisionRegistry::new(),
+        }
+    }
+
+    /// Load decision capabilities from a directory of JSON manifests
+    pub fn load_decision_capabilities<P: AsRef<std::path::Path>>(&mut self, dir: P) -> Result<usize, String> {
+        self.registry.load_from_directory(dir)
+    }
+
+    /// Register a single decision capability
+    pub fn register_decision_capability(&mut self, capability: DecisionCapability) {
+        self.registry.register(capability);
+    }
+
+    /// Get the decision registry for inspection
+    pub fn registry(&self) -> &DecisionRegistry {
+        &self.registry
     }
 
     /// Get cache statistics from the underlying JEV evaluator
     pub fn cache_stats(&self) -> CacheStats {
         self.evaluator.cache_stats()
+    }
+
+    /// Find a decision capability that matches the observation's triggers.
+    /// Returns the first matching capability, or None if no triggers match.
+    fn find_matching_capability(&self, observation: &str) -> Option<&DecisionCapability> {
+        let matches = self.registry.find_matches(observation);
+        matches.first().copied()
     }
 
     /// Evaluate an observation against decision criteria (generic, for external callers).
@@ -81,19 +110,27 @@ impl DecisionGate {
         criteria_file: Option<&str>,
         state_store: Option<&StateStore>,
     ) -> Result<GateResult, Box<dyn std::error::Error>> {
-        let policy = self.policy.as_ref();
-        let criteria = if let Some(cf) = criteria_file {
-            cf.to_string()
-        } else {
-            policy
-                .and_then(|p| p.default_criteria_for(GateType::PreExecution))
-                .ok_or("No pre-execution criteria specified or configured")?
-        };
-
         let observation = format!(
             "Goal: {}. Current fleet state: {}",
             goal_description, fleet_state
         );
+
+        // First check for trigger-based decision capabilities
+        let criteria = if let Some(cf) = criteria_file {
+            cf.to_string()
+        } else if let Some(capability) = self.find_matching_capability(&observation) {
+            tracing::info!(
+                "Trigger matched decision capability '{}'",
+                capability.name
+            );
+            capability.criteria_file.to_string_lossy().to_string()
+        } else {
+            // Fall back to policy-based selection
+            let policy = self.policy.as_ref();
+            policy
+                .and_then(|p| p.default_criteria_for(GateType::PreExecution))
+                .ok_or("No pre-execution criteria specified, triggered, or configured")?
+        };
 
         let result = self
             .evaluator
