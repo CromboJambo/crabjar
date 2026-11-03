@@ -1,5 +1,5 @@
 use agent_context::state_docs::schema as state_schema;
-use agent_context::{Store, store::StoreError};
+use agent_context::{Store, Source, store::StoreError};
 use axum::{
     Router,
     Json,
@@ -527,6 +527,15 @@ async fn execute_with_guard(
     Ok(output)
 }
 
+/// Validate tool name — prevent path traversal and injection via tool names.
+fn validate_tool_name(name: &str) -> bool {
+    if name.is_empty() || name.len() > 64 {
+        return false;
+    }
+    // Allow lowercase alphanumeric, hyphens, underscores (standard tool naming)
+    name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+}
+
 /// Resolve and execute a tool call via the tool registry, falling back to
 /// the built-in tool dispatch for backward compatibility.
 async fn execute_tool_call(
@@ -535,6 +544,11 @@ async fn execute_tool_call(
     store: Arc<std::sync::Mutex<Store>>,
     process_registry: Arc<Mutex<process_management::ProcessRegistry>>,
 ) -> Result<String, String> {
+    // Validate tool name to prevent path traversal and injection (#16 security finding)
+    if !validate_tool_name(function_name) {
+        warn!(tool = %function_name, "Invalid tool name rejected");
+        return Err(format!("Invalid tool name: {}", function_name));
+    }
     // --- Attempt tool registry resolution first ---
     let project_root = std::env::var("CRABJAR_ROOT")
         .map(std::path::PathBuf::from)
@@ -1461,6 +1475,23 @@ async fn clarify_pending(
     State(state): State<AppState>,
 ) -> Result<Json<AcpResponse>, axum::http::StatusCode> {
     let store = state.store.lock().unwrap();
+
+    // Clean up old answered/expired questions older than 24 hours (#13 security finding: memory leak)
+    // Deactivate them so they don't accumulate forever in the database.
+    let now = chrono::Utc::now().timestamp_millis();
+    let twenty_four_hours_ms = 86_400_000;
+    if let Ok(all_entries) = store.query(&["clarify-pending"], 500, "", "", "") {
+        for entry in &all_entries {
+            if let Some(created_at_str) = entry.metadata.get("created_at").and_then(|v| v.as_str()) {
+                if let Ok(created_at) = created_at_str.parse::<i64>() {
+                    if now - created_at > twenty_four_hours_ms {
+                        // Entry is older than 24 hours — deactivate it
+                        let _ = store.deactivate(entry.id, Source::System, Some("expired: older than 24h"));
+                    }
+                }
+            }
+        }
+    }
 
     // Query for all entries tagged with "clarify-pending"
     let entries = match store.query(&["clarify-pending"], 100, "", "", "") {

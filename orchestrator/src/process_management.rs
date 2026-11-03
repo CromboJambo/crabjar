@@ -85,6 +85,15 @@ pub struct ProcessManageResponse {
     pub result: serde_json::Value,
 }
 
+/// Validate tool name format (redteam finding #16).
+/// Tool names must be lowercase alphanumeric with hyphens/underscores.
+fn validate_tool_name(name: &str) -> bool {
+    // Must start with letter, then alphanumeric/hyphen/underscore only
+    name.starts_with(|c: char| c.is_ascii_lowercase()) && name.chars().all(|c| {
+        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
+    })
+}
+
 /// Execute a process management operation.
 pub async fn execute_process_management(
     request: ProcessManageRequest,
@@ -105,6 +114,17 @@ pub async fn execute_process_management(
         }
         "start" => {
             let cmd = request.command.ok_or_else(|| anyhow::anyhow!("command required for start"))?;
+
+            // Validate command format (redteam finding #14)
+            if !validate_tool_name(&cmd) {
+                return Ok(ProcessManageResponse {
+                    success: false,
+                    action: "start".to_string(),
+                    result: serde_json::json!({
+                        "error": "Invalid command format. Use lowercase alphanumeric with hyphens/underscores only."
+                    }),
+                });
+            }
 
             // Actually spawn the process
             let child = Command::new("sh")
