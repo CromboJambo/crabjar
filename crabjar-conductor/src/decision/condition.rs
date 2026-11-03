@@ -178,7 +178,8 @@ fn is_numeric(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::decision::structural::{ErrorHandling, Mutability, OwnershipMode};
+    use crate::decision::structural::{ErrorHandling, Mutability, OwnershipMode, SpanKind};
+    use std::collections::HashMap;
 
     fn make_target(structure: SpanKind, name: Option<&str>) -> EvaluationTarget {
         let mut tags = HashMap::new();
