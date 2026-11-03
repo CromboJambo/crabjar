@@ -169,8 +169,7 @@ crabjar/
 ├── scripts/                 # Build/dev scripts
 ├── .agents/skills/          # Agent skills (Hermes skill ecosystem)
 ├── specs/                   # Architecture Decision Records (Nygard-style templates)
-├── docs/                    # Documentation (architecture, security, specs, training)
-└── state-docs/              # State documentation storage
+├── state-docs/              # State documentation storage
 ```
 
 ### 2.2 Core Components

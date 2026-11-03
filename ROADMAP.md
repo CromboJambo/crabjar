@@ -31,7 +31,7 @@ Final cleanup phase before first public release. Focus: eliminate all remaining 
 - ✅ crabjar-conductor crate scaffolded with core orchestration types (Goal, Task, Worker), state store abstraction, HTTP API layer
 - ✅ SQLite-backed persistent state store for conductor (rusqlite, goals/tasks/workers tables with FK constraints)
 - ✅ vm-bridge deployed to ftw3 home-lab node as dinit service on port 8090
-- ✅ Orchestrator fine-tuning pipeline documented (docs/training/orchestrator-fine-tuning.md)
+- ✅ Orchestrator fine-tuning pipeline documented (orchestrator/docs/fine-tuning.md)
 - ✅ crabjar-conductor deployed to ftw3:8091 with pesti-server orchestrator integration (dinit service, SQLite state store)
 - ✅ 27B post-trained model integrated as default provider (DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF)
 - ✅ crabjar-review code review pipeline complete (Phases 1-4 + conductor integration) — deterministic pre-processing, agent review units, post-processor with position validation/deduplication, GitHub PR integration, benchmark suite with precision/recall/F1 metrics
