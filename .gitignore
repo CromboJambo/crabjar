@@ -57,8 +57,9 @@ historical/
 # Zed editor state
 .zed/*
 
-# Agent runtime state
-.agents/
+# Agent symlinks to external directories (local paths)
+.agents/GitCloneResearch
+.agents/reference_materials
 
 # Database files (runtime state)
 *.db
