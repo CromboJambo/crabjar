@@ -17,7 +17,8 @@ pub async fn handle_exec(
     let project_root = std::env::current_dir()?;
 
     // Config check: tool_execution_enabled must be true
-    let loader = ProjectLoader::new();
+    let mut loader = ProjectLoader::new();
+    loader.load_from_directory(&project_root).await.ok();
     let user_dinit_socket = if let Some(config) = loader.get_current_config() {
         if !config.tool_execution_enabled {
             return Ok(json!({

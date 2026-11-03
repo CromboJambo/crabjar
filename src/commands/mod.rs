@@ -11,21 +11,17 @@ pub mod habitat;
 pub mod semantic;
 pub mod state;
 
-// Decision provenance query functions
-pub fn list_decision_provenance() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Listing decision provenance records...");
-    // TODO: Query database and display decision audit trail with parent links
-    Ok(())
-}
-
-pub fn get_decision_provenance(decision_id: i64) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Getting provenance for decision {}", decision_id);
-    // TODO: Retrieve specific decision's provenance chain
-    Ok(())
-}
-
-pub fn list_decision_versions(decision_hash: &str) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Listing versions for decision hash {}", decision_hash);
-    // TODO: Show all versions of a decision (original + corrections)
-    Ok(())
-}
+// Command handler modules (extracted from main.rs)
+pub mod backend;
+pub mod dotfile;
+pub mod ha;
+pub mod knowledge;
+pub mod metrics;
+pub mod memory;
+pub mod workspace;
+pub mod fleet;
+pub mod goals;
+pub mod exec;
+pub mod dinitctl;
+pub mod podman;
+pub mod slow_friend;
