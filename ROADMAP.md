@@ -11,7 +11,10 @@ See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complet
 ## Production Readiness Phase
 
 ### Performance Optimization & Benchmarking
-- [ ] Performance benchmarking suite for execution pipeline
+- [x] Performance benchmarking suite for execution pipeline — **complete** (commit 61d9ec2)
+  - Baseline: gate_check_happy_path avg 1192ns, domain allowlist +209ns overhead
+  - High-risk commands show higher variance (max 100μs vs typical 5μs)
+  - Trust layers have no significant latency impact
 - [ ] Latency profiling across guard → concierge → telemetry path
 - [ ] Memory usage optimization for long-running orchestrator instances
 
