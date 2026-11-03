@@ -7,7 +7,6 @@ use commands::metrics::handle_metrics_command;
 use commands::memory::handle_memory_command;
 use commands::state::handle as handle_state_command;
 use commands::fleet::handle_fleet_submit_kanban_task;
-use commands::goals::submit_goal_to_conductor;
 use commands::guard::handle as handle_guard_command;
 use commands::knowledge::handle_knowledge_command;
 use commands::slow_friend::handle as handle_slow_friend_command;
@@ -31,17 +30,10 @@ mod tool_registry_cli;
 use bitwarden::commands::handle_bitwarden_command;
 mod commands;
 use crabjar_lib::{
-    ApprovalCommand, AttemptsCommand, BackendCommand, BitwardenCommand, CheckpointCommand, Cli, CliCommand, DoctorCommand, DotfileCommand, FleetCommand, GuardCommand,
-    HabitatCommand, HaCommand, KnowledgeCommand, McpCommand, MemoryCommand, MetricsCommand, SessionCommand, SlowFriendCommand, StateCommand, ToolCommand, WorkspaceCommand,
+    ApprovalCommand, BitwardenCommand, Cli, CliCommand, DoctorCommand, KnowledgeCommand, WorkspaceCommand,
 };
-use crabjar_slow_friend::action::ActionClass;
-use crabjar_slow_friend::autonomy::{AutonomyLevel, AutonomyTracker};
 use doctor::handle_doctor_command;
-use dotfile_manager::DotfileManager;
-use knowledge_store::KnowledgeBridge;
-use knowledge_store::commands::KnowledgeCommandExt;
 use mcp_client_cli::handle_mcp_command;
-use metrics::{run_module_sizes, run_test_count};
 use project_loader::ProjectLoader;
 use tool_registry_cli::handle_tool_command;
 

@@ -54,7 +54,7 @@ impl InvocationFingerprint {
 
 impl fmt::Display for InvocationFingerprint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "fp:{:.16}...", &self.0)
+        write!(f, "fp:{:.16}...", self.0)
     }
 }
 

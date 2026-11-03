@@ -1,7 +1,7 @@
 //! Sandbox management API endpoints.
 
 use crate::api::ConductorState;
-use crate::sandbox::{SandboxConfig, SandboxManager};
+use crate::sandbox::SandboxConfig;
 use axum::{Json, extract::Path};
 use serde_json::json;
 

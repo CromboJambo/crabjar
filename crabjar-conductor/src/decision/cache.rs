@@ -33,6 +33,7 @@ impl DecisionCache {
     /// # Arguments
     /// * `max_entries` - Maximum number of cached decisions before LRU eviction
     /// * `ttl` - Time-to-live for each cached entry
+    #[must_use]
     pub fn new(max_entries: usize, ttl: Duration) -> Self {
         Self {
             entries: HashMap::new(),
@@ -45,8 +46,9 @@ impl DecisionCache {
     }
 
     /// Default cache configuration: 1000 entries, 24h TTL
+    #[must_use]
     pub fn default_config() -> Self {
-        Self::new(1000, Duration::from_secs(86400))
+        Self::new(1000, Duration::from_hours(24))
     }
 
     /// Compute cache key from observation and criteria file
@@ -56,7 +58,7 @@ impl DecisionCache {
         hasher.update(b"::"); // delimiter
         hasher.update(criteria_file.as_bytes());
         let result = hasher.finalize();
-        format!("{:x}", result)
+        format!("{result:x}")
     }
 
     /// Get cached decision result, or None if not found/expired
@@ -68,11 +70,10 @@ impl DecisionCache {
             if entry.inserted_at.elapsed() < self.ttl {
                 self.hits += 1;
                 return Some(entry.result.clone());
-            } else {
-                // Expired - evict
-                self.entries.remove(&key);
-                self.evictions += 1;
             }
+            // Expired - evict
+            self.entries.remove(&key);
+            self.evictions += 1;
         }
 
         self.misses += 1;
@@ -102,6 +103,7 @@ impl DecisionCache {
     }
 
     /// Get cache hit rate as a percentage (0.0 - 100.0)
+    #[must_use]
     pub fn hit_rate(&self) -> f64 {
         let total = self.hits + self.misses;
         if total == 0 {
@@ -111,6 +113,7 @@ impl DecisionCache {
     }
 
     /// Get cache statistics
+    #[must_use]
     pub fn stats(&self) -> CacheStats {
         CacheStats {
             entries: self.entries.len(),

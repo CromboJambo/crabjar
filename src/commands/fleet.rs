@@ -19,7 +19,7 @@ pub async fn handle_fleet_submit_kanban_task(
 
     match task {
         None => {
-            return error_response(&format!("kanban task '{}' not found", task_id), true);
+            error_response(&format!("kanban task '{}' not found", task_id), true)
         }
         Some(task) => {
             // Build goal description from task details

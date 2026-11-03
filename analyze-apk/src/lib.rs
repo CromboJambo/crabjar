@@ -10,7 +10,7 @@ use analyze_common::{AnalysisProvenance, AnalysisResult, AnalyzeError, DoubtBloc
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::Read;
 use zip::ZipArchive;
 
 /// APK analysis result data.
@@ -226,7 +226,7 @@ impl ApkParser {
         // Try to find and read the manifest
         if let Ok(mut manifest) = archive.by_name(manifest_name) {
             let mut manifest_data = Vec::new();
-            if let Err(_) = manifest.read_to_end(&mut manifest_data) {
+            if manifest.read_to_end(&mut manifest_data).is_err() {
                 return (
                     None,
                     None,
@@ -318,22 +318,22 @@ impl ApkParser {
 
         // Extract strings from the resource table section
         // This is a simplified parser that looks for known patterns
-        let mut package_name = None;
-        let mut version_code = None;
-        let mut version_name = None;
-        let mut app_label = None;
-        let mut min_sdk = None;
-        let mut target_sdk = None;
+        let package_name = None;
+        let version_code = None;
+        let version_name = None;
+        let app_label = None;
+        let min_sdk = None;
+        let target_sdk = None;
         let mut permissions = Vec::new();
-        let mut features = Vec::new();
-        let mut activities = Vec::new();
-        let mut services = Vec::new();
-        let mut receivers = Vec::new();
-        let mut providers = Vec::new();
+        let features = Vec::new();
+        let activities = Vec::new();
+        let services = Vec::new();
+        let receivers = Vec::new();
+        let providers = Vec::new();
 
         // Look for permission strings in the binary data
         let bytes = &data[8..]; // Skip header
-        if let Some(idx) = bytes.windows(12).position(|w| w.starts_with(b"permission")) {
+        if let Some(_idx) = bytes.windows(12).position(|w| w.starts_with(b"permission")) {
             permissions.push("android.permission.INTERNET".to_string());
         }
 

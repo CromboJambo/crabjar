@@ -133,7 +133,7 @@ fn draw_tile(tile: &IsometricTile, screen_x: i32, screen_y: i32) {
 
     // Draw diamond using box-drawing characters
     // Top point
-    print!("{} {}{}", color, "▲", reset);
+    print!("{} ▲{}", color, reset);
 
     // Middle row (widest)
     print!(
@@ -146,11 +146,10 @@ fn draw_tile(tile: &IsometricTile, screen_x: i32, screen_y: i32) {
 
     // Bottom point
     print!(
-        "\x1b[{};{}H{} {}{}",
+        "\x1b[{};{}H{} ▼{}",
         screen_y + 4,
         screen_x + 2,
         color,
-        "▼",
         reset
     );
 
@@ -370,7 +369,7 @@ pub fn step_world(world: &mut GameWorld, delta: f32) -> bool {
 pub async fn run_isometric_world(mut world: GameWorld) {
     eprintln!("DEBUG: isometric render loop STARTED");
 
-    let mut tick = 0u64;
+    let tick = 0u64;
     while world.tick > 0 || tick == 0 {
         if !world.paused {
             // Update world state

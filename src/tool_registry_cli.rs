@@ -8,7 +8,7 @@ use crabjar_clawhub_client::ClawHubClient;
 use crabjar_github_client::models::SortField;
 use crabjar_github_client::{GitHubClient, SearchOptions};
 use crabjar_lib::{ToolCacheCommand, ToolCommand};
-use crabjar_trust_manager::{SkillCache, TrustManager, UpdateDetector};
+use crabjar_trust_manager::{SkillCache, UpdateDetector};
 
 /// Mapped tool row from a SQLite query.
 type ToolRow = (String, String, String, String, u32, f64, String);
@@ -385,8 +385,8 @@ async fn handle_github_install(
             let project_root = std::env::current_dir()?;
             let db_path = project_root.join("tool_registry/tool_registry.db");
 
-            if db_path.exists() {
-                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            if db_path.exists()
+                && let Ok(conn) = rusqlite::Connection::open(&db_path) {
                     conn.execute_batch(crabjar_tool_registry::schema::TOOL_REGISTRY_SCHEMA)?;
                     let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
 
@@ -417,7 +417,6 @@ async fn handle_github_install(
                         }
                     }
                 }
-            }
 
             Ok(json!({
                 "success": true,
@@ -559,8 +558,8 @@ async fn handle_clawhub_install(
             let project_root = std::env::current_dir()?;
             let db_path = project_root.join("tool_registry/tool_registry.db");
 
-            if db_path.exists() {
-                if let Ok(conn) = rusqlite::Connection::open(&db_path) {
+            if db_path.exists()
+                && let Ok(conn) = rusqlite::Connection::open(&db_path) {
                     conn.execute_batch(crabjar_tool_registry::schema::TOOL_REGISTRY_SCHEMA)?;
                     let registry = crabjar_tool_registry::ToolRegistry::new(&conn);
 
@@ -594,7 +593,6 @@ async fn handle_clawhub_install(
                         }
                     }
                 }
-            }
 
             Ok(json!({
                 "success": true,

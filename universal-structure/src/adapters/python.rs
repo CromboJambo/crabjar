@@ -1,7 +1,7 @@
 //! Python adapter for universal structural token representation.
 //!
 //! Uses regex-based pattern matching to identify key Python constructs and map them
-//! to universal SpanKind variants. This follows the same approach as the JavaScript
+//! to universal `SpanKind` variants. This follows the same approach as the JavaScript
 //! adapter, demonstrating the pluggable adapter architecture without requiring a full
 //! Python parser.
 
@@ -19,10 +19,17 @@ enum PyToken {
     Decorator(String),
 }
 
-/// Python adapter implementing the LanguageAdapter trait.
+/// Python adapter implementing the `LanguageAdapter` trait.
 pub struct PythonAdapter;
 
+impl Default for PythonAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PythonAdapter {
+    #[must_use]
     pub fn new() -> Self {
         PythonAdapter
     }
@@ -202,7 +209,7 @@ impl PythonAdapter {
 }
 
 impl LanguageAdapter for PythonAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "python"
     }
 
@@ -226,8 +233,8 @@ impl LanguageAdapter for PythonAdapter {
                         i + 1
                     };
 
-                    if start_idx < tokens.len() {
-                        if let PyToken::Identifier(name) = &tokens[start_idx] {
+                    if start_idx < tokens.len()
+                        && let PyToken::Identifier(name) = &tokens[start_idx] {
                             spans.push(Span {
                                 kind: SpanKind::FnDecl,
                                 open_token: None,
@@ -240,20 +247,18 @@ impl LanguageAdapter for PythonAdapter {
                                 ),
                             });
                         }
-                    }
                 }
                 PyToken::Keyword(kw) if kw == "class" => {
-                    if i + 1 < tokens.len() {
-                        if let PyToken::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let PyToken::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("class {}", name),
+                                source: format!("class {name}"),
                             });
                         }
-                    }
                 }
                 PyToken::Keyword(kw) if kw == "if" || kw == "elif" => {
                     spans.push(Span {
@@ -261,7 +266,7 @@ impl LanguageAdapter for PythonAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 PyToken::Keyword(kw) if kw == "for" || kw == "while" => {
@@ -270,7 +275,7 @@ impl LanguageAdapter for PythonAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 PyToken::Keyword(kw) if kw == "try" => {
@@ -297,7 +302,7 @@ impl LanguageAdapter for PythonAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 PyToken::StringLiteral(content) => {
@@ -306,7 +311,7 @@ impl LanguageAdapter for PythonAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("\"{}\"", content),
+                        source: format!("\"{content}\""),
                     });
                 }
                 PyToken::NumberLiteral(content) => {

@@ -23,7 +23,7 @@
 //!                    /          \
 //!                   no            yes
 //!                   │              │
-//!                 sleep       CrabJar proposal/execution
+//!                 sleep       `CrabJar` proposal/execution
 //!
 //! Each tier is more expensive but only triggered when cheaper checks detect
 //! something interesting. Attention itself becomes a scarce resource.

@@ -63,7 +63,7 @@ fn main() {
             "secrets_found": result.secrets_found,
             "total_secrets": result.secrets_found.values().sum::<usize>()
         });
-        println!("{}", report.to_string());
+        println!("{}", report);
     } else {
         println!("Cleaned: {} → {}", args.input, output_path);
         if !result.secrets_found.is_empty() {

@@ -5,7 +5,6 @@
 
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
 use crate::error::DelegationError;
 use crate::{DelegatedTask, DelegationRequest, DelegationResult, TaskResult, TaskStatus};
 
@@ -16,7 +15,7 @@ pub struct DispatcherConfig {
     pub max_concurrent: usize,
     /// Timeout per task in seconds (default: 600)
     pub task_timeout: u64,
-    /// Conductor API endpoint (default: http://localhost:8080)
+    /// Conductor API endpoint (default: <http://localhost:8080>)
     pub conductor_url: String,
 }
 
@@ -37,6 +36,7 @@ pub struct TaskDispatcher {
 
 impl TaskDispatcher {
     /// Create a new task dispatcher with the given configuration.
+    #[must_use]
     pub fn new(config: Option<DispatcherConfig>) -> Self {
         Self {
             config: config.unwrap_or_default(),
@@ -75,7 +75,7 @@ impl TaskDispatcher {
     }
 
     /// Execute a single delegated task via the conductor API.
-    pub async fn execute_task(&self, goal: String, context: Option<String>) -> Result<String, DelegationError> {
+    pub async fn execute_task(&self, goal: String, _context: Option<String>) -> Result<String, DelegationError> {
         let task_id = uuid::Uuid::new_v4().to_string();
         // Submit goal to conductor
         let goal_id = self.submit_goal(&goal).await?;
@@ -175,9 +175,7 @@ impl TaskDispatcher {
                         goal: task.goal.clone(),
                         status: TaskStatus::Completed,
                         summary: Some(json.get("result")
-                            .and_then(|r| r.as_str())
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| json["result"].to_string())),
+                            .and_then(|r| r.as_str()).map_or_else(|| json["result"].to_string(), std::string::ToString::to_string)),
                         error: None,
                     });
                 }

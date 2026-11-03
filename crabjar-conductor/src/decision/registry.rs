@@ -42,7 +42,7 @@ pub struct DecisionCapability {
     pub requires_bounded_model: bool,
 
     /// Embedding similarity threshold below which to escalate to KEV-9B.
-    /// Only applies if requires_bounded_model is false. Default: 0.75.
+    /// Only applies if `requires_bounded_model` is false. Default: 0.75.
     #[serde(default = "default_similarity_threshold")]
     pub similarity_threshold: f64,
 
@@ -72,7 +72,14 @@ pub struct DecisionRegistry {
     trigger_index: HashMap<String, Vec<String>>,
 }
 
+impl Default for DecisionRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DecisionRegistry {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             capabilities: HashMap::new(),
@@ -95,7 +102,7 @@ impl DecisionRegistry {
         for trigger in &capability.triggers {
             self.trigger_index
                 .entry(trigger.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(capability.name.clone());
         }
 
@@ -120,10 +127,10 @@ impl DecisionRegistry {
         let mut count = 0;
 
         for entry in std::fs::read_dir(dir).map_err(|e| format!("Failed to read directory {}: {}", dir.display(), e))? {
-            let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+            let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
             let path = entry.path();
 
-            if path.extension().map_or(false, |ext| ext == "json") {
+            if path.extension().is_some_and(|ext| ext == "json") {
                 match self.load_from_file(&path) {
                     Ok(capability) => {
                         self.register(capability);
@@ -162,6 +169,7 @@ impl DecisionRegistry {
     }
 
     /// Find decision capabilities that should be triggered by an observation.
+    #[must_use]
     pub fn find_matches(&self, observation: &str) -> Vec<&DecisionCapability> {
         let mut matches = Vec::new();
 
@@ -182,11 +190,13 @@ impl DecisionRegistry {
     }
 
     /// Get a specific decision capability by name.
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&DecisionCapability> {
         self.capabilities.get(name)
     }
 
     /// List all registered decision capabilities.
+    #[must_use]
     pub fn list_capabilities(&self) -> Vec<&DecisionCapability> {
         let mut caps = self.capabilities.values().collect::<Vec<_>>();
         caps.sort_by(|a, b| a.name.cmp(&b.name));
@@ -194,11 +204,13 @@ impl DecisionRegistry {
     }
 
     /// Get the total number of registered capabilities.
+    #[must_use]
     pub fn count(&self) -> usize {
         self.capabilities.len()
     }
 
     /// Serialize registry state for API exposure.
+    #[must_use]
     pub fn to_json(&self) -> serde_json::Value {
         let capabilities: Vec<serde_json::Value> = self
             .list_capabilities()

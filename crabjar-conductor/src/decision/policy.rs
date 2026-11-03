@@ -37,6 +37,7 @@ impl Default for DecisionPolicy {
 
 impl DecisionPolicy {
     /// Get the default criteria file for a given gate type
+    #[must_use]
     pub fn default_criteria_for(&self, gate: GateType) -> Option<String> {
         match gate {
             GateType::PreExecution => self.pre_execution_criteria.clone(),
@@ -46,30 +47,35 @@ impl DecisionPolicy {
     }
 
     /// Set the pre-execution criteria file
+    #[must_use]
     pub fn with_pre_execution_criteria(mut self, path: &str) -> Self {
         self.pre_execution_criteria = Some(path.to_string());
         self
     }
 
     /// Set the annealing loop criteria file
+    #[must_use]
     pub fn with_annealing_criteria(mut self, path: &str) -> Self {
         self.annealing_criteria = Some(path.to_string());
         self
     }
 
     /// Set the resource contention criteria file
+    #[must_use]
     pub fn with_resource_contention_criteria(mut self, path: &str) -> Self {
         self.resource_contention_criteria = Some(path.to_string());
         self
     }
 
     /// Configure whether to block goal execution on decision failure
+    #[must_use]
     pub fn with_block_on_failure(mut self, block: bool) -> Self {
         self.block_on_failure = block;
         self
     }
 
     /// Configure the evaluation timeout in seconds
+    #[must_use]
     pub fn with_timeout_seconds(mut self, seconds: u64) -> Self {
         self.evaluation_timeout_seconds = seconds;
         self

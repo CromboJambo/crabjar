@@ -54,16 +54,16 @@ impl GithubClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .map_err(|e| format!("Request failed: {e}"))?;
 
         let status = response.status();
         let body = response
             .json::<Value>()
             .await
-            .map_err(|e| format!("JSON parse failed: {}", e))?;
+            .map_err(|e| format!("JSON parse failed: {e}"))?;
 
         if !status.is_success() {
-            return Err(format!("GitHub API error {}: {:?}", status, body));
+            return Err(format!("GitHub API error {status}: {body:?}"));
         }
 
         Ok(body)
@@ -93,16 +93,16 @@ impl GithubClient {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| format!("Request failed: {}", e))?;
+            .map_err(|e| format!("Request failed: {e}"))?;
 
         let status = response.status();
         let body = response
             .json::<Value>()
             .await
-            .map_err(|e| format!("JSON parse failed: {}", e))?;
+            .map_err(|e| format!("JSON parse failed: {e}"))?;
 
         if !status.is_success() {
-            return Err(format!("GitHub API error {}: {:?}", status, body));
+            return Err(format!("GitHub API error {status}: {body:?}"));
         }
 
         Ok(body)
@@ -126,7 +126,7 @@ impl GithubClient {
                 .post_review_comment(file, line, description, severity)
                 .await
             {
-                eprintln!("Warning: failed to post comment on {}:{}", file, line);
+                eprintln!("Warning: failed to post comment on {file}:{line}");
             } else {
                 // success
             }
@@ -137,7 +137,7 @@ impl GithubClient {
 }
 
 fn build_api_url(owner: &str, repo: &str, path: &str) -> String {
-    format!("https://api.github.com/repos/{}/{}{}", owner, repo, path)
+    format!("https://api.github.com/repos/{owner}/{repo}{path}")
 }
 
 #[cfg(test)]

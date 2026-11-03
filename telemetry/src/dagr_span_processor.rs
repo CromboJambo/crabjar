@@ -55,7 +55,7 @@ pub struct StderrEmitter;
 
 impl DagrEventEmitter for StderrEmitter {
     fn emit(&self, event: Value) {
-        eprintln!("DAGR EVENT: {}", event.to_string());
+        eprintln!("DAGR EVENT: {}", event);
     }
 }
 

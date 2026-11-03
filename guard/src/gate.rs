@@ -472,21 +472,18 @@ impl<'a> ExecutionGate<'a> {
         }
 
         // chmod/chown on critical paths is high risk
-        if basename.eq_ignore_ascii_case("chmod") || basename.eq_ignore_ascii_case("chown") {
-            if args_str.contains("/etc/") || args_str.contains("/usr/") || args_str.contains("/") {
+        if (basename.eq_ignore_ascii_case("chmod") || basename.eq_ignore_ascii_case("chown"))
+            && (args_str.contains("/etc/") || args_str.contains("/usr/") || args_str.contains("/")) {
                 return CommandRisk::High;
             }
-        }
 
         // Package manager install commands are high risk (system-wide changes)
         if ["apt", "apt-get", "yum", "dnf", "pacman", "pip", "npm", "cargo"]
             .iter()
             .any(|c| basename.eq_ignore_ascii_case(c))
-        {
-            if args_str.contains("install") || args_str.contains("upgrade") {
+            && (args_str.contains("install") || args_str.contains("upgrade")) {
                 return CommandRisk::High;
             }
-        }
 
         // Check static high-risk list (for commands that are always risky)
         for risk_cmd in &self.risk_config.high_risk {

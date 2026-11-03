@@ -114,7 +114,7 @@ pub struct HarAnalysis {
 
 /// Parse a HAR file from disk.
 fn parse_har(path: &str) -> Result<HarFile, AnalyzeError> {
-    let content = fs::read_to_string(path).map_err(|e| AnalyzeError::Io(e))?;
+    let content = fs::read_to_string(path).map_err(AnalyzeError::Io)?;
 
     let har: HarFile = serde_json::from_str(&content)
         .map_err(|e| AnalyzeError::ParseError(format!("invalid HAR JSON: {}", e)))?;
@@ -228,7 +228,7 @@ impl<'a> HarUrlParts<'a> {
 }
 
 /// Simple URL parser to extract domain.
-fn parse_url(url: &str) -> HarUrlParts {
+fn parse_url(url: &str) -> HarUrlParts<'_> {
     let mut scheme = "http";
     let mut host = "";
     let mut path = url;

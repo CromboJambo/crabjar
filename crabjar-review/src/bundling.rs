@@ -12,7 +12,7 @@ fn get_crate_name(path: &Path) -> Option<String> {
     // Look for Cargo.toml or src/ pattern to identify crate boundary
     for (i, component) in components.iter().enumerate() {
         if i + 1 < components.len() && components[i + 1] == "src" {
-            return Some(component.to_string());
+            return Some(component.clone());
         }
     }
 
@@ -45,7 +45,7 @@ fn pair_source_with_tests(files: &[ChangedFile]) -> HashMap<usize, Vec<usize>> {
             let test_stem = test_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
             // Match patterns: foo.rs + foo_test.rs, or foo.rs + tests/foo.rs
-            if test_stem == source_stem || test_stem == format!("{}_test", source_stem) {
+            if test_stem == source_stem || test_stem == format!("{source_stem}_test") {
                 pairs.entry(i).or_insert_with(Vec::new).push(j);
             }
         }
@@ -55,6 +55,7 @@ fn pair_source_with_tests(files: &[ChangedFile]) -> HashMap<usize, Vec<usize>> {
 }
 
 /// Create review bundles from changed files.
+#[must_use]
 pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
     if files.is_empty() {
         return vec![];
@@ -86,7 +87,7 @@ pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
 
         let crate_name = get_crate_name(&bundle_files[0].path);
         bundles.push(ReviewBundle {
-            id: format!("bundle-{}", bundle_id),
+            id: format!("bundle-{bundle_id}"),
             files: bundle_files,
             crate_name,
         });
@@ -112,7 +113,7 @@ pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
         } else {
             // Flush existing bundle
             bundles.push(ReviewBundle {
-                id: format!("bundle-{}", bundle_id),
+                id: format!("bundle-{bundle_id}"),
                 files: std::mem::take(&mut current_bundle),
                 crate_name: current_crate.clone(),
             });
@@ -128,7 +129,7 @@ pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
     // Flush final bundle
     if !current_bundle.is_empty() {
         bundles.push(ReviewBundle {
-            id: format!("bundle-{}", bundle_id),
+            id: format!("bundle-{bundle_id}"),
             files: current_bundle,
             crate_name: current_crate,
         });

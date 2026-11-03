@@ -182,7 +182,7 @@ pub async fn execute_process_management(
                                     let _ = sandbox.stop_container(&container_id);
                                     let _ = sandbox.destroy_container(&container_id);
                                     
-                                    return Ok(ProcessManageResponse {
+                                    Ok(ProcessManageResponse {
                                         success: result.success(),
                                         action: "start".to_string(),
                                         result: serde_json::json!({
@@ -193,38 +193,38 @@ pub async fn execute_process_management(
                                             "stderr": result.stderr,
                                             "sandboxed": true
                                         }),
-                                    });
+                                    })
                                 }
                                 Err(e) => {
                                     let _ = sandbox.destroy_container(&container_id);
-                                    return Ok(ProcessManageResponse {
+                                    Ok(ProcessManageResponse {
                                         success: false,
                                         action: "start".to_string(),
                                         result: serde_json::json!({
                                             "error": format!("Failed to execute in sandbox: {}", e)
                                         }),
-                                    });
+                                    })
                                 }
                             }
                         } else {
                             let _ = sandbox.destroy_container(&container_id);
-                            return Ok(ProcessManageResponse {
+                            Ok(ProcessManageResponse {
                                 success: false,
                                 action: "start".to_string(),
                                 result: serde_json::json!({
                                     "error": "Empty command"
                                 }),
-                            });
+                            })
                         }
                     }
                     Err(e) => {
-                        return Ok(ProcessManageResponse {
+                        Ok(ProcessManageResponse {
                             success: false,
                             action: "start".to_string(),
                             result: serde_json::json!({
                                 "error": format!("Failed to create sandbox container: {}", e)
                             }),
-                        });
+                        })
                     }
                 }
             } else {

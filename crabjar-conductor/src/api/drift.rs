@@ -71,7 +71,7 @@ pub async fn record_drift_outcome_handler(
     State(conductor): State<ConductorState>,
     Json(req): Json<DriftOutcomeRequest>,
 ) -> Json<serde_json::Value> {
-    let observation = format!(
+    let _observation = format!(
         "Drift outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Remediation time: {:?} minutes",
         req.system,
         req.action_taken,
@@ -80,8 +80,8 @@ pub async fn record_drift_outcome_handler(
         req.remediation_time_minutes
     );
 
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         Ok::<&str, String>("outcome_recorded")
     })
     .await;

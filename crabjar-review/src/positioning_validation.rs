@@ -3,6 +3,7 @@ use serde_json::Value;
 
 /// Validate that a finding's position is correct by searching for the quoted code snippet
 /// in the actual file content. Do NOT trust LLM-reported line numbers directly.
+#[must_use]
 pub fn validate_position(
     bundle: &ReviewBundle,
     file_path: &str,
@@ -14,9 +15,7 @@ pub fn validate_position(
         .files
         .iter()
         .find(|f| f.path.to_string_lossy() == file_path);
-    if changed_file.is_none() {
-        return None;
-    }
+    changed_file?;
 
     // Read the actual file content
     let full_path = changed_file.unwrap().path.clone();
@@ -31,11 +30,7 @@ pub fn validate_position(
     let line_index = (line - 1) as usize;
     let tolerance = 2; // ±2 lines per spec
 
-    let start = if line_index >= tolerance {
-        line_index - tolerance
-    } else {
-        0
-    };
+    let start = line_index.saturating_sub(tolerance);
     let end = std::cmp::min(line_index + tolerance + 1, lines.len());
 
     for (i, l) in lines[start..end].iter().enumerate() {
@@ -58,6 +53,7 @@ pub fn validate_position(
 }
 
 /// Validate severity assignment based on finding type.
+#[must_use]
 pub fn validate_severity(finding_type: &str, severity: &str) -> bool {
     match (finding_type, severity) {
         ("bug", "critical" | "major") => true,
@@ -69,6 +65,7 @@ pub fn validate_severity(finding_type: &str, severity: &str) -> bool {
 }
 
 /// Validate that a finding is actionable (not vague).
+#[must_use]
 pub fn validate_actionability(description: &str) -> bool {
     if description.len() < 20 {
         return false;
@@ -92,6 +89,7 @@ pub fn validate_actionability(description: &str) -> bool {
 }
 
 /// Validate all findings in a batch.
+#[must_use]
 pub fn validate_findings(bundle: &ReviewBundle, findings: &[Value]) -> Vec<Value> {
     let mut valid = Vec::new();
 

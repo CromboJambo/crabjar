@@ -123,11 +123,10 @@ fn parse_dow(field: &str) -> Result<HashSet<u8>, SchedulerError> {
 
             if let Some((_, num)) = found {
                 result.insert(*num);
-            } else if let Ok(val) = part.parse::<u8>() {
-                if val <= 6 {
+            } else if let Ok(val) = part.parse::<u8>()
+                && val <= 6 {
                     result.insert(val);
                 }
-            }
         }
     }
 

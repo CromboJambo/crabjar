@@ -202,7 +202,7 @@ async fn handle_commands(state: &Mutex<PluginState>) -> io::Result<()> {
             Err(_) => continue,
         }
 
-        let request: CommandRequest = match serde_json::from_str(&line.trim()) {
+        let request: CommandRequest = match serde_json::from_str(line.trim()) {
             Ok(r) => r,
             Err(e) => {
                 let resp = CommandResponse {
@@ -319,7 +319,7 @@ async fn render_loop(state: &Mutex<PluginState>) {
             break;
         }
 
-        let tick_result = {
+        let _tick_result = {
             let mut state_guard = state.lock().await;
             if !state_guard.world.paused {
                 step_world(&mut state_guard.world);

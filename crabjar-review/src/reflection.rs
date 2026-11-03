@@ -2,6 +2,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 /// Deduplicate findings: merge findings that refer to the same code location with similar descriptions.
+#[must_use]
 pub fn deduplicate_findings(findings: &[Value]) -> Vec<Value> {
     if findings.is_empty() {
         return vec![];
@@ -23,8 +24,8 @@ pub fn deduplicate_findings(findings: &[Value]) -> Vec<Value> {
             description.chars().take(30).collect::<String>()
         );
 
-        if !seen.contains_key(&key) {
-            seen.insert(key, true);
+        if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
+            e.insert(true);
             result.push(finding.clone());
         }
     }
@@ -33,6 +34,7 @@ pub fn deduplicate_findings(findings: &[Value]) -> Vec<Value> {
 }
 
 /// Reflect on severity: adjust based on context.
+#[must_use]
 pub fn reflect_severity(findings: &[Value]) -> Vec<Value> {
     let mut result = Vec::with_capacity(findings.len());
 
@@ -48,11 +50,10 @@ pub fn reflect_severity(findings: &[Value]) -> Vec<Value> {
         }
 
         // Bugs in non-test source files are at least major
-        if finding_type == "bug" && !file.contains("test") {
-            if severity == "minor" || severity == "nit" {
+        if finding_type == "bug" && !file.contains("test")
+            && (severity == "minor" || severity == "nit") {
                 updated["severity"] = Value::String("major".to_string());
             }
-        }
 
         result.push(updated);
     }
@@ -61,6 +62,7 @@ pub fn reflect_severity(findings: &[Value]) -> Vec<Value> {
 }
 
 /// Full post-processing pipeline: deduplicate, reflect, sort.
+#[must_use]
 pub fn process_findings(raw_findings: &[Value]) -> Vec<Value> {
     // Step 1: Deduplicate
     let deduped = deduplicate_findings(raw_findings);
@@ -90,6 +92,7 @@ fn severity_rank(severity: &str) -> u8 {
 }
 
 /// Generate a reflection summary for the review.
+#[must_use]
 pub fn generate_reflection(findings: &[Value]) -> String {
     let total = findings.len();
     if total == 0 {
@@ -111,18 +114,18 @@ pub fn generate_reflection(findings: &[Value]) -> String {
         }
     }
 
-    let mut summary = format!("Review complete: {} issues found.", total);
+    let mut summary = format!("Review complete: {total} issues found.");
     if critical > 0 {
-        summary.push_str(&format!(" {} critical", critical));
+        summary.push_str(&format!(" {critical} critical"));
     }
     if major > 0 {
-        summary.push_str(&format!(", {} major", major));
+        summary.push_str(&format!(", {major} major"));
     }
     if minor > 0 {
-        summary.push_str(&format!(", {} minor", minor));
+        summary.push_str(&format!(", {minor} minor"));
     }
     if nits > 0 {
-        summary.push_str(&format!(", {} nits", nits));
+        summary.push_str(&format!(", {nits} nits"));
     }
 
     summary

@@ -12,7 +12,7 @@ pub async fn handle_exec(
     reason: &str,
     dry_run: bool,
     container: bool,
-    otel_endpoint: &str,
+    _otel_endpoint: &str,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let project_root = std::env::current_dir()?;
 

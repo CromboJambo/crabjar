@@ -1,4 +1,4 @@
-//! Conductor execution gate — reuses guard's ExecutionGate patterns for
+//! Conductor execution gate — reuses guard's `ExecutionGate` patterns for
 //! task assignment and fleet orchestration authorization.
 //!
 //! The conductor uses the same provenance-based, trust-layer gating as
@@ -12,6 +12,7 @@ use crate::state_store::{Task, Worker};
 
 /// Map conductor trust levels (0-3) to guard trust layers (1-3).
 /// Conductor level 0 = unknown/unproven → guard layer 1 (quarantine).
+#[must_use]
 pub fn conductor_level_to_guard_layer(level: u8) -> u32 {
     match level {
         0 => 1, // Unknown → quarantine
@@ -22,8 +23,8 @@ pub fn conductor_level_to_guard_layer(level: u8) -> u32 {
 }
 
 /// Check if a worker can claim a task based on trust layer requirements.
-/// Uses guard's ExecutionGate pattern with provenance verification.
-pub fn can_claim_task(gate: &ExecutionGate<'_>, worker: &Worker, task: &Task) -> Result<bool> {
+/// Uses guard's `ExecutionGate` pattern with provenance verification.
+pub fn can_claim_task(gate: &ExecutionGate<'_>, worker: &Worker, _task: &Task) -> Result<bool> {
     // Build a gate context for the claim decision
     let trust_layer = conductor_level_to_guard_layer(worker.trust_level);
 
@@ -45,6 +46,7 @@ pub fn can_claim_task(gate: &ExecutionGate<'_>, worker: &Worker, task: &Task) ->
 
 /// Check if a worker's trust level is sufficient for task auto-assignment.
 /// Trust layer 2+ can be auto-assigned; layer 1 requires manual review.
+#[must_use]
 pub fn trust_sufficient_for_auto_assign(worker: &Worker) -> bool {
     let layer = conductor_level_to_guard_layer(worker.trust_level);
     layer >= 2 // WORKING layer (id=2) or above

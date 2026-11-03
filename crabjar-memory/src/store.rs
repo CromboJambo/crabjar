@@ -18,6 +18,7 @@ pub enum MemoryTarget {
 
 impl MemoryTarget {
     /// Get the filename for this target.
+    #[must_use]
     pub fn filename(&self) -> &'static str {
         match self {
             MemoryTarget::Memory => "MEMORY.md",
@@ -26,6 +27,7 @@ impl MemoryTarget {
     }
 
     /// Create capacity tracker for this target.
+    #[must_use]
     pub fn capacity(&self) -> MemoryCapacity {
         match self {
             MemoryTarget::Memory => MemoryCapacity::for_memory(),

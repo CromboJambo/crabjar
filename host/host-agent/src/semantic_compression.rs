@@ -199,7 +199,7 @@ pub fn compress_observations(observations: &[Observation]) -> SemanticCompressio
                 };
 
                 let knowledge = CompressedKnowledge {
-                    id: format!("kn_{}_{}", cluster_idx, uuid::Uuid::new_v4().to_string()[..8].to_string()),
+                    id: format!("kn_{}_{}", cluster_idx, &uuid::Uuid::new_v4().to_string()[..8]),
                     content: format!(
                         "If {} context with {} pattern, expect {} outcome",
                         representative.stage, representative.kind, representative.details

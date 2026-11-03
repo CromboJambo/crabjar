@@ -111,7 +111,7 @@ impl<'a> CommitGenerator<'a> {
 
         // Generate subject based on changes
         let subject = if diffs.len() == 1 {
-            format!("update {}", &diffs[0].path)
+            format!("update {}", diffs[0].path)
         } else {
             format!("update {} files", diffs.len())
         };

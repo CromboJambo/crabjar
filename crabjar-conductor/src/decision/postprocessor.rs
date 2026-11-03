@@ -19,29 +19,28 @@ pub struct PostProcessResult {
 }
 
 /// Validate a JEV decision against structural rules.
+#[must_use]
 pub fn validate_decision(
     target: &EvaluationTarget,
-    option_id: &str,
-    criteria_path: &str,
+    _option_id: &str,
+    _criteria_path: &str,
 ) -> PostProcessResult {
     let mut issues = Vec::new();
     let mut confidence_adjustment = 0.0;
 
     // Rule 1: Function declarations must have error handling analysis
-    if target.structure == SpanKind::FnDecl {
-        if target.error_handling.is_none() && target.semantic_tags.get("error_handling").is_none() {
+    if target.structure == SpanKind::FnDecl
+        && target.error_handling.is_none() && target.semantic_tags.get("error_handling").is_none() {
             issues.push("Function declaration lacks error handling analysis".to_string());
             confidence_adjustment -= 0.1;
         }
-    }
 
     // Rule 2: Struct declarations should have ownership analysis
-    if target.structure == SpanKind::ClassDecl {
-        if target.semantic_tags.get("ownership_mode").is_none() {
+    if target.structure == SpanKind::ClassDecl
+        && target.semantic_tags.get("ownership_mode").is_none() {
             issues.push("Struct declaration lacks ownership analysis".to_string());
             confidence_adjustment -= 0.05;
         }
-    }
 
     // Rule 3: High-confidence decisions should have supporting tags
     if !target.semantic_tags.is_empty() || target.error_handling.is_some() {
@@ -82,6 +81,7 @@ pub fn record_feedback(feedback: &DecisionFeedback) -> Result<(), String> {
 }
 
 /// Analyze accumulated feedback to suggest criteria improvements.
+#[must_use]
 pub fn reflect_on_feedback(feedbacks: &[DecisionFeedback]) -> Vec<String> {
     let mut suggestions = Vec::new();
 
@@ -100,7 +100,7 @@ pub fn reflect_on_feedback(feedbacks: &[DecisionFeedback]) -> Vec<String> {
     }
 
     for (option_id, (total, correct)) in option_stats {
-        let accuracy = correct as f64 / total as f64;
+        let accuracy = f64::from(correct) / f64::from(total);
         if accuracy < 0.7 && total >= 5 {
             suggestions.push(format!(
                 "Option '{}' has low accuracy ({:.1}% over {} decisions). Consider refining criteria.",

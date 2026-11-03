@@ -20,7 +20,7 @@ impl CronScheduler {
         CronScheduler {
             store,
             conductor_url: conductor_url.to_string(),
-            interval: Duration::from_secs(60),
+            interval: Duration::from_mins(1),
         }
     }
 

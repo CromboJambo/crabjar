@@ -45,7 +45,7 @@ pub async fn report_task_result(
     body: Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     let status = body["status"].as_str().unwrap_or("completed").to_string();
-    let result_text = body["result"].as_str().map(|s| s.to_string());
+    let result_text = body["result"].as_str().map(std::string::ToString::to_string);
 
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();

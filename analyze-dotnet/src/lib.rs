@@ -36,7 +36,7 @@ pub fn analyze_dotnet(path: &str) -> Result<AnalysisResult<DotnetAnalysis>, Anal
         return Err(AnalyzeError::FileNotFound(path.to_string()));
     }
 
-    let bytes = fs::read(path_buf).map_err(|e| AnalyzeError::Io(e))?;
+    let bytes = fs::read(path_buf).map_err(AnalyzeError::Io)?;
     let size_bytes = bytes.len() as u64;
 
     // Parse PE header
@@ -47,7 +47,7 @@ pub fn analyze_dotnet(path: &str) -> Result<AnalysisResult<DotnetAnalysis>, Anal
     }
 
     // Check DOS header signature (MZ)
-    if &bytes[0..2] != [0x4D, 0x5A] {
+    if bytes[0..2] != [0x4D, 0x5A] {
         return Err(AnalyzeError::InvalidFormat(
             "not a PE file (missing MZ signature)".to_string(),
         ));
@@ -61,7 +61,7 @@ pub fn analyze_dotnet(path: &str) -> Result<AnalysisResult<DotnetAnalysis>, Anal
     }
 
     // Check PE signature (PE\0\0)
-    if &bytes[pe_offset..pe_offset + 4] != [0x50, 0x45, 0x00, 0x00] {
+    if bytes[pe_offset..pe_offset + 4] != [0x50, 0x45, 0x00, 0x00] {
         return Err(AnalyzeError::InvalidFormat(
             "invalid PE signature".to_string(),
         ));
@@ -172,15 +172,13 @@ fn enumerate_types(bytes: &[u8]) -> Vec<DotnetType> {
                     .next()
                     .map(|c| c.is_uppercase())
                     .unwrap_or(false)
-                {
-                    if name.chars().any(|c| c.is_lowercase()) {
+                    && name.chars().any(|c| c.is_lowercase()) {
                         types.push(DotnetType {
                             name,
                             is_class: true,
                             method_count: 0,
                         });
                     }
-                }
             }
             i = j;
         } else {

@@ -16,7 +16,14 @@ pub struct HtmlExtractor {
     client: Client,
 }
 
+impl Default for HtmlExtractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HtmlExtractor {
+    #[must_use]
     pub fn new() -> Self {
         let timeout = std::env::var("WEB_EXTRACT_TIMEOUT")
             .ok()
@@ -38,7 +45,7 @@ impl HtmlExtractor {
             .get(url)
             .send()
             .await
-            .map_err(|e| WebExtractError::HttpRequestFailed(format!("Failed to fetch {}: {}", url, e)))?;
+            .map_err(|e| WebExtractError::HttpRequestFailed(format!("Failed to fetch {url}: {e}")))?;
 
         if !response.status().is_success() {
             return Err(WebExtractError::HttpRequestFailed(format!(
@@ -49,7 +56,7 @@ impl HtmlExtractor {
         }
 
         let html = response.text().await.map_err(|e| {
-            WebExtractError::HttpRequestFailed(format!("Failed to read body: {}", e))
+            WebExtractError::HttpRequestFailed(format!("Failed to read body: {e}"))
         })?;
 
         // Parse HTML and extract text content
@@ -127,11 +134,10 @@ impl HtmlExtractor {
                 }
 
                 // Add extra newlines for block elements
-                if ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br"].contains(&tag_name.as_str()) {
-                    if !text.is_empty() && !text.ends_with('\n') {
+                if ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br"].contains(&tag_name.as_str())
+                    && !text.is_empty() && !text.ends_with('\n') {
                         text.push('\n');
                     }
-                }
 
                 if let Some(child_ref) = scraper::ElementRef::wrap(child) {
                     let child_text = self.extract_text_from_element(&child_ref);
@@ -139,7 +145,7 @@ impl HtmlExtractor {
                         // For links, include the URL in parentheses
                         if let Some(href) = child.value().as_element().unwrap().attr("href") {
                             text.push_str(&child_text);
-                            text.push_str(&format!(" ({}))", href));
+                            text.push_str(&format!(" ({href}))"));
                         } else {
                             text.push_str(&child_text);
                         }

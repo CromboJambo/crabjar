@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use super::evaluate::evaluate_structural_conditions;
-use super::structural::{EvaluationTarget, build_target};
+use super::structural::build_target;
 
 /// Information about a single crate in the workspace.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,7 +105,7 @@ fn parse_cargo_toml(path: &Path) -> Option<(String, Vec<String>)> {
     let mut deps = Vec::new();
     if let Some(dependencies) = doc.get("dependencies").and_then(|d| d.as_table()) {
         for dep_name in dependencies.keys() {
-            deps.push(dep_name.to_string());
+            deps.push(dep_name.clone());
         }
     }
 
@@ -113,8 +113,8 @@ fn parse_cargo_toml(path: &Path) -> Option<(String, Vec<String>)> {
     for section in ["dev-dependencies", "build-dependencies"] {
         if let Some(deps_table) = doc.get(section).and_then(|d| d.as_table()) {
             for dep_name in deps_table.keys() {
-                if !deps.contains(&dep_name.to_string()) {
-                    deps.push(dep_name.to_string());
+                if !deps.contains(&dep_name.clone()) {
+                    deps.push(dep_name.clone());
                 }
             }
         }
@@ -129,8 +129,8 @@ fn discover_crates(workspace_path: &Path) -> Vec<CrateInfo> {
 
     // Check root Cargo.toml
     let root_toml = workspace_path.join("Cargo.toml");
-    if root_toml.exists() {
-        if let Some((name, deps)) = parse_cargo_toml(&root_toml) {
+    if root_toml.exists()
+        && let Some((name, deps)) = parse_cargo_toml(&root_toml) {
             crates.push(CrateInfo {
                 name,
                 path: root_toml.parent().unwrap().to_path_buf(),
@@ -141,13 +141,12 @@ fn discover_crates(workspace_path: &Path) -> Vec<CrateInfo> {
                 evaluation_result: None,
             });
         }
-    }
 
     // Check Cargo.toml members array for sub-crates
-    if let Ok(content) = fs::read_to_string(&root_toml) {
-        if let Ok(doc) = toml::from_str::<toml::Value>(&content) {
-            if let Some(workspace) = doc.get("workspace").and_then(|w| w.as_table()) {
-                if let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
+    if let Ok(content) = fs::read_to_string(&root_toml)
+        && let Ok(doc) = toml::from_str::<toml::Value>(&content)
+            && let Some(workspace) = doc.get("workspace").and_then(|w| w.as_table())
+                && let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
                     for member in members {
                         if let Some(path_str) = member.as_str() {
                             let member_path = workspace_path.join(path_str);
@@ -166,9 +165,6 @@ fn discover_crates(workspace_path: &Path) -> Vec<CrateInfo> {
                         }
                     }
                 }
-            }
-        }
-    }
 
     crates
 }
@@ -187,7 +183,7 @@ fn build_dependency_graph(crates: &mut [CrateInfo]) {
 
     // Collect edges first to avoid borrow checker issues
     let mut edges: Vec<(usize, String)> = Vec::new();
-    for (i, crate_info) in crates.iter().enumerate() {
+    for crate_info in crates.iter() {
         for dep in &crate_info.dependencies {
             if let Some(&dep_index) = name_to_index.get(dep) {
                 edges.push((dep_index, crate_info.name.clone()));
@@ -367,7 +363,7 @@ fn calculate_cohesion_score(crates: &[CrateInfo]) -> f64 {
         return 1.0; // No dependencies = perfectly cohesive (trivially)
     }
 
-    internal_deps as f64 / total_deps as f64
+    f64::from(internal_deps) / f64::from(total_deps)
 }
 
 /// Evaluate a single crate using structural conditions.
@@ -416,6 +412,7 @@ fn evaluate_crate(crate_info: &CrateInfo, criteria_path: &str) -> Option<Evaluat
 }
 
 /// Analyze an entire Cargo workspace.
+#[must_use]
 pub fn analyze_workspace(
     workspace_path: &Path,
     criteria_path: &str,
@@ -457,7 +454,7 @@ pub fn analyze_workspace(
     };
 
     let mut confidence_sum = 0.0;
-    for crate_info in crates.iter_mut() {
+    for crate_info in &mut crates {
         if budget.max_time_seconds > 0 {
             let elapsed = start_time.elapsed().as_secs();
             if elapsed >= budget.max_time_seconds {

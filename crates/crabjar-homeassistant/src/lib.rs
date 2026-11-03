@@ -76,7 +76,7 @@ impl HaClient {
         data: Option<&Value>,
     ) -> Result<()> {
         let path = format!("/api/services/{}/{}", domain, service);
-        let body = json!({});
+        let _body = json!({});
 
         if let Some(data) = data {
             // Merge data into the request body

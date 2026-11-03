@@ -27,7 +27,7 @@ impl Default for WorkerConfig {
         let mut caps = vec![];
         if let Ok(output) = Command::new("uname").arg("-s").output() {
             let os = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            caps.push(format!("os:{}", os));
+            caps.push(format!("os:{os}"));
         }
 
         Self {
@@ -122,7 +122,7 @@ pub async fn run(config: WorkerConfig) -> Result<()> {
                 {
                     Ok(()) => info!(task_id = %task.id, "Task completed and reported"),
                     Err(e) => {
-                        error!(task_id = %task.id, error = %e, "Failed to report task result")
+                        error!(task_id = %task.id, error = %e, "Failed to report task result");
                     }
                 }
             }
@@ -169,7 +169,7 @@ async fn send_heartbeat(
     worker_id: &str,
     _state: &Arc<Mutex<WorkerState>>,
 ) {
-    let url = format!("{}/workers/heartbeat", conductor_url);
+    let url = format!("{conductor_url}/workers/heartbeat");
 
     let body = serde_json::json!({ "worker_id": worker_id });
 
@@ -199,7 +199,7 @@ async fn poll_for_tasks(
     worker_id: &str,
     state: &Arc<Mutex<WorkerState>>,
 ) -> Result<Option<TaskInfo>> {
-    let url = format!("{}/tasks/for-worker/{}", conductor_url, worker_id);
+    let url = format!("{conductor_url}/tasks/for-worker/{worker_id}");
 
     let s = state.lock().await;
     let token = match &s.auth_token {
@@ -210,7 +210,7 @@ async fn poll_for_tasks(
 
     let resp = client
         .get(&url)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .send()
         .await?;
 
@@ -236,7 +236,7 @@ async fn execute_task(command: &str) -> TaskResult {
     info!(elapsed_ms = elapsed.as_millis(), "Task execution finished");
 
     TaskResult {
-        exit_code: if output.status.success() { 0 } else { 1 },
+        exit_code: i32::from(!output.status.success()),
         output: Some(String::from_utf8_lossy(&output.stdout).to_string()),
     }
 }
@@ -249,7 +249,7 @@ async fn report_result(
     result: Option<&str>,
     state: &Arc<Mutex<WorkerState>>,
 ) -> Result<()> {
-    let url = format!("{}/tasks/{}/result", conductor_url, task_id);
+    let url = format!("{conductor_url}/tasks/{task_id}/result");
     let body = ReportBody { status, result };
 
     let s = state.lock().await;
@@ -261,7 +261,7 @@ async fn report_result(
 
     let resp = client
         .post(&url)
-        .header("Authorization", format!("Bearer {}", token))
+        .header("Authorization", format!("Bearer {token}"))
         .json(&body)
         .send()
         .await?;
@@ -272,15 +272,14 @@ async fn report_result(
 
     // Check for token refresh (trust level change)
     let text = resp.text().await.unwrap_or_default();
-    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
-        if let Some(new_token) = parsed["auth_token"].as_str() {
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text)
+        && let Some(new_token) = parsed["auth_token"].as_str() {
             {
                 let mut s = state.lock().await;
                 s.auth_token = Some(new_token.to_string());
             }
             info!("Auth token refreshed after task completion");
         }
-    }
 
     Ok(())
 }

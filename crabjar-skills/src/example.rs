@@ -3,6 +3,7 @@ use crate::manifest::{SkillManifest, ToolDefinition};
 /// Example: Create a skill manifest programmatically and bind it to the registry.
 ///
 /// This demonstrates the complete flow from manifest → loader → binder → registry.
+#[must_use]
 pub fn create_example_skill_manifest() -> SkillManifest {
     SkillManifest {
         name: "example-skill".to_string(),

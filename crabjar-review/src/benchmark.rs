@@ -1,4 +1,4 @@
-use crate::reflection::{generate_reflection, process_findings};
+use crate::reflection::process_findings;
 use serde_json::Value;
 
 /// Benchmark PR with known issues (ground truth).
@@ -79,6 +79,7 @@ fn evaluate_pr(pr: &BenchmarkPR) -> BenchmarkResults {
 }
 
 /// Run all benchmarks and print summary.
+#[must_use]
 pub fn run_all_benchmarks(prs: &[BenchmarkPR]) -> Vec<BenchmarkResults> {
     let mut all_results = Vec::new();
 
@@ -111,12 +112,12 @@ pub fn run_all_benchmarks(prs: &[BenchmarkPR]) -> Vec<BenchmarkResults> {
 
     println!("\n=== Benchmark Summary ===");
     println!("PRs tested: {}", prs.len());
-    println!("True positives: {}", total_tp);
-    println!("False positives: {}", total_fp);
-    println!("False negatives: {}", total_fn);
-    println!("Average precision: {:.2}", avg_precision);
-    println!("Average recall: {:.2}", avg_recall);
-    println!("Average F1 score: {:.2}", avg_f1);
+    println!("True positives: {total_tp}");
+    println!("False positives: {total_fp}");
+    println!("False negatives: {total_fn}");
+    println!("Average precision: {avg_precision:.2}");
+    println!("Average recall: {avg_recall:.2}");
+    println!("Average F1 score: {avg_f1:.2}");
 
     all_results
 }

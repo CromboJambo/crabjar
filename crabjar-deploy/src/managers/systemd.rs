@@ -7,7 +7,14 @@ pub struct SystemdManager {
     user_mode: bool,
 }
 
+impl Default for SystemdManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SystemdManager {
+    #[must_use]
     pub fn new() -> Self {
         // Detect if we're in user or system mode
         let user_mode = std::env::var("XDG_RUNTIME_DIR").is_ok();
@@ -26,9 +33,9 @@ impl SystemdManager {
         if self.user_mode {
             let xdg = std::env::var("XDG_CONFIG_HOME")
                 .unwrap_or_else(|_| format!("{}/.config", std::env::var("HOME").unwrap_or_default()));
-            format!("{}/systemd/user/{}.service", xdg, name)
+            format!("{xdg}/systemd/user/{name}.service")
         } else {
-            format!("/etc/systemd/system/{}.service", name)
+            format!("/etc/systemd/system/{name}.service")
         }
     }
 
@@ -37,13 +44,13 @@ impl SystemdManager {
         lines.push("[Unit]".to_string());
         lines.push(format!("Description=Crabjar service: {}", config.name));
         lines.push("After=network.target".to_string());
-        lines.push("".to_string());
+        lines.push(String::new());
 
         lines.push("[Service]".to_string());
         lines.push("Type=simple".to_string());
 
         if let Some(dir) = &config.working_dir {
-            lines.push(format!("WorkingDirectory={}", dir));
+            lines.push(format!("WorkingDirectory={dir}"));
         }
 
         // Build command with args
@@ -52,11 +59,11 @@ impl SystemdManager {
             cmd.push(' ');
             cmd.push_str(arg);
         }
-        lines.push(format!("ExecStart={}", cmd));
+        lines.push(format!("ExecStart={cmd}"));
 
         // Environment variables
         for (key, value) in &config.environment {
-            lines.push(format!("Environment={}={}", key, value));
+            lines.push(format!("Environment={key}={value}"));
         }
 
         // Restart policy
@@ -73,11 +80,11 @@ impl SystemdManager {
         }
 
         if let Some(log) = &config.log_file {
-            lines.push(format!("StandardOutput=append:{}", log));
-            lines.push(format!("StandardError=append:{}", log));
+            lines.push(format!("StandardOutput=append:{log}"));
+            lines.push(format!("StandardError=append:{log}"));
         }
 
-        lines.push("".to_string());
+        lines.push(String::new());
         lines.push("[Install]".to_string());
         lines.push("WantedBy=default.target".to_string());
 
@@ -88,22 +95,22 @@ impl SystemdManager {
 impl ServiceManager for SystemdManager {
     fn start(&self, name: &str) -> ServiceResult {
         let cmd = self.systemctl_cmd();
-        crate::service::exec_command(&format!("{} start {}", cmd, name))
+        crate::service::exec_command(&format!("{cmd} start {name}"))
     }
 
     fn stop(&self, name: &str) -> ServiceResult {
         let cmd = self.systemctl_cmd();
-        crate::service::exec_command(&format!("{} stop {}", cmd, name))
+        crate::service::exec_command(&format!("{cmd} stop {name}"))
     }
 
     fn restart(&self, name: &str) -> ServiceResult {
         let cmd = self.systemctl_cmd();
-        crate::service::exec_command(&format!("{} restart {}", cmd, name))
+        crate::service::exec_command(&format!("{cmd} restart {name}"))
     }
 
     fn status(&self, name: &str) -> ServiceStatus {
         let cmd = self.systemctl_cmd();
-        let result = crate::service::exec_command(&format!("{} is-active {}", cmd, name));
+        let result = crate::service::exec_command(&format!("{cmd} is-active {name}"));
         if result.success && result.output.trim() == "active" {
             ServiceStatus::Running
         } else if result.success && result.output.trim() == "inactive" {
@@ -115,19 +122,18 @@ impl ServiceManager for SystemdManager {
 
     fn enable(&self, name: &str) -> ServiceResult {
         let cmd = self.systemctl_cmd();
-        crate::service::exec_command(&format!("{} enable {}", cmd, name))
+        crate::service::exec_command(&format!("{cmd} enable {name}"))
     }
 
     fn disable(&self, name: &str) -> ServiceResult {
         let cmd = self.systemctl_cmd();
-        crate::service::exec_command(&format!("{} disable {}", cmd, name))
+        crate::service::exec_command(&format!("{cmd} disable {name}"))
     }
 
     fn list(&self) -> Vec<String> {
         let cmd = self.systemctl_cmd();
         let result = crate::service::exec_command(&format!(
-            "{} list-units --type=service --no-pager",
-            cmd
+            "{cmd} list-units --type=service --no-pager"
         ));
         if !result.success {
             return Vec::new();
@@ -146,31 +152,30 @@ impl ServiceManager for SystemdManager {
         let content = Self::generate_systemd_unit(config);
 
         // Ensure directory exists
-        if let Some(parent) = Path::new(&path).parent() {
-            if let Err(e) = fs::create_dir_all(parent) {
+        if let Some(parent) = Path::new(&path).parent()
+            && let Err(e) = fs::create_dir_all(parent) {
                 return ServiceResult::err(
-                    format!("Failed to create directory: {}", e),
+                    format!("Failed to create directory: {e}"),
                     -1,
                 );
             }
-        }
 
         // Write service file
         if let Err(e) = fs::write(&path, content) {
             return ServiceResult::err(
-                format!("Failed to write service file: {}", e),
+                format!("Failed to write service file: {e}"),
                 -1,
             );
         }
 
         // Reload systemd daemon
         let cmd = self.systemctl_cmd();
-        crate::service::exec_command(&format!("{} daemon-reload", cmd))
+        crate::service::exec_command(&format!("{cmd} daemon-reload"))
     }
 
     fn reload(&self, name: &str) -> ServiceResult {
         let cmd = self.systemctl_cmd();
-        crate::service::exec_command(&format!("{} reload {}", cmd, name))
+        crate::service::exec_command(&format!("{cmd} reload {name}"))
     }
 }
 

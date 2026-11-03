@@ -41,13 +41,14 @@ pub struct DiskUsageSensor {
 }
 
 impl DiskUsageSensor {
+    #[must_use]
     pub fn new(threshold_pct: f64) -> Self {
         Self { threshold_pct }
     }
 }
 
 impl Sensor for DiskUsageSensor {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "disk_usage"
     }
 

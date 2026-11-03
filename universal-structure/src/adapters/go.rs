@@ -1,7 +1,7 @@
 //! Go adapter for universal structural token representation.
 //!
 //! Uses regex-based pattern matching to identify key Go constructs and map them
-//! to universal SpanKind variants. This follows the same approach as the JavaScript,
+//! to universal `SpanKind` variants. This follows the same approach as the JavaScript,
 //! Python, C, and C++ adapters, demonstrating the pluggable adapter architecture without
 //! requiring a full Go parser.
 
@@ -20,10 +20,17 @@ enum GoTok {
     Comment(String),
 }
 
-/// Go adapter implementing the LanguageAdapter trait.
+/// Go adapter implementing the `LanguageAdapter` trait.
 pub struct GoAdapter;
 
+impl Default for GoAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GoAdapter {
+    #[must_use]
     pub fn new() -> Self {
         GoAdapter
     }
@@ -195,7 +202,7 @@ impl GoAdapter {
     fn detect_goroutine_patterns(&self, source: &str) -> HashMap<String, String> {
         let mut tags = HashMap::new();
 
-        if source.contains("go ") && (source.contains("(") || source.contains(".")) {
+        if source.contains("go ") && (source.contains('(') || source.contains('.')) {
             tags.insert("goroutines".to_string(), "true".to_string());
         }
 
@@ -229,7 +236,7 @@ impl GoAdapter {
 }
 
 impl LanguageAdapter for GoAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "go"
     }
 
@@ -243,17 +250,16 @@ impl LanguageAdapter for GoAdapter {
             match token {
                 GoTok::Keyword(kw) if kw == "package" => {
                     // Look ahead for package name
-                    if i + 1 < tokens.len() {
-                        if let GoTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let GoTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ModuleDecl,
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("package {}", name),
+                                source: format!("package {name}"),
                             });
                         }
-                    }
                 }
                 GoTok::Keyword(kw) if kw == "import" => {
                     spans.push(Span {
@@ -266,17 +272,16 @@ impl LanguageAdapter for GoAdapter {
                 }
                 GoTok::Keyword(kw) if kw == "func" => {
                     // Look ahead for function name
-                    if i + 1 < tokens.len() {
-                        if let GoTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let GoTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::FnDecl,
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("func {}", name),
+                                source: format!("func {name}"),
                             });
                         }
-                    }
                 }
                 GoTok::Keyword(kw) if kw == "type" => {
                     spans.push(Span {
@@ -329,7 +334,7 @@ impl LanguageAdapter for GoAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 GoTok::Keyword(kw) if kw == "for" || kw == "range" => {
@@ -338,7 +343,7 @@ impl LanguageAdapter for GoAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 GoTok::Keyword(kw) if kw == "switch" => {
@@ -392,7 +397,7 @@ impl LanguageAdapter for GoAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("\"{}\"", content),
+                        source: format!("\"{content}\""),
                     });
                 }
                 GoTok::CharLiteral(ch) => {
@@ -401,7 +406,7 @@ impl LanguageAdapter for GoAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("'{}'", ch),
+                        source: format!("'{ch}'"),
                     });
                 }
                 GoTok::NumberLiteral(content) => {

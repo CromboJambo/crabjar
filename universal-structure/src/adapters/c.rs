@@ -1,7 +1,7 @@
 //! C adapter for universal structural token representation.
 //!
 //! Uses regex-based pattern matching to identify key C constructs and map them
-//! to universal SpanKind variants. This follows the same approach as the JavaScript
+//! to universal `SpanKind` variants. This follows the same approach as the JavaScript
 //! and Python adapters, demonstrating the pluggable adapter architecture without
 //! requiring a full C parser.
 
@@ -20,10 +20,17 @@ enum CTok {
     Preprocessor(String),
 }
 
-/// C adapter implementing the LanguageAdapter trait.
+/// C adapter implementing the `LanguageAdapter` trait.
 pub struct CAdapter;
 
+impl Default for CAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CAdapter {
+    #[must_use]
     pub fn new() -> Self {
         CAdapter
     }
@@ -212,7 +219,7 @@ impl CAdapter {
     fn detect_pointer_patterns(&self, source: &str) -> HashMap<String, String> {
         let mut tags = HashMap::new();
 
-        if source.contains("*") {
+        if source.contains('*') {
             tags.insert("pointer_usage".to_string(), "true".to_string());
         }
         if source.contains("**") || source.contains("(*") {
@@ -255,7 +262,7 @@ impl CAdapter {
 }
 
 impl LanguageAdapter for CAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "c"
     }
 
@@ -269,17 +276,16 @@ impl LanguageAdapter for CAdapter {
             match token {
                 CTok::Keyword(kw) if kw == "struct" || kw == "enum" || kw == "union" => {
                     // Look ahead for name
-                    if i + 1 < tokens.len() {
-                        if let CTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let CTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("{} {}", kw, name),
+                                source: format!("{kw} {name}"),
                             });
                         }
-                    }
                 }
                 CTok::Keyword(kw) if kw == "typedef" => {
                     spans.push(Span {
@@ -296,7 +302,7 @@ impl LanguageAdapter for CAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 CTok::Keyword(kw) if kw == "for" || kw == "while" => {
@@ -305,7 +311,7 @@ impl LanguageAdapter for CAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 CTok::Keyword(kw) if kw == "switch" => {
@@ -350,7 +356,7 @@ impl LanguageAdapter for CAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("\"{}\"", content),
+                        source: format!("\"{content}\""),
                     });
                 }
                 CTok::CharLiteral(ch) => {
@@ -359,7 +365,7 @@ impl LanguageAdapter for CAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("'{}'", ch),
+                        source: format!("'{ch}'"),
                     });
                 }
                 CTok::NumberLiteral(content) => {
@@ -380,9 +386,9 @@ impl LanguageAdapter for CAdapter {
         while i < tokens.len() {
             if let CTok::Identifier(name) = &tokens[i] {
                 // Check if next token is '(' — potential function definition
-                if i + 1 < tokens.len() {
-                    if let CTok::Punctuation(p) = &tokens[i + 1] {
-                        if p == "(" {
+                if i + 1 < tokens.len()
+                    && let CTok::Punctuation(p) = &tokens[i + 1]
+                        && p == "(" {
                             // Look back for return type (identifier or keyword)
                             let has_return_type = i > 0
                                 && matches!(&tokens[i - 1], CTok::Keyword(_) | CTok::Identifier(_));
@@ -397,8 +403,6 @@ impl LanguageAdapter for CAdapter {
                                 });
                             }
                         }
-                    }
-                }
             }
             i += 1;
         }

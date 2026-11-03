@@ -4,7 +4,7 @@ use crate::auth;
 use crate::audit::{ConductorAuditLogger, AuditContext, AuditEventType};
 use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
 use crate::fleet_status::FleetStatusTracker;
-use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assign};
+use crate::gate::trust_sufficient_for_auto_assign;
 use crate::promotion::PromotionManager;
 use crate::sandbox::SandboxManager;
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
@@ -114,9 +114,7 @@ impl Conductor {
     /// List all registered decision capabilities as JSON values.
     pub fn list_decision_capabilities(&self) -> serde_json::Value {
         self.decision_gate
-            .as_ref()
-            .map(|gate| gate.registry().to_json())
-            .unwrap_or_else(|| serde_json::json!({"count": 0, "capabilities": []}))
+            .as_ref().map_or_else(|| serde_json::json!({"count": 0, "capabilities": []}), |gate| gate.registry().to_json())
     }
 
     /// Configure hybrid attention + JEV decision layer.
@@ -172,7 +170,7 @@ impl Conductor {
 
     /// Get JEV decision cache statistics (for monitoring and metrics).
     pub fn cache_stats(&self) -> Option<CacheStats> {
-        self.decision_gate.as_ref().map(|gate| gate.cache_stats())
+        self.decision_gate.as_ref().map(super::decision::DecisionGate::cache_stats)
     }
 
     /// Extract candidate rules from decision history.
@@ -246,7 +244,7 @@ impl Conductor {
 
         gate.evaluate(observation, criteria_file, Some(&self.store))
             .await
-            .map_err(|e| anyhow::anyhow!("{}", e))
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
     /// Submit a new goal for decomposition and execution.
@@ -329,12 +327,11 @@ impl Conductor {
         // Call pesti-server to break the goal into steps via LLM inference.
         let prompt = format!(
             "You are a task planner that breaks goals into executable shell commands.\n\
-             \nGoal: {}\n\n\
+             \nGoal: {description}\n\n\
              Return ONLY a JSON array (no markdown, no explanation) with this exact format:\n\
              [{{\"command\": \"shell command here\", \"description\": \"what it does\"}}]\n\
              \nEach object must have exactly two fields: 'command' and 'description'.\n\
-             Do not include depends_on. Just the command and description.\n",
-            description
+             Do not include depends_on. Just the command and description.\n"
         );
 
         // Configure HTTP client with explicit timeout and DNS resolution
@@ -343,14 +340,14 @@ impl Conductor {
 
         // Debug: resolve the hostname ourselves to see what IP we get
         let parsed =
-            reqwest::Url::parse(&url).map_err(|e| anyhow::anyhow!("invalid URL: {}", e))?;
+            reqwest::Url::parse(&url).map_err(|e| anyhow::anyhow!("invalid URL: {e}"))?;
         let host = parsed
             .host_str()
             .ok_or_else(|| anyhow::anyhow!("no host in URL"))?;
         info!(goal_id = %goal_id, host = %host, "Resolved hostname");
 
         // Try resolving manually to see what we get
-        match std::net::ToSocketAddrs::to_socket_addrs(&format!("{}:8081", host)) {
+        match std::net::ToSocketAddrs::to_socket_addrs(&format!("{host}:8081")) {
             Ok(addrs) => {
                 for addr in addrs {
                     info!(goal_id = %goal_id, addr = ?addr, "DNS resolution result");
@@ -362,10 +359,10 @@ impl Conductor {
         }
 
         let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(120))
+            .timeout(std::time::Duration::from_mins(2))
             .connect_timeout(std::time::Duration::from_secs(10))
             .build()
-            .map_err(|e| anyhow::anyhow!("failed to build HTTP client: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("failed to build HTTP client: {e}"))?;
 
         let body = serde_json::json!({
             "model": "orchestrator_merged",
@@ -387,17 +384,17 @@ impl Conductor {
             .post(&url)
             .json(&body)
             .send()
-            .map_err(|e| anyhow::anyhow!("pesti-server request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("pesti-server request failed: {e}"))?;
 
         let status = resp.status();
         info!(goal_id = %goal_id, status = status.as_u16(), "Received response from pesti-server");
 
         let text = resp
             .text()
-            .map_err(|e| anyhow::anyhow!("failed to read response: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("failed to read response: {e}"))?;
 
         if !status.is_success() {
-            return Err(anyhow::anyhow!("pesti-server error {}: {}", status, text));
+            return Err(anyhow::anyhow!("pesti-server error {status}: {text}"));
         }
 
         // Parse the LLM response
@@ -442,7 +439,7 @@ impl Conductor {
                     // Check if this looks like a JSON array (next non-whitespace is '{' or '[')
                     let rest: String = chars[i..].iter().collect();
                     let trimmed = rest.trim_start();
-                    if trimmed.starts_with("[") || trimmed.starts_with("{") {
+                    if trimmed.starts_with('[') || trimmed.starts_with('{') {
                         found = Some(i);
                         break;
                     }
@@ -477,7 +474,7 @@ impl Conductor {
             debug!(goal_id = %goal_id, command = %command, "Creating task from LLM spec");
             let task = self
                 .store
-                .create_task(&goal_id, format!("[{}] {}", description, command))?;
+                .create_task(&goal_id, format!("[{description}] {command}"))?;
             tasks.push(task);
         }
 
@@ -496,7 +493,7 @@ impl Conductor {
     pub fn get_goal(&self, goal_id: &str) -> Result<Option<Goal>> {
         self.store
             .get_goal(goal_id)
-            .map_err(|e| anyhow::anyhow!("{}", e))
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
     /// List all registered workers.
@@ -504,7 +501,7 @@ impl Conductor {
         self.store.list_workers().unwrap_or_default()
     }
 
-    /// Register a new worker in the fleet. Returns (worker, auth_token).
+    /// Register a new worker in the fleet. Returns (worker, `auth_token`).
     pub fn register_worker(
         &self,
         name: String,
@@ -538,7 +535,7 @@ impl Conductor {
         Ok(result)
     }
 
-    /// Authenticate a worker by name and SSH key, returning (worker, auth_token).
+    /// Authenticate a worker by name and SSH key, returning (worker, `auth_token`).
     /// If the worker is not registered, this creates a new registration.
     pub fn worker_login(&self, name: &str, ssh_key: Option<String>) -> Result<(Worker, String)> {
         // Try to find existing worker by name
@@ -585,7 +582,7 @@ impl Conductor {
         let ready_tasks = self.store.get_ready_tasks()?;
 
         // Filter by worker capabilities and trust level, then assign
-        for task in ready_tasks.iter() {
+        for task in &ready_tasks {
             if task.worker_id.is_some() {
                 continue; // Already assigned to another worker
             }
@@ -725,7 +722,9 @@ impl Conductor {
             .store
             .get_worker(&worker_id)?
             .ok_or_else(|| anyhow::anyhow!("worker not found"))?;
-        if worker.trust_level != new_trust_level {
+        if worker.trust_level == new_trust_level {
+            Ok(None)
+        } else {
             // Trust level was upgraded — refresh token
             let new_token = self.store.refresh_worker_token(&worker_id)?;
             info!(worker_id = %worker_id, trust_level = new_trust_level, "Worker trust level upgraded, new token issued");
@@ -733,13 +732,13 @@ impl Conductor {
             // Audit: log trust level change
             if let Some(logger) = &self.audit_logger {
                 let logger = logger.clone();
-                let worker_id = worker_id.to_string();
+                let worker_id = worker_id.clone();
                 tokio::runtime::Handle::current().block_on(async move {
                     let logger = logger.lock().await;
                     let ctx = AuditContext {
                         task_id: None,
                         worker_id: Some(worker_id),
-                        outcome: format!("trust_upgrade:{}", new_trust_level),
+                        outcome: format!("trust_upgrade:{new_trust_level}"),
                         duration_ms: None,
                         metadata: json!({}),
                     };
@@ -748,8 +747,6 @@ impl Conductor {
             }
 
             Ok(Some(new_token))
-        } else {
-            Ok(None)
         }
     }
 
@@ -795,20 +792,22 @@ impl Conductor {
             .store
             .get_worker(&worker_id)?
             .ok_or_else(|| anyhow::anyhow!("worker not found"))?;
-        if worker.trust_level != new_trust_level {
+        if worker.trust_level == new_trust_level {
+            Ok(None)
+        } else {
             let new_token = self.store.refresh_worker_token(&worker_id)?;
             warn!(worker_id = %worker_id, trust_level = new_trust_level, "Worker trust level downgraded, new token issued");
 
             // Audit: log trust level change
             if let Some(logger) = &self.audit_logger {
                 let logger = logger.clone();
-                let worker_id = worker_id.to_string();
+                let worker_id = worker_id.clone();
                 tokio::runtime::Handle::current().block_on(async move {
                     let logger = logger.lock().await;
                     let ctx = AuditContext {
                         task_id: None,
                         worker_id: Some(worker_id),
-                        outcome: format!("trust_downgrade:{}", new_trust_level),
+                        outcome: format!("trust_downgrade:{new_trust_level}"),
                         duration_ms: None,
                         metadata: json!({}),
                     };
@@ -817,8 +816,6 @@ impl Conductor {
             }
 
             Ok(Some(new_token))
-        } else {
-            Ok(None)
         }
     }
 

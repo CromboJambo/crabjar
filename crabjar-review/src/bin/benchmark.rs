@@ -15,7 +15,7 @@ fn load_benchmarks(benchmark_dir: &str) -> Vec<BenchmarkPR> {
 
     let path = PathBuf::from(benchmark_dir);
     if !path.exists() {
-        eprintln!("Benchmark directory not found: {}", benchmark_dir);
+        eprintln!("Benchmark directory not found: {benchmark_dir}");
         return prs;
     }
 
@@ -23,7 +23,7 @@ fn load_benchmarks(benchmark_dir: &str) -> Vec<BenchmarkPR> {
         let entry = entry.expect("Failed to read entry");
         let file_path = entry.path();
 
-        if !file_path.extension().map_or(false, |ext| ext == "json") {
+        if !file_path.extension().is_some_and(|ext| ext == "json") {
             continue;
         }
 
@@ -35,7 +35,7 @@ fn load_benchmarks(benchmark_dir: &str) -> Vec<BenchmarkPR> {
             name: data["name"].as_str().unwrap_or("unknown").to_string(),
             findings: data["findings"]
                 .as_array()
-                .map(|arr| arr.to_vec())
+                .map(|arr| arr.clone())
                 .unwrap_or_default(),
             expected_rule_ids: data["expected_rule_ids"]
                 .as_array()
@@ -59,7 +59,7 @@ fn main() {
         .nth(1)
         .unwrap_or_else(|| "crabjar-review/benchmarks".to_string());
 
-    println!("Loading benchmarks from: {}", benchmark_dir);
+    println!("Loading benchmarks from: {benchmark_dir}");
     let prs = load_benchmarks(&benchmark_dir);
 
     if prs.is_empty() {

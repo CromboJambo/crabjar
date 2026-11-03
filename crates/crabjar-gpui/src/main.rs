@@ -101,7 +101,7 @@ impl DashboardView {
 
 impl Render for DashboardView {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let cols = if self.agents.len() <= 2 {
+        let _cols = if self.agents.len() <= 2 {
             1
         } else if self.agents.len() <= 4 {
             2
@@ -117,7 +117,7 @@ impl Render for DashboardView {
                     .flex_1()
                     .grid()
                     .children(self.agents.iter().map(|agent| {
-                        let status_color = rgb((agent.status.color()[0] as u32) << 16
+                        let _status_color = rgb((agent.status.color()[0] as u32) << 16
                             | (agent.status.color()[1] as u32) << 8
                             | (agent.status.color()[2] as u32));
 

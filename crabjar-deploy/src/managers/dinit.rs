@@ -7,7 +7,14 @@ pub struct DinitManager {
     config_dir: String,
 }
 
+impl Default for DinitManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DinitManager {
+    #[must_use]
     pub fn new() -> Self {
         // Detect dinit config directory
         if Path::new("/etc/dinit.d").exists() {
@@ -35,19 +42,19 @@ impl DinitManager {
             cmd.push(' ');
             cmd.push_str(arg);
         }
-        lines.push(format!("command  = {}", cmd));
+        lines.push(format!("command  = {cmd}"));
 
         if let Some(dir) = &config.working_dir {
-            lines.push(format!("directory= {}", dir));
+            lines.push(format!("directory= {dir}"));
         }
 
         // Environment variables
         for (key, value) in &config.environment {
-            lines.push(format!("env      = {}={}", key, value));
+            lines.push(format!("env      = {key}={value}"));
         }
 
         if let Some(log) = &config.log_file {
-            lines.push(format!("logfile  = {}", log));
+            lines.push(format!("logfile  = {log}"));
         }
 
         // Restart policy
@@ -69,19 +76,19 @@ impl DinitManager {
 
 impl ServiceManager for DinitManager {
     fn start(&self, name: &str) -> ServiceResult {
-        crate::service::exec_command(&format!("dinitctl start {}", name))
+        crate::service::exec_command(&format!("dinitctl start {name}"))
     }
 
     fn stop(&self, name: &str) -> ServiceResult {
-        crate::service::exec_command(&format!("dinitctl stop {}", name))
+        crate::service::exec_command(&format!("dinitctl stop {name}"))
     }
 
     fn restart(&self, name: &str) -> ServiceResult {
-        crate::service::exec_command(&format!("dinitctl restart {}", name))
+        crate::service::exec_command(&format!("dinitctl restart {name}"))
     }
 
     fn status(&self, name: &str) -> ServiceStatus {
-        let result = crate::service::exec_command(&format!("dinitctl status {}", name));
+        let result = crate::service::exec_command(&format!("dinitctl status {name}"));
         if result.success && result.output.contains("running") {
             ServiceStatus::Running
         } else if result.success && result.output.contains("stopped") {
@@ -120,16 +127,16 @@ impl ServiceManager for DinitManager {
 
         // Write service file
         match fs::write(&path, content) {
-            Ok(_) => {
+            Ok(()) => {
                 // Reload dinit to pick up the new service
                 crate::service::exec_command(&format!("dinitctl reload {}", config.name))
             }
-            Err(e) => ServiceResult::err(format!("Failed to write service file: {}", e), -1),
+            Err(e) => ServiceResult::err(format!("Failed to write service file: {e}"), -1),
         }
     }
 
     fn reload(&self, name: &str) -> ServiceResult {
-        crate::service::exec_command(&format!("dinitctl reload {}", name))
+        crate::service::exec_command(&format!("dinitctl reload {name}"))
     }
 }
 

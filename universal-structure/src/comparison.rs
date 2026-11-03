@@ -175,7 +175,7 @@ fn avg_nesting_depth(tree: &SpanTree) -> f64 {
         return 0.0;
     }
 
-    total_depth as f64 / count as f64
+    total_depth as f64 / f64::from(count)
 }
 
 /// Compare two codebases and generate a comparison report.

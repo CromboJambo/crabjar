@@ -7,7 +7,14 @@ pub struct RunitManager {
     sv_dir: String,
 }
 
+impl Default for RunitManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RunitManager {
+    #[must_use]
     pub fn new() -> Self {
         // Detect runit service directory
         if Path::new("/etc/sv").exists() {
@@ -26,7 +33,7 @@ impl RunitManager {
         lines.push("#!/bin/sh".to_string());
 
         if let Some(dir) = &config.working_dir {
-            lines.push(format!("cd {}", dir));
+            lines.push(format!("cd {dir}"));
         }
 
         // Build command with args
@@ -35,7 +42,7 @@ impl RunitManager {
             cmd.push(' ');
             cmd.push_str(arg);
         }
-        lines.push(format!("exec {}", cmd));
+        lines.push(format!("exec {cmd}"));
 
         lines.join("\n") + "\n"
     }
@@ -47,19 +54,19 @@ impl RunitManager {
 
 impl ServiceManager for RunitManager {
     fn start(&self, name: &str) -> ServiceResult {
-        crate::service::exec_command(&format!("sv start {}", name))
+        crate::service::exec_command(&format!("sv start {name}"))
     }
 
     fn stop(&self, name: &str) -> ServiceResult {
-        crate::service::exec_command(&format!("sv stop {}", name))
+        crate::service::exec_command(&format!("sv stop {name}"))
     }
 
     fn restart(&self, name: &str) -> ServiceResult {
-        crate::service::exec_command(&format!("sv restart {}", name))
+        crate::service::exec_command(&format!("sv restart {name}"))
     }
 
     fn status(&self, name: &str) -> ServiceStatus {
-        let result = crate::service::exec_command(&format!("sv status {}", name));
+        let result = crate::service::exec_command(&format!("sv status {name}"));
         if result.success && result.output.contains("running") {
             ServiceStatus::Running
         } else if result.success && result.output.contains("stopped") {
@@ -111,7 +118,7 @@ impl ServiceManager for RunitManager {
         // Create service directory
         if let Err(e) = fs::create_dir_all(&service_dir) {
             return ServiceResult::err(
-                format!("Failed to create service directory: {}", e),
+                format!("Failed to create service directory: {e}"),
                 -1,
             );
         }
@@ -122,13 +129,13 @@ impl ServiceManager for RunitManager {
 
         if let Err(e) = fs::write(&run_path, run_script) {
             return ServiceResult::err(
-                format!("Failed to write run script: {}", e),
+                format!("Failed to write run script: {e}"),
                 -1,
             );
         }
 
         // Make run script executable
-        crate::service::exec_command(&format!("chmod +x {}", run_path))
+        crate::service::exec_command(&format!("chmod +x {run_path}"))
     }
 
     fn reload(&self, name: &str) -> ServiceResult {

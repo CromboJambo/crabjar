@@ -19,7 +19,6 @@ use axum::{
 use chrono::Utc;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use tracing::{info, warn};
 
 /// Generate a task ID in the same format as hermes agent (t_xxxxxxxx)
@@ -317,7 +316,7 @@ async fn block_task(
 async fn list_tasks() -> JsonResponse<serde_json::Value> {
     match find_active_board() {
         Ok(conn) => {
-            let mut stmt = conn.prepare(
+            let stmt = conn.prepare(
                 "SELECT id, title, status, assignee, priority, created_at FROM tasks WHERE status != 'archived' ORDER BY created_at DESC LIMIT 50",
             );
 

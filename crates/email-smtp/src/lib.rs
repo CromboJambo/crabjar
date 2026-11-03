@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use crabjar_host_core::{EmailAddress, EmailError, EmailListFilter, EmailMessage, EmailProvider};
+use crabjar_host_core::{EmailError, EmailListFilter, EmailMessage, EmailProvider};
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message, Transport};
 
@@ -60,11 +60,13 @@ pub struct SmtpEmailProvider {
 
 impl SmtpEmailProvider {
     /// Create a new SMTP email provider with the given configuration.
+    #[must_use]
     pub fn new(config: SmtpConfig) -> Self {
         Self { config }
     }
 
     /// Create with default Gmail settings.
+    #[must_use]
     pub fn gmail(xoauth2_config: Xoauth2Config) -> Self {
         let mut config = SmtpConfig::default();
         config.xoauth2_config = Some(xoauth2_config);
@@ -92,25 +94,25 @@ impl EmailProvider for SmtpEmailProvider {
 
         let email = Message::builder()
             .from(from_addr.parse().map_err(|e| {
-                EmailError::ProviderSpecific(format!("invalid from address: {}", e))
+                EmailError::ProviderSpecific(format!("invalid from address: {e}"))
             })?)
             .to(to_addrs[0].parse().map_err(|e| {
-                EmailError::ProviderSpecific(format!("invalid to address: {}", e))
+                EmailError::ProviderSpecific(format!("invalid to address: {e}"))
             })?)
             .subject(&message.subject)
             .body(body_html.to_string())
-            .map_err(|e| EmailError::ProviderSpecific(format!("failed to build email: {}", e)))?;
+            .map_err(|e| EmailError::ProviderSpecific(format!("failed to build email: {e}")))?;
 
         // Create SMTP transport
         let creds = self.build_credentials();
         let transport = if let Some(creds) = creds {
             lettre::transport::smtp::SmtpTransport::relay(&self.config.host)
-                .map_err(|e| EmailError::ProviderSpecific(format!("relay error: {}", e)))?
+                .map_err(|e| EmailError::ProviderSpecific(format!("relay error: {e}")))?
                 .credentials(creds)
                 .build()
         } else {
             lettre::transport::smtp::SmtpTransport::relay(&self.config.host)
-                .map_err(|e| EmailError::ProviderSpecific(format!("relay error: {}", e)))?
+                .map_err(|e| EmailError::ProviderSpecific(format!("relay error: {e}")))?
                 .build()
         };
 
@@ -125,7 +127,7 @@ impl EmailProvider for SmtpEmailProvider {
                 );
                 Ok("sent".to_string())
             }
-            Err(e) => Err(EmailError::ProviderSpecific(format!("send error: {}", e))),
+            Err(e) => Err(EmailError::ProviderSpecific(format!("send error: {e}"))),
         }
     }
 

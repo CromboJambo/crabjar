@@ -6,7 +6,7 @@ use std::path::Path;
 pub fn load_rules_from_str(content: &str) -> Result<Vec<ReviewRule>, String> {
     let parsed: toml::Value = content
         .parse()
-        .map_err(|e| format!("Failed to parse TOML: {}", e))?;
+        .map_err(|e| format!("Failed to parse TOML: {e}"))?;
 
     let rules_array = parsed
         .get("rules")
@@ -18,7 +18,7 @@ pub fn load_rules_from_str(content: &str) -> Result<Vec<ReviewRule>, String> {
         let rule: ReviewRule = rule_value
             .clone()
             .try_into()
-            .map_err(|e| format!("Failed to parse rule at index {}: {}", i, e))?;
+            .map_err(|e| format!("Failed to parse rule at index {i}: {e}"))?;
         rules.push(rule);
     }
 
@@ -28,12 +28,13 @@ pub fn load_rules_from_str(content: &str) -> Result<Vec<ReviewRule>, String> {
 /// Load review rules from a TOML file.
 pub fn load_rules(path: &Path) -> Result<Vec<ReviewRule>, String> {
     let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read rules file {:?}: {}", path, e))?;
+        .map_err(|e| format!("Failed to read rules file {path:?}: {e}"))?;
 
     load_rules_from_str(&content)
 }
 
 /// Match review rules against a file based on its type.
+#[must_use]
 pub fn match_rules<'a>(file: &ChangedFile, rules: &'a [ReviewRule]) -> Vec<&'a ReviewRule> {
     let file_type = file.file_type.as_str();
 

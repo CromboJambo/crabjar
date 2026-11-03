@@ -1,9 +1,9 @@
 //! Web content extraction for crabjar agents.
 //!
 //! Provides web page content extraction via multiple backends:
-//! - HtmlExtractor: Simple HTML pages using reqwest + html2text
-//! - PdfExtractor: PDF documents (planned)
-//! - PlaywrightExtractor: JavaScript-heavy SPAs (planned)
+//! - `HtmlExtractor`: Simple HTML pages using reqwest + html2text
+//! - `PdfExtractor`: PDF documents (planned)
+//! - `PlaywrightExtractor`: JavaScript-heavy SPAs (planned)
 //!
 //! Integrates with orchestrator tool calling infrastructure so agents can
 //! extract detailed content from URLs found via web search.
@@ -23,7 +23,7 @@ pub use models::{ExtractResult, ExtractResponse};
 /// * `char_limit` - Maximum characters per page (default: 15000)
 ///
 /// # Returns
-/// ExtractResponse with results for each URL.
+/// `ExtractResponse` with results for each URL.
 pub async fn extract(urls: &[String], char_limit: Option<usize>) -> Result<ExtractResponse, WebExtractError> {
     let char_limit = char_limit.unwrap_or(15000);
     let mut results = Vec::new();
@@ -50,7 +50,7 @@ pub async fn extract(urls: &[String], char_limit: Option<usize>) -> Result<Extra
                         url: url.clone(),
                         title: String::new(),
                         content: String::new(),
-                        error: Some(format!("{}", e)),
+                        error: Some(format!("{e}")),
                     });
                 }
             }

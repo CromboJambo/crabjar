@@ -27,16 +27,17 @@ pub enum DelegationError {
 }
 
 impl DelegationError {
-    /// Convert to a TaskResult error message.
+    /// Convert to a `TaskResult` error message.
+    #[must_use]
     pub fn to_task_error(&self) -> String {
         match self {
-            DelegationError::SpawnFailed(msg) => format!("Spawn failed: {}", msg),
-            DelegationError::Timeout { seconds } => format!("Timed out after {}s", seconds),
-            DelegationError::ExitCode { code } => format!("Exit code {}", code),
-            DelegationError::ConcurrencyLimit { limit } => format!("Concurrency limit: {}", limit),
-            DelegationError::InvalidRequest(msg) => format!("Invalid request: {}", msg),
-            DelegationError::AggregationFailed(msg) => format!("Aggregation failed: {}", msg),
-            DelegationError::Serialization(err) => format!("Serialization error: {}", err),
+            DelegationError::SpawnFailed(msg) => format!("Spawn failed: {msg}"),
+            DelegationError::Timeout { seconds } => format!("Timed out after {seconds}s"),
+            DelegationError::ExitCode { code } => format!("Exit code {code}"),
+            DelegationError::ConcurrencyLimit { limit } => format!("Concurrency limit: {limit}"),
+            DelegationError::InvalidRequest(msg) => format!("Invalid request: {msg}"),
+            DelegationError::AggregationFailed(msg) => format!("Aggregation failed: {msg}"),
+            DelegationError::Serialization(err) => format!("Serialization error: {err}"),
         }
     }
 }

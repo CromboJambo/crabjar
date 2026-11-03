@@ -119,7 +119,7 @@ impl InferenceBackend for lm_studio_client::LmStudioClient {
         let metrics = InferenceMetrics::new(tokens_in, tokens_out, model_id, latency_ms);
 
         // Calculate cost based on tokens and model (approximate)
-        let cost_cents = metrics.estimated_cost_cents();
+        let _cost_cents = metrics.estimated_cost_cents();
 
         Ok((response, metrics))
     }

@@ -3,7 +3,6 @@
 /// Detects available resources at session start and adapts agent behavior
 /// (tool selection, parallelism, fallback strategies) based on actual capabilities.
 use std::fs;
-use std::path::PathBuf;
 
 use serde_json::{Value, json};
 
@@ -22,6 +21,12 @@ pub struct EnvironmentProfile {
 /// Proactive environment detector.
 pub struct EnvironmentDetector {
     profile: Option<EnvironmentProfile>,
+}
+
+impl Default for EnvironmentDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EnvironmentDetector {
@@ -106,11 +111,10 @@ impl EnvironmentDetector {
             for line in content.lines() {
                 if line.starts_with("MemTotal:") {
                     let parts: Vec<&str> = line.split_whitespace().collect();
-                    if parts.len() >= 2 {
-                        if let Ok(kb) = parts[1].parse::<u64>() {
+                    if parts.len() >= 2
+                        && let Ok(kb) = parts[1].parse::<u64>() {
                             return kb / 1024 / 1024;
                         }
-                    }
                 }
             }
         }
@@ -127,11 +131,10 @@ impl EnvironmentDetector {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines().skip(1) {
                 let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() >= 4 {
-                    if let Ok(gb) = parts[3].trim_end_matches('G').parse::<u64>() {
+                if parts.len() >= 4
+                    && let Ok(gb) = parts[3].trim_end_matches('G').parse::<u64>() {
                         return gb;
                     }
-                }
             }
         }
         100 // Default assumption

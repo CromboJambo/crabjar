@@ -70,7 +70,7 @@ pub async fn record_recovery_outcome_handler(
     State(conductor): State<ConductorState>,
     body: Json<RecoveryOutcomeRequest>,
 ) -> Json<serde_json::Value> {
-    let observation = format!(
+    let _observation = format!(
         "Recovery outcome: {} action '{}' resulted in {}. Time: {:?}s, Recurrence: {:?}",
         body.service,
         body.action_taken,
@@ -79,8 +79,8 @@ pub async fn record_recovery_outcome_handler(
         body.recurrence_within_24h
     );
 
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         Ok::<&str, String>("outcome_recorded")
     })
     .await;

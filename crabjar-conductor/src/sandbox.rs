@@ -1,6 +1,6 @@
 //! Sandbox management for ephemeral worker environments.
 //!
-//! This module provides the SandboxManager which orchestrates Podman container
+//! This module provides the `SandboxManager` which orchestrates Podman container
 //! lifecycle operations for creating, configuring, and destroying isolated
 //! execution environments for agent workers.
 
@@ -17,7 +17,7 @@ pub struct SandboxConfig {
     /// Network mode (default, none, host).
     #[serde(default = "default_network_mode")]
     pub network_mode: String,
-    /// Filesystem mounts (host_path:container_path pairs).
+    /// Filesystem mounts (`host_path:container_path` pairs).
     #[serde(default)]
     pub mounts: Vec<String>,
     /// Published ports (host:container pairs).
@@ -34,6 +34,7 @@ fn default_network_mode() -> String {
 
 /// Resource limits for sandbox containers.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Default)]
 pub struct SandboxResources {
     /// CPU limit (e.g., "0.5" for half a core).
     #[serde(default)]
@@ -43,14 +44,6 @@ pub struct SandboxResources {
     pub memory_limit: Option<String>,
 }
 
-impl Default for SandboxResources {
-    fn default() -> Self {
-        Self {
-            cpu_limit: None,
-            memory_limit: None,
-        }
-    }
-}
 
 /// State of a running sandbox environment.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -81,6 +74,7 @@ impl Default for SandboxManager {
 
 impl SandboxManager {
     /// Create a new sandbox manager.
+    #[must_use]
     pub fn new() -> Self {
         let podman_config = PodmanConfig::default();
         let podman = PodmanSandbox::new(podman_config);
@@ -101,12 +95,12 @@ impl SandboxManager {
         let container_id = self
             .podman
             .create_container(&container_name)
-            .map_err(|e| format!("Failed to create sandbox container: {}", e))?;
+            .map_err(|e| format!("Failed to create sandbox container: {e}"))?;
 
         // Start the container
         self.podman
             .start_container(&container_id)
-            .map_err(|e| format!("Failed to start sandbox container: {}", e))?;
+            .map_err(|e| format!("Failed to start sandbox container: {e}"))?;
 
         let state = SandboxState {
             container_id,
@@ -121,7 +115,7 @@ impl SandboxManager {
         let sandbox_id = state.container_id.clone();
         self.sandboxes
             .lock()
-            .map_err(|e| format!("Mutex poisoned: {}", e))?
+            .map_err(|e| format!("Mutex poisoned: {e}"))?
             .insert(sandbox_id.clone(), state.clone());
 
         info!(sandbox_id = %sandbox_id, "Sandbox provisioned successfully");
@@ -149,9 +143,9 @@ impl SandboxManager {
         let state = self
             .sandboxes
             .lock()
-            .map_err(|e| format!("Mutex poisoned: {}", e))?
+            .map_err(|e| format!("Mutex poisoned: {e}"))?
             .remove(sandbox_id)
-            .ok_or_else(|| format!("Sandbox {} not found", sandbox_id))?;
+            .ok_or_else(|| format!("Sandbox {sandbox_id} not found"))?;
 
         info!(sandbox_id = %sandbox_id, "Destroying sandbox");
 
@@ -171,10 +165,10 @@ impl SandboxManager {
 
     /// Assign a worker to a sandbox.
     pub fn assign_worker(&self, sandbox_id: &str, worker_id: &str) -> Result<(), String> {
-        let mut sandboxes = self.sandboxes.lock().map_err(|e| format!("Mutex poisoned: {}", e))?;
+        let mut sandboxes = self.sandboxes.lock().map_err(|e| format!("Mutex poisoned: {e}"))?;
         let state = sandboxes
             .get_mut(sandbox_id)
-            .ok_or_else(|| format!("Sandbox {} not found", sandbox_id))?;
+            .ok_or_else(|| format!("Sandbox {sandbox_id} not found"))?;
 
         if state.worker_id.is_some() {
             return Err(format!(

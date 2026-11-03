@@ -72,7 +72,7 @@ pub async fn record_optimization_outcome_handler(
     State(conductor): State<ConductorState>,
     Json(req): Json<OptimizationOutcomeRequest>,
 ) -> Json<serde_json::Value> {
-    let observation = format!(
+    let _observation = format!(
         "Optimization outcome: {} action '{}' resulted in {}. Savings: ${:?}, Performance impact: {:?}%",
         req.service,
         req.action_taken,
@@ -81,8 +81,8 @@ pub async fn record_optimization_outcome_handler(
         req.performance_impact_percent
     );
 
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         Ok::<&str, String>("outcome_recorded")
     })
     .await;

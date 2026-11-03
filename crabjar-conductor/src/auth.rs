@@ -4,7 +4,7 @@
 //! the `CRABJAR_AUTH_SECRET` environment variable, allowing both conductor and
 //! workers to share the same credential pool.
 
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -125,6 +125,7 @@ pub fn validate_token(token: &str) -> Result<ConductorClaims, AuthError> {
 }
 
 /// Check if claims have a required scope.
+#[must_use]
 pub fn has_scope(claims: &ConductorClaims, required: &str) -> bool {
     claims.scope.contains(&required.to_string())
 }

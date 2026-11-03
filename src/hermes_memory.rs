@@ -4,7 +4,7 @@
 //! the § delimiter format that Hermes Agent uses for persistent memory.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Character budgets matching Hermes defaults
 const MEMORY_MAX_CHARS: usize = 2200;

@@ -1,19 +1,19 @@
 //! Structural condition evaluator for JEV decision rules.
 //!
-//! Evaluates structural predicates against EvaluationTarget fields using
+//! Evaluates structural predicates against `EvaluationTarget` fields using
 //! a simple expression parser supporting:
 //! - Equality: `structure == FnDecl`, `error_handling == Propagated`
 //! - Comparison: `<`, `>`, `<=`, `>=`
 //! - Boolean: `&&`, `||`, `!`
 //! - Null checks: `!= null`
 //!
-//! Supported field names: structure, name, ownership_mode, error_handling, mutability
+//! Supported field names: structure, name, `ownership_mode`, `error_handling`, mutability
 
-use std::collections::HashMap;
 
-use crate::decision::structural::{EvaluationTarget, SpanKind};
+use crate::decision::structural::EvaluationTarget;
 
 /// Evaluate a condition expression against an evaluation target.
+#[must_use]
 pub fn evaluate_condition(target: &EvaluationTarget, condition: &str) -> bool {
     let expr = condition.trim();
 
@@ -26,7 +26,7 @@ pub fn evaluate_condition(target: &EvaluationTarget, condition: &str) -> bool {
     }
 
     // Handle negation of simple comparisons: !field == value
-    if expr.starts_with("!") {
+    if expr.starts_with('!') {
         let rest = expr[1..].trim();
         if rest.contains("==") || rest.contains("!=") {
             return !evaluate_condition(target, rest);
@@ -67,8 +67,8 @@ fn find_top_level_operator(expr: &str, op: &str) -> Option<usize> {
         match bytes[i] {
             b'(' => depth += 1,
             b')' => depth -= 1,
-            _ if depth == 0 && i + op_bytes.len() <= bytes.len() => {
-                if &bytes[i..i + op_bytes.len()] == op_bytes {
+            _ if depth == 0 && i + op_bytes.len() <= bytes.len()
+                && &bytes[i..i + op_bytes.len()] == op_bytes => {
                     // Check that this isn't part of a longer token
                     let before_ok = i == 0 || bytes[i - 1] == b' ';
                     let after_ok =
@@ -77,7 +77,6 @@ fn find_top_level_operator(expr: &str, op: &str) -> Option<usize> {
                         return Some(i);
                     }
                 }
-            }
             _ => {}
         }
     }
@@ -141,11 +140,10 @@ fn resolve_value(target: &EvaluationTarget, value: &str) -> String {
     }
 
     // Enum variant (starts with capital letter)
-    if let Some(first) = value.chars().next() {
-        if first.is_uppercase() && value.chars().all(|c| c.is_alphanumeric() || c == '_') {
+    if let Some(first) = value.chars().next()
+        && first.is_uppercase() && value.chars().all(|c| c.is_alphanumeric() || c == '_') {
             return value.to_string();
         }
-    }
 
     // Field name — resolve against target (typed fields first, then semantic_tags)
     match value {
@@ -153,19 +151,13 @@ fn resolve_value(target: &EvaluationTarget, value: &str) -> String {
         "name" => target.name.clone().unwrap_or("null".to_string()),
         "error_handling" => target
             .error_handling
-            .as_ref()
-            .map(|eh| eh.as_str().to_string())
-            .unwrap_or_else(|| resolve_semantic_tag(target, "error_handling")),
+            .as_ref().map_or_else(|| resolve_semantic_tag(target, "error_handling"), |eh| eh.as_str().to_string()),
         "mutability" => target
             .mutability
-            .as_ref()
-            .map(|mt| mt.as_str().to_string())
-            .unwrap_or_else(|| resolve_semantic_tag(target, "mutability")),
+            .as_ref().map_or_else(|| resolve_semantic_tag(target, "mutability"), |mt| mt.as_str().to_string()),
         "ownership_mode" => target
             .ownership_mode
-            .as_ref()
-            .map(|om| om.as_str().to_string())
-            .unwrap_or_else(|| resolve_semantic_tag(target, "ownership_mode")),
+            .as_ref().map_or_else(|| resolve_semantic_tag(target, "ownership_mode"), |om| om.as_str().to_string()),
         // Legacy: ownership stored in semantic_tags (language-specific)
         _ => resolve_semantic_tag(target, value),
     }

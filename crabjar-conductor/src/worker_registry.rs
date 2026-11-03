@@ -7,7 +7,14 @@ pub struct WorkerRegistry {
     workers: HashMap<String, Worker>,
 }
 
+impl Default for WorkerRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WorkerRegistry {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             workers: HashMap::new(),
@@ -29,15 +36,18 @@ impl WorkerRegistry {
         worker
     }
 
+    #[must_use]
     pub fn get(&self, id: &str) -> Option<&Worker> {
         self.workers.get(id)
     }
 
+    #[must_use]
     pub fn list(&self) -> Vec<&Worker> {
         self.workers.values().collect()
     }
 
     /// Find workers with a specific capability.
+    #[must_use]
     pub fn find_by_capability(&self, capability: &str) -> Vec<&Worker> {
         self.workers
             .values()
@@ -46,6 +56,7 @@ impl WorkerRegistry {
     }
 
     /// Find an online worker with the required capabilities.
+    #[must_use]
     pub fn find_available(&self, required: &[String]) -> Option<&Worker> {
         self.workers.values().find(|w| {
             if w.status != WorkerStatus::Online {

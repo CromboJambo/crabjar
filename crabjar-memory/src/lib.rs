@@ -1,4 +1,4 @@
-//! Hermes-compatible memory system for CrabJar.
+//! Hermes-compatible memory system for `CrabJar`.
 //!
 //! Provides MEMORY.md and USER.md file-based persistent memory with
 //! identical format and tool schema to Hermes Agent's memory system.

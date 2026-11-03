@@ -4,6 +4,7 @@
 use crate::types::{ReviewBundle, ReviewRule, Severity};
 
 /// Generate a scenario-tuned prompt for a specific review bundle.
+#[must_use]
 pub fn generate_review_prompt(
     bundle: &ReviewBundle,
     rules: &[ReviewRule],
@@ -19,7 +20,7 @@ pub fn generate_review_prompt(
 
     // Bundle metadata
     if let Some(crate_name) = &bundle.crate_name {
-        prompt.push_str(&format!("Crate: {}\n", crate_name));
+        prompt.push_str(&format!("Crate: {crate_name}\n"));
     }
     prompt.push_str(&format!(
         "Files in this review unit: {}\n\n",
@@ -102,6 +103,7 @@ fn matches_rule_for_bundle(rule: &ReviewRule, bundle: &ReviewBundle) -> bool {
 }
 
 /// Generate a context retrieval prompt when the agent needs additional information.
+#[must_use]
 pub fn generate_context_prompt(bundle: &ReviewBundle, question: &str) -> String {
     format!(
         "While reviewing this code change, I need to understand more context.\n\n\

@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 
 /// Isolation profile for agent workloads.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum SandboxProfile {
     /// Minimal isolation: Unix user only. Fast, least overhead.
     User,
     /// Rootless Podman container with default settings.
+    #[default]
     Container,
     /// Rootless Podman with read-only root filesystem.
     ReadOnlyContainer,
@@ -15,11 +17,6 @@ pub enum SandboxProfile {
     Isolated,
 }
 
-impl Default for SandboxProfile {
-    fn default() -> Self {
-        SandboxProfile::Container
-    }
-}
 
 /// Complete sandbox configuration for an agent workload.
 #[derive(Debug, Clone, Serialize, Deserialize)]

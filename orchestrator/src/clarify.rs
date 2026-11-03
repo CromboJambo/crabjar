@@ -83,7 +83,7 @@ pub async fn execute_clarify(
     }
 
     // Wait for user response via channel
-    let (tx, rx) = oneshot::channel();
+    let (_tx, rx) = oneshot::channel();
 
     // Store the sender so handler can respond to it
     // In a real implementation, this would be stored in shared state keyed by question_id

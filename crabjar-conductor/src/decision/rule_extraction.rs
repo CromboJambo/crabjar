@@ -5,7 +5,7 @@
 //! decision patterns into deterministic rules that bypass embedding computation.
 
 use crate::state_store::StateStore;
-use tracing::{debug, info};
+use tracing::info;
 
 /// A candidate rule extracted from decision history patterns.
 #[derive(Debug, Clone)]
@@ -24,6 +24,7 @@ pub struct CandidateRule {
 
 impl CandidateRule {
     /// Check if this rule meets the threshold to be promoted.
+    #[must_use]
     pub fn is_promotable(&self, min_occurrences: i64, min_confidence: f64) -> bool {
         self.occurrence_count >= min_occurrences && self.avg_confidence >= min_confidence
     }

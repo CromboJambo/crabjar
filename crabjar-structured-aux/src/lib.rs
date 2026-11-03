@@ -9,10 +9,8 @@
 
 use async_trait::async_trait;
 use crabjar_plugin::{Plugin, PluginError, ToolDefinition, ToolResult};
-use std::collections::HashMap;
 use std::fs;
 use reqwest::Client;
-use serde_json;
 use std::env;
 
 /// OpenRouter JEV endpoint base URL.
@@ -107,7 +105,7 @@ impl StructuredAuxPlugin {
             if let Some(val_str) = value.as_str() {
                 prompt.push_str(&format!("  {}: {}\n", key, val_str));
             } else {
-                prompt.push_str(&format!("  {}: {}\n", key, value.to_string()));
+                prompt.push_str(&format!("  {}: {}\n", key, value));
             }
         }
         prompt.push('\n');
@@ -200,7 +198,7 @@ impl StructuredAuxPlugin {
         let user_content = match custom_prompt {
             Some(prompt) => prompt.to_string(),
             None => {
-                let mut content = format!("State: {}\n", state.to_string());
+                let mut content = format!("State: {}\n", state);
                 for q in &questions {
                     if let Some(name) = q.get("name").and_then(|v| v.as_str()) {
                         content.push_str(&format!("Question: {}\n", name));
@@ -266,16 +264,16 @@ impl StructuredAuxPlugin {
         }
 
         // Parse the chat completion response.
-        let parsed: serde_json::Value = serde_json::from_str(&body).map_err(|e| PluginError::Serialization(e.into()))?;
+        let parsed: serde_json::Value = serde_json::from_str(&body).map_err(|e| PluginError::Serialization(e))?;
 
         // Debug: log raw response for troubleshooting.
         println!("DEBUG: Raw response from {}:", base_url);
         println!("DEBUG: {}", body);
 
         // Extract content from choices[0].message.content or reasoning_content.
-        if let Some(choices) = parsed.get("choices").and_then(|c| c.as_array()) {
-            if !choices.is_empty() {
-                if let Some(message) = choices[0].get("message") {
+        if let Some(choices) = parsed.get("choices").and_then(|c| c.as_array())
+            && !choices.is_empty()
+                && let Some(message) = choices[0].get("message") {
                     // Try content first, fall back to reasoning_content for reasoning models.
                     let content = message.get("content").and_then(|v| v.as_str())
                         .or_else(|| message.get("reasoning_content").and_then(|v| v.as_str()));
@@ -285,8 +283,6 @@ impl StructuredAuxPlugin {
                         return Ok(serde_json::json!({ "answer": text }));
                     }
                 }
-            }
-        }
 
         Err(PluginError::Execution {
             name: self.name.clone(),
@@ -333,8 +329,8 @@ impl StructuredAuxPlugin {
 
         // Parse available tools into options.
         let mut questions = vec![];
-        if let Some(tools) = tools_value {
-            if let Some(tool_list) = tools.as_array() {
+        if let Some(tools) = tools_value
+            && let Some(tool_list) = tools.as_array() {
                 let tool_names: Vec<String> = tool_list
                     .iter()
                     .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
@@ -348,7 +344,6 @@ impl StructuredAuxPlugin {
                     }));
                 }
             }
-        }
 
         let state = serde_json::json!({
             "request": request,
@@ -405,8 +400,8 @@ impl StructuredAuxPlugin {
         let tasks_value = args.get("tasks");
         let mut questions = vec![];
 
-        if let Some(tasks) = tasks_value {
-            if let Some(task_list) = tasks.as_array() {
+        if let Some(tasks) = tasks_value
+            && let Some(task_list) = tasks.as_array() {
                 let task_names: Vec<String> = task_list
                     .iter()
                     .filter_map(|t| t.get("name").and_then(|n| n.as_str()))
@@ -420,7 +415,6 @@ impl StructuredAuxPlugin {
                     }));
                 }
             }
-        }
 
         let state = serde_json::json!({
             "tasks": tasks_value,
@@ -476,8 +470,8 @@ impl StructuredAuxPlugin {
         let resources_value = args.get("resources");
 
         let mut questions = vec![];
-        if let Some(resources) = resources_value {
-            if let Some(resource_list) = resources.as_array() {
+        if let Some(resources) = resources_value
+            && let Some(resource_list) = resources.as_array() {
                 let resource_names: Vec<String> = resource_list
                     .iter()
                     .filter_map(|r| r.get("name").and_then(|n| n.as_str()))
@@ -491,7 +485,6 @@ impl StructuredAuxPlugin {
                     }));
                 }
             }
-        }
 
         let state = serde_json::json!({
             "request": request,

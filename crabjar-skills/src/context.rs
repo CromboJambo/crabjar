@@ -41,6 +41,7 @@ impl Default for SkillContext {
 
 impl SkillContext {
     /// Create a new context with default values from the current process environment.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -51,6 +52,7 @@ impl SkillContext {
     }
 
     /// Get an environment variable.
+    #[must_use]
     pub fn get_env(&self, key: &str) -> Option<&String> {
         self.env.get(key)
     }
@@ -71,6 +73,7 @@ impl SkillContext {
     }
 
     /// Get the current session state.
+    #[must_use]
     pub fn get_session_state(&self) -> &serde_json::Value {
         &self.session_state
     }
@@ -81,6 +84,7 @@ impl SkillContext {
     }
 
     /// Get a skill-specific configuration override.
+    #[must_use]
     pub fn get_config_override(&self, key: &str) -> Option<&serde_json::Value> {
         self.config_overrides.get(key)
     }
@@ -91,6 +95,7 @@ impl SkillContext {
     }
 
     /// Get metadata.
+    #[must_use]
     pub fn get_metadata(&self, key: &str) -> Option<&String> {
         self.metadata.get(key)
     }

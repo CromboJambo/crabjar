@@ -1,7 +1,6 @@
 //! VM lifecycle control plane — HTTP API for starting, stopping, and
 //! managing VMs via vm-core's LibvirtBackend.
 
-use anyhow::Result;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -14,9 +13,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use vm_core::{
-    backend::LibvirtBackend,
-    manager::{ManagerConfig, VmManager},
-    types::{SnapshotRequest, VmId, VmSpec},
+    manager::VmManager,
+    types::{VmId, VmSpec},
 };
 
 /// Shared state for the lifecycle API.

@@ -32,7 +32,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-/// Action types for the delegate_task tool (Hermes-compatible).
+/// Action types for the `delegate_task` tool (Hermes-compatible).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DelegationAction {
@@ -42,7 +42,7 @@ pub enum DelegationAction {
     Stop,
 }
 
-/// Input structure for the delegate_task tool (Hermes-compatible schema).
+/// Input structure for the `delegate_task` tool (Hermes-compatible schema).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DelegationInput {
     /// Tasks to spawn (required for spawn action).
@@ -142,6 +142,7 @@ pub struct DelegationResult {
 
 impl DelegationRequest {
     /// Convert to a list of individual tasks (handles single vs batch mode).
+    #[must_use]
     pub fn into_tasks(self) -> Vec<DelegatedTask> {
         if let Some(tasks) = self.tasks {
             return tasks;
@@ -161,6 +162,7 @@ impl DelegationRequest {
 
 impl DelegationResult {
     /// Create a success result.
+    #[must_use]
     pub fn success(results: Vec<TaskResult>) -> Self {
         let task_ids = results.iter().map(|r| r.task_id.clone()).collect();
         Self {
@@ -171,6 +173,7 @@ impl DelegationResult {
     }
 
     /// Create a failure result.
+    #[must_use]
     pub fn failure(error: String) -> Self {
         Self {
             success: false,

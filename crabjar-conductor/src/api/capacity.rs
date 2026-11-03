@@ -2,7 +2,7 @@
 
 use crate::api::ConductorState;
 use axum::{Json, extract::State};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 
 /// Request for capacity evaluation and adjustment decision.
@@ -74,7 +74,7 @@ pub async fn record_capacity_outcome_handler(
     State(conductor): State<ConductorState>,
     Json(req): Json<CapacityOutcomeRequest>,
 ) -> Json<serde_json::Value> {
-    let observation = format!(
+    let _observation = format!(
         "Capacity outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Utilization after: {:?}%",
         req.service,
         req.action_taken,
@@ -83,8 +83,8 @@ pub async fn record_capacity_outcome_handler(
         req.resource_utilization_after_percent
     );
 
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         Ok::<&str, String>("outcome_recorded")
     })
     .await;

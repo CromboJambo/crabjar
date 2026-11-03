@@ -11,7 +11,7 @@
 //! remains via russh but is only exercised when connecting to servers that
 //! exclusively support RSA host keys. Best practice: Ed25519 or ECDSA for all lab machines.
 
-use crabjar_lab_topology::{LabTopology, TopologyError};
+use crabjar_lab_topology::LabTopology;
 use std::env;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
@@ -145,7 +145,7 @@ pub async fn execute_remote(
     let mut full_cmd = command.to_string();
     if !args.is_empty() {
         for arg in args {
-            full_cmd.push_str(" ");
+            full_cmd.push(' ');
             full_cmd.push_str(arg);
         }
     }

@@ -1,15 +1,13 @@
 //! Phase 1: Structural region evaluation for JEV.
 //!
 //! Bridges pesti-structural-tokenizer output into the JEV decision layer
-//! by defining an EvaluationTarget type that wraps structural tokens with
+//! by defining an `EvaluationTarget` type that wraps structural tokens with
 //! semantic annotations, then evaluates them against JEV criteria files.
 //!
 //! Uses universal structural types from the multi-language topological analysis
 //! layer (universal-structure crate) for cross-language compatibility.
 
-use crate::decision::condition::evaluate_condition;
 use pesti_structural_tokenizer::semantic::{analyze_errors, analyze_mutability, analyze_ownership};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 pub use universal_structure::{
     ErrorHandling, EvaluationTarget, Mutability, OwnershipMode, SpanKind,
@@ -105,8 +103,9 @@ fn annotate_target(source: &str, target: &mut EvaluationTarget) {
     }
 }
 
-/// Build an EvaluationTarget from a code region, populating typed semantic fields
+/// Build an `EvaluationTarget` from a code region, populating typed semantic fields
 /// by analyzing the source text for ownership, error handling, and mutability patterns.
+#[must_use]
 pub fn build_target(
     structure: SpanKind,
     range: [usize; 2],
@@ -117,7 +116,7 @@ pub fn build_target(
         structure,
         range,
         source: source.to_string(),
-        name: name.map(|s| s.to_string()),
+        name: name.map(std::string::ToString::to_string),
         language: Some("rust".to_string()),
         semantic_tags: HashMap::new(),
         error_handling: None,

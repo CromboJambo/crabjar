@@ -26,7 +26,7 @@ fn select_backend() -> Result<SearchBackend, WebSearchError> {
     }
 
     // Fallback 1: Brave Search API (requires API key)
-    if let Some(key) = env::var("BRAVE_SEARCH_API_KEY").ok() {
+    if let Ok(key) = env::var("BRAVE_SEARCH_API_KEY") {
         tracing::info!("Using Brave Search backend");
         return Ok(SearchBackend::Brave(brave_client::BraveBackend::new(key)));
     }

@@ -3,13 +3,12 @@
 use std::env;
 use std::path::Path;
 
-use chrono::Utc;
 use reqwest::{Client, StatusCode};
 use serde_json::Value;
 use tracing::{debug, info};
 
 use crate::error::ClawHubError;
-use crate::models::{SearchOptions, SkillInfo, SkillVersion};
+use crate::models::{SearchOptions, SkillInfo};
 use crabjar_skill_scanner::SkillScanner;
 
 /// ClawHub API base URL.

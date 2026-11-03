@@ -25,6 +25,12 @@ pub struct FeedbackCollector {
     feedback_path: PathBuf,
 }
 
+impl Default for FeedbackCollector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FeedbackCollector {
     pub fn new() -> Self {
         let home = std::env::var("HOME").unwrap_or_default();
@@ -116,13 +122,12 @@ impl FeedbackCollector {
         let mut corrections = Vec::new();
 
         for line in content.lines() {
-            if let Ok(event) = serde_json::from_str::<Value>(line) {
-                if event["type"].as_str() == Some("correction")
+            if let Ok(event) = serde_json::from_str::<Value>(line)
+                && event["type"].as_str() == Some("correction")
                     && event["details"]["task_type"].as_str() == Some(task_type)
                 {
                     corrections.push(event);
                 }
-            }
         }
 
         Ok(corrections)

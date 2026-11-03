@@ -77,7 +77,7 @@ pub async fn record_security_outcome_handler(
     Json(req): Json<SecurityOutcomeRequest>,
 ) -> Json<serde_json::Value> {
     // Log the security outcome for future JEV learning
-    let observation = format!(
+    let _observation = format!(
         "Security outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Resolution time: {:?} min",
         req.system,
         req.action_taken,
@@ -87,8 +87,8 @@ pub async fn record_security_outcome_handler(
     );
 
     // Store outcome in decision history for future rule extraction
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         // Log as a decision event for historical analysis
         Ok::<&str, String>("outcome_recorded")
     })

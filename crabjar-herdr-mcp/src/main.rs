@@ -673,7 +673,7 @@ impl HerdrServer {
 
     #[tool(description = "List all available herdr session templates. Templates define pane layouts and applications for common workflows (e.g., dev, review, explore).")]
     fn template_list(&self, params: Parameters<TemplateListRequest>) -> String {
-        let req = params.0;
+        let _req = params.0;
         let dir = Self::template_dir();
 
         if !dir.exists() {
@@ -684,28 +684,18 @@ impl HerdrServer {
         }
 
         let mut templates = Vec::new();
-        match std::fs::read_dir(&dir) {
-            Ok(entries) => {
-                for entry in entries {
-                    match entry {
-                        Ok(e) => {
-                            let path = e.path();
-                            if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-                                if let Ok(content) = std::fs::read_to_string(&path) {
-                                    if let Ok(template) = serde_json::from_str::<serde_json::Value>(&content) {
-                                        templates.push(serde_json::json!({
-                                            "name": path.file_stem().and_then(|s| s.to_str()).unwrap_or(""),
-                                            "template": template
-                                        }));
-                                    }
-                                }
-                            }
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for e in entries.flatten() {
+                let path = e.path();
+                if path.extension().and_then(|ext| ext.to_str()) == Some("json")
+                    && let Ok(content) = std::fs::read_to_string(&path)
+                        && let Ok(template) = serde_json::from_str::<serde_json::Value>(&content) {
+                            templates.push(serde_json::json!({
+                                "name": path.file_stem().and_then(|s| s.to_str()).unwrap_or(""),
+                                "template": template
+                            }));
                         }
-                        Err(_) => {}
-                    }
-                }
             }
-            Err(_) => {}
         }
 
         serde_json::to_string(&serde_json::json!({

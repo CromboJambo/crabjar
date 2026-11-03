@@ -119,14 +119,13 @@ impl MemoryTool {
         self
     }
 
-    /// Parse target string into MemoryTarget enum.
+    /// Parse target string into `MemoryTarget` enum.
     fn parse_target(target: &str) -> MemoryResult<MemoryTarget> {
         match target.to_lowercase().as_str() {
             "memory" => Ok(MemoryTarget::Memory),
             "user" => Ok(MemoryTarget::User),
             _ => Err(MemoryError::InvalidParams(format!(
-                "Unknown target: {}. Must be 'memory' or 'user'.",
-                target
+                "Unknown target: {target}. Must be 'memory' or 'user'."
             ))),
         }
     }
@@ -260,11 +259,10 @@ impl MemoryTool {
         for op in operations {
             match &op.action {
                 MemoryAction::Add => {
-                    if let Some(content) = &op.content {
-                        if !entries.iter().any(|e| e == content) {
+                    if let Some(content) = &op.content
+                        && !entries.iter().any(|e| e == content) {
                             entries.push(content.clone());
                         }
-                    }
                 }
                 MemoryAction::Patch => {
                     if let (Some(old_text), Some(new_text)) = (&op.old_text, &op.content) {
@@ -380,6 +378,7 @@ impl MemoryTool {
     }
 
     /// Get the tool schema for Hermes integration.
+    #[must_use]
     pub fn schema() -> &'static str {
         r#"{
   "name": "memory",

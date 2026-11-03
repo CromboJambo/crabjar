@@ -43,7 +43,7 @@ pub struct CronJob {
     pub prompt: Option<String>,
     /// Ordered skill names to load before the cron prompt.
     pub skills: Vec<String>,
-    /// Script path to run each tick (optional; required for no_agent jobs).
+    /// Script path to run each tick (optional; required for `no_agent` jobs).
     pub script: Option<String>,
     /// Delivery target for job output.
     pub deliver: Option<String>,

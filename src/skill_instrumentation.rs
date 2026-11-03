@@ -14,7 +14,7 @@
 /// success rate × complexity), and generates QLoRA training examples from
 /// high-value successful invocations.
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;

@@ -1,7 +1,7 @@
 //! C++ adapter for universal structural token representation.
 //!
 //! Uses regex-based pattern matching to identify key C++ constructs and map them
-//! to universal SpanKind variants. This follows the same approach as the JavaScript,
+//! to universal `SpanKind` variants. This follows the same approach as the JavaScript,
 //! Python, and C adapters, demonstrating the pluggable adapter architecture without
 //! requiring a full C++ parser.
 
@@ -20,10 +20,17 @@ enum CppTok {
     Preprocessor(String),
 }
 
-/// C++ adapter implementing the LanguageAdapter trait.
+/// C++ adapter implementing the `LanguageAdapter` trait.
 pub struct CppAdapter;
 
+impl Default for CppAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CppAdapter {
+    #[must_use]
     pub fn new() -> Self {
         CppAdapter
     }
@@ -267,7 +274,7 @@ impl CppAdapter {
     fn detect_template_patterns(&self, source: &str) -> HashMap<String, String> {
         let mut tags = HashMap::new();
 
-        if source.contains("<") && source.contains(">") {
+        if source.contains('<') && source.contains('>') {
             tags.insert("template_usage".to_string(), "true".to_string());
         }
         if source.contains("template <") {
@@ -294,7 +301,7 @@ impl CppAdapter {
     fn detect_modern_cpp_patterns(&self, source: &str) -> HashMap<String, String> {
         let mut tags = HashMap::new();
 
-        if source.contains("auto") && (source.contains("=") || source.contains("(")) {
+        if source.contains("auto") && (source.contains('=') || source.contains('(')) {
             tags.insert("type_inference".to_string(), "true".to_string());
         }
         if source.contains("nullptr") {
@@ -312,7 +319,7 @@ impl CppAdapter {
 }
 
 impl LanguageAdapter for CppAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "cpp"
     }
 
@@ -326,17 +333,16 @@ impl LanguageAdapter for CppAdapter {
             match token {
                 CppTok::Keyword(kw) if kw == "class" || kw == "struct" => {
                     // Look ahead for name
-                    if i + 1 < tokens.len() {
-                        if let CppTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let CppTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("{} {}", kw, name),
+                                source: format!("{kw} {name}"),
                             });
                         }
-                    }
                 }
                 CppTok::Keyword(kw) if kw == "enum" => {
                     spans.push(Span {
@@ -371,7 +377,7 @@ impl LanguageAdapter for CppAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 CppTok::Keyword(kw) if kw == "for" || kw == "while" => {
@@ -380,7 +386,7 @@ impl LanguageAdapter for CppAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 CppTok::Keyword(kw) if kw == "switch" => {
@@ -443,7 +449,7 @@ impl LanguageAdapter for CppAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("\"{}\"", content),
+                        source: format!("\"{content}\""),
                     });
                 }
                 CppTok::CharLiteral(ch) => {
@@ -452,7 +458,7 @@ impl LanguageAdapter for CppAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("'{}'", ch),
+                        source: format!("'{ch}'"),
                     });
                 }
                 CppTok::NumberLiteral(content) => {
@@ -473,9 +479,9 @@ impl LanguageAdapter for CppAdapter {
         while i < tokens.len() {
             if let CppTok::Identifier(name) = &tokens[i] {
                 // Check if next token is '(' — potential function definition
-                if i + 1 < tokens.len() {
-                    if let CppTok::Punctuation(p) = &tokens[i + 1] {
-                        if p == "(" {
+                if i + 1 < tokens.len()
+                    && let CppTok::Punctuation(p) = &tokens[i + 1]
+                        && p == "(" {
                             // Look back for return type (identifier or keyword)
                             let has_return_type = i > 0
                                 && matches!(
@@ -493,8 +499,6 @@ impl LanguageAdapter for CppAdapter {
                                 });
                             }
                         }
-                    }
-                }
             }
             i += 1;
         }

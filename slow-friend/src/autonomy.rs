@@ -6,7 +6,6 @@
 use crate::action::{Action, ActionClass, ActionResult, PermissionLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
 
 /// Per-action-class approval history record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,7 +56,14 @@ pub struct AutonomyTracker {
     autonomous_threshold: u64,
 }
 
+impl Default for AutonomyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AutonomyTracker {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             records: HashMap::new(),
@@ -68,13 +74,10 @@ impl AutonomyTracker {
 
     /// Record the outcome of an action attempt.
     pub fn record_outcome(&mut self, action: &Action, result: &ActionResult) {
-        let record = match self.records.get_mut(&action.class) {
-            Some(r) => r,
-            None => {
-                let new_record = ActionClassRecord::new(action.class.clone());
-                self.records.insert(action.class.clone(), new_record);
-                self.records.get_mut(&action.class).unwrap()
-            }
+        let record = if let Some(r) = self.records.get_mut(&action.class) { r } else {
+            let new_record = ActionClassRecord::new(action.class.clone());
+            self.records.insert(action.class.clone(), new_record);
+            self.records.get_mut(&action.class).unwrap()
         };
 
         record.total_attempts += 1;
@@ -105,6 +108,7 @@ impl AutonomyTracker {
     }
 
     /// Determine the autonomy level for an action class based on history.
+    #[must_use]
     pub fn autonomy_level(&self, class: &ActionClass) -> AutonomyLevel {
         match self.records.get(class) {
             Some(record) => match record.permission {
@@ -117,6 +121,7 @@ impl AutonomyTracker {
     }
 
     /// Get the approval history for an action class (for inspectable provenance).
+    #[must_use]
     pub fn get_record(&self, class: &ActionClass) -> Option<&ActionClassRecord> {
         self.records.get(class)
     }

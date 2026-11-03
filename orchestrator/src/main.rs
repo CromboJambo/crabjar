@@ -14,8 +14,6 @@ use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use chrono::Utc;
-use rusqlite;
 
 mod backend;
 mod clarify;
@@ -31,7 +29,6 @@ use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use axum::middleware;
-use axum::http::request::Parts;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
@@ -206,7 +203,7 @@ fn spawn_sse_cleanup(manager: Arc<tokio::sync::Mutex<SseSubscriptionManager>>) {
 async fn subscribe_events(
     State(state): State<AppState>,
 ) -> Sse<impl stream::Stream<Item = Result<SseEvent, Infallible>>> {
-    let mut rx = state.event_channel.lock().await.subscribe();
+    let rx = state.event_channel.lock().await.subscribe();
 
     let event_stream = stream::unfold(rx, |mut rx| async move {
         match tokio::time::timeout(tokio::time::Duration::from_secs(30), rx.recv()).await {
@@ -505,7 +502,7 @@ async fn execute_with_guard(
     tool_name: &str,
     _args: &[String],
     binary_path: &str,
-    project_root: &std::path::Path,
+    _project_root: &std::path::Path,
     _store: &std::sync::Mutex<Store>,
 ) -> Result<String, String> {
     let source_event_id = format!("orchestrator-tr-{}", tool_name);
@@ -751,7 +748,7 @@ async fn execute_tool_call(
             let query = &args[0];
 
             // Security layer: check command before execution with provenance.
-            guard_tool_call("search_logs", &[query.clone()], "orchestrator-tc")?;
+            guard_tool_call("search_logs", std::slice::from_ref(query), "orchestrator-tc")?;
 
             let search_req: SearchLogsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
@@ -879,13 +876,13 @@ async fn execute_tool_call(
             Ok(output)
         }
         "web_search" => {
-            if args.len() < 1 {
+            if args.is_empty() {
                 return Err("Error: web_search requires at least 1 argument (query)".to_string());
             }
             let query = &args[0];
 
             // Security layer: check command before execution with provenance.
-            guard_tool_call("web_search", &[query.clone()], "orchestrator-ws")?;
+            guard_tool_call("web_search", std::slice::from_ref(query), "orchestrator-ws")?;
 
             info!("Executing web search for query: {}", query);
 
@@ -941,7 +938,9 @@ async fn execute_tool_call(
             let dispatcher = Dispatcher::new(None);
 
             // Execute based on action type
-            let result = match input.action {
+            
+
+            match input.action {
                 crabjar_delegation::DelegationAction::Spawn => {
                     if input.tasks.is_empty() {
                         return Err("Error: delegate_task spawn requires at least one task".to_string());
@@ -1016,9 +1015,7 @@ async fn execute_tool_call(
                         Err(e) => Err(format!("Error stopping task: {}", e)),
                     }
                 }
-            };
-
-            result
+            }
         }
         // P1-5: Interactive clarify tooling
         "clarify" => {
@@ -1188,16 +1185,14 @@ fn format_results(response: &crabjar_web_search::SearchResponse) -> Result<Strin
     for (i, result) in response.results.iter().enumerate() {
         output.push_str(&format!("{}. {}\n", i + 1, result.title));
         output.push_str(&format!("   URL: {}\n", result.url));
-        if let Some(desc) = &result.description {
-            if !desc.is_empty() {
+        if let Some(desc) = &result.description
+            && !desc.is_empty() {
                 output.push_str(&format!("   Description: {}\n", desc));
             }
-        }
-        if let Some(snippet) = &result.snippet {
-            if !snippet.is_empty() {
+        if let Some(snippet) = &result.snippet
+            && !snippet.is_empty() {
                 output.push_str(&format!("   Snippet: {}\n", snippet));
             }
-        }
         output.push('\n');
     }
 
@@ -1381,11 +1376,10 @@ async fn clarify_response(
     let row = &entries[0];
 
     // Check if already answered
-    if let Some(status) = row.metadata.get("status").and_then(|v| v.as_str()) {
-        if status == "answered" {
+    if let Some(status) = row.metadata.get("status").and_then(|v| v.as_str())
+        && status == "answered" {
             return Err(axum::http::StatusCode::CONFLICT);
         }
-    }
 
     // Update the question entry with the response via raw SQL
     let updated_metadata = serde_json::json!({
@@ -1488,27 +1482,23 @@ async fn clarify_status(
                 .get("created_at")
                 .and_then(|v| v.as_str());
 
-            if let Some(createdAt) = created_at {
-                match chrono::DateTime::parse_from_rfc3339(createdAt) {
-                    Ok(dt) => {
-                        // Convert to UTC for comparison
-                        let dt_utc = dt.with_timezone(&chrono::Utc);
-                        let elapsed = chrono::Utc::now() - dt_utc;
-                        // Default timeout is 300 seconds (5 minutes)
-                        if elapsed.num_seconds() > 300 {
-                            return Ok(Json(AcpResponse::Output {
-                                data: serde_json::json!({
-                                    "status": "timed_out",
-                                    "question_id": question_id,
-                                    "elapsed_seconds": elapsed.num_seconds()
-                                })
-                                .to_string(),
-                            }));
-                        }
+            if let Some(createdAt) = created_at
+                && let Ok(dt) = chrono::DateTime::parse_from_rfc3339(createdAt) {
+                    // Convert to UTC for comparison
+                    let dt_utc = dt.with_timezone(&chrono::Utc);
+                    let elapsed = chrono::Utc::now() - dt_utc;
+                    // Default timeout is 300 seconds (5 minutes)
+                    if elapsed.num_seconds() > 300 {
+                        return Ok(Json(AcpResponse::Output {
+                            data: serde_json::json!({
+                                "status": "timed_out",
+                                "question_id": question_id,
+                                "elapsed_seconds": elapsed.num_seconds()
+                            })
+                            .to_string(),
+                        }));
                     }
-                    Err(_) => {}
                 }
-            }
 
             Ok(Json(AcpResponse::Output {
                 data: serde_json::json!({
@@ -1533,14 +1523,12 @@ async fn clarify_pending(
     let twenty_four_hours_ms = 86_400_000;
     if let Ok(all_entries) = store.query(&["clarify-pending"], 500, "", "", "") {
         for entry in &all_entries {
-            if let Some(created_at_str) = entry.metadata.get("created_at").and_then(|v| v.as_str()) {
-                if let Ok(created_at) = created_at_str.parse::<i64>() {
-                    if now - created_at > twenty_four_hours_ms {
+            if let Some(created_at_str) = entry.metadata.get("created_at").and_then(|v| v.as_str())
+                && let Ok(created_at) = created_at_str.parse::<i64>()
+                    && now - created_at > twenty_four_hours_ms {
                         // Entry is older than 24 hours — deactivate it
                         let _ = store.deactivate(entry.id, Source::System, Some("expired: older than 24h"));
                     }
-                }
-            }
         }
     }
 
@@ -1599,30 +1587,25 @@ async fn api_key_auth(
     let expected = expected_key.unwrap();
 
     // Check Authorization: Bearer *** header first
-    if let Some(auth_header) = req.headers().get("authorization") {
-        if let Ok(auth_str) = auth_header.to_str() {
-            if auth_str.starts_with("Bearer ") {
-                let token = &auth_str[7..];
+    if let Some(auth_header) = req.headers().get("authorization")
+        && let Ok(auth_str) = auth_header.to_str()
+            && let Some(token) = auth_str.strip_prefix("Bearer ") {
                 // Constant-time comparison to prevent timing attacks
                 if subtle::ConstantTimeEq::ct_eq(token.as_bytes(), expected.as_bytes()).into() {
                     return Ok(next.run(req).await);
                 }
             }
-        }
-    }
 
     // Also check api_key query parameter for simpler clients
     let uri = req.uri();
     if let Some(query) = uri.query() {
         for pair in query.split('&') {
             let mut kv = pair.splitn(2, '=');
-            if let (Some(key), Some(value)) = (kv.next(), kv.next()) {
-                if key == "api_key" {
-                    if subtle::ConstantTimeEq::ct_eq(value.as_bytes(), expected.as_bytes()).into() {
+            if let (Some(key), Some(value)) = (kv.next(), kv.next())
+                && key == "api_key"
+                    && subtle::ConstantTimeEq::ct_eq(value.as_bytes(), expected.as_bytes()).into() {
                         return Ok(next.run(req).await);
                     }
-                }
-            }
         }
     }
 
@@ -1658,8 +1641,8 @@ impl RateLimiter {
     }
 
     fn load_state(&mut self) {
-        if let Ok(content) = std::fs::read_to_string(&self.state_file) {
-            if let Ok(state) = serde_json::from_str::<HashMap<String, Vec<i64>>>(&content) {
+        if let Ok(content) = std::fs::read_to_string(&self.state_file)
+            && let Ok(state) = serde_json::from_str::<HashMap<String, Vec<i64>>>(&content) {
                 // Filter out stale entries
                 let now = chrono::Utc::now().timestamp();
                 for (ip, timestamps) in state {
@@ -1672,7 +1655,6 @@ impl RateLimiter {
                     }
                 }
             }
-        }
     }
 
     fn save_state(&self) {

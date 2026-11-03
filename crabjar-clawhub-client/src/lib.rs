@@ -8,7 +8,6 @@ pub mod client;
 pub mod error;
 pub mod models;
 
-use crabjar_skill_scanner::SkillScanner;
 
 pub use client::ClawHubClient;
 pub use error::ClawHubError;

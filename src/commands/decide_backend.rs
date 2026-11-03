@@ -119,24 +119,21 @@ impl LlamaServerBackend {
             serde_json::from_str(body).map_err(|e| BackendError::InvalidResponse(e.to_string()))?;
 
         // Try llama-server response format: { "embeddings": [[...], ...] }
-        if let Some(embeddings) = parsed.get("embeddings") {
-            if let Some(arr) = embeddings.as_array() {
-                if !arr.is_empty() {
+        if let Some(embeddings) = parsed.get("embeddings")
+            && let Some(arr) = embeddings.as_array()
+                && !arr.is_empty() {
                     return self.extract_vector(&arr[0]);
                 }
-            }
-        }
 
         // Try OpenAI-compatible format: { "data": [{ "embedding": [...] }] }
-        if let Some(data) = parsed.get("data") {
-            if let Some(arr) = data.as_array() {
+        if let Some(data) = parsed.get("data")
+            && let Some(arr) = data.as_array() {
                 for item in arr {
                     if let Some(emb) = item.get("embedding") {
                         return self.extract_vector(emb);
                     }
                 }
             }
-        }
 
         Err(BackendError::InvalidResponse(
             "No embedding found in response".to_string(),

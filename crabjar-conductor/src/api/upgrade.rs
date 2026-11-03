@@ -77,14 +77,14 @@ pub async fn record_upgrade_outcome_handler(
 ) -> Json<serde_json::Value> {
     // Log the upgrade outcome for future JEV learning
     let issues_str = req.compatibility_issues.join(", ");
-    let observation = format!(
+    let _observation = format!(
         "Upgrade outcome: {} {} resulted in {}. Downtime: {:?}s, Issues: {}",
         req.service, req.version_change, req.outcome, req.downtime_seconds, issues_str
     );
 
     // Store outcome in decision history for future rule extraction
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         // Log as a decision event for historical analysis
         Ok::<&str, String>("outcome_recorded")
     })

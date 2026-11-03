@@ -6,7 +6,9 @@
 use anyhow::Result;
 use clap::Parser;
 use crabjar_conductor::{api, conductor};
+use crabjar_conductor::decision::{BackendConfig, DecisionPolicy};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -29,11 +31,11 @@ struct Args {
     #[arg(long, default_value = "http://localhost:8000")]
     pesti_url: String,
 
-    /// SQLite database path (default: conductor-state.db in current directory)
+    /// `SQLite` database path (default: conductor-state.db in current directory)
     #[arg(long, default_value = "conductor-state.db")]
     db_path: String,
 
-    /// JEV embedding backend URL (overrides CRABJAR_JEV_API_URL if set)
+    /// JEV embedding backend URL (overrides `CRABJAR_JEV_API_URL` if set)
     #[arg(long)]
     jev_url: Option<String>,
 }
@@ -63,7 +65,6 @@ async fn main() -> Result<()> {
     let mut conductor = conductor::Conductor::with_db(config, &args.db_path)?;
 
     // Configure JEV decision gate (required for automated fleet decisions)
-    use crabjar_conductor::decision::{BackendConfig, DecisionPolicy};
     let jev_url = args
         .jev_url
         .or_else(|| std::env::var("CRABJAR_JEV_API_URL").ok())
@@ -82,7 +83,6 @@ async fn main() -> Result<()> {
     }
 
     // Wrap in Arc<Mutex<>> for shared state across API handlers
-    use tokio::sync::Mutex;
     let conductor_state: api::ConductorState = Arc::new(Mutex::new(conductor));
 
     let app = api::routes(conductor_state);

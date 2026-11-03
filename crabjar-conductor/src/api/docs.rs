@@ -72,7 +72,7 @@ pub async fn record_documentation_outcome_handler(
     State(conductor): State<ConductorState>,
     Json(req): Json<DocumentationOutcomeRequest>,
 ) -> Json<serde_json::Value> {
-    let observation = format!(
+    let _observation = format!(
         "Documentation outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Improvement time: {:?} hours",
         req.system,
         req.action_taken,
@@ -81,8 +81,8 @@ pub async fn record_documentation_outcome_handler(
         req.improvement_time_hours
     );
 
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         Ok::<&str, String>("outcome_recorded")
     })
     .await;

@@ -1,4 +1,4 @@
-//! Conductor execution gate — wraps crabjar-guard's ExecutionGate patterns
+//! Conductor execution gate — wraps crabjar-guard's `ExecutionGate` patterns
 //! for fleet orchestration authorization decisions.
 //!
 //! This module provides a unified interface for validating worker eligibility
@@ -19,6 +19,7 @@ use tracing::{debug, warn};
 ///
 /// Conductor levels: 0 (unknown), 1 (proven), 2 (trusted), 3 (elite)
 /// Guard layers: 1 (quarantine), 2 (working), 3 (annealed)
+#[must_use]
 pub fn map_conductor_trust_to_guard_layer(conductor_level: u8) -> u32 {
     match conductor_level {
         0 => 1, // unknown → quarantine
@@ -34,7 +35,7 @@ pub fn map_conductor_trust_to_guard_layer(conductor_level: u8) -> u32 {
 /// 2. Task has valid provenance (exists in conductor state)
 /// 3. Confidence threshold is met for auto-assignment
 ///
-/// Returns GateResult::Proceed if eligible, otherwise Interrupted/Pending with reason.
+/// Returns `GateResult::Proceed` if eligible, otherwise Interrupted/Pending with reason.
 pub fn check_task_claim_eligibility(
     worker_trust_level: u8,
     task_trust_required: u8,
@@ -44,8 +45,7 @@ pub fn check_task_claim_eligibility(
     // 1. Trust level check
     if worker_trust_level < task_trust_required {
         let reason = format!(
-            "Worker trust level {} below task requirement {}",
-            worker_trust_level, task_trust_required
+            "Worker trust level {worker_trust_level} below task requirement {task_trust_required}"
         );
         debug!(task_id, %reason, "Task claim eligibility: interrupted");
         return GateResult::Interrupted { reason };
@@ -55,8 +55,7 @@ pub fn check_task_claim_eligibility(
     const CONFIDENCE_FLOOR: f64 = 0.65;
     if confidence < CONFIDENCE_FLOOR {
         let reason = format!(
-            "Confidence {:.3} below floor {:.3}; must surface before assignment",
-            confidence, CONFIDENCE_FLOOR
+            "Confidence {confidence:.3} below floor {CONFIDENCE_FLOOR:.3}; must surface before assignment"
         );
         warn!(task_id, %reason, "Task claim eligibility: interrupted");
         return GateResult::Interrupted { reason };
@@ -99,7 +98,8 @@ pub fn check_task_assignment_authorization(
     GateResult::Proceed
 }
 
-/// Build a GateContext for conductor operations.
+/// Build a `GateContext` for conductor operations.
+#[must_use]
 pub fn build_gate_context<'a>(
     action_type: &'a str,
     task_id: &'a str,

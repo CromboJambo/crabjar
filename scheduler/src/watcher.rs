@@ -56,6 +56,12 @@ pub struct WatcherRegistry {
     watchers: HashMap<String, Watcher>,
 }
 
+impl Default for WatcherRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WatcherRegistry {
     pub fn new() -> Self {
         Self {
@@ -73,7 +79,7 @@ impl WatcherRegistry {
 
     pub fn evaluate_all(&mut self) -> Vec<WatchEvent> {
         let mut events = Vec::new();
-        for (_, watcher) in self.watchers.iter_mut() {
+        for watcher in self.watchers.values_mut() {
             if let Some(event) = watcher.evaluate() {
                 events.push(event);
             }

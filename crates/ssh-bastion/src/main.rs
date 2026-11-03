@@ -170,7 +170,7 @@ impl russh::server::Handler for Bastion {
         );
 
         match connect_to_target(&host, port, &user, &self.key_path).await {
-            Ok((mut target_session, mut outbound_channel)) => {
+            Ok((_target_session, mut outbound_channel)) => {
                 info!("Outbound connection established to {}", host);
 
                 // Request PTY for interactive shell
@@ -250,7 +250,7 @@ impl russh::server::Handler for Bastion {
         );
 
         match connect_to_target(&host, port, &user, &self.key_path).await {
-            Ok((target_session, mut outbound_channel)) => {
+            Ok((_target_session, mut outbound_channel)) => {
                 info!("Outbound connection established to {} for exec", host);
 
                 if let Err(e) = outbound_channel.exec(true, cmd_str.as_bytes()).await {
@@ -299,7 +299,7 @@ impl russh::server::Handler for Bastion {
         &mut self,
         channel: russh::ChannelId,
         data: &[u8],
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         info!("Client sent {} bytes on channel {}", data.len(), channel);
         Ok(())
@@ -308,7 +308,7 @@ impl russh::server::Handler for Bastion {
     async fn channel_close(
         &mut self,
         channel: russh::ChannelId,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         info!("Client channel closed: {}", channel);
         Ok(())

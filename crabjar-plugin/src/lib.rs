@@ -470,7 +470,7 @@ impl PluginRegistry {
     /// Call on_load hook for a registered plugin.
     pub async fn load(&self, name: &str) -> Result<(), PluginError> {
         let plugins = self.plugins.read().await;
-        let (plugin_name, plugin) = plugins
+        let (_plugin_name, plugin) = plugins
             .iter()
             .find(|(n, _)| n == name)
             .ok_or_else(|| PluginError::NotFound(name.to_string()))?;
@@ -547,7 +547,7 @@ impl PluginRegistry {
         args: serde_json::Value,
     ) -> Result<ToolResult, PluginError> {
         let plugins = self.plugins.read().await;
-        for (plugin_name, plugin) in plugins.iter() {
+        for (_plugin_name, plugin) in plugins.iter() {
             let tools = plugin.list_tools();
             if tools.iter().any(|t| t.name == tool_name) {
                 match plugin.execute_tool(tool_name, args).await {

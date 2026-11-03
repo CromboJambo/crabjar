@@ -9,7 +9,7 @@ use serde_json::json;
 use std::sync::{Arc, Mutex, OnceLock};
 use uuid::Uuid;
 
-/// In-memory store for background evaluations (eval_id -> status JSON).
+/// In-memory store for background evaluations (`eval_id` -> status JSON).
 static BG_EVALUATIONS: OnceLock<Arc<Mutex<std::collections::HashMap<String, serde_json::Value>>>> =
     OnceLock::new();
 

@@ -36,17 +36,17 @@ pub enum MemoryError {
 impl fmt::Display for MemoryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MemoryError::Io(e) => write!(f, "I/O error: {}", e),
+            MemoryError::Io(e) => write!(f, "I/O error: {e}"),
             MemoryError::Full {
                 current_chars,
                 max_chars,
                 would_exceed_by,
                 ..
             } => {
-                write!(f, "Memory full: {} chars used of {} limit. Adding this entry would exceed by {} characters.", current_chars, max_chars, would_exceed_by)
+                write!(f, "Memory full: {current_chars} chars used of {max_chars} limit. Adding this entry would exceed by {would_exceed_by} characters.")
             }
             MemoryError::NotFound { old_text, .. } => {
-                write!(f, "Entry not found containing: {}", old_text)
+                write!(f, "Entry not found containing: {old_text}")
             }
             MemoryError::Ambiguous {
                 old_text,
@@ -54,12 +54,11 @@ impl fmt::Display for MemoryError {
             } => {
                 write!(
                     f,
-                    "Substring '{}' matches {} entries (ambiguous). Use a more specific substring.",
-                    old_text, matching_count
+                    "Substring '{old_text}' matches {matching_count} entries (ambiguous). Use a more specific substring."
                 )
             }
-            MemoryError::InvalidParams(msg) => write!(f, "Invalid parameters: {}", msg),
-            MemoryError::Duplicate(entry) => write!(f, "Duplicate entry: {}", entry),
+            MemoryError::InvalidParams(msg) => write!(f, "Invalid parameters: {msg}"),
+            MemoryError::Duplicate(entry) => write!(f, "Duplicate entry: {entry}"),
         }
     }
 }

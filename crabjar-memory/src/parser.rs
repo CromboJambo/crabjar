@@ -9,6 +9,7 @@ const DELIMITER: &str = "§\n";
 /// Parse memory file content into individual entries.
 ///
 /// Empty entries (whitespace only) are filtered out.
+#[must_use]
 pub fn parse_entries(content: &str) -> Vec<String> {
     if content.is_empty() {
         return vec![];
@@ -28,6 +29,7 @@ pub fn parse_entries(content: &str) -> Vec<String> {
 /// Serialize entries back to memory file format.
 ///
 /// Entries are joined with the § delimiter and a trailing newline is added.
+#[must_use]
 pub fn serialize_entries(entries: &[String]) -> String {
     if entries.is_empty() {
         return String::new();
@@ -45,6 +47,7 @@ pub fn serialize_entries(entries: &[String]) -> String {
 }
 
 /// Find entries containing a given substring.
+#[must_use]
 pub fn find_entries_containing(entries: &[String], substring: &str) -> Vec<usize> {
     let mut matches = Vec::new();
     for (i, entry) in entries.iter().enumerate() {

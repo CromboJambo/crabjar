@@ -1,4 +1,4 @@
-//! Cron job SQLite storage layer.
+//! Cron job `SQLite` storage layer.
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::types::{CreateJobRequest, CronJob, JobStatus, UpdateJobRequest};
 
-/// Cron job store backed by SQLite.
+/// Cron job store backed by `SQLite`.
 pub struct CronStore {
     conn: Connection,
 }
@@ -35,7 +35,7 @@ impl CronStore {
                 serde_json::to_string(&req.skills)?,
                 req.script,
                 req.deliver,
-                if req.no_agent { 1 } else { 0 },
+                i32::from(req.no_agent),
                 created_at.to_rfc3339()
             ],
         )?;
@@ -144,7 +144,7 @@ impl CronStore {
         if let Some(no_agent) = req.no_agent {
             self.conn.execute(
                 "UPDATE jobs SET no_agent = ? WHERE id = ?",
-                params![if no_agent { 1 } else { 0 }, id],
+                params![i32::from(no_agent), id],
             )?;
         }
 
@@ -202,7 +202,7 @@ impl CronStore {
         Ok(())
     }
 
-    /// SQLite schema for cron jobs.
+    /// `SQLite` schema for cron jobs.
     const SCHEMA: &str = "
         CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY,

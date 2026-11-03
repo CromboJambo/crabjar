@@ -236,7 +236,7 @@ pub fn handle(command: AttemptsCommand) -> Result<serde_json::Value, Box<dyn std
                 preconditions: Vec::new(),
                 invertible: true,
                 intent,
-                recorded_at: now.clone(),
+                recorded_at: now,
                 approach_warning: None,
                 status: crabjar_terminal::AttemptStatus::Unjudged,
                 inference_metrics: crabjar_terminal::InferenceMetrics::default(),

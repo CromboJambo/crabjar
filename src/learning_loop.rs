@@ -2,7 +2,7 @@
 ///
 /// Reads ~/.crabjar/skill-instrumentation.jsonl, computes skill health metrics,
 /// identifies failure patterns, and generates actionable recommendations.
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -24,6 +24,12 @@ pub struct SkillHealth {
 /// Learning analyzer that processes skill instrumentation logs.
 pub struct LearningAnalyzer {
     log_path: PathBuf,
+}
+
+impl Default for LearningAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LearningAnalyzer {
@@ -125,10 +131,10 @@ impl LearningAnalyzer {
         // Pattern 2: Repeated error types
         let mut error_counts: HashMap<String, Vec<String>> = HashMap::new();
         for h in &health {
-            for (error_type, count) in &h.error_types {
+            for (error_type, _count) in &h.error_types {
                 error_counts
                     .entry(error_type.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(h.name.clone());
             }
         }

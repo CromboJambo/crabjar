@@ -5,16 +5,23 @@
 use crate::{LanguageAdapter, Span, SpanKind, SpanTree, StructuralToken};
 use std::collections::HashMap;
 
-/// Lean language adapter implementing the LanguageAdapter trait.
+/// Lean language adapter implementing the `LanguageAdapter` trait.
 pub struct LeanAdapter {}
 
+impl Default for LeanAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LeanAdapter {
+    #[must_use]
     pub fn new() -> Self {
         LeanAdapter {}
     }
 
-    /// Map a simple regex pattern to a universal SpanKind for Lean constructs.
-    fn map_pattern(pattern: &str, text: &str) -> Option<SpanKind> {
+    /// Map a simple regex pattern to a universal `SpanKind` for Lean constructs.
+    fn map_pattern(pattern: &str, _text: &str) -> Option<SpanKind> {
         match pattern {
             "theorem" => Some(SpanKind::FnDecl),
             "lemma" => Some(SpanKind::FnDecl),
@@ -46,7 +53,7 @@ impl LeanAdapter {
         }
 
         // Detect type annotations
-        if source.contains(":") && (source.contains(" : ") || source.contains(": ")) {
+        if source.contains(':') && (source.contains(" : ") || source.contains(": ")) {
             tags.insert("has_type_annotations".to_string(), "true".to_string());
         }
 
@@ -55,7 +62,7 @@ impl LeanAdapter {
 }
 
 impl LanguageAdapter for LeanAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "lean"
     }
 

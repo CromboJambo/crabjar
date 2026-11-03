@@ -25,7 +25,14 @@ pub struct SparseLattice {
     nodes: HashMap<String, LatticeNode>,
 }
 
+impl Default for SparseLattice {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SparseLattice {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             nodes: HashMap::new(),
@@ -43,11 +50,13 @@ impl SparseLattice {
     }
 
     /// Get a value by exact key.
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&serde_json::Value> {
         self.nodes.get(key).map(|n| &n.value)
     }
 
     /// Check if a key exists.
+    #[must_use]
     pub fn contains(&self, key: &str) -> bool {
         self.nodes.contains_key(key)
     }
@@ -58,15 +67,18 @@ impl SparseLattice {
     }
 
     /// List all keys.
+    #[must_use]
     pub fn keys(&self) -> Vec<&String> {
         self.nodes.keys().collect()
     }
 
     /// Number of stored nodes.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }

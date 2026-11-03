@@ -1,17 +1,18 @@
-/// Cross-session continuity: search past sessions using SQLite FTS5.
-///
-/// Indexes session transcripts, tool calls, and outcomes for semantic retrieval.
-/// Enables "what did we learn last time about X?" queries across days/weeks of work.
-use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use serde_json::{Value, json};
+use serde_json::Value;
 
 /// Session search index manager.
 pub struct SessionSearchIndex {
     index_path: PathBuf,
     index: Option<rusqlite::Connection>,
+}
+
+impl Default for SessionSearchIndex {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SessionSearchIndex {
@@ -60,9 +61,9 @@ impl SessionSearchIndex {
     }
 
     /// Index a completed session for future search.
-    pub fn index_session(&mut self, session_data: &Value) -> Result<(), String> {
+    pub fn index_session(&mut self, _session_data: &Value) -> Result<(), String> {
         self.open_index()?;
-        let idx = self.index.as_ref().unwrap();
+        let _idx = self.index.as_ref().unwrap();
 
         // In production, this would parse the session JSON and index relevant fields
         // with proper schema. For now, we log that indexing occurred.
@@ -70,9 +71,9 @@ impl SessionSearchIndex {
     }
 
     /// Search past sessions for relevant context.
-    pub fn search(&mut self, query: &str, limit: usize) -> Result<Vec<Value>, String> {
+    pub fn search(&mut self, _query: &str, _limit: usize) -> Result<Vec<Value>, String> {
         self.open_index()?;
-        let idx = self.index.as_ref().unwrap();
+        let _idx = self.index.as_ref().unwrap();
 
         // Simplified search — real implementation would use QueryParser with schema
         Ok(Vec::new())

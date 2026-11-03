@@ -21,6 +21,7 @@ const BINARY_PATTERNS: &[&str] = &[
 ];
 
 /// Classify a file by type based on path and content heuristics.
+#[must_use]
 pub fn classify_file(path: &Path, content: Option<&str>) -> FileType {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     let path_str = path.to_string_lossy();
@@ -73,27 +74,27 @@ pub fn classify_file(path: &Path, content: Option<&str>) -> FileType {
 }
 
 /// Check if a file matches generated file patterns.
+#[must_use]
 pub fn is_generated(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     for pattern in GENERATED_PATTERNS {
-        if let Ok(re) = Regex::new(pattern) {
-            if re.is_match(&path_str) {
+        if let Ok(re) = Regex::new(pattern)
+            && re.is_match(&path_str) {
                 return true;
             }
-        }
     }
     false
 }
 
 /// Check if a file matches binary asset patterns.
+#[must_use]
 pub fn is_binary_asset(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     for pattern in BINARY_PATTERNS {
-        if let Ok(re) = Regex::new(pattern) {
-            if re.is_match(&path_str) {
+        if let Ok(re) = Regex::new(pattern)
+            && re.is_match(&path_str) {
                 return true;
             }
-        }
     }
     false
 }
@@ -105,29 +106,29 @@ pub fn get_changed_files(
     target_commit: &str,
 ) -> Result<Vec<ChangedFile>, String> {
     let repo = git2::Repository::open(repo_path)
-        .map_err(|e| format!("Failed to open repository at {:?}: {}", repo_path, e))?;
+        .map_err(|e| format!("Failed to open repository at {repo_path:?}: {e}"))?;
 
     let base_obj = repo
         .revparse_single(base_commit)
-        .map_err(|e| format!("Failed to resolve base commit '{}': {}", base_commit, e))?;
+        .map_err(|e| format!("Failed to resolve base commit '{base_commit}': {e}"))?;
     let target_obj = repo
         .revparse_single(target_commit)
-        .map_err(|e| format!("Failed to resolve target commit '{}': {}", target_commit, e))?;
+        .map_err(|e| format!("Failed to resolve target commit '{target_commit}': {e}"))?;
 
     let base_tree = repo
         .find_object(base_obj.id(), None)
         .and_then(|o| o.peel_to_commit())
         .and_then(|c| c.tree())
-        .map_err(|e| format!("Failed to get base tree: {}", e))?;
+        .map_err(|e| format!("Failed to get base tree: {e}"))?;
     let target_tree = repo
         .find_object(target_obj.id(), None)
         .and_then(|o| o.peel_to_commit())
         .and_then(|c| c.tree())
-        .map_err(|e| format!("Failed to get target tree: {}", e))?;
+        .map_err(|e| format!("Failed to get target tree: {e}"))?;
 
     let diff = repo
         .diff_tree_to_tree(Some(&base_tree), Some(&target_tree), None)
-        .map_err(|e| format!("Failed to compute diff: {}", e))?;
+        .map_err(|e| format!("Failed to compute diff: {e}"))?;
 
     let mut changed_files = Vec::new();
 
@@ -158,7 +159,7 @@ pub fn get_changed_files(
     Ok(changed_files)
 }
 
-/// Parse a unified diff text into ChangedFile objects.
+/// Parse a unified diff text into `ChangedFile` objects.
 pub fn parse_diff(repo_path: &Path, diff_text: &str) -> Result<Vec<ChangedFile>, String> {
     let mut changed_files = Vec::new();
     let lines = diff_text.lines().collect::<Vec<_>>();
@@ -181,9 +182,9 @@ pub fn parse_diff(repo_path: &Path, diff_text: &str) -> Result<Vec<ChangedFile>,
                     let mut deletions = 0;
                     let mut j = i + 1;
                     while j < lines.len() && !lines[j].starts_with("diff --git") {
-                        if lines[j].starts_with("+") && !lines[j].starts_with("+++") {
+                        if lines[j].starts_with('+') && !lines[j].starts_with("+++") {
                             additions += 1;
-                        } else if lines[j].starts_with("-") && !lines[j].starts_with("---") {
+                        } else if lines[j].starts_with('-') && !lines[j].starts_with("---") {
                             deletions += 1;
                         }
                         j += 1;

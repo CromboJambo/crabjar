@@ -7,7 +7,7 @@ use tracing::{debug, info};
 
 /// Submit a code review request.
 pub async fn submit_review(
-    State(conductor): State<ConductorState>,
+    State(_conductor): State<ConductorState>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     let repo_url = body["repo_url"].as_str().unwrap_or("").to_string();
@@ -86,7 +86,7 @@ description = "Style and formatting conventions"
             let scenario = "general".to_string();
             let owned_rules: Vec<crabjar_review::types::ReviewRule> =
                 matched_rules.iter().map(|r| (*r).clone()).collect();
-            let prompt =
+            let _prompt =
                 crabjar_review::prompts::generate_review_prompt(bundle, &owned_rules, &scenario);
 
             debug!(bundle_files = bundle.files.len(), "Reviewing bundle");
@@ -124,7 +124,7 @@ description = "Style and formatting conventions"
     }))
 }
 
-/// Parse a unified diff into ChangedFile structs for review.
+/// Parse a unified diff into `ChangedFile` structs for review.
 fn parse_diff_to_changed_files(diff: &str) -> Vec<crabjar_review::types::ChangedFile> {
     let mut files = Vec::new();
     let mut current_file = None;
@@ -195,23 +195,19 @@ fn simulate_bundle_review(
     for file in &bundle.files {
         if let Ok(content) = std::fs::read_to_string(&file.path) {
             for rule in matched_rules {
-                match rule.id.as_str() {
-                    "check_errors" => {
-                        if content.contains("unwrap()")
-                            && !file.path.to_string_lossy().contains("test")
-                        {
-                            findings.push(serde_json::json!({
-                                "file": file.path.to_string_lossy(),
-                                "line": 1,
-                                "severity": "high",
-                                "type": "bug",
-                                "rule_id": rule.id,
-                                "description": "unwrap() called without error handling"
-                            }));
-                        }
+                if rule.id.as_str() == "check_errors"
+                    && content.contains("unwrap()")
+                        && !file.path.to_string_lossy().contains("test")
+                    {
+                        findings.push(serde_json::json!({
+                            "file": file.path.to_string_lossy(),
+                            "line": 1,
+                            "severity": "high",
+                            "type": "bug",
+                            "rule_id": rule.id,
+                            "description": "unwrap() called without error handling"
+                        }));
                     }
-                    _ => {}
-                }
             }
         }
     }

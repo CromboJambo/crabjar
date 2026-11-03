@@ -205,8 +205,8 @@ impl GitHubClient {
     async fn check_rate_limit(&self, resp: &reqwest::Response) -> Result<(), GitHubError> {
         if let Some(retry_after) = resp.headers().get("X-RateLimit-Reset") {
             // Parse reset time and check if we're rate limited
-            if let Ok(reset_time) = retry_after.to_str() {
-                if let Ok(unix_ts) = reset_time.parse::<i64>() {
+            if let Ok(reset_time) = retry_after.to_str()
+                && let Ok(unix_ts) = reset_time.parse::<i64>() {
                     let now = Utc::now().timestamp();
                     if unix_ts > now {
                         warn!(
@@ -215,17 +215,14 @@ impl GitHubClient {
                         );
                     }
                 }
-            }
         }
 
         // Check X-RateLimit-Remaining
-        if let Some(remaining) = resp.headers().get("X-RateLimit-Remaining") {
-            if let Ok(val) = remaining.to_str() {
-                if val == "0" {
+        if let Some(remaining) = resp.headers().get("X-RateLimit-Remaining")
+            && let Ok(val) = remaining.to_str()
+                && val == "0" {
                     return Err(GitHubError::RateLimited { retry_after: 3600 });
                 }
-            }
-        }
 
         Ok(())
     }

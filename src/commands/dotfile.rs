@@ -1,6 +1,5 @@
-use crabjar_lib::{DotfileCommand, HabitatCommand};
+use crabjar_lib::DotfileCommand;
 use crate::dotfile_manager::DotfileManager;
-use serde_json::json;
 
 pub fn handle(
     command: DotfileCommand,

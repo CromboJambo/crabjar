@@ -1,6 +1,6 @@
 //! SQLite-backed state store for conductor persistence.
 //!
-//! Provides durable storage for goals, tasks, and workers using embedded SQLite.
+//! Provides durable storage for goals, tasks, and workers using embedded `SQLite`.
 //! Schema migrations are handled automatically on open.
 
 use chrono::{DateTime, Utc};
@@ -143,7 +143,7 @@ fn row_to_goal(row: &Row<'_>) -> rusqlite::Result<Goal> {
         description: row.get(1)?,
         status: GoalStatus::from_str(&row.get::<_, String>(2)?),
         created_at: DateTime::parse_from_rfc3339(&created_at_str)
-            .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?
             .with_timezone(&Utc),
     })
 }
@@ -159,11 +159,11 @@ fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
         worker_id: row.get(2)?,
         command: row.get(3)?,
         dependencies: serde_json::from_str(&deps_str)
-            .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?,
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?,
         status: TaskStatus::from_str(&row.get::<_, String>(5)?),
         result: row.get(6)?,
         required_capabilities: serde_json::from_str(&required_caps_str)
-            .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?,
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?,
         trust_level_required: trust_required,
     })
 }
@@ -175,7 +175,7 @@ fn row_to_worker(row: &Row<'_>) -> rusqlite::Result<Worker> {
         name: row.get(1)?,
         ssh_key: row.get(2)?,
         capabilities: serde_json::from_str(&caps_str)
-            .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?,
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?,
         status: WorkerStatus::from_str(&row.get::<_, String>(4)?),
         trust_level: row.get(5).unwrap_or(0u8),
         successful_tasks: row.get(6).unwrap_or(0i32),
@@ -327,7 +327,7 @@ impl StateStore {
         };
 
         let deps_json = serde_json::to_string(&task.dependencies)
-            .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?;
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
         self.db.execute(
             "INSERT INTO tasks (id, goal_id, worker_id, command, dependencies, status) VALUES (?, ?, ?, ?, ?, ?)",
             params![
@@ -413,7 +413,7 @@ impl StateStore {
             .optional()?
             .unwrap_or_else(|| "[]".to_string());
 
-        serde_json::from_str(&caps_str).map_err(|e| rusqlite::Error::ExecuteReturnedResults)
+        serde_json::from_str(&caps_str).map_err(|_e| rusqlite::Error::ExecuteReturnedResults)
     }
 
     /// Set the trust level required for a task.
@@ -436,7 +436,7 @@ impl StateStore {
         caps: &[String],
     ) -> Result<(), rusqlite::Error> {
         let caps_json =
-            serde_json::to_string(caps).map_err(|e| rusqlite::Error::ExecuteReturnedResults)?;
+            serde_json::to_string(caps).map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
         self.db.execute(
             "UPDATE tasks SET required_capabilities = ? WHERE id = ?",
             params![caps_json, task_id],
@@ -446,7 +446,7 @@ impl StateStore {
 
     /// Get pending tasks that have no dependencies or whose dependencies are all completed.
     pub fn get_ready_tasks(&self) -> Result<Vec<Task>, rusqlite::Error> {
-        let sql = r#"
+        let sql = r"
             SELECT t.id, t.goal_id, t.worker_id, t.command, t.dependencies, t.status, t.result,
                    t.required_capabilities, t.trust_level_required
             FROM tasks t
@@ -458,7 +458,7 @@ impl StateStore {
                     WHERE (SELECT status FROM tasks WHERE id = dep.value) != 'completed'
                 )
               )
-        "#;
+        ";
         let mut stmt = self.db.prepare(sql)?;
         let rows = stmt.query_map(params![], row_to_task)?;
         rows.collect()
@@ -493,7 +493,7 @@ impl StateStore {
         };
 
         let caps_json = serde_json::to_string(&worker.capabilities)
-            .map_err(|e| rusqlite::Error::ExecuteReturnedResults)?;
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
         self.db.execute(
             "INSERT OR REPLACE INTO workers (id, name, ssh_key, capabilities, status, auth_token) VALUES (?, ?, ?, ?, ?, ?)",
             params![
@@ -602,24 +602,21 @@ impl StateStore {
                 return Ok(()); // No heartbeat recorded yet
             }
 
-            match DateTime::parse_from_rfc3339(&last_hb) {
-                Ok(last_time) => {
-                    let now = Utc::now();
-                    // Convert parsed time to UTC for subtraction
-                    let last_utc = last_time.with_timezone(&Utc);
-                    let elapsed = (now - last_utc).num_days();
+            if let Ok(last_time) = DateTime::parse_from_rfc3339(&last_hb) {
+                let now = Utc::now();
+                // Convert parsed time to UTC for subtraction
+                let last_utc = last_time.with_timezone(&Utc);
+                let elapsed = (now - last_utc).num_days();
 
-                    if elapsed > 30 && current_level > 0 {
-                        // Idle for >30 days, drop one trust level
-                        self.db.execute(
-                            "UPDATE workers SET trust_level = ? WHERE id = ?",
-                            params![current_level.saturating_sub(1), worker_id],
-                        )?;
-                    }
+                if elapsed > 30 && current_level > 0 {
+                    // Idle for >30 days, drop one trust level
+                    self.db.execute(
+                        "UPDATE workers SET trust_level = ? WHERE id = ?",
+                        params![current_level.saturating_sub(1), worker_id],
+                    )?;
                 }
-                Err(_) => {
-                    // Invalid timestamp, skip decay
-                }
+            } else {
+                // Invalid timestamp, skip decay
             }
         }
 
@@ -703,7 +700,7 @@ impl StateStore {
 
         // Downgrade if failure rate exceeds 50% of recent tasks
         let total = successes + failures;
-        if total > 10 && (failures as f64 / total as f64) > 0.5 {
+        if total > 10 && (f64::from(failures) / f64::from(total)) > 0.5 {
             return Ok((current_level.saturating_sub(1)) as i8);
         }
 
@@ -759,7 +756,7 @@ impl StateStore {
                 criteria_file,
                 chosen_option,
                 confidence,
-                if cache_hit { 1 } else { 0 },
+                i32::from(cache_hit),
                 created_at
             ],
         )?;
@@ -795,13 +792,13 @@ impl StateStore {
         &self,
         criteria_file: &str,
     ) -> Result<Vec<DecisionFrequency>, rusqlite::Error> {
-        let sql = r#"
+        let sql = r"
             SELECT chosen_option, COUNT(*) as count, AVG(confidence) as avg_confidence
             FROM decisions
             WHERE criteria_file = ?
             GROUP BY chosen_option
             ORDER BY count DESC
-        "#;
+        ";
         let mut stmt = self.db.prepare(sql)?;
         let rows = stmt.query_map(params![criteria_file], |row| {
             Ok(DecisionFrequency {
@@ -835,7 +832,7 @@ impl StateStore {
         occurrence_count: i64,
     ) -> Result<i64, rusqlite::Error> {
         let promoted_at = Utc::now().to_rfc3339();
-        let result = self.db.execute(
+        let _result = self.db.execute(
             "INSERT INTO decision_rules (pattern_id, criteria_file, recommended_option, avg_confidence, occurrence_count, promoted_at) VALUES (?, ?, ?, ?, ?, ?)",
             params![pattern_id, criteria_file, recommended_option, avg_confidence, occurrence_count, promoted_at],
         )?;

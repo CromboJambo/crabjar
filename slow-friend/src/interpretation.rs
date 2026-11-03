@@ -33,7 +33,14 @@ pub trait InterpretationEngine: Send + Sync {
 /// Simple heuristic interpretation engine for demonstration.
 pub struct HeuristicInterpreter;
 
+impl Default for HeuristicInterpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HeuristicInterpreter {
+    #[must_use]
     pub fn new() -> Self {
         Self
     }

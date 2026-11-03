@@ -4,7 +4,7 @@ use crabjar_guard::Scope;
 /// Each task is independently executable. Results are captured and stored.
 /// Supports host execution or isolated Podman container execution.
 use crabjar_host_core::{WorkItem, work_item::TaskStatus};
-use crabjar_podman::{PodmanExecutor, SandboxConfig, SandboxProfile};
+use crabjar_podman::{PodmanExecutor, SandboxConfig};
 
 pub struct TaskExecutor {
     /// Default scope for gate context (can be overridden per-call).

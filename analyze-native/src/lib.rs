@@ -264,7 +264,7 @@ fn parse_sections(data: &[u8], header: &ElfHeader) -> Result<Vec<ElfSection>, An
             let link = read_u32(data, offset as usize + 40, header.endian)?;
             let entsize = read_u64(data, offset as usize + 56, header.endian)?;
             sections.push(ElfSection {
-                index: i as usize,
+                index: i,
                 name: String::new(),
                 r#type,
                 addr,
@@ -307,7 +307,7 @@ fn parse_sections(data: &[u8], header: &ElfHeader) -> Result<Vec<ElfSection>, An
             let link = read_u32(data, offset as usize + 24, header.endian)?;
             let entsize = u64::from(read_u32(data, offset as usize + 36, header.endian)?);
             sections.push(ElfSection {
-                index: i as usize,
+                index: i,
                 name: String::new(),
                 r#type,
                 addr,

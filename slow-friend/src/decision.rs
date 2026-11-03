@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub enum JevDecision {
     /// Not worth acting on after all — go back to sleep.
     Sleep,
-    /// Propose an action for CrabJar execution (requires guard/concierge approval).
+    /// Propose an action for `CrabJar` execution (requires guard/concierge approval).
     Execute(Action),
 }
 
@@ -30,7 +30,14 @@ pub trait JevEngine: Send + Sync {
 /// Simple rule-based Jev engine for testing/demonstration.
 pub struct RuleBasedJevEngine;
 
+impl Default for RuleBasedJevEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RuleBasedJevEngine {
+    #[must_use]
     pub fn new() -> Self {
         Self
     }

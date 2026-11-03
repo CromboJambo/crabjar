@@ -123,7 +123,7 @@ impl HerdrBackend {
             .ok_or_else(|| {
                 anyhow::anyhow!(
                     "sentinel line not found in pane read:\n{}",
-                    &text.lines().take(20).collect::<Vec<_>>().join("\n")
+                    text.lines().take(20).collect::<Vec<_>>().join("\n")
                 )
             })?;
         let start = lines
@@ -133,7 +133,7 @@ impl HerdrBackend {
             .ok_or_else(|| {
                 anyhow::anyhow!(
                     "start marker line not found in pane read:\n{}",
-                    &text.lines().take(20).collect::<Vec<_>>().join("\n")
+                    text.lines().take(20).collect::<Vec<_>>().join("\n")
                 )
             })?;
 

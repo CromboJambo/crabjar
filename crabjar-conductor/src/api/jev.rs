@@ -89,7 +89,7 @@ pub async fn record_feedback_handler(
     Json(body): Json<crate::decision::postprocessor::DecisionFeedback>,
 ) -> Json<serde_json::Value> {
     match crate::decision::postprocessor::record_feedback(&body) {
-        Ok(_) => Json(json!({
+        Ok(()) => Json(json!({
             "success": true,
             "message": "Feedback recorded"
         })),
@@ -120,8 +120,8 @@ fn evaluate_structural_conditions(
     // Check each option for structural conditions
     if let Some(options) = criteria["options"].as_array() {
         for option in options {
-            if let Some(condition) = option["conditions"].as_str() {
-                if crate::decision::condition::evaluate_condition(target, condition) {
+            if let Some(condition) = option["conditions"].as_str()
+                && crate::decision::condition::evaluate_condition(target, condition) {
                     return Some(Json(json!({
                         "success": true,
                         "evaluation": {
@@ -132,7 +132,6 @@ fn evaluate_structural_conditions(
                         }
                     })));
                 }
-            }
         }
     }
 

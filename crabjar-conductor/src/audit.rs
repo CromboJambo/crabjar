@@ -84,7 +84,7 @@ impl ConductorAuditLogger {
         let conn = self.conn.lock().await;
 
         let payload = json!({
-            "event_type": format!("{:?}", event_type).to_lowercase(),
+            "event_type": format!("{event_type:?}").to_lowercase(),
             "timestamp": Utc::now().to_rfc3339(),
             "source": "crabjar-conductor",
             "task_id": context.task_id,
@@ -150,7 +150,7 @@ pub async fn log_route_decision(
     let context = AuditContext {
         task_id: Some(task_id),
         worker_id: Some(worker_id.clone()),
-        outcome: format!("routed: {}", reason),
+        outcome: format!("routed: {reason}"),
         duration_ms: None,
         metadata: json!({}),
     };

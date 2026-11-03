@@ -14,6 +14,7 @@ pub enum FileType {
 }
 
 impl FileType {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             FileType::Source => "source",
@@ -47,6 +48,7 @@ pub enum FileStatus {
 }
 
 impl FileStatus {
+    #[must_use]
     pub fn from_git_status(status: git2::Delta) -> Self {
         match status {
             git2::Delta::Modified => FileStatus::Modified,
@@ -56,6 +58,7 @@ impl FileStatus {
         }
     }
 
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             FileStatus::Modified => "M",
@@ -75,6 +78,7 @@ pub struct ReviewBundle {
 }
 
 impl ReviewBundle {
+    #[must_use]
     pub fn file_count(&self) -> usize {
         self.files.len()
     }
@@ -103,6 +107,7 @@ pub enum Severity {
 }
 
 impl Severity {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Severity::High => "high",

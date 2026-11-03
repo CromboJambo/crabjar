@@ -1,6 +1,6 @@
-//! Rust adapter: uses pesti-structural-tokenizer to build universal SpanTree.
+//! Rust adapter: uses pesti-structural-tokenizer to build universal `SpanTree`.
 //!
-//! This is a full LanguageAdapter implementation that leverages the mature
+//! This is a full `LanguageAdapter` implementation that leverages the mature
 //! pesti-structural-tokenizer for accurate Rust parsing, then maps the results
 //! to the universal structural token representation with language-specific tags.
 
@@ -8,19 +8,26 @@ use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
 use pesti_structural_tokenizer::{StructuralTokenizer, TokenKind};
 use std::collections::HashMap;
 
-/// Rust adapter implementing the LanguageAdapter trait using pesti-structural-tokenizer.
+/// Rust adapter implementing the `LanguageAdapter` trait using pesti-structural-tokenizer.
 pub struct RustAdapter {
     tokenizer: StructuralTokenizer,
 }
 
+impl Default for RustAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RustAdapter {
+    #[must_use]
     pub fn new() -> Self {
         RustAdapter {
             tokenizer: StructuralTokenizer::new(),
         }
     }
 
-    /// Map a pesti TokenKind to the universal SpanKind representation.
+    /// Map a pesti `TokenKind` to the universal `SpanKind` representation.
     fn map_token_kind(&self, kind: &TokenKind) -> Option<SpanKind> {
         match kind {
             // Declarations
@@ -48,7 +55,7 @@ impl RustAdapter {
         }
     }
 
-    /// Convert a pesti StructuralToken to a universal Span with Rust-specific tags.
+    /// Convert a pesti `StructuralToken` to a universal Span with Rust-specific tags.
     fn convert_token(&self, token: &pesti_structural_tokenizer::StructuralToken) -> Option<Span> {
         let kind = self.map_token_kind(&token.kind)?;
 
@@ -66,7 +73,7 @@ impl RustAdapter {
         let mut tags = HashMap::new();
 
         // Detect reference types
-        if source.contains("&") || source.contains("&&") {
+        if source.contains('&') || source.contains("&&") {
             tags.insert("ownership_pattern".to_string(), "references".to_string());
         }
 
@@ -127,16 +134,13 @@ impl RustAdapter {
 }
 
 impl LanguageAdapter for RustAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "rust"
     }
 
     fn tokenize_and_adapt(&self, source: &str) -> SpanTree {
         // Tokenize using pesti-structural-tokenizer
-        let tokens = match self.tokenizer.tokenize(source) {
-            Ok(tokens) => tokens,
-            Err(_) => Vec::new(),
-        };
+        let tokens = self.tokenizer.tokenize(source).unwrap_or_default();
 
         // Convert to universal spans
         let mut spans = Vec::new();

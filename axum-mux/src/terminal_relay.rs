@@ -420,11 +420,10 @@ async fn handle_ws(socket: ws::WebSocket, state: TerminalRelayState) {
             } => {
                 // Channel closed (all senders dropped) or lagged —
                 // best-effort fan-out; keep relaying.
-                if let Ok(json) = json {
-                    if ws_sink.send(Message::Text(json)).await.is_err() {
+                if let Ok(json) = json
+                    && ws_sink.send(Message::Text(json)).await.is_err() {
                         break;
                     }
-                }
             }
         }
     }

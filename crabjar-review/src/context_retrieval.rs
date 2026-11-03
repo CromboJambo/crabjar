@@ -13,6 +13,7 @@ pub struct ToolCallTracker {
 }
 
 impl ToolCallTracker {
+    #[must_use]
     pub fn new(limit: u32) -> Self {
         Self {
             calls_per_bundle: HashMap::new(),
@@ -39,6 +40,7 @@ impl ToolCallTracker {
     }
 
     /// Get remaining calls for a bundle.
+    #[must_use]
     pub fn remaining(&self, bundle_id: &str) -> u32 {
         let used = *self.calls_per_bundle.get(bundle_id).unwrap_or(&0);
         self.limit.saturating_sub(used)
@@ -77,9 +79,8 @@ fn search_dir(dir: &Path, pattern: &str, results: &mut Vec<String>) -> Result<()
             search_dir(&path, pattern, results)?;
         } else if path
             .extension()
-            .map_or(false, |ext| ext == "rs" || ext == "toml" || ext == "md")
-        {
-            if let Ok(content) = fs::read_to_string(&path) {
+            .is_some_and(|ext| ext == "rs" || ext == "toml" || ext == "md")
+            && let Ok(content) = fs::read_to_string(&path) {
                 for (line_num, line) in content.lines().enumerate() {
                     if line.contains(pattern) {
                         results.push(format!(
@@ -91,12 +92,12 @@ fn search_dir(dir: &Path, pattern: &str, results: &mut Vec<String>) -> Result<()
                     }
                 }
             }
-        }
     }
     Ok(())
 }
 
 /// List all changed files in a review session for cross-file context.
+#[must_use]
 pub fn list_changed_files(bundles: &[crate::types::ReviewBundle]) -> Vec<String> {
     let mut files = Vec::new();
     for bundle in bundles {

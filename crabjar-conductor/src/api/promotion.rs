@@ -4,7 +4,7 @@ use crate::api::ConductorState;
 use axum::{Json, extract::Path};
 use serde_json::json;
 
-/// GET /promotion/evaluate/:worker_id - Evaluate promotion eligibility.
+/// GET /`promotion/evaluate/:worker_id` - Evaluate promotion eligibility.
 pub async fn evaluate_promotion_endpoint(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     worker_id: Path<String>,
@@ -47,7 +47,7 @@ pub async fn evaluate_promotion_endpoint(
     }
 }
 
-/// POST /promotion/execute/:worker_id - Execute promotion for eligible worker.
+/// POST /`promotion/execute/:worker_id` - Execute promotion for eligible worker.
 pub async fn execute_promotion_endpoint(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     worker_id: Path<String>,
@@ -81,7 +81,7 @@ pub async fn execute_promotion_endpoint(
     }
 }
 
-/// GET /promotion/history/:worker_id - Get promotion history for worker.
+/// GET /`promotion/history/:worker_id` - Get promotion history for worker.
 pub async fn get_promotion_history_endpoint(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     worker_id: Path<String>,
@@ -114,7 +114,7 @@ pub async fn get_promotion_history_endpoint(
     }
 }
 
-/// GET /promotion/metrics/:worker_id - Get competence metrics for worker.
+/// GET /`promotion/metrics/:worker_id` - Get competence metrics for worker.
 pub async fn get_worker_metrics_endpoint(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     worker_id: Path<String>,

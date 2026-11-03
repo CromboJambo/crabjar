@@ -22,6 +22,7 @@ pub use service::{ServiceConfig, ServiceManager, ServiceResult, ServiceStatus, R
 pub use managers::{DinitManager, RunitManager, SystemdManager, NullManager};
 
 /// Factory function to create the appropriate service manager based on the detected init system.
+#[must_use]
 pub fn create_service_manager() -> Box<dyn ServiceManager> {
     let init = detect_primary_init();
 
@@ -34,6 +35,7 @@ pub fn create_service_manager() -> Box<dyn ServiceManager> {
 }
 
 /// Create a service manager for a specific init system (override auto-detection).
+#[must_use]
 pub fn create_service_manager_for(init: &InitSystem) -> Box<dyn ServiceManager> {
     match init {
         InitSystem::Dinit => Box::new(DinitManager::new()),

@@ -27,6 +27,7 @@ impl WorkerRank {
     pub const SUPERVISOR: Self = Self(1);
     pub const MANAGER: Self = Self(2);
 
+    #[must_use]
     pub fn value(&self) -> u8 {
         self.0
     }
@@ -103,7 +104,7 @@ impl PromotionManager {
         Ok(manager)
     }
 
-    /// Initialize SQLite schema for promotion tracking.
+    /// Initialize `SQLite` schema for promotion tracking.
     fn init_schema(&self) -> Result<(), rusqlite::Error> {
         self.db.execute_batch(
             "CREATE TABLE IF NOT EXISTS worker_competence_evidence (
@@ -195,7 +196,7 @@ impl PromotionManager {
         self.db.execute(
             "INSERT INTO worker_competence_evidence (evidence_id, worker_id, timestamp, task_completions, success_count, failure_count)
              VALUES (?, ?, ?, 1, ?, ?)",
-            params![evidence_id, worker_id, now, if success { 1 } else { 0 }, if success { 0 } else { 1 }],
+            params![evidence_id, worker_id, now, i32::from(success), i32::from(!success)],
         )?;
 
         Ok(())
@@ -213,7 +214,7 @@ impl PromotionManager {
         self.db.execute(
             "INSERT INTO worker_competence_evidence (evidence_id, worker_id, timestamp, decisions_made, accurate_decisions)
              VALUES (?, ?, ?, 1, ?)",
-            params![evidence_id, worker_id, now, if accurate { 1 } else { 0 }],
+            params![evidence_id, worker_id, now, i32::from(accurate)],
         )?;
 
         Ok(())
@@ -222,7 +223,7 @@ impl PromotionManager {
     /// Aggregate evidence for a worker within a time window.
     fn aggregate_evidence(&self, worker_id: &str, window_hours: u32) -> Result<WorkerCompetenceEvidence, rusqlite::Error> {
         let cutoff = Utc::now()
-            .checked_sub_signed(chrono::Duration::hours(window_hours as i64))
+            .checked_sub_signed(chrono::Duration::hours(i64::from(window_hours)))
             .unwrap_or(Utc::now())
             .to_rfc3339();
 
@@ -311,14 +312,14 @@ impl PromotionManager {
         let tasks_met = evidence.task_completions >= thresholds.minimum_tasks;
         checks.push(ThresholdCheck {
             criterion: "minimum_tasks".to_string(),
-            required: thresholds.minimum_tasks as f64,
-            actual: evidence.task_completions as f64,
+            required: f64::from(thresholds.minimum_tasks),
+            actual: f64::from(evidence.task_completions),
             met: tasks_met,
         });
 
         // Success rate
         let success_rate = if evidence.task_completions > 0 {
-            evidence.success_count as f64 / evidence.task_completions as f64
+            f64::from(evidence.success_count) / f64::from(evidence.task_completions)
         } else {
             0.0
         };
@@ -335,14 +336,14 @@ impl PromotionManager {
             let decisions_met = evidence.decisions_made >= thresholds.minimum_decisions;
             checks.push(ThresholdCheck {
                 criterion: "minimum_decisions".to_string(),
-                required: thresholds.minimum_decisions as f64,
-                actual: evidence.decisions_made as f64,
+                required: f64::from(thresholds.minimum_decisions),
+                actual: f64::from(evidence.decisions_made),
                 met: decisions_met,
             });
 
             // Decision accuracy
             let accuracy_rate = if evidence.decisions_made > 0 {
-                evidence.accurate_decisions as f64 / evidence.decisions_made as f64
+                f64::from(evidence.accurate_decisions) / f64::from(evidence.decisions_made)
             } else {
                 0.0
             };

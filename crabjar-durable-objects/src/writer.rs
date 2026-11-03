@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use serde_json::Value;
 
-use crate::error::{CheckpointError, CheckpointResult};
+use crate::error::CheckpointResult;
 use crate::store::CheckpointStore;
 
 /// Writes checkpoint data to disk with atomicity guarantees.

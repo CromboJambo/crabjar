@@ -10,6 +10,7 @@ pub struct TaskTimeout {
 
 impl TaskTimeout {
     /// Create a new timeout tracker.
+    #[must_use]
     pub fn new(duration: Duration) -> Self {
         Self {
             started_at: Instant::now(),
@@ -18,17 +19,19 @@ impl TaskTimeout {
     }
 
     /// Check if the task has timed out.
+    #[must_use]
     pub fn is_expired(&self) -> bool {
         self.started_at.elapsed() > self.duration
     }
 
     /// Remaining time before timeout.
+    #[must_use]
     pub fn remaining(&self) -> Duration {
         let elapsed = self.started_at.elapsed();
         if elapsed > self.duration {
             Duration::from_secs(0)
         } else {
-            self.duration - elapsed
+            self.duration.checked_sub(elapsed).unwrap()
         }
     }
 }

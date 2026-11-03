@@ -113,7 +113,7 @@ impl AcpAgentServer {
 
     pub async fn handle_request(&mut self, request: AcpRequest) -> Result<AcpResponse, AcpServerError> {
         match request {
-            AcpRequest::Initialize { id, protocol_version, client_capabilities, client_info } => {
+            AcpRequest::Initialize { id, protocol_version: _, client_capabilities: _, client_info: _ } => {
                 self.initialized = true;
                 let response = json!({
                     "protocolVersion": 1,
@@ -127,7 +127,7 @@ impl AcpAgentServer {
                 });
                 Ok(AcpResponse::Result { id, result: response })
             }
-            AcpRequest::SessionNew { id, cwd, mcp_servers } => {
+            AcpRequest::SessionNew { id, cwd, mcp_servers: _ } => {
                 let session = AcpSession::new(cwd);
                 self.sessions.push(session.clone());
                 let response = json!({
@@ -135,7 +135,7 @@ impl AcpAgentServer {
                 });
                 Ok(AcpResponse::Result { id, result: response })
             }
-            AcpRequest::SessionLoad { id, session_id, cwd } => {
+            AcpRequest::SessionLoad { id, session_id, cwd: _ } => {
                 let found = self.sessions.iter().find(|s| s.session_id == session_id);
                 match found {
                     Some(session) => Ok(AcpResponse::Result {

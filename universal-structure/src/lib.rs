@@ -22,7 +22,7 @@ pub trait LanguageAdapter {
     /// Return the name of this adapter (e.g., "rust", "javascript").
     fn name(&self) -> &str;
 
-    /// Tokenize source code and adapt to universal SpanTree representation.
+    /// Tokenize source code and adapt to universal `SpanTree` representation.
     fn tokenize_and_adapt(&self, source: &str) -> SpanTree;
 }
 
@@ -98,6 +98,7 @@ pub enum SpanKind {
 
 impl SpanKind {
     /// Get the string representation of this span kind.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             SpanKind::FnDecl => "FnDecl",
@@ -146,6 +147,7 @@ impl SpanKind {
     }
 
     /// Check if this is a declaration span.
+    #[must_use]
     pub fn is_declaration(&self) -> bool {
         matches!(
             self,
@@ -159,6 +161,7 @@ impl SpanKind {
     }
 
     /// Check if this is an expression span.
+    #[must_use]
     pub fn is_expression(&self) -> bool {
         matches!(
             self,
@@ -175,6 +178,7 @@ impl SpanKind {
     }
 
     /// Check if this is a control flow span.
+    #[must_use]
     pub fn is_control_flow(&self) -> bool {
         matches!(
             self,
@@ -191,6 +195,7 @@ impl SpanKind {
     }
 
     /// Check if this is an error handling span.
+    #[must_use]
     pub fn is_error_handling(&self) -> bool {
         matches!(
             self,
@@ -202,6 +207,7 @@ impl SpanKind {
     }
 
     /// Check if this is a module boundary span.
+    #[must_use]
     pub fn is_module_boundary(&self) -> bool {
         matches!(
             self,
@@ -238,6 +244,7 @@ impl StructuralToken {
         }
     }
 
+    #[must_use]
     pub fn with_line(mut self, line: u32) -> Self {
         self.line = Some(line);
         self
@@ -269,6 +276,7 @@ pub struct Span {
 }
 
 impl Span {
+    #[must_use]
     pub fn new(kind: SpanKind) -> Self {
         Self {
             kind,
@@ -280,6 +288,7 @@ impl Span {
     }
 
     /// Get all descendant spans of a specific kind.
+    #[must_use]
     pub fn find_all(&self, target_kind: SpanKind) -> Vec<&Span> {
         let mut results = Vec::new();
         if self.kind == target_kind {
@@ -292,6 +301,7 @@ impl Span {
     }
 
     /// Get the depth of this span tree.
+    #[must_use]
     pub fn depth(&self) -> usize {
         let mut max_child = 0;
         for child in &self.body {
@@ -304,6 +314,7 @@ impl Span {
     }
 
     /// Count total spans in this tree.
+    #[must_use]
     pub fn span_count(&self) -> usize {
         let mut count = 1;
         for child in &self.body {
@@ -333,6 +344,7 @@ fn default_min_node_bytes() -> usize {
 }
 
 impl Budget {
+    #[must_use]
     pub fn new(max_tokens: usize, min_node_bytes: usize) -> Self {
         Self {
             max_tokens,
@@ -340,6 +352,7 @@ impl Budget {
         }
     }
 
+    #[must_use]
     pub fn unlimited() -> Self {
         Self::new(usize::MAX, 0)
     }
@@ -364,6 +377,7 @@ pub enum ErrorHandling {
 }
 
 impl ErrorHandling {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             ErrorHandling::Propagated => "Propagated",
@@ -381,6 +395,7 @@ pub enum Mutability {
 }
 
 impl Mutability {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             Mutability::Mutable => "Mutable",
@@ -399,6 +414,7 @@ pub enum OwnershipMode {
 }
 
 impl OwnershipMode {
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             OwnershipMode::Owned => "Owned",
@@ -438,11 +454,12 @@ pub struct EvaluationTarget {
 
 impl EvaluationTarget {
     /// Convert to an observation string for JEV embedding evaluation.
+    #[must_use]
     pub fn to_observation(&self) -> String {
         let mut obs = format!("[{}] ", self.structure.as_str());
 
         if let Some(name) = &self.name {
-            obs.push_str(&format!("{} - ", name));
+            obs.push_str(&format!("{name} - "));
         }
 
         // Include typed semantic tags first
@@ -459,7 +476,7 @@ impl EvaluationTarget {
 
         // Include raw semantic tags for extensibility
         for (k, v) in &self.semantic_tags {
-            parts.push(format!("{}={}", k, v));
+            parts.push(format!("{k}={v}"));
         }
 
         if !parts.is_empty() {
@@ -471,6 +488,7 @@ impl EvaluationTarget {
     }
 
     /// Resolve a field name to its string value for condition evaluation.
+    #[must_use]
     pub fn parse_value(&self, field: &str) -> Option<String> {
         match field {
             "structure" => Some(self.structure.as_str().to_string()),

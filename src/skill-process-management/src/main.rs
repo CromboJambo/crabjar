@@ -202,10 +202,10 @@ fn check_process(pid: u32) -> Result<serde_json::Value> {
                 // Zombie or dead - process has exited
                 return Ok(json!({ "alive": false, "exit_code": 0 }));
             }
-            return Ok(json!({ "alive": true }));
+            Ok(json!({ "alive": true }))
         }
         _ => {
-            return Ok(json!({ "alive": false, "exit_code": -1 }));
+            Ok(json!({ "alive": false, "exit_code": -1 }))
         }
     }
 }

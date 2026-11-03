@@ -55,7 +55,7 @@ fn process_file(file: &str) {
                 "file": file,
                 "tokens": tokens.trim()
             });
-            println!("{}", event.to_string());
+            println!("{}", event);
         }
         _ => {
             eprintln!("Failed to tokenize {}", file);

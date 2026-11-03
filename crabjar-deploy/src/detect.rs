@@ -22,6 +22,7 @@ impl std::fmt::Display for InitSystem {
 
 /// Detect the init system running on this machine.
 /// Returns a priority-ordered list of detected init systems.
+#[must_use]
 pub fn detect_init_systems() -> Vec<InitSystem> {
     let mut detected = Vec::new();
 
@@ -48,6 +49,7 @@ pub fn detect_init_systems() -> Vec<InitSystem> {
 }
 
 /// Get the primary init system (first in priority order).
+#[must_use]
 pub fn detect_primary_init() -> InitSystem {
     let systems = detect_init_systems();
     systems[0].clone()
@@ -64,10 +66,10 @@ fn which(binary: &str) -> Option<String> {
             let path = String::from_utf8_lossy(&output.stdout)
                 .trim()
                 .to_string();
-            if !path.is_empty() {
-                Some(path)
-            } else {
+            if path.is_empty() {
                 None
+            } else {
+                Some(path)
             }
         }
         _ => None,

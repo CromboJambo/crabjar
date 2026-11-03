@@ -5,7 +5,7 @@
 //! Implements TTL-based expiration and LRU eviction.
 
 use std::collections::{HashMap, VecDeque};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 

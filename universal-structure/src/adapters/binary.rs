@@ -41,8 +41,8 @@ impl BinaryAdapter {
 
         // Extract functions from symbol table
         for sym in obj.symbols() {
-            if let Ok(name) = sym.name() {
-                if !name.is_empty() {
+            if let Ok(name) = sym.name()
+                && !name.is_empty() {
                     structure.symbols.push(SymbolInfo {
                         name: name.to_string(),
                         address: sym.address() as usize,
@@ -63,7 +63,6 @@ impl BinaryAdapter {
                         });
                     }
                 }
-            }
         }
 
         // Note: Dynamic symbol (import) extraction requires format-specific parsing.
@@ -84,6 +83,7 @@ impl BinaryAdapter {
     }
 
     /// Convert binary structure to universal span tree for JEV evaluation.
+    #[must_use]
     pub fn to_span_tree(&self, structure: &BinaryStructure) -> SpanTree {
         let mut spans = Vec::new();
 
@@ -111,7 +111,7 @@ impl BinaryAdapter {
         // Add exports as ExportStatement spans
         for export in &structure.exports {
             let mut export_span = Span::new(SpanKind::ExportStatement);
-            export_span.source = format!("export {}", export);
+            export_span.source = format!("export {export}");
             export_span.open_token = Some(crate::StructuralToken::new(
                 SpanKind::ExportStatement,
                 export,
@@ -124,7 +124,7 @@ impl BinaryAdapter {
         // Add imports as ImportStatement spans
         for import in &structure.imports {
             let mut import_span = Span::new(SpanKind::ImportStatement);
-            import_span.source = format!("import {}", import);
+            import_span.source = format!("import {import}");
             import_span.open_token = Some(crate::StructuralToken::new(
                 SpanKind::ImportStatement,
                 import,
@@ -159,6 +159,7 @@ impl BinaryAdapter {
     }
 
     /// Convert binary structure to evaluation targets for JEV.
+    #[must_use]
     pub fn to_evaluation_targets(&self, structure: &BinaryStructure) -> Vec<EvaluationTarget> {
         let mut targets = Vec::new();
 
@@ -183,6 +184,7 @@ impl BinaryAdapter {
     }
 
     /// Compare two binary structures and identify differences.
+    #[must_use]
     pub fn compare_binaries(&self, a: &BinaryStructure, b: &BinaryStructure) -> BinaryDiff {
         let mut diff = BinaryDiff {
             added_functions: Vec::new(),
@@ -214,19 +216,18 @@ impl BinaryAdapter {
         let a_funcs: std::collections::HashMap<&str, usize> =
             a.functions.iter().map(|f| (&f.name[..], f.size)).collect();
         for b_func in &b.functions {
-            if let Some(&a_size) = a_funcs.get(b_func.name.as_str()) {
-                if a_size != b_func.size {
+            if let Some(&a_size) = a_funcs.get(b_func.name.as_str())
+                && a_size != b_func.size {
                     diff.modified_functions
                         .push((b_func.name.clone(), a_size, b_func.size));
                 }
-            }
         }
 
         // Find added/removed imports
         let a_import_names: std::collections::HashSet<&str> =
-            a.imports.iter().map(|i| i.as_str()).collect();
+            a.imports.iter().map(std::string::String::as_str).collect();
         let b_import_names: std::collections::HashSet<&str> =
-            b.imports.iter().map(|i| i.as_str()).collect();
+            b.imports.iter().map(std::string::String::as_str).collect();
 
         for name in &b_import_names {
             if !a_import_names.contains(name) {
@@ -245,7 +246,7 @@ impl BinaryAdapter {
 }
 
 impl LanguageAdapter for BinaryAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "binary"
     }
 
@@ -313,6 +314,7 @@ pub struct BinaryDiff {
 
 impl BinaryDiff {
     /// Check if the diff is empty (binaries are structurally identical).
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.added_functions.is_empty()
             && self.removed_functions.is_empty()
@@ -322,6 +324,7 @@ impl BinaryDiff {
     }
 
     /// Generate a human-readable summary of the diff.
+    #[must_use]
     pub fn summary(&self) -> String {
         let mut lines = Vec::new();
 
@@ -342,7 +345,7 @@ impl BinaryDiff {
                 .modified_functions
                 .iter()
                 .map(|(name, old_size, new_size)| {
-                    format!("{} (size {} -> {})", name, old_size, new_size)
+                    format!("{name} (size {old_size} -> {new_size})")
                 })
                 .collect();
             lines.push(format!("Modified functions: {}", modified.join(", ")));

@@ -9,7 +9,7 @@
 //! 6. Parse structured JSON output (deterministic)
 //! 7. Validate positions and deduplicate (deterministic)
 //!
-//! This module provides the ReviewAgent struct which coordinates all phases.
+//! This module provides the `ReviewAgent` struct which coordinates all phases.
 
 use anyhow::Result;
 use std::path::Path;
@@ -41,6 +41,7 @@ pub struct ReviewAgent {
 
 impl ReviewAgent {
     /// Create a new review agent with default configuration.
+    #[must_use]
     pub fn new(config: ReviewConfig) -> Self {
         Self {
             tool_tracker: ToolCallTracker::new(config.context_retrieval_limit),
@@ -143,7 +144,7 @@ description = "New public functions should have documentation comments."
             .json(&body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("pesti-server request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("pesti-server request failed: {e}"))?;
 
         let text = resp.text().await?;
 
@@ -174,7 +175,7 @@ pub fn parse_review_output(text: &str) -> Result<Vec<ReviewFinding>> {
 
     // Parse as array of finding objects
     let findings: Vec<serde_json::Value> = serde_json::from_str(&json_text)
-        .map_err(|e| anyhow::anyhow!("Failed to parse review output as JSON: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to parse review output as JSON: {e}"))?;
 
     let mut results = Vec::new();
     for f in findings {
@@ -183,9 +184,9 @@ pub fn parse_review_output(text: &str) -> Result<Vec<ReviewFinding>> {
             line_start: f["line_start"].as_i64().unwrap_or(0) as i32,
             line_end: f["line_end"].as_i64().unwrap_or(0) as i32,
             severity: parse_severity(f["severity"].as_str()),
-            rule_id: f["rule_id"].as_str().map(|s| s.to_string()),
+            rule_id: f["rule_id"].as_str().map(std::string::ToString::to_string),
             message: f["message"].as_str().unwrap_or("").to_string(),
-            suggestion: f["suggestion"].as_str().map(|s| s.to_string()),
+            suggestion: f["suggestion"].as_str().map(std::string::ToString::to_string),
         };
         results.push(finding);
     }
@@ -203,11 +204,10 @@ fn parse_severity(s: Option<&str>) -> crate::types::Severity {
 
 fn extract_json_array(text: &str) -> Result<String> {
     // First try: parse as-is
-    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text) {
-        if parsed.is_array() {
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text)
+        && parsed.is_array() {
             return Ok(text.to_string());
         }
-    }
 
     // Try to find JSON array in markdown code fences
     if let Some(start) = text.find("```") {
@@ -216,7 +216,7 @@ fn extract_json_array(text: &str) -> Result<String> {
             let inner = after_fences[..end].trim();
             // Skip language tag if present
             let json_start = if inner.starts_with("json") {
-                inner.find('\n').map(|i| i + 1).unwrap_or(0)
+                inner.find('\n').map_or(0, |i| i + 1)
             } else {
                 0
             };
@@ -228,14 +228,13 @@ fn extract_json_array(text: &str) -> Result<String> {
     }
 
     // Try to find [ that starts an array
-    if let Some(start) = text.find('[') {
-        if let Some(end) = text.rfind(']') {
+    if let Some(start) = text.find('[')
+        && let Some(end) = text.rfind(']') {
             let candidate = &text[start..=end];
             if let Ok(_) = serde_json::from_str::<serde_json::Value>(candidate) {
                 return Ok(candidate.to_string());
             }
         }
-    }
 
     Ok("[]".to_string())
 }

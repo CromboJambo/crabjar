@@ -6,9 +6,8 @@
 use crate::error::PodmanError;
 use crate::sandbox_config::{SandboxConfig, SandboxProfile};
 use serde_json::Value;
-use std::path::Path;
 use std::process::{Command, Output};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Podman container lifecycle manager.
 pub struct PodmanExecutor {
@@ -26,11 +25,10 @@ impl PodmanExecutor {
         // Try common locations first
         let candidates = ["/usr/bin/podman", "/usr/local/bin/podman", "podman"];
         for candidate in candidates {
-            if let Ok(output) = Command::new(candidate).arg("--version").output() {
-                if output.status.success() {
+            if let Ok(output) = Command::new(candidate).arg("--version").output()
+                && output.status.success() {
                     return Ok(candidate.to_string());
                 }
-            }
         }
         Err(PodmanError::BinaryNotFound("podman".to_string()))
     }

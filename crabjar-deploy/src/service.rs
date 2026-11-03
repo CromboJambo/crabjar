@@ -19,6 +19,7 @@ pub struct ServiceResult {
 }
 
 impl ServiceResult {
+    #[must_use]
     pub fn ok(output: String) -> Self {
         Self {
             success: true,
@@ -27,6 +28,7 @@ impl ServiceResult {
         }
     }
 
+    #[must_use]
     pub fn err(output: String, exit_code: i32) -> Self {
         Self {
             success: false,
@@ -57,6 +59,7 @@ pub enum RestartPolicy {
 }
 
 impl ServiceConfig {
+    #[must_use]
     pub fn new(name: &str, command: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -69,21 +72,25 @@ impl ServiceConfig {
         }
     }
 
+    #[must_use]
     pub fn with_args(mut self, args: Vec<String>) -> Self {
         self.args = args;
         self
     }
 
+    #[must_use]
     pub fn with_working_dir(mut self, dir: &str) -> Self {
         self.working_dir = Some(dir.to_string());
         self
     }
 
+    #[must_use]
     pub fn with_log_file(mut self, path: &str) -> Self {
         self.log_file = Some(path.to_string());
         self
     }
 
+    #[must_use]
     pub fn with_restart_policy(mut self, policy: RestartPolicy) -> Self {
         self.restart_policy = policy;
         self
@@ -126,7 +133,7 @@ pub fn exec_command(cmd: &str) -> ServiceResult {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout).to_string();
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            let combined = format!("{}{}", stdout, stderr);
+            let combined = format!("{stdout}{stderr}");
 
             if output.status.success() {
                 ServiceResult::ok(combined)
@@ -137,6 +144,6 @@ pub fn exec_command(cmd: &str) -> ServiceResult {
                 )
             }
         }
-        Err(e) => ServiceResult::err(format!("Failed to execute: {}", e), -1),
+        Err(e) => ServiceResult::err(format!("Failed to execute: {e}"), -1),
     }
 }

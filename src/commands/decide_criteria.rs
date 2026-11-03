@@ -71,8 +71,7 @@ pub struct CriteriaLibraryInfo {
 /// Load decision criteria from a file path or inline JSON.
 pub fn load_criteria(source: &str) -> CriteriaResult<DecisionCriteria> {
     // Inline JSON is prefixed with '@'
-    if source.starts_with('@') {
-        let json_str = &source[1..];
+    if let Some(json_str) = source.strip_prefix('@') {
         return serde_json::from_str::<DecisionCriteria>(json_str)
             .map_err(CriteriaError::JsonParse);
     }
@@ -86,8 +85,8 @@ pub fn load_criteria(source: &str) -> CriteriaResult<DecisionCriteria> {
     }
 
     // Try discovery paths
-    for discovered in discover_criteria(source) {
-        let content = fs::read_to_string(&discovered).map_err(|e| CriteriaError::Io(e))?;
+    if let Some(discovered) = discover_criteria(source).into_iter().next() {
+        let content = fs::read_to_string(&discovered).map_err(CriteriaError::Io)?;
         let criteria: DecisionCriteria = serde_json::from_str(&content)?;
         return Ok(criteria);
     }

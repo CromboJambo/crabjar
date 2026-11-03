@@ -4,8 +4,8 @@
 //! tasks into DAGR v3 format. This connects crabjar's habitat dashboard to
 //! real multi-agent orchestration activity.
 
-use chrono::{DateTime, Utc};
-use rusqlite::{Connection, Error as SqlError};
+use chrono::Utc;
+use rusqlite::Connection;
 use serde_json::Value;
 use std::path::PathBuf;
 

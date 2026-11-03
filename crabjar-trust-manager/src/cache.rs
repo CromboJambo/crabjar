@@ -167,12 +167,11 @@ impl SkillCache {
 
         let names: Vec<String> = self.entries.keys().cloned().collect();
         for name in names {
-            if let Some(entry) = self.entries.get(&name) {
-                if entry.last_used < threshold {
+            if let Some(entry) = self.entries.get(&name)
+                && entry.last_used < threshold {
                     self.remove(&name)?;
                     removed.push(name);
                 }
-            }
         }
 
         if !removed.is_empty() {
@@ -204,7 +203,7 @@ impl SkillCache {
 
         for entry in fs::read_dir(cache_dir)? {
             let path = entry?.path();
-            if path.extension().map_or(false, |ext| ext == "json") {
+            if path.extension().is_some_and(|ext| ext == "json") {
                 let content = fs::read_to_string(&path)?;
                 if let Ok(meta) = serde_json::from_str::<CacheMetadata>(&content) {
                     let tier =

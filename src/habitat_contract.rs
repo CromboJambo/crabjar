@@ -186,7 +186,7 @@ pub fn build_contract(
             Some(mid) => json!(mid),
             None => json!(null),
         };
-        let cost_cents = if let Some(latency) = im.latency_ms {
+        let cost_cents = if let Some(_latency) = im.latency_ms {
             // Real latency captured; local inference is "free"
             0.0
         } else {

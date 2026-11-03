@@ -61,6 +61,7 @@ impl Default for FleetStatusTracker {
 }
 
 impl FleetStatusTracker {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             machines: RwLock::new(HashMap::new()),
@@ -164,26 +165,24 @@ impl FleetStatusTracker {
 
         // Prefer operational machines with the required model
         for (name, machine) in &entries {
-            if matches!(machine.overall_health, MachineHealth::Operational) {
-                if machine.models.iter().any(|m| {
+            if matches!(machine.overall_health, MachineHealth::Operational)
+                && machine.models.iter().any(|m| {
                     m.name.contains(required_model)
                         && matches!(m.health, ServerHealth::Healthy { .. })
                 }) {
                     return Some(name.clone());
                 }
-            }
         }
 
         // Fall back to partially degraded machines
         for (name, machine) in &entries {
-            if matches!(machine.overall_health, MachineHealth::PartiallyDegraded) {
-                if machine.models.iter().any(|m| {
+            if matches!(machine.overall_health, MachineHealth::PartiallyDegraded)
+                && machine.models.iter().any(|m| {
                     m.name.contains(required_model)
                         && matches!(m.health, ServerHealth::Healthy { .. })
                 }) {
                     return Some(name.clone());
                 }
-            }
         }
 
         None
@@ -195,7 +194,7 @@ impl FleetStatusTracker {
 
         match tokio::time::timeout(
             Duration::from_secs(5),
-            reqwest::get(format!("{}/v1/models", url)),
+            reqwest::get(format!("{url}/v1/models")),
         )
         .await
         {

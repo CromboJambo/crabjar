@@ -1,4 +1,4 @@
-//! Hermes-compatible cronjob_manage tool implementation.
+//! Hermes-compatible `cronjob_manage` tool implementation.
 
 use anyhow::Result;
 use serde_json::{json, Value};
@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use crate::store::CronStore;
 use crate::types::{CreateJobRequest, UpdateJobRequest};
 
-/// Handle a cronjob_manage tool invocation.
+/// Handle a `cronjob_manage` tool invocation.
 pub async fn handle_cronjob_manage(
     store: &CronStore,
     params: &Value,
@@ -23,7 +23,7 @@ pub async fn handle_cronjob_manage(
         "resume" => handle_resume(store, params).await,
         "remove" => handle_remove(store, params).await,
         "run" => handle_run(store, params).await,
-        _ => Err(anyhow::anyhow!("Unknown action: {}", action)),
+        _ => Err(anyhow::anyhow!("Unknown action: {action}")),
     }
 }
 

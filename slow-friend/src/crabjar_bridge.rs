@@ -1,29 +1,29 @@
-//! CrabJar Integration Bridge — connects the slow friend daemon to CrabJar's
+//! `CrabJar` Integration Bridge — connects the slow friend daemon to `CrabJar`'s
 //! guard/concierge pipeline. Every action proposed by the Jev decision layer
-//! must pass through ExecutionGate before being executed.
+//! must pass through `ExecutionGate` before being executed.
 
 use crate::action::{Action, ActionExecutor, ActionResult};
-use std::sync::Arc;
 
-/// CrabJar guard integration for the slow friend daemon.
-/// Wraps CrabJar's ExecutionGate to provide action execution with full
+/// `CrabJar` guard integration for the slow friend daemon.
+/// Wraps `CrabJar`'s `ExecutionGate` to provide action execution with full
 /// trust-layer gating and provenance tracking.
 pub struct CrabJarGuardBridge {
-    /// The CrabJar execution gate (would be injected via dependency injection).
+    /// The `CrabJar` execution gate (would be injected via dependency injection).
     /// For now, this is a placeholder that demonstrates the integration pattern.
     dry_run: bool,
 }
 
 impl CrabJarGuardBridge {
+    #[must_use]
     pub fn new(dry_run: bool) -> Self {
         Self { dry_run }
     }
 
-    /// Route an action through CrabJar's guard/concierge pipeline.
+    /// Route an action through `CrabJar`'s guard/concierge pipeline.
     ///
-    /// This is where the slow friend daemon connects to CrabJar's existing
-    /// infrastructure. The ExecutionGate performs:
-    /// 1. Provenance verification (source_event_id must exist)
+    /// This is where the slow friend daemon connects to `CrabJar`'s existing
+    /// infrastructure. The `ExecutionGate` performs:
+    /// 1. Provenance verification (`source_event_id` must exist)
     /// 2. Confidence threshold check
     /// 3. Interruptibility check
     /// 4. Trust layer check
@@ -32,6 +32,7 @@ impl CrabJarGuardBridge {
     /// 7. Command risk assessment
     /// 8. Domain allowlist check
     /// 9. Context budget check
+    #[must_use]
     pub fn execute_through_guard(&self, action: &Action) -> ActionResult {
         if self.dry_run {
             return ActionResult::Success {

@@ -9,10 +9,9 @@
 
 use crate::decision::{DecisionGate, DecisionResult};
 use anyhow::Result;
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
@@ -37,20 +36,13 @@ impl Default for AttentionThresholds {
 
 /// Decision policy configuration for the hybrid model.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct HybridDecisionPolicy {
     pub attention_thresholds: AttentionThresholds,
     /// JEV criteria files per observation source type
     pub jev_criteria_files: Option<std::collections::HashMap<String, String>>,
 }
 
-impl Default for HybridDecisionPolicy {
-    fn default() -> Self {
-        Self {
-            attention_thresholds: AttentionThresholds::default(),
-            jev_criteria_files: None,
-        }
-    }
-}
 
 /// Outcome of the hybrid two-stage decision pipeline.
 #[derive(Debug, Clone)]
@@ -151,19 +143,19 @@ impl HybridDecisionLayer {
 
         match self.jev_gate.evaluate(content, &criteria_file, None).await {
             Ok(jev_result) => {
-                if !jev_result.option.is_empty() {
+                if jev_result.option.is_empty() {
                     Ok(HybridDecision {
                         attention_score,
                         escalated_to_jev: true,
                         jev_result: Some(jev_result.clone()),
-                        action: HybridAction::Execute(jev_result.option),
+                        action: HybridAction::Hold(jev_result.rationale),
                     })
                 } else {
                     Ok(HybridDecision {
                         attention_score,
                         escalated_to_jev: true,
                         jev_result: Some(jev_result.clone()),
-                        action: HybridAction::Hold(jev_result.rationale),
+                        action: HybridAction::Execute(jev_result.option),
                     })
                 }
             }
@@ -174,7 +166,7 @@ impl HybridDecisionLayer {
                     attention_score,
                     escalated_to_jev: true,
                     jev_result: None,
-                    action: HybridAction::Hold(format!("JEV evaluation failed: {}", e)),
+                    action: HybridAction::Hold(format!("JEV evaluation failed: {e}")),
                 })
             }
         }
@@ -225,18 +217,17 @@ impl HybridDecisionLayer {
         let score = raw_score.clamp(0.0, 100.0);
 
         // Track access for future attention calculations
-        self.track_access_internal(conn.deref(), obs_id)?;
+        self.track_access_internal(&conn, obs_id)?;
 
         Ok(score)
     }
 
     /// Get JEV criteria file path for a given observation source type.
     fn get_criteria_for_source(&self, source: &str) -> Result<String> {
-        if let Some(criteria_map) = &self.policy.jev_criteria_files {
-            if let Some(file) = criteria_map.get(source) {
+        if let Some(criteria_map) = &self.policy.jev_criteria_files
+            && let Some(file) = criteria_map.get(source) {
                 return Ok(file.clone());
             }
-        }
 
         // Default criteria file for unknown sources
         Ok("specs/criteria/autonomous-routing-evaluation.json".to_string())
@@ -291,6 +282,7 @@ pub struct AttentionStats {
 }
 
 impl AttentionStats {
+    #[must_use]
     pub fn active_percentage(&self) -> f64 {
         if self.total_events == 0 {
             0.0

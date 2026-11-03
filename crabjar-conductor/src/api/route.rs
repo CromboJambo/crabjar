@@ -1,8 +1,8 @@
 //! Autonomous task routing decision endpoints (Milestone 7).
 
-use crate::api::{ConductorState, evaluate_decision_handler};
+use crate::api::ConductorState;
 use axum::{Json, extract::State};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 
 /// Request for autonomous routing decision.
@@ -77,7 +77,7 @@ pub async fn record_routing_outcome_handler(
     Json(req): Json<RoutingOutcomeRequest>,
 ) -> Json<serde_json::Value> {
     // Log the routing outcome for future JEV learning
-    let observation = format!(
+    let _observation = format!(
         "Routing outcome: task {} assigned to {} resulted in {}. Time: {:?}s, Quality: {:?}",
         req.task_id,
         req.assigned_worker,
@@ -87,8 +87,8 @@ pub async fn record_routing_outcome_handler(
     );
 
     // Store outcome in decision history for future rule extraction
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         // Log as a decision event for historical analysis
         Ok::<&str, String>("outcome_recorded")
     })

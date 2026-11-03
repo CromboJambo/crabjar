@@ -5,7 +5,7 @@ use std::path::Path;
 
 use walkdir::WalkDir;
 
-use crate::checksum::{compute_sha256, verify_checksum};
+use crate::checksum::compute_sha256;
 use crate::models::{ScanFinding, ScanResult, Severity};
 use tracing::{debug, info, warn};
 
@@ -222,8 +222,8 @@ impl SkillScanner {
             }
 
             // Check file size — non-source files > 1KB are suspicious
-            if let Ok(metadata) = path.metadata() {
-                if metadata.len() > 1024 {
+            if let Ok(metadata) = path.metadata()
+                && metadata.len() > 1024 {
                     // Try to read as text to determine if it's binary
                     match fs::read_to_string(path) {
                         Err(_) => {
@@ -240,7 +240,6 @@ impl SkillScanner {
                         Ok(_) => {} // It's text
                     }
                 }
-            }
         }
     }
 

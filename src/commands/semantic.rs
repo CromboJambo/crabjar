@@ -2,7 +2,7 @@
 //! Evaluates observations against decision criteria using cosine similarity.
 //! Provides evaluate, list-criteria, and validate subcommands.
 
-use crate::commands::decide_backend::{cosine_similarity, create_backend};
+use crate::commands::decide_backend::create_backend;
 use crate::commands::decide_cache::{CachedDecision, DecisionCache};
 use crate::commands::decide_criteria::{list_criteria, load_criteria, validate_criteria};
 use crate::commands::decide_db::{DecisionRecord, EvidenceStore};
@@ -49,8 +49,8 @@ pub fn handle_evaluate(
     let evidence_store = EvidenceStore::open(&db_path);
 
     // Check cache unless --fresh flag specified
-    if !skip_cache {
-        if let Some(cached) = cache.get(&obs_hash) {
+    if !skip_cache
+        && let Some(cached) = cache.get(&obs_hash) {
             // Store cache hit in evidence store for learning loop
             if let Ok(store) = &evidence_store {
                 let record = DecisionRecord {
@@ -87,7 +87,6 @@ pub fn handle_evaluate(
                 "doubt": build_doubt_block(backend_name, criteria_source)
             }));
         }
-    }
 
     // Load criteria
     let criteria = match load_criteria(criteria_source) {
@@ -103,9 +102,9 @@ pub fn handle_evaluate(
     };
 
     // Fast-path: try rule-based matching first (deterministic, no API call)
-    if let Some(rule_json) = criteria.rules {
-        if let Ok(engine) = RuleEngine::from_json(&rule_json) {
-            if let Some(match_result) = engine.evaluate(observation) {
+    if let Some(rule_json) = criteria.rules
+        && let Ok(engine) = RuleEngine::from_json(&rule_json)
+            && let Some(match_result) = engine.evaluate(observation) {
                 // Store rule-based decision in evidence store
                 if let Ok(store) = &evidence_store {
                     let record = DecisionRecord {
@@ -176,8 +175,6 @@ pub fn handle_evaluate(
                     "doubt": build_doubt_block("rule_engine", criteria_source)
                 }));
             }
-        }
-    }
 
     // Slow-path: embedding similarity (expensive API call)
     // Create backend and time the computation

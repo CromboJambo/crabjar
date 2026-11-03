@@ -1,7 +1,7 @@
 //! JavaScript/TypeScript adapter for universal structural token representation.
 //!
 //! Uses regex-based pattern matching to identify key JS/TS constructs and map them
-//! to universal SpanKind variants. This is a proof-of-concept implementation that
+//! to universal `SpanKind` variants. This is a proof-of-concept implementation that
 //! demonstrates the pluggable adapter architecture without requiring a full JS parser.
 
 use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
@@ -17,10 +17,17 @@ enum JsToken {
     NumberLiteral(String),
 }
 
-/// JavaScript/TypeScript adapter implementing the LanguageAdapter trait.
+/// JavaScript/TypeScript adapter implementing the `LanguageAdapter` trait.
 pub struct JavaScriptAdapter;
 
+impl Default for JavaScriptAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl JavaScriptAdapter {
+    #[must_use]
     pub fn new() -> Self {
         JavaScriptAdapter
     }
@@ -169,7 +176,7 @@ impl JavaScriptAdapter {
 }
 
 impl LanguageAdapter for JavaScriptAdapter {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "javascript"
     }
 
@@ -190,33 +197,31 @@ impl LanguageAdapter for JavaScriptAdapter {
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("{} {}", kw, name),
+                                source: format!("{kw} {name}"),
                             });
-                        } else if let JsToken::Punctuation(p) = &tokens[i + 1] {
-                            if p == "(" {
+                        } else if let JsToken::Punctuation(p) = &tokens[i + 1]
+                            && p == "(" {
                                 spans.push(Span {
                                     kind: SpanKind::FnDecl,
                                     open_token: None,
                                     body: Vec::new(),
                                     close_token: None,
-                                    source: kw.to_string(),
+                                    source: kw.clone(),
                                 });
                             }
-                        }
                     }
                 }
                 JsToken::Keyword(kw) if kw == "class" => {
-                    if i + 1 < tokens.len() {
-                        if let JsToken::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let JsToken::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
                                 body: Vec::new(),
                                 close_token: None,
-                                source: format!("class {}", name),
+                                source: format!("class {name}"),
                             });
                         }
-                    }
                 }
                 JsToken::Keyword(kw) if kw == "const" || kw == "let" => {
                     spans.push(Span {
@@ -224,7 +229,7 @@ impl LanguageAdapter for JavaScriptAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 JsToken::Keyword(kw) if kw == "try" => {
@@ -251,7 +256,7 @@ impl LanguageAdapter for JavaScriptAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: kw.to_string(),
+                        source: kw.clone(),
                     });
                 }
                 JsToken::StringLiteral(content) => {
@@ -260,7 +265,7 @@ impl LanguageAdapter for JavaScriptAdapter {
                         open_token: None,
                         body: Vec::new(),
                         close_token: None,
-                        source: format!("\"{}\"", content),
+                        source: format!("\"{content}\""),
                     });
                 }
                 JsToken::NumberLiteral(content) => {

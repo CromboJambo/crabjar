@@ -37,7 +37,7 @@ pub fn analyze_firmware(path: &str) -> Result<AnalysisResult<FirmwareAnalysis>, 
         return Err(AnalyzeError::FileNotFound(path.to_string()));
     }
 
-    let bytes = fs::read(path_buf).map_err(|e| AnalyzeError::Io(e))?;
+    let bytes = fs::read(path_buf).map_err(AnalyzeError::Io)?;
     let size_bytes = bytes.len() as u64;
 
     // Detect format by file magic
@@ -77,12 +77,12 @@ pub fn analyze_firmware(path: &str) -> Result<AnalysisResult<FirmwareAnalysis>, 
 
 fn detect_format(bytes: &[u8]) -> Option<String> {
     // FIT image (Flattened Image Tree) — ARM firmware
-    if bytes.len() >= 4 && &bytes[0..4] == [0x27, 0x05, 0x19, 0x56] {
+    if bytes.len() >= 4 && bytes[0..4] == [0x27, 0x05, 0x19, 0x56] {
         return Some("FIT image".to_string());
     }
 
     // U-Boot header
-    if bytes.len() >= 64 && &bytes[0..4] == [0x27, 0x05, 0x19, 0x56] {
+    if bytes.len() >= 64 && bytes[0..4] == [0x27, 0x05, 0x19, 0x56] {
         return Some("U-Boot image".to_string());
     }
 
@@ -98,13 +98,13 @@ fn detect_format(bytes: &[u8]) -> Option<String> {
 
     // JFFS2 (embedded filesystem)
     if bytes.len() >= 4
-        && (&bytes[0..4] == [0x85, 0xEC, 0x13, 0x37] || &bytes[0..4] == [0x1E, 0x90, 0x82, 0xA6])
+        && (bytes[0..4] == [0x85, 0xEC, 0x13, 0x37] || bytes[0..4] == [0x1E, 0x90, 0x82, 0xA6])
     {
         return Some("JFFS2 filesystem".to_string());
     }
 
     // CramFS
-    if bytes.len() >= 4 && (&bytes[0..4] == [0x27, 0x05, 0x19, 0x56]) {
+    if bytes.len() >= 4 && (bytes[0..4] == [0x27, 0x05, 0x19, 0x56]) {
         return Some("CramFS filesystem".to_string());
     }
 
@@ -118,7 +118,7 @@ fn detect_compression(bytes: &[u8]) -> Option<String> {
     }
 
     // xz/lzma
-    if bytes.len() >= 6 && &bytes[0..6] == [0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00] {
+    if bytes.len() >= 6 && bytes[0..6] == [0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00] {
         return Some("xz/lzma".to_string());
     }
 
@@ -165,8 +165,8 @@ fn identify_regions(bytes: &[u8], size_bytes: u64) -> Vec<FirmwareRegion> {
 
         // Look for JFFS2 magic
         if bytes.len() > offset + 4
-            && (&bytes[offset..offset + 4] == [0x85, 0xEC, 0x13, 0x37]
-                || &bytes[offset..offset + 4] == [0x1E, 0x90, 0x82, 0xA6])
+            && (bytes[offset..offset + 4] == [0x85, 0xEC, 0x13, 0x37]
+                || bytes[offset..offset + 4] == [0x1E, 0x90, 0x82, 0xA6])
         {
             regions.push(FirmwareRegion {
                 name: "rootfs".to_string(),

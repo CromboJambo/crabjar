@@ -25,12 +25,10 @@ pub mod schema;
 
 use crate::auth::{AuthError, validate_token};
 use crate::conductor::Conductor;
-use crate::fleet_status::FleetStatusTracker;
-use crate::sandbox::{SandboxConfig, SandboxManager};
 use axum::{
     Json, Router,
     extract::{Request, State},
-    http::{HeaderMap, Method, StatusCode},
+    http::StatusCode,
     middleware::{self, Next},
     response::IntoResponse,
     routing::{delete, get, post},
@@ -40,7 +38,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::Mutex as TokioMutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 pub mod workers;
@@ -369,7 +367,7 @@ async fn report_task_result(
 ) -> Json<serde_json::Value> {
     let task_id = id.0;
     let status = body["status"].as_str().unwrap_or("completed").to_string();
-    let result_text = body["result"].as_str().map(|s| s.to_string());
+    let result_text = body["result"].as_str().map(std::string::ToString::to_string);
 
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
@@ -523,7 +521,7 @@ async fn record_disaster_recovery_outcome_handler(
     Json(req): Json<DisasterRecoveryOutcomeRequest>,
 ) -> Json<serde_json::Value> {
     // Log the disaster recovery outcome for future JEV learning
-    let observation = format!(
+    let _observation = format!(
         "Disaster recovery outcome: {} action '{}' resulted in {}. Recovery time: {:?} min, Data loss: {:?}%.",
         req.system,
         req.action_taken,
@@ -533,8 +531,8 @@ async fn record_disaster_recovery_outcome_handler(
     );
 
     // Store outcome in decision history for future rule extraction
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         // Log as a decision event for historical analysis
         Ok::<&str, String>("outcome_recorded")
     })
@@ -617,7 +615,7 @@ async fn record_feedback_handler(
     Json(req): Json<crate::decision::postprocessor::DecisionFeedback>,
 ) -> Json<serde_json::Value> {
     match crate::decision::postprocessor::record_feedback(&req) {
-        Ok(_) => Json(json!({
+        Ok(()) => Json(json!({
             "success": true,
             "message": "Feedback recorded"
         })),
@@ -705,8 +703,8 @@ fn evaluate_structural_conditions(
     // Check each option for structural conditions
     if let Some(options) = criteria["options"].as_array() {
         for option in options {
-            if let Some(condition) = option["conditions"].as_str() {
-                if crate::decision::condition::evaluate_condition(target, condition) {
+            if let Some(condition) = option["conditions"].as_str()
+                && crate::decision::condition::evaluate_condition(target, condition) {
                     return Some(Json(json!({
                         "success": true,
                         "evaluation": {
@@ -717,7 +715,6 @@ fn evaluate_structural_conditions(
                         }
                     })));
                 }
-            }
         }
     }
 
@@ -973,7 +970,7 @@ async fn record_recovery_outcome_handler(
     Json(req): Json<RecoveryOutcomeRequest>,
 ) -> Json<serde_json::Value> {
     // Log the recovery outcome for future JEV learning
-    let observation = format!(
+    let _observation = format!(
         "Recovery outcome: {} action '{}' resulted in {}. Time: {:?}s, Recurrence: {:?}",
         req.service,
         req.action_taken,
@@ -983,8 +980,8 @@ async fn record_recovery_outcome_handler(
     );
 
     // Store outcome in decision history for future rule extraction
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         // Log as a decision event for historical analysis
         Ok::<&str, String>("outcome_recorded")
     })
@@ -1080,7 +1077,7 @@ async fn record_monitoring_outcome_handler(
     Json(req): Json<MonitoringOutcomeRequest>,
 ) -> Json<serde_json::Value> {
     // Log the monitoring outcome for future JEV learning
-    let observation = format!(
+    let _observation = format!(
         "Monitoring outcome: {} action '{}' resulted in {}. Prediction accuracy: {:?}%, Improvement time: {:?} hours",
         req.system,
         req.action_taken,
@@ -1090,8 +1087,8 @@ async fn record_monitoring_outcome_handler(
     );
 
     // Store outcome in decision history for future rule extraction
-    let result = tokio::task::spawn_blocking(move || {
-        let c = conductor.blocking_lock();
+    let _result = tokio::task::spawn_blocking(move || {
+        let _c = conductor.blocking_lock();
         // Log as a decision event for historical analysis
         Ok::<&str, String>("outcome_recorded")
     })

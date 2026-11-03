@@ -99,7 +99,7 @@ impl DecisionGate {
         self.evaluator
             .evaluate(observation, criteria_file, state_store)
             .await
-            .map_err(|e| e.into())
+            .map_err(std::convert::Into::into)
     }
 
     /// Evaluate pre-execution readiness for a goal
@@ -111,8 +111,7 @@ impl DecisionGate {
         state_store: Option<&StateStore>,
     ) -> Result<GateResult, Box<dyn std::error::Error>> {
         let observation = format!(
-            "Goal: {}. Current fleet state: {}",
-            goal_description, fleet_state
+            "Goal: {goal_description}. Current fleet state: {fleet_state}"
         );
 
         // First check for trigger-based decision capabilities
@@ -167,9 +166,8 @@ impl DecisionGate {
         };
 
         let observation = format!(
-            "Annealing iteration {}. Task batch: {} succeeded, {} failed. \
-             Failure patterns: {}. Fleet load: {:.0}%.",
-            iteration, success_count, failure_count, failure_summary, fleet_load_percent
+            "Annealing iteration {iteration}. Task batch: {success_count} succeeded, {failure_count} failed. \
+             Failure patterns: {failure_summary}. Fleet load: {fleet_load_percent:.0}%."
         );
 
         let result = self

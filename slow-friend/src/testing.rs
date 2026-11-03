@@ -2,10 +2,7 @@
 //! Generates fake sensor alerts to drive the full tiered attention pipeline.
 
 use crate::action::{ActionClass, ActionExecutor, ActionResult};
-use crate::autonomy::AutonomyTracker;
-use crate::decision::{JevDecision, JevEngine};
-use crate::interpretation::{HeuristicInterpreter, Interpretation, InterpretationEngine};
-use crate::lattice::SparseLattice;
+use crate::interpretation::HeuristicInterpreter;
 use crate::sensor::{Sensor, SensorEvent, SensorResult};
 use std::sync::{Arc, Mutex};
 
@@ -17,7 +14,7 @@ pub struct SyntheticSensor {
 }
 
 impl Sensor for SyntheticSensor {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "synthetic"
     }
 
@@ -40,7 +37,14 @@ pub struct RecordingExecutor {
     pub executed_actions: Arc<Mutex<Vec<ActionClass>>>,
 }
 
+impl Default for RecordingExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecordingExecutor {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             executed_actions: Arc::new(Mutex::new(Vec::new())),
@@ -61,6 +65,7 @@ impl ActionExecutor for RecordingExecutor {
 }
 
 /// Run a full synthetic test scenario.
+#[must_use]
 pub fn run_synthetic_test() -> Vec<ActionClass> {
     // Create components
     let sensor = Arc::new(SyntheticSensor {

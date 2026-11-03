@@ -9,14 +9,12 @@
 //! 4. Shared User (crombo/user level configs and shell env)
 //! 5. Crabjar User (own configs and shell env for experimentation)
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 
 use crate::error::SandboxError;
 use crate::schema::{init_db, SandboxRow};
 use rusqlite::Connection;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Worker promotion tiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,7 +84,7 @@ impl PromotionManager {
 
     /// Create a new task worker (tier 1).
     pub fn create_task_worker(&self, agent_name: &str) -> Result<WorkerMetadata, SandboxError> {
-        let sandbox_id = self.conn.execute(
+        let _sandbox_id = self.conn.execute(
             "INSERT INTO agent_sandboxes (agent_name, isolation_type, created_at) VALUES (?, ?, ?)",
             rusqlite::params![
                 agent_name,

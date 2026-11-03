@@ -1,20 +1,20 @@
 //! Task scheduler — routes tasks to appropriate workers based on capabilities.
 
-use crate::state_store::{Task, TaskStatus};
+use crate::state_store::Task;
 use crate::worker_registry::WorkerRegistry;
-use std::collections::HashMap;
 
 pub struct TaskScheduler {
     registry: WorkerRegistry,
 }
 
 impl TaskScheduler {
+    #[must_use]
     pub fn new(registry: WorkerRegistry) -> Self {
         Self { registry }
     }
 
     /// Assign a task to an available worker with the required capabilities.
-    pub fn schedule(&mut self, task: &Task, required_capabilities: &[String]) -> Option<&str> {
+    pub fn schedule(&mut self, _task: &Task, required_capabilities: &[String]) -> Option<&str> {
         // Find an available worker with the required capabilities
         if let Some(worker) = self.registry.find_available(required_capabilities) {
             // In production, update task status to assigned via state store
@@ -24,6 +24,7 @@ impl TaskScheduler {
     }
 
     /// Get all pending tasks that can be scheduled.
+    #[must_use]
     pub fn pending_tasks(&self) -> Vec<&Task> {
         // In production, query state store for tasks with Pending status
         vec![]

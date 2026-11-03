@@ -1,4 +1,4 @@
-//! Tier 4: CrabJar Action Execution — actual actions with checkpointing and
+//! Tier 4: `CrabJar` Action Execution — actual actions with checkpointing and
 //! notification. Every action goes through the guard/concierge pipeline
 //! regardless of how it was decided.
 
@@ -23,7 +23,7 @@ impl std::fmt::Display for ActionClass {
             ActionClass::SendNotification => write!(f, "send_notification"),
             ActionClass::ArchiveFile => write!(f, "archive_file"),
             ActionClass::RunBackup => write!(f, "run_backup"),
-            ActionClass::Custom(name) => write!(f, "{}", name),
+            ActionClass::Custom(name) => write!(f, "{name}"),
         }
     }
 }
@@ -62,7 +62,7 @@ pub enum ActionResult {
     },
 }
 
-/// Trait for executing actions through CrabJar's guard/concierge pipeline.
+/// Trait for executing actions through `CrabJar`'s guard/concierge pipeline.
 pub trait ActionExecutor: Send + Sync {
     fn execute(&self, action: &Action) -> ActionResult;
 }

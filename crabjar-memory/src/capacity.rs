@@ -13,6 +13,7 @@ pub struct MemoryCapacity {
 
 impl MemoryCapacity {
     /// Create capacity tracker for the memory store (agent notes).
+    #[must_use]
     pub fn for_memory() -> Self {
         MemoryCapacity {
             current_chars: 0,
@@ -21,6 +22,7 @@ impl MemoryCapacity {
     }
 
     /// Create capacity tracker for the user store (user profile).
+    #[must_use]
     pub fn for_user() -> Self {
         MemoryCapacity {
             current_chars: 0,
@@ -36,12 +38,14 @@ impl MemoryCapacity {
     /// Check if adding content would exceed the limit.
     ///
     /// `additional_content` is the new entry text plus delimiter overhead.
+    #[must_use]
     pub fn would_fit(&self, additional_content: &str) -> bool {
         let additional_chars = additional_content.chars().count();
         self.current_chars + additional_chars <= self.max_chars
     }
 
     /// Calculate how many characters would be exceeded.
+    #[must_use]
     pub fn exceed_by(&self, additional_content: &str) -> usize {
         let additional_chars = additional_content.chars().count();
         if self.would_fit(additional_content) {
@@ -51,6 +55,7 @@ impl MemoryCapacity {
     }
 
     /// Get usage percentage (0-100).
+    #[must_use]
     pub fn usage_percent(&self) -> u32 {
         if self.max_chars == 0 {
             return 0;
@@ -59,6 +64,7 @@ impl MemoryCapacity {
     }
 
     /// Get remaining characters.
+    #[must_use]
     pub fn remaining(&self) -> usize {
         if self.current_chars >= self.max_chars {
             return 0;

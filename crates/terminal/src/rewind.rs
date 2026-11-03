@@ -29,7 +29,7 @@
 use crate::InferenceMetrics;
 use crate::attempts::{Attempt, RewindTier, TaskType};
 use crate::git_repo::GitRepo;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Why a rewind was refused. A refusal is a value, not a panic — the
 /// caller (CLI, user) gets the reason in hand and the state is untouched.

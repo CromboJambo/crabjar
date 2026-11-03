@@ -106,7 +106,7 @@ impl FileWatcher {
 
         // Step 3: Dedup check
         let result = self.dedup_engine.process_file(
-            path.to_string_lossy().to_string(),
+            &path.to_string_lossy(),
             &cleaned,
             Some(secrets_found.keys().cloned().collect()),
         )?;
@@ -172,15 +172,14 @@ impl FileWatcher {
 
         let mut watcher = RecommendedWatcher::new(
             move |res: notify::Result<notify::Event>| {
-                if let Ok(event) = res {
-                    if let EventKind::Create(_) = event.kind {
+                if let Ok(event) = res
+                    && let EventKind::Create(_) = event.kind {
                         for path in event.paths {
-                            if path.extension().map_or(false, |ext| ext == "md") {
+                            if path.extension().is_some_and(|ext| ext == "md") {
                                 let _ = tx.blocking_send(path);
                             }
                         }
                     }
-                }
             },
             notify::Config::default(),
         )

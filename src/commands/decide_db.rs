@@ -8,7 +8,6 @@
 
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 
 /// A stored decision record for the learning loop.
 #[derive(Debug, Clone, Serialize, Deserialize)]

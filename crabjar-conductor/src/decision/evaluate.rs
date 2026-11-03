@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::Duration;
 
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -75,6 +74,7 @@ struct EmbeddingData {
 
 impl JevEvaluator {
     /// Create a new JEV evaluator with the given backend configuration
+    #[must_use]
     pub fn new(config: BackendConfig) -> Self {
         Self {
             client: reqwest::Client::new(),
@@ -261,7 +261,7 @@ fn compute_observation_hash(observation: &str, criteria_file: &str) -> String {
     hasher.update(b"\n");
     hasher.update(observation.as_bytes());
     let result = hasher.finalize();
-    format!("{:x}", result)[..16].to_string()
+    format!("{result:x}")[..16].to_string()
 }
 
 /// Evaluate a structural target against criteria, using fast-path condition
@@ -286,6 +286,7 @@ pub async fn evaluate_structural_target(
 
 /// Evaluate structural conditions directly against the target.
 /// Returns Some(DecisionResult) if a condition matched, None to fall back to embedding evaluation.
+#[must_use]
 pub fn evaluate_structural_conditions(
     target: &crate::decision::structural::EvaluationTarget,
     criteria_path: &str,
@@ -304,15 +305,14 @@ pub fn evaluate_structural_conditions(
     // Check each option for structural conditions
     if let Some(options) = criteria["options"].as_array() {
         for option in options {
-            if let Some(condition) = option["conditions"].as_str() {
-                if crate::decision::condition::evaluate_condition(target, condition) {
+            if let Some(condition) = option["conditions"].as_str()
+                && crate::decision::condition::evaluate_condition(target, condition) {
                     return Some(DecisionResult {
                         option: option["id"].as_str().unwrap_or("unknown").to_string(),
                         confidence: 1.0,
-                        rationale: format!("Structural condition matched: {}", condition),
+                        rationale: format!("Structural condition matched: {condition}"),
                     });
                 }
-            }
         }
     }
 
