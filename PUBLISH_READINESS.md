@@ -1,75 +1,47 @@
-# Crabjar/Pesti Ecosystem Publish Readiness Spec
+# Crabjar Publish Readiness Assessment
 
-**Date:** 2026-10-18
-**Purpose:** Assess and plan crates.io publishing for all crabjar/pesti ecosystem packages
+**Date:** 2026-11-03
+**Purpose:** Assess crates.io publishing readiness for crabjar workspace packages
 
 ## Current State
 
-| Package | Local Version | crates.io Version | Status | Publish Ready? |
-|---------|--------------|-------------------|--------|----------------|
-| pesti-gguf | 0.2.4 | 0.2.4 | ✅ In sync | N/A |
-| pesti-structural-tokenizer | 0.1.3 | 0.1.2 | ⚠️ Local ahead | Yes — just publish |
-| git-sheets | 0.1.2 | 0.1.2 | ✅ In sync | N/A |
-| pesti-runner | 0.1.0 | Not published | 🔧 Version wrong | No — bump to 0.1.2 first |
-| pesti-embeddings | 0.1.4 | Not published | 🆕 New crate | Maybe — needs evaluation |
-| nustage | 0.1.0 | Not published | 📦 Untouched | No — missing metadata |
+The crabjar workspace contains ~80 Cargo.toml files. Most internal components are explicitly marked `publish = false`. The following packages are potentially publishable:
 
-## Publish Readiness Assessment
+### Main Package
+| Package | Version | Status | Notes |
+|---------|---------|--------|-------|
+| crabjar | 0.12.4 | Ready? | Main CLI binary; depends on many internal crates |
 
-### pesti-structural-tokenizer (0.1.3 → publish)
-**Status:** Ready to publish immediately.
-- ✅ Builds clean
-- ✅ Has documentation and examples
-- ✅ Version bump already done locally
-- **Action:** `cargo publish -p pesti-structural-tokenizer`
+### Internal (publish = false) — 12 packages
+These are explicitly marked as not publishable:
+- orchestrator, guard, telemetry, sandbox, tool_registry
+- zed-acp-bridge, zed-acp-server
+- memory (agent-context), crabjar-delegation
+- skill-script-runner, skill-reference-store, skill-process-management
 
-### pesti-runner (0.1.0 → 0.1.2 → publish)
-**Status:** Not ready — version needs correction.
-- ⚠️ User specified target version is 0.1.2, not current 0.1.0
-- ✅ Builds clean (with warnings)
-- **Action:** Bump version to 0.1.2, then publish
+### Potentially Publishable — Need Assessment
+| Package | Version | Notes |
+|---------|---------|-------|
+| crabjar-host | 0.12.4 | Host binary |
+| vm-bridge | 0.1.0 | VM bridge service |
+| terrarium | 0.1.0 | Isometric habitat app |
+| crabjar-terminal | — | Terminal UI components |
+| crabjar-commit / crabjar-commit-cli | 0.1.0 | Commit tooling |
+| crabjar-gpui | 0.1.0 | GPU dashboard |
+| crabjar-kanban-orchestrator | 0.1.0 | Kanban integration |
+| crabjar-podman | 0.1.0 | Podman integration |
+| hermes-struct-tok-pipeline | 0.1.0 | Structural tokenization pipeline |
 
-### pesti-embeddings (0.1.4 → evaluate)
-**Status:** Substantial new crate (489 lines across 5 modules). Builds but needs evaluation.
-- ✅ Builds clean
-- ✅ Has description and dependencies properly declared
-- ✅ Real functionality: embedder, pooling, similarity modules
-- ⚠️ Very new — may not be stable enough for public release yet
-- **Recommendation:** Finish embedding work, test thoroughly, then publish as 0.1.0
+## Publish Strategy
 
-### nustage (0.1.0 → prepare)
-**Status:** Not ready — missing essential metadata.
-- ❌ No `publish = true` in Cargo.toml
-- ❌ No license field
-- ❌ No homepage/repository URLs
-- ✅ Builds (as part of tabular-work workspace)
-- **Action:** Add publish metadata, write README, then prepare for 0.1.0 release
+**Decision needed:** Should crabjar packages be published to crates.io, or kept as private/internal?
 
-## Version Correction Plan
-
-### pesti-runner version bump
-```bash
-# In /home/crombo/projects/active/pesti
-sed -i 's/version = "0.1.0"/version = "0.1.2"/' pesti-runner/Cargo.toml
-cargo check -p pesti-runner  # verify build
-```
-
-## Publish Sequence
-
-1. **Immediate:** `cargo publish -p pesti-structural-tokenizer` (local already at 0.1.3)
-2. **After version bump:** `cargo publish -p pesti-runner` (after bumping to 0.1.2)
-3. **After embedding work completes:** `cargo publish -p pesti-embeddings` (as 0.1.0)
-4. **After metadata prep:** `cargo publish -p nustage` (as 0.1.0)
+If publishing:
+1. Main `crabjar` package depends on many internal crates — need to publish dependencies first
+2. Check for proper metadata (license, description, homepage) in each Cargo.toml
+3. Verify no private path dependencies remain
 
 ## Notes
 
-- pesti-gguf and git-sheets are already in sync — no action needed
-- crabjar main crate has `publish = true` but hasn't been published yet — separate decision
-- Workspace root version (0.1.4) is used by crates that inherit via `version.workspace = true`
-- pesti-runner uses explicit version (0.1.0), not inherited from workspace
-
-## Risk Assessment
-
-**Low risk:** pesti-structural-tokenizer publish — already tested, just a version bump
-**Medium risk:** pesti-runner publish — needs version correction and testing
-**Higher risk:** pesti-embeddings publish — very new crate, limited testing history
+- pesti crates (pesti-gguf, pesti-runner, etc.) are in a separate project, not this workspace
+- This assessment supersedes the previous PUBLISH_READINESS.md from 2026-10-18 which referenced the old pesti workspace structure
