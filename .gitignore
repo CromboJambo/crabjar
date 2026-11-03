@@ -46,7 +46,7 @@ unsloth_compiled_cache/
 attempts.jsonl
 
 # Local runtime artifacts (regenerable)
-_umsloth_sentencepiece_temp/
+*temp/
 
 # Abandoned experiments / local scratch — keep off git, on disk
 historical/
