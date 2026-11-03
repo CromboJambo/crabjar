@@ -1,6 +1,21 @@
 # crabjar
 
-Multi-agent orchestration framework with execution gating, trust layers, and knowledge compression. Drop-in replacement for Hermes Agent.
+An execution framework where agents calibrate their own confidence, test their assumptions against reality, and build knowledge through relationships rather than flat assertions.
+
+Multi-agent orchestration with execution gating, trust layers, and knowledge compression. Drop-in replacement for Hermes Agent if that's what you need.
+
+## The Idea
+
+Agents make mistakes. They're overconfident when they should be uncertain. Current systems either trust everything the agent says or require human review for every action — neither scales.
+
+Crabjar measures confidence empirically:
+- **Trust layers** (0-3) are earned through execution history, not declared by the agent
+- **Annealing** decays confidence over time — untested knowledge rots
+- You only notice calibration failures when they're catastrophic. The system is designed to surface those.
+
+The best way to understand a system is to push it past its limits and see where it breaks. That's how we approach performance — benchmark everything, trust nothing until measured. Risk assessment adds ~30ns overhead. We know that because we tested it, not because we assumed it.
+
+Knowledge isn't facts stored in rows. It's relationships between things. Crabjar stores knowledge as a graph — nodes (facts, patterns, rules) connected by edges (supports, contradicts, derived_from). You find what matters by following connections, not searching keywords.
 
 ## Quick Start
 
@@ -57,6 +72,8 @@ Run `crabjar --help` for complete command reference.
 ## Architecture
 
 8-layer dependency model enforced by `crabjar-architecture`. The glass separates stable substrate (guard, host-core) from disposable integrations. See [AGENTS.md](./AGENTS.md) for the full principle.
+
+The chicken-and-egg problem: how can an agent self-correct if it can't identify "self" outside its own context? Crabjar's answer is to build the external observer into the system — annealing, trust layer transitions, outcome tracking are mechanisms for the system to observe itself from outside. Not perfect. A compromise between true external observation (impossible) and blind self-trust (dangerous).
 
 ## Version
 
