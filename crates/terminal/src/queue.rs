@@ -287,7 +287,7 @@ impl TriageQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::attempts::{Condition, Doubt};
+    use crate::attempts::{Condition, Doubt, InferenceMetrics};
     use crate::stream::Receipt;
     use chrono::DateTime;
 

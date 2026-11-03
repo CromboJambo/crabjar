@@ -250,9 +250,10 @@ pub fn rewind_commit(commit: &str, workdir: &Path, trunk: &str) -> anyhow::Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::attempts::{Attempt, AttemptStatus, Condition, RewindTier};
+    use crate::attempts::{Attempt, AttemptStatus, Condition, InferenceMetrics, RewindTier};
     use crate::stream::Receipt;
     use chrono::Utc;
+    use std::path::PathBuf;
     use std::time::Duration;
 
     /// A scratch git repo for real-repo tests.
@@ -300,6 +301,7 @@ mod tests {
     }
 
     /// An attempt rooted at `parent`, on the fine tier by default.
+    
     fn attempt(id: u64, parent: &str, invertible: bool) -> Attempt {
         Attempt {
             id,
