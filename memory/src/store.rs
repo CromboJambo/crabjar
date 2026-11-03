@@ -309,6 +309,7 @@ fn row_matches_tags(row: &KnowledgeRow, tags: &[&str]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Evidence;
     use crate::KnowledgeKind;
 
     fn temp_store() -> (Store, tempfile::TempDir) {
@@ -356,6 +357,9 @@ mod tests {
             source_type: "file".to_string(),
             source_id: "test-file".to_string(),
             provenance_id: "prov-1".to_string(),
+            confidence: 1.0,
+            evidence: Evidence::default(),
+            source_observations: Vec::new(),
         };
         store.insert(entry).unwrap()
     }
@@ -434,6 +438,9 @@ mod tests {
                     source_type: "file".to_string(),
                     source_id: "test".to_string(),
                     provenance_id: "prov-1".to_string(),
+                    confidence: 1.0,
+                    evidence: Evidence::default(),
+                    source_observations: Vec::new(),
                 })
                 .unwrap();
         }
@@ -455,6 +462,9 @@ mod tests {
                 source_type: "file".to_string(),
                 source_id: "unique-id".to_string(),
                 provenance_id: "prov-1".to_string(),
+                confidence: 1.0,
+                evidence: Evidence::default(),
+                source_observations: Vec::new(),
             })
             .unwrap();
         let row = store.find_active_by_source("file", "unique-id").unwrap();

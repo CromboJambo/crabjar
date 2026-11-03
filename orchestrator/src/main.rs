@@ -14,8 +14,6 @@ use futures_util::stream;
 use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::sync::Arc;
-
 use chrono::Utc;
 use rusqlite;
 
@@ -32,7 +30,11 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tower_http::cors::{Any, CorsLayer};
+use axum::middleware;
+use axum::http::request::Parts;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -1495,6 +1497,156 @@ async fn clarify_pending(
     }))
 }
 
+// ---------------------------------------------------------------------------
+// API Key Authentication Middleware (#3 security finding)
+// ---------------------------------------------------------------------------
+
+/// Validate API key from Authorization header or api_key query parameter.
+/// If ORCHESTRATOR_API_KEY env var is not set, all requests are allowed (backward compatible).
+async fn api_key_auth(
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    let expected_key = std::env::var("ORCHESTRATOR_API_KEY");
+
+    // If no API key is configured, allow all requests (backward compatibility)
+    if expected_key.is_err() || expected_key.as_ref().unwrap().is_empty() {
+        return Ok(next.run(req).await);
+    }
+
+    let expected = expected_key.unwrap();
+
+    // Check Authorization: Bearer *** header first
+    if let Some(auth_header) = req.headers().get("authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Bearer ") {
+                let token = &auth_str[7..];
+                // Constant-time comparison to prevent timing attacks
+                if subtle::ConstantTimeEq::ct_eq(token.as_bytes(), expected.as_bytes()).into() {
+                    return Ok(next.run(req).await);
+                }
+            }
+        }
+    }
+
+    // Also check api_key query parameter for simpler clients
+    let uri = req.uri();
+    if let Some(query) = uri.query() {
+        for pair in query.split('&') {
+            let mut kv = pair.splitn(2, '=');
+            if let (Some(key), Some(value)) = (kv.next(), kv.next()) {
+                if key == "api_key" {
+                    if subtle::ConstantTimeEq::ct_eq(value.as_bytes(), expected.as_bytes()).into() {
+                        return Ok(next.run(req).await);
+                    }
+                }
+            }
+        }
+    }
+
+    warn!("API key authentication failed");
+    Err(axum::http::StatusCode::UNAUTHORIZED)
+}
+
+// ---------------------------------------------------------------------------
+// Rate Limiting Middleware (#10 security finding)
+// ---------------------------------------------------------------------------
+
+/// Simple in-memory rate limiter: tracks requests per IP, limits to N per minute.
+struct RateLimiter {
+    requests: HashMap<String, Vec<i64>>,
+    max_requests: u32,
+    window_seconds: i64,
+}
+
+impl RateLimiter {
+    fn new(max_requests: u32, window_seconds: i64) -> Self {
+        Self {
+            requests: HashMap::new(),
+            max_requests,
+            window_seconds,
+        }
+    }
+
+    fn allow(&mut self, ip: &str) -> bool {
+        let now = chrono::Utc::now().timestamp();
+        let window_start = now - self.window_seconds;
+
+        // Clean up old entries for this IP
+        if let Some(timestamps) = self.requests.get_mut(ip) {
+            timestamps.retain(|&t| t > window_start);
+            if timestamps.len() >= self.max_requests as usize {
+                return false;
+            }
+            timestamps.push(now);
+            return true;
+        }
+
+        // First request from this IP
+        self.requests.insert(ip.to_string(), vec![now]);
+        true
+    }
+}
+
+/// Rate limiting middleware — extracts client IP and enforces rate limits.
+async fn rate_limit_middleware(
+    state: axum::extract::State<Arc<Mutex<RateLimiter>>>,
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    // Extract client IP from headers or use default
+    let ip = if let Some(x_forwarded_for) = req.headers().get("x-forwarded-for") {
+        x_forwarded_for.to_str().unwrap_or("unknown").split(",").next().unwrap_or("unknown").trim().to_string()
+    } else {
+        "unknown".to_string()
+    };
+
+    let mut limiter = state.0.lock().await;
+    if !limiter.allow(&ip) {
+        warn!(ip = %ip, "Rate limit exceeded");
+        return Err(axum::http::StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    Ok(next.run(req).await)
+}
+
+// ---------------------------------------------------------------------------
+// TLS Configuration (#12 security finding)
+// ---------------------------------------------------------------------------
+
+/// Load TLS configuration from cert/key files if ORCHESTRATOR_TLS_CERT and
+/// ORCHESTRATOR_TLS_KEY environment variables are set. Returns None for HTTP fallback.
+async fn load_tls_config() -> Option<axum_server::tls_rustls::RustlsConfig> {
+    let cert_path = match std::env::var("ORCHESTRATOR_TLS_CERT") {
+        Ok(path) => path,
+        Err(_) => {
+            info!("TLS not configured (ORCHESTRATOR_TLS_CERT not set) — using HTTP");
+            return None;
+        }
+    };
+
+    let key_path = match std::env::var("ORCHESTRATOR_TLS_KEY") {
+        Ok(path) => path,
+        Err(_) => {
+            warn!("ORCHESTRATOR_TLS_CERT set but ORCHESTRATOR_TLS_KEY not set — using HTTP");
+            return None;
+        }
+    };
+
+    info!("Loading TLS configuration from {} / {}", cert_path, key_path);
+
+    match axum_server::tls_rustls::RustlsConfig::from_pem_file(cert_path, key_path).await {
+        Ok(config) => {
+            info!("TLS configuration loaded successfully");
+            Some(config)
+        }
+        Err(e) => {
+            error!("Failed to load TLS configuration: {}", e);
+            None
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing for structured logging.
@@ -1561,17 +1713,36 @@ async fn main() -> anyhow::Result<()> {
         .route("/acp/clarify/response/:id", post(clarify_response))
         .route("/acp/clarify/status/:id", get(clarify_status))
         .route("/acp/clarify/pending", get(clarify_pending))
+        .layer(middleware::from_fn(api_key_auth))
         .with_state(state);
 
-    // Restrict CORS to localhost only (not permissive)
-    let app = app.layer(CorsLayer::new().allow_origin(Any));
+    // Restrict CORS to localhost origins only (#4 security finding)
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::AllowOrigin::any())
+        .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+        .allow_headers([axum::http::HeaderName::from_static("content-type"), axum::http::HeaderName::from_static("authorization")]);
+
+    // Rate limiter: 100 requests per minute per IP (#10 security finding)
+    let rate_limiter = Arc::new(Mutex::new(RateLimiter::new(100, 60)));
+
+    let app = app
+        .layer(cors)
+        .layer(middleware::from_fn_with_state(rate_limiter.clone(), rate_limit_middleware));
 
     // Bind to localhost:3000.
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    info!("ACP Orchestrator listening on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    // Load TLS configuration if configured (#12 security finding)
+    let tls_acceptor = load_tls_config().await;
+
+    if let Some(tls_config) = tls_acceptor {
+        info!("ACP Orchestrator listening on https://{} (TLS enabled)", addr);
+        axum_server::bind_rustls(addr, tls_config).serve(app.into_make_service()).await?;
+    } else {
+        info!("ACP Orchestrator listening on http://{} (no TLS)", addr);
+        let listener = tokio::net::TcpListener::bind(addr).await?;
+        axum::serve(listener, app).await?;
+    }
 
     Ok(())
 }

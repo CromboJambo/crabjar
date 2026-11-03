@@ -360,17 +360,39 @@ impl<'a> ExecutionGate<'a> {
         }
     }
 
-    /// Verify provenance: source_event_id exists in GuardDb action_requests.
+    /// Verify provenance: source_event_id exists in GuardDb action_requests AND is recent.
+    /// Addresses redteam finding #7: stale approvals should be rejected.
     fn verify_provenance(&self, id: &str) -> Result<bool, GuardDbError> {
         let conn = self.trust.conn();
-        let exists: bool = conn
+
+        // Check existence and freshness in a single query
+        // Approvals older than 24 hours are considered stale
+        let exists_and_fresh: bool = conn
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM action_requests WHERE source_event_id = ?1)",
-                rusqlite::params![id],
+                "SELECT EXISTS(SELECT 1 FROM action_requests \n\
+                 WHERE source_event_id = ?1 AND created_at > ?2)",
+                rusqlite::params![id, chrono::Utc::now().timestamp() - 86400],
                 |r| r.get(0),
             )
             .map_err(|_| GuardDbError::SchemaError("Provenance check failed".into()))?;
-        Ok(exists)
+
+        if !exists_and_fresh {
+            // Check if it exists but is stale
+            let is_stale: bool = conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM action_requests \n\
+                     WHERE source_event_id = ?1 AND created_at <= ?2)",
+                    rusqlite::params![id, chrono::Utc::now().timestamp() - 86400],
+                    |r| r.get(0),
+                )
+                .map_err(|_| GuardDbError::SchemaError("Stale provenance check failed".into()))?;
+
+            if is_stale {
+                warn!(event_id = id, "Provenance exists but is stale (>24h)");
+            }
+        }
+
+        Ok(exists_and_fresh)
     }
 
     /// Check PID trust layer (Option B).
@@ -426,20 +448,54 @@ impl<'a> ExecutionGate<'a> {
         Ok(None)
     }
 
-    /// Assess command risk based on name and arguments.
+    /// Assess command risk based on name AND arguments (dynamic, context-aware).
+    /// This addresses redteam finding #5: risk must be evaluated based on what the
+    /// command is operating on, not just the command name.
     fn assess_command_risk(&self, command: &str, args: &[String]) -> CommandRisk {
         let basename = command.split('/').next_back().unwrap_or(command);
 
-        for risk_cmd in &self.risk_config.high_risk {
-            if basename.eq_ignore_ascii_case(risk_cmd) {
+        // Dynamic risk assessment: evaluate both command name and arguments
+        // to determine actual risk level based on context.
+
+        // Check for high-risk patterns in arguments regardless of command name
+        let args_str = args.join(" ");
+
+        // rm -rf / or similar destructive patterns are always high risk
+        if basename.eq_ignore_ascii_case("rm") {
+            if args_str.contains("-rf /") || args_str.contains("-fr /") || args_str == "/" {
                 return CommandRisk::High;
             }
-            let full_cmd = format!("{} {}", basename, args.join(" "));
-            if full_cmd.eq_ignore_ascii_case(risk_cmd) {
+            // rm with specific files is lower risk
+            if !args.is_empty() && !args_str.contains("/") {
+                return CommandRisk::Low;
+            }
+        }
+
+        // chmod/chown on critical paths is high risk
+        if basename.eq_ignore_ascii_case("chmod") || basename.eq_ignore_ascii_case("chown") {
+            if args_str.contains("/etc/") || args_str.contains("/usr/") || args_str.contains("/") {
                 return CommandRisk::High;
             }
         }
 
+        // Package manager install commands are high risk (system-wide changes)
+        if ["apt", "apt-get", "yum", "dnf", "pacman", "pip", "npm", "cargo"]
+            .iter()
+            .any(|c| basename.eq_ignore_ascii_case(c))
+        {
+            if args_str.contains("install") || args_str.contains("upgrade") {
+                return CommandRisk::High;
+            }
+        }
+
+        // Check static high-risk list (for commands that are always risky)
+        for risk_cmd in &self.risk_config.high_risk {
+            if basename.eq_ignore_ascii_case(risk_cmd) {
+                return CommandRisk::High;
+            }
+        }
+
+        // Check static medium-risk list
         for risk_cmd in &self.risk_config.medium_risk {
             if basename.eq_ignore_ascii_case(risk_cmd) {
                 return CommandRisk::Medium;

@@ -10,7 +10,7 @@ const CONDUCTOR_PORT: u16 = 8092;
 const CONDUCTOR_URL: &str = "http://localhost:8092";
 const CONDUCTOR_BINARY: &str = "../target/release/crabjar-conductor";
 
-fn start_conductor() -> Result<Command, Box<dyn std::error::Error>> {
+fn start_conductor() -> Result<std::process::Child, Box<dyn std::error::Error>> {
     let temp_dir = tempfile::tempdir()?.into_path();
 
     // Kill any existing conductor on this port
@@ -42,7 +42,7 @@ fn start_conductor() -> Result<Command, Box<dyn std::error::Error>> {
 
 fn is_conductor_ready() -> bool {
     let output = Command::new("curl")
-        .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", format!("{}/health", CONDUCTOR_URL)])
+        .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", format!("{}/health", CONDUCTOR_URL).as_str()])
         .output();
 
     match output {
@@ -54,7 +54,7 @@ fn is_conductor_ready() -> bool {
 fn register_worker(name: &str) -> Option<String> {
     let output = Command::new("curl")
         .args([
-            "-s", "-X", "POST", format!("{}/workers/register", CONDUCTOR_URL),
+            "-s", "-X", "POST", format!("{}/workers/register", CONDUCTOR_URL).as_str(),
             "-H", "Content-Type: application/json",
             "-d", &format!(
                 "{{\"name\":\"{}\",\"machine_id\":\"jambo\",\"capabilities\":[\"os:Linux\"]}}",
@@ -74,7 +74,7 @@ fn register_worker(name: &str) -> Option<String> {
 
 fn poll_tasks(worker_id: &str) -> Option<serde_json::Value> {
     let output = Command::new("curl")
-        .args(["-s", format!("{}/tasks/for-worker/{}", CONDUCTOR_URL, worker_id)])
+        .args(["-s", format!("{}/tasks/for-worker/{}", CONDUCTOR_URL, worker_id).as_str()])
         .output()
         .ok()?;
 
@@ -84,7 +84,7 @@ fn poll_tasks(worker_id: &str) -> Option<serde_json::Value> {
 
 #[test]
 fn test_worker_registration() {
-    let conductor = start_conductor().expect("Failed to start conductor");
+    let mut conductor = start_conductor().expect("Failed to start conductor");
 
     let worker_id = register_worker("integration-test-worker");
     assert!(worker_id.is_some(), "Worker registration failed");
@@ -96,7 +96,7 @@ fn test_worker_registration() {
 
 #[test]
 fn test_worker_polling() {
-    let conductor = start_conductor().expect("Failed to start conductor");
+    let mut conductor = start_conductor().expect("Failed to start conductor");
 
     let worker_id = register_worker("polling-test-worker");
     assert!(worker_id.is_some());
@@ -111,7 +111,7 @@ fn test_worker_polling() {
 
 #[test]
 fn test_multiple_workers() {
-    let conductor = start_conductor().expect("Failed to start conductor");
+    let mut conductor = start_conductor().expect("Failed to start conductor");
 
     let w1 = register_worker("worker-1");
     let w2 = register_worker("worker-2");
@@ -132,12 +132,12 @@ fn test_multiple_workers() {
 
 #[test]
 fn test_worker_capabilities() {
-    let conductor = start_conductor().expect("Failed to start conductor");
+    let mut conductor = start_conductor().expect("Failed to start conductor");
 
     // Register worker with specific capabilities
     let output = Command::new("curl")
         .args([
-            "-s", "-X", "POST", format!("{}/workers/register", CONDUCTOR_URL),
+            "-s", "-X", "POST", format!("{}/workers/register", CONDUCTOR_URL).as_str(),
             "-H", "Content-Type: application/json",
             "-d", r#"{
                 "name": "capable-worker",

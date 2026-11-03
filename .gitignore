@@ -62,3 +62,4 @@ conductor-state.db
 
 # Hermes Agent internal state (per-project)
 .hermes/state
+.zed/

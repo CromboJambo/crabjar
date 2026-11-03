@@ -16,16 +16,30 @@ pub fn is_available() -> bool {
 
 /// Login to bitwarden CLI
 pub fn login(email: &str, master_password: &str, server: Option<&str>) -> BitwardenResult<()> {
+    // Use stdin for password to avoid exposing it in process listings (#8 security finding)
     let mut cmd = Command::new("bw");
-    cmd.arg("login").arg(email).arg(master_password);
+    cmd.arg("login").arg("--raw").arg(email);
 
     if let Some(server) = server {
         cmd.arg("--server").arg(server);
     }
 
-    let output = cmd
-        .output()
-        .map_err(|e| BitwardenError::CliNotFound(format!("Failed to execute bw: {}", e)))?;
+    cmd.stdin(std::process::Stdio::piped());
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| BitwardenError::CliNotFound(format!("Failed to spawn bw: {}", e)))?;
+
+    // Write password to stdin
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        writeln!(stdin, "{}", master_password)
+            .map_err(|e| BitwardenError::CliError(format!("Failed to write password: {}", e)))?;
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| BitwardenError::CliError(format!("Failed to wait for bw login: {}", e)))?;
 
     if output.status.success() {
         Ok(())

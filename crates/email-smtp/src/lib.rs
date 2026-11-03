@@ -8,6 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use crabjar_host_core::{EmailAddress, EmailError, EmailListFilter, EmailMessage, EmailProvider};
 use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, Transport};
 
 /// XOAUTH2 configuration for SMTP authentication.
 #[derive(Debug, Clone)]
@@ -79,37 +80,26 @@ impl SmtpEmailProvider {
 #[async_trait]
 impl EmailProvider for SmtpEmailProvider {
     async fn send(&self, message: &EmailMessage) -> Result<String, EmailError> {
-        // Build raw email body using SMTP protocol format
-        let mut body = "From: ".to_string();
-        body.push_str(&message.from.address);
-        if let Some(name) = &message.from.name {
-            body.push_str(" (");
-            body.push_str(name);
-            body.push(')');
-        }
-        body.push('\n');
+        // Build email using lettre's Message builder (v0.11 API)
+        let from_addr = format!("{} <{}>", message.from.name.as_deref().unwrap_or("Agent"), message.from.address);
+        let to_addrs: Vec<String> = message.to.iter()
+            .map(|t| format!("{} <{}>", t.name.as_deref().unwrap_or("User"), t.address))
+            .collect();
 
-        for to in &message.to {
-            body.push_str("To: ");
-            body.push_str(&to.address);
-            if let Some(name) = &to.name {
-                body.push_str(" (");
-                body.push_str(name);
-                body.push(')');
-            }
-            body.push('\n');
-        }
+        // Build body content
+        let body_text = message.body_text.as_deref().unwrap_or("");
+        let body_html = message.body_html.as_deref().unwrap_or(body_text);
 
-        body.push_str("Subject: ");
-        body.push_str(&message.subject);
-        body.push('\n');
-        body.push('\n');
-
-        if let Some(html) = &message.body_html {
-            body.push_str(html);
-        } else {
-            body.push_str(message.body_text.as_deref().unwrap_or(""));
-        }
+        let email = Message::builder()
+            .from(from_addr.parse().map_err(|e| {
+                EmailError::ProviderSpecific(format!("invalid from address: {}", e))
+            })?)
+            .to(to_addrs[0].parse().map_err(|e| {
+                EmailError::ProviderSpecific(format!("invalid to address: {}", e))
+            })?)
+            .subject(&message.subject)
+            .body(body_html.to_string())
+            .map_err(|e| EmailError::ProviderSpecific(format!("failed to build email: {}", e)))?;
 
         // Create SMTP transport
         let creds = self.build_credentials();
@@ -124,8 +114,8 @@ impl EmailProvider for SmtpEmailProvider {
                 .build()
         };
 
-        // Send raw email via SMTP transport using send_raw_bytes
-        let result = transport.send_raw_bytes(body.as_bytes());
+        // Send email
+        let result = transport.send(&email);
 
         match result {
             Ok(response) => {

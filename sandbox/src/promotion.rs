@@ -203,7 +203,7 @@ impl PromotionManager {
             rusqlite::params![
                 PromotionTier::SharedUser.name(),
                 serde_json::to_string(
-                    &serde_json::json!({"username": username, "home_path": home_path.to_string()})
+                    &serde_json::json!({"username": username, "home_path": home_path.display().to_string()})
                 )?,
                 agent_name
             ],
@@ -245,7 +245,7 @@ impl PromotionManager {
             rusqlite::params![
                 PromotionTier::CrabjarUser.name(),
                 serde_json::to_string(
-                    &serde_json::json!({"username": username, "home_path": home_path.to_string()})
+                    &serde_json::json!({"username": username, "home_path": home_path.display().to_string()})
                 )?,
                 agent_name
             ],

@@ -54,6 +54,12 @@ pub struct FleetStatusTracker {
     machines: RwLock<HashMap<String, MachineStatus>>,
 }
 
+impl Default for FleetStatusTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FleetStatusTracker {
     pub fn new() -> Self {
         Self {

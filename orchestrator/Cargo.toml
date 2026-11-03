@@ -32,8 +32,12 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 sha2 = "0.10"
+subtle = "2.4"
 rusqlite.workspace = true
 uuid.workspace = true
+
+# TLS support (#12 security finding)
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 
 # Security layer
 crabjar-guard = { path = "../guard" }

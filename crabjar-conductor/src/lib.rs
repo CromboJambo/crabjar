@@ -30,6 +30,7 @@ pub mod decision;
 pub mod fleet_status;
 pub mod gate;
 pub mod promotion;
+pub mod sandbox;
 pub mod state_store;
 pub mod task_scheduler;
 pub mod worker_registry;
