@@ -13,7 +13,7 @@ categories.workspace = true
 
 [dependencies]
 crabjar-skills = { path = "../crabjar-skills" }
-crabjar-tool-registry = { path = "../tool_registry", package = "crabjar-tool-registry" }
+crabjar-tool-registry = { path = "../../tool_registry", package = "crabjar-tool-registry" }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

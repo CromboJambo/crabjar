@@ -17,6 +17,6 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
-crabjar-tool-registry = { path = "../tool_registry" }
+crabjar-tool-registry = { path = "../../tool_registry" }
 rusqlite = { workspace = true }
 tempfile = { workspace = true }
