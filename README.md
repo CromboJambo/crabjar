@@ -60,7 +60,7 @@ Run `crabjar --help` for complete command reference.
 
 ## Version
 
-0.12.4
+0.12.5
 
 ## Repository
 
