@@ -53,6 +53,34 @@ impl MemoryStore {
         self.base_dir.join(target.filename())
     }
 
+    /// Validate that a path stays within the base directory (defense against path traversal).
+    fn validate_path_within_base(&self, path: &PathBuf) -> MemoryResult<()> {
+        // Canonicalize both paths to resolve symlinks and .. components
+        let canonical_base = self.base_dir.canonicalize().map_err(|e| {
+            MemoryError::Io(e)
+        })?;
+
+        let canonical_path = path.canonicalize().or_else(|_| {
+            // File may not exist yet — create parent and try again
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).ok();
+            }
+            path.canonicalize()
+        }).map_err(|e| {
+            MemoryError::Io(e)
+        })?;
+
+        if !canonical_path.starts_with(&canonical_base) {
+            return Err(MemoryError::InvalidParams(format!(
+                "Path traversal detected: {} is outside base dir {}",
+                path.display(),
+                self.base_dir.display()
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Read all entries from a memory store.
     pub fn read_entries(&self, target: &MemoryTarget) -> MemoryResult<Vec<String>> {
         let path = self.file_path(target);
@@ -67,6 +95,9 @@ impl MemoryStore {
     /// Write entries to a memory store.
     pub fn write_entries(&self, target: &MemoryTarget, entries: &[String]) -> MemoryResult<()> {
         let path = self.file_path(target);
+
+        // Validate path stays within base directory (redteam finding #17)
+        self.validate_path_within_base(&path)?;
 
         // Ensure directory exists
         if let Some(parent) = path.parent() {

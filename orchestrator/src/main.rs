@@ -150,13 +150,63 @@ enum AcpResponse {
 }
 
 /// Shared SSE event channel for live updates (e.g., terrarium entity positions).
-type EventChannel = Arc<tokio::sync::broadcast::Sender<String>>;
+type EventChannel = Arc<tokio::sync::Mutex<SseSubscriptionManager>>;
+
+/// SSE subscription manager with inactive subscriber cleanup (#18 security finding).
+struct SseSubscriptionManager {
+    sender: tokio::sync::broadcast::Sender<String>,
+}
+
+impl SseSubscriptionManager {
+    fn new(capacity: usize) -> Self {
+        let (tx, _rx) = tokio::sync::broadcast::channel(capacity);
+        Self { sender: tx }
+    }
+
+    fn subscribe(&self) -> tokio::sync::broadcast::Receiver<String> {
+        self.sender.subscribe()
+    }
+
+    fn send(&self, data: String) -> Result<usize, tokio::sync::broadcast::error::SendError<String>> {
+        self.sender.send(data)
+    }
+
+    /// Recreate the channel to clear all subscribers (forces reconnection).
+    /// Returns a new manager instance.
+    fn reset(&self) -> Self {
+        let (tx, _rx) = tokio::sync::broadcast::channel(100);
+        info!("SSE subscription manager reset — cleared all subscribers");
+        Self { sender: tx }
+    }
+
+    /// Get the current subscriber count.
+    fn subscriber_count(&self) -> usize {
+        self.sender.receiver_count()
+    }
+}
+
+/// Spawn a background task to periodically clean up SSE subscribers (#18).
+fn spawn_sse_cleanup(manager: Arc<tokio::sync::Mutex<SseSubscriptionManager>>) {
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+            let count = manager.lock().await.subscriber_count();
+            if count > 50 {
+                warn!(count, "SSE subscriber count exceeds threshold — resetting channel");
+                *manager.lock().await = manager.lock().await.reset();
+            } else {
+                info!(count, "SSE subscriber cleanup check");
+            }
+        }
+    });
+}
 
 /// Subscribe to live events via SSE — used by crabjar-gpui for terrarium entity updates.
 async fn subscribe_events(
     State(state): State<AppState>,
 ) -> Sse<impl stream::Stream<Item = Result<SseEvent, Infallible>>> {
-    let mut rx = state.event_channel.subscribe();
+    let mut rx = state.event_channel.lock().await.subscribe();
 
     let event_stream = stream::unfold(rx, |mut rx| async move {
         match tokio::time::timeout(tokio::time::Duration::from_secs(30), rx.recv()).await {
@@ -178,7 +228,8 @@ async fn publish_event(
     Json(payload): Json<PublishRequest>,
 ) -> Json<AcpResponse> {
     let data = serde_json::to_string(&payload.data).unwrap_or_default();
-    if state.event_channel.send(data).is_err() {
+    let manager = state.event_channel.lock().await;
+    if manager.send(data).is_err() {
         return Json(AcpResponse::Error {
             error: "No subscribers".to_string(),
         });
@@ -1583,20 +1634,52 @@ async fn api_key_auth(
 // Rate Limiting Middleware (#10 security finding)
 // ---------------------------------------------------------------------------
 
-/// Simple in-memory rate limiter: tracks requests per IP, limits to N per minute.
+/// Persistent rate limiter: tracks requests per IP, limits to N per minute.
+/// Uses file-based persistence across conductor restarts (redteam finding #15).
 struct RateLimiter {
-    requests: HashMap<String, Vec<i64>>,
+    state_file: std::path::PathBuf,
     max_requests: u32,
     window_seconds: i64,
+    // In-memory cache of recent requests
+    requests: HashMap<String, Vec<i64>>,
 }
 
 impl RateLimiter {
     fn new(max_requests: u32, window_seconds: i64) -> Self {
-        Self {
-            requests: HashMap::new(),
+        let state_file = std::path::PathBuf::from("/tmp/crabjar_rate_limits.json");
+        let mut limiter = Self {
+            state_file,
             max_requests,
             window_seconds,
+            requests: HashMap::new(),
+        };
+        limiter.load_state();
+        limiter
+    }
+
+    fn load_state(&mut self) {
+        if let Ok(content) = std::fs::read_to_string(&self.state_file) {
+            if let Ok(state) = serde_json::from_str::<HashMap<String, Vec<i64>>>(&content) {
+                // Filter out stale entries
+                let now = chrono::Utc::now().timestamp();
+                for (ip, timestamps) in state {
+                    let recent: Vec<i64> = timestamps
+                        .into_iter()
+                        .filter(|&t| now - t < self.window_seconds)
+                        .collect();
+                    if !recent.is_empty() {
+                        self.requests.insert(ip, recent);
+                    }
+                }
+            }
         }
+    }
+
+    fn save_state(&self) {
+        let _ = std::fs::write(
+            &self.state_file,
+            serde_json::to_string(&self.requests).unwrap_or_default(),
+        );
     }
 
     fn allow(&mut self, ip: &str) -> bool {
@@ -1606,15 +1689,20 @@ impl RateLimiter {
         // Clean up old entries for this IP
         if let Some(timestamps) = self.requests.get_mut(ip) {
             timestamps.retain(|&t| t > window_start);
-            if timestamps.len() >= self.max_requests as usize {
-                return false;
-            }
-            timestamps.push(now);
-            return true;
+        } else {
+            self.requests.insert(ip.to_string(), Vec::new());
         }
 
-        // First request from this IP
-        self.requests.insert(ip.to_string(), vec![now]);
+        let timestamps = self.requests.get_mut(ip).unwrap();
+
+        // Check if within limit
+        if timestamps.len() >= self.max_requests as usize {
+            return false;
+        }
+
+        // Add current timestamp
+        timestamps.push(now);
+        self.save_state();
         true
     }
 }
@@ -1713,7 +1801,7 @@ async fn main() -> anyhow::Result<()> {
     let target_scope = actor_scope.clone();
 
     // SSE event broadcast channel (capacity 100, oldest dropped if full)
-    let (event_tx, _event_rx) = tokio::sync::broadcast::channel(100);
+    let event_channel: EventChannel = Arc::new(tokio::sync::Mutex::new(SseSubscriptionManager::new(100)));
 
     // Shared state across request handlers
     let state = AppState {
@@ -1723,9 +1811,12 @@ async fn main() -> anyhow::Result<()> {
         backend: Arc::new(Mutex::new(backend)),
         actor_scope,
         target_scope,
-        event_channel: Arc::new(event_tx),
+        event_channel: event_channel.clone(),
         process_registry: Arc::new(Mutex::new(process_management::ProcessRegistry::new())),
     };
+
+    // Spawn SSE subscriber cleanup task (#18 security finding)
+    spawn_sse_cleanup(event_channel);
 
     // Define the Axum router with SSE and JSON endpoints.
     let app = Router::new()

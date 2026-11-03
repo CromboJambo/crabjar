@@ -8,6 +8,9 @@ use std::collections::HashMap;
 use std::process::{Command, Stdio};
 use tokio::sync::Mutex;
 
+// Import sandbox infrastructure
+use crabjar_sandbox::podman::{PodmanConfig, PodmanSandbox};
+
 /// Process status enum.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ProcessStatus {
@@ -75,6 +78,11 @@ pub struct ProcessManageRequest {
     pub command: Option<String>,
     /// PID to operate on (for "stop" or "inspect" actions).
     pub pid: Option<i32>,
+    /// Run in sandboxed container (Podman) for isolation.
+    #[serde(default)]
+    pub sandboxed: bool,
+    /// Container name for sandboxed execution (optional).
+    pub container_name: Option<String>,
 }
 
 /// Response payload for the process_manage tool.
@@ -126,28 +134,124 @@ pub async fn execute_process_management(
                 });
             }
 
-            // Actually spawn the process
-            let child = Command::new("sh")
-                .arg("-c")
-                .arg(&cmd)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn()
-                .map_err(|e| anyhow::anyhow!("Failed to spawn process: {}", e))?;
+            if request.sandboxed {
+                // Sandboxed execution via Podman container (redteam finding #14)
+                let sandbox = PodmanSandbox::new(PodmanConfig::default());
+                
+                // Verify podman is available
+                match sandbox.verify_installation() {
+                    Ok(_version) => {}
+                    Err(e) => {
+                        return Ok(ProcessManageResponse {
+                            success: false,
+                            action: "start".to_string(),
+                            result: serde_json::json!({
+                                "error": format!("Podman not available for sandboxed execution: {}", e)
+                            }),
+                        });
+                    }
+                }
 
-            let pid = child.id() as i32;
-            let mut reg = registry.lock().await;
-            reg.register(pid, cmd.clone()).await;
+                // Generate container name if not provided
+                let container_name = request.container_name.unwrap_or_else(|| {
+                    format!("crabjar-sandbox-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap())
+                });
 
-            Ok(ProcessManageResponse {
-                success: true,
-                action: "start".to_string(),
-                result: serde_json::json!({
-                    "pid": pid,
-                    "command": cmd,
-                    "status": "running"
-                }),
-            })
+                // Create and run container with the command
+                match sandbox.create_container(&container_name) {
+                    Ok(container_id) => {
+                        match sandbox.start_container(&container_id) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                let _ = sandbox.destroy_container(&container_id);
+                                return Ok(ProcessManageResponse {
+                                    success: false,
+                                    action: "start".to_string(),
+                                    result: serde_json::json!({
+                                        "error": format!("Failed to start sandbox container: {}", e)
+                                    }),
+                                });
+                            }
+                        }
+
+                        // Execute command in container
+                        let parts: Vec<&str> = cmd.split_whitespace().collect();
+                        if !parts.is_empty() {
+                            match sandbox.exec_in_container(&container_id, &parts) {
+                                Ok(result) => {
+                                    let _ = sandbox.stop_container(&container_id);
+                                    let _ = sandbox.destroy_container(&container_id);
+                                    
+                                    return Ok(ProcessManageResponse {
+                                        success: result.success(),
+                                        action: "start".to_string(),
+                                        result: serde_json::json!({
+                                            "container": container_name,
+                                            "command": cmd,
+                                            "exit_code": result.exit_code,
+                                            "stdout": result.stdout,
+                                            "stderr": result.stderr,
+                                            "sandboxed": true
+                                        }),
+                                    });
+                                }
+                                Err(e) => {
+                                    let _ = sandbox.destroy_container(&container_id);
+                                    return Ok(ProcessManageResponse {
+                                        success: false,
+                                        action: "start".to_string(),
+                                        result: serde_json::json!({
+                                            "error": format!("Failed to execute in sandbox: {}", e)
+                                        }),
+                                    });
+                                }
+                            }
+                        } else {
+                            let _ = sandbox.destroy_container(&container_id);
+                            return Ok(ProcessManageResponse {
+                                success: false,
+                                action: "start".to_string(),
+                                result: serde_json::json!({
+                                    "error": "Empty command"
+                                }),
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        return Ok(ProcessManageResponse {
+                            success: false,
+                            action: "start".to_string(),
+                            result: serde_json::json!({
+                                "error": format!("Failed to create sandbox container: {}", e)
+                            }),
+                        });
+                    }
+                }
+            } else {
+                // Unsandboxed execution (legacy behavior)
+                let child = Command::new("sh")
+                    .arg("-c")
+                    .arg(&cmd)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .map_err(|e| anyhow::anyhow!("Failed to spawn process: {}", e))?;
+
+                let pid = child.id() as i32;
+                let mut reg = registry.lock().await;
+                reg.register(pid, cmd.clone()).await;
+
+                Ok(ProcessManageResponse {
+                    success: true,
+                    action: "start".to_string(),
+                    result: serde_json::json!({
+                        "pid": pid,
+                        "command": cmd,
+                        "status": "running",
+                        "sandboxed": false
+                    }),
+                })
+            }
         }
         "stop" => {
             let pid = request.pid.ok_or_else(|| anyhow::anyhow!("pid required for stop"))?;
