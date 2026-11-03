@@ -98,6 +98,25 @@ fn expand_tilde(path: &str) -> String {
     }
 }
 
+/// Validate SSH key file permissions (redteam finding #1).
+/// Key files should be 0600 or stricter to prevent unauthorized access.
+fn validate_ssh_key_permissions(key_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let metadata = std::fs::metadata(key_path)?;
+    let mode = metadata.permissions().mode();
+
+    // Check that the key is not world-readable or group-readable
+    if mode & 0o077 != 0 {
+        return Err(format!(
+            "SSH key '{}' has overly permissive permissions ({}). Expected 0600 or stricter.",
+            key_path,
+            format!("{:o}", mode)
+        )
+        .into());
+    }
+
+    Ok(())
+}
+
 /// Execute a command on a remote machine via SSH.
 ///
 /// # Arguments
@@ -217,6 +236,9 @@ pub async fn execute_remote(
             Some(path) => expand_tilde(path),
             None => expand_tilde("~/.ssh/id_lab"), // default lab key
         };
+
+        // Validate SSH key permissions before use (redteam finding #1)
+        validate_ssh_key_permissions(&key_path)?;
 
         ssh_options.push("-i".to_string());
         ssh_options.push(key_path);

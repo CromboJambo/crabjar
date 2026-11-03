@@ -1718,7 +1718,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Restrict CORS to localhost origins only (#4 security finding)
     let cors = CorsLayer::new()
-        .allow_origin(tower_http::cors::AllowOrigin::any())
+        .allow_origin(tower_http::cors::AllowOrigin::exact(
+            axum::http::HeaderValue::from_static("http://localhost:3000"),
+        ))
         .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
         .allow_headers([axum::http::HeaderName::from_static("content-type"), axum::http::HeaderName::from_static("authorization")]);
 
