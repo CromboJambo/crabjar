@@ -25,6 +25,10 @@ test-e2e-smoke:
 test-e2e-full:
     cargo test -p crabjar --test e2e_full
 
+# Run execution pipeline benchmarks
+bench:
+    cargo bench -p crabjar-benchmarks
+
 # Narrow-scope test: pass a crate DIRECTORY (e.g. `guard`, `host/host-core`,
 # `memory`). Resolves the package name from <dir>/Cargo.toml at runtime, so the
 # directory works even when it != the package name (ADR-004: the glass; e.g.
