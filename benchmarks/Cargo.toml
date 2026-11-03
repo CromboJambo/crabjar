@@ -8,6 +8,10 @@ publish = false
 name = "execution_pipeline"
 harness = false
 
+[[bench]]
+name = "memory_profile"
+harness = false
+
 [dependencies]
 crabjar-guard = { path = "../guard" }
 tracing = "0.1"
