@@ -59,3 +59,6 @@ _unsloth_sentencepiece_temp/
 # Abandoned experiments / local scratch — keep off git, on disk
 historical/
 conductor-state.db
+
+# Hermes Agent internal state (per-project)
+.hermes/state

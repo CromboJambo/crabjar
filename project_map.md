@@ -1,14 +1,14 @@
 # project_map.md
 
-> Generated: July 10 2026 (updated October 16 2026 — remote skill discovery crates added)
-> Source: Cargo.toml (root + all members), filesystem scan, README.md, AGENTS.md, agent_config.md
+> Generated: November 02 2026 — Fresh structural audit (77 workspace members)
+> Source: Cargo.toml, filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
 ---
 
 ## 1. Overview
 
-CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), conductor (fleet orchestration service with capability-based security model), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, file search engine (BM25/Tantivy 0.22), plugin system (WASM runtime), Zed ACP bridge, agent skills, remote skill discovery infrastructure (GitHub client, ClawHub registry client, security scanner, trust manager), and subagent delegation framework (Hermes-compatible delegate_task tool). LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
+CrabJar is a Rust 2024 workspace with 77 crates centered on the `crabjar` CLI. It provides state-docs management, workspace config loading, knowledge-store bridge, orchestrator (Axum SSE server with unified LM client), conductor (fleet orchestration service with capability-based security model), guard (execution gate with trust layers, annealing, scope isolation, fingerprint approvals), telemetry (flight recorder), sandbox (agent isolation), tool registry, skill script runner, skill reference store, file search engine (BM25/Tantivy 0.22), plugin system (WASM runtime), Zed ACP bridge, agent skills, remote skill discovery infrastructure, subagent delegation framework, analysis toolkit (8 analyze-* crates for APK/dotnet/firmware/HAR/JS/native/MCP), VM lifecycle management (vm-core + vm-bridge), durable objects, worker framework, compression pipeline, ML training data extraction and preprocessing, GPU-accelerated dashboard (herdr protocol), git operations, commit message generation, kanban orchestration, SSH bastion host, email/web/browser tools, Home Assistant integration, and deployment tooling. LLM inference (runner, plug-in, safetensors, GGUF parser) is in a separate workspace at `llm-workspace/`.
 
 ---
 
@@ -18,363 +18,159 @@ CrabJar is a Rust 2024 workspace centered on the `crabjar` CLI. It includes stat
 
 ```text
 crabjar/
-├── Cargo.toml               # Workspace root — 25 members, shared deps
+├── Cargo.toml               # Workspace root — 77 members, shared deps
 ├── Cargo.lock               # Locked dependency graph
 ├── build.rs                 # Root build script
-├── AGENTS.md               # Repository guidelines
-├── README.md               # Project overview
-├── agent_config.md         # Agent configuration
-├── Justfile               # Task runner shortcuts
+├── AGENTS.md                # Repository guidelines
+├── README.md                # Project overview
+├── agent_config.md          # Agent configuration
+├── Justfile                 # Task runner shortcuts
 ├── Containerfile, Dockerfile
-├── rust-toolchain.toml     # Rust nightly toolchain
-├── .crabjar_config.toml    # Workspace config (tool_execution_enabled)
-├── index.md               # Root index
-├── REPRO.md               # Reproduction guide
-├── human_reference.md     # Human reference documentation
-├── environment_manifest.json  # Environment manifest (CPU/GPU/storage)
-
-├── project_map.md         # This file
-├── ROADMAP.md             # Development roadmap
+├── rust-toolchain.toml      # Rust nightly toolchain
+├── .crabjar_config.toml     # Workspace config (tool_execution_enabled)
+├── index.md                 # Root index
+├── REPRO.md                 # Reproduction guide
+├── human_reference.md       # Human reference documentation
+├── environment_manifest.json# Environment manifest (CPU/GPU/storage)
+│
+├── project_map.md           # This file
+├── ROADMAP.md               # Development roadmap
 │
 │  Core crabjar crates
-├── src/main.rs              # CLI entry point
+├── src/main.rs              # CLI entry point (PR #3: split into command modules)
 ├── src/lib.rs               # shared library surface
-├── src/project_loader.rs    # config loading
-├── src/dotfile_manager.rs   # dotfile management
-├── src/doctor.rs            # doctor check command
+├── src/commands/            # Command modules (post PR #3 api-module-splitting)
 ├── src/bitwarden/           # bitwarden CLI integration
-│   ├── cli.rs
-│   ├── commands.rs
-│   ├── mod.rs
-│   └── store.rs
 ├── src/knowledge_store/     # knowledge-store commands
-│   ├── mod.rs
-│   └── commands.rs
 ├── src/crabjar_config/      # workspace config crate
-│   └── mod.rs
-├── src/host-binary/         # host binary crate
-│   ├── AGENTS.md
-│   ├── Cargo.toml
-│   ├── cli.rs
-│   ├── dashboard.rs
-│   └── main.rs
+├── src/host-binary/         # host binary crate (TUI, guard approval flow)
 ├── src/skill-script-runner/ # skill script discovery and execution
-│   └── src/
 ├── src/skill-reference-store/ # skill reference indexing and staleness
-│   └── src/
-├── src/index.md             # src directory index
-├── src/manifest.json        # src directory manifest
+├── src/skill-process-management/ # process management skill
+├── src/skill-struct-tok-pipeline/ # structural tokenization pipeline
 │
 │  Supporting crates
-├── memory/                  # agent-context crate, SQLite-backed storage (18 source files)
-│   ├── Cargo.toml
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── error.rs
-│   │   ├── models.rs
-│   │   ├── schema.rs
-│   │   ├── store.rs
-│   │   ├── context/           # ContextFragmentBuilder with token budget (4 files)
-│   │   │   ├── mod.rs
-│   │   │   ├── constants.rs
-│   │   │   ├── fragment.rs
-│   │   │   └── budget.rs
-│   │   ├── state_docs/      # state-docs querier (drift_status)
-│   │   │   ├── mod.rs
-│   │   │   ├── indexer.rs
-│   │   │   ├── extract.rs     # markdown parsing (~400 LoC)
-│   │   │   ├── insert.rs      # SQLite writes (~144 LoC)
-│   │   │   ├── querier.rs
-│   │   │   ├── renderer.rs
-│   │   │   ├── models.rs
-│   │   │   └── schema.rs
+├── memory/                  # agent-context crate, SQLite-backed storage (21 files)
+│   ├── state_docs/          # state-docs querier (drift_status)
 │   └── tests/
-│       └── state_docs_tests.rs
-├── memory/files/            # memory crate helper files
-│   ├── index.md
-│   └── manifest.json
-├── guard/                   # Trust layers, annealing, execution gate, scope isolation (28 source files)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── gate.rs          # ExecutionGate (single authorization boundary)
-│       ├── gate_tests.rs    # ExecutionGate unit tests
-│       ├── gate_context.rs  # GateContext struct
-│       ├── gate_result.rs   # GateResult enum
-│       ├── concierge.rs     # GateConcierge (enforce: deny/pending/proceed)
-│       ├── concierge_types.rs # GateConcierge types
-│       ├── trust.rs         # TrustManager (confidence bands)
-│       ├── trust_types.rs   # TrustScore, TrustLayer, RetrievalBand types
-│       ├── trust_resolution.rs # Requested-vs-effective trust resolution
-│       ├── action.rs        # ActionStatus, OutcomeStatus, ActionRequest, ActionOutcome
-│       ├── inference.rs     # ModelInferenceKind, ModelInferenceRequest, ModelInferenceOutcome
-│       ├── guard_db.rs        # GuardDb (SQLite schema + queries)
-│       ├── guard_db_impl.rs   # GuardDb impl (anneal + concierge + PID trust)
-│       ├── guard_db_queries.rs # Action requests + trust resolution queries
-│       ├── guard_db_types.rs   # TrustResolutionEntry type
-│       ├── db_error.rs        # GuardDb error types
-│       ├── schema.sql       # GuardDb schema definition
-│       ├── scope.rs         # Scope isolation model (identity, project, tenant, thread)
-│       ├── fingerprint.rs   # InvocationFingerprint + SHA-256
-│       ├── fingerprint_types.rs # ApprovalLease, ApprovalScope types
-│       ├── memory.rs        # MemoryGraph (nodes + edges)
-│       ├── memory_types.rs  # NodeKind, MemoryNode, EdgeRelation, MemoryEdge
-│       ├── command_risk.rs  # CommandRisk, HIGH/MEDIUM_RISK_COMMANDS
-│       ├── risk_config.rs   # RiskConfig
-│       ├── domain_allowlist.rs  # Domain allowlist for web fetch scope gating
-│       ├── policy.rs        # StaticPolicyEngine (TOML-based declarative policies)
-│       ├── policy_types.rs  # PolicyRule, PolicyCheck types
-│       └── context_budget.rs # ContextBudget + MAX_TOKENS_PER_FRAGMENT
-├── telemetry/               # Flight recorder, command executor
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── flight_recorder.rs  # FlightRecorder (execute_command, git capture)
-│       ├── command_executor.rs # process spawning + output capture
-│       ├── schema.rs
-│       └── error.rs
-├── sandbox/                 # Agent isolation (Unix user, dinit-container, cgroup)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── agent_isolation.rs
-│       ├── schema.rs
-│       └── error.rs
-├── tool_registry/           # MCP tool registry (rig/aur patterns)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── tool_registry.rs
-│       ├── schema.rs
-│       └── error.rs
-├── crabjar-github-client/   # GitHub API client for skill search/install (Phase 8)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── models.rs        # SkillInfo, SearchResult types
-│       └── error.rs         # GitHubError enum
-├── crabjar-clawhub-client/  # ClawHub.io registry API integration (Phase 9)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── models.rs        # SkillInfo with trust_tier, download_url fields
-│       └── error.rs         # ClawHubError enum
-├── crabjar-skill-scanner/   # Security scanning pipeline + checksum verification (Phase 10)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── scanner.rs       # SkillScanner with scan_skill(), scan_skill_with_checksum()
-│       ├── report.rs        # ScanReport, Finding types
-│       └── error.rs         # ScannerError enum
-├── crabjar-trust-manager/   # Trust tier management, skill cache, update detection (Phase 11)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── trust.rs         # TrustManager with policy mapping logic
-│       ├── cache.rs         # SkillCache with version-aware caching and stale entry cleanup
-│       ├── updates.rs       # UpdateDetector with semantic version comparison
-│       ├── models.rs        # TrustTier, SkillCacheEntry, UpdateCheckResult types
-│       └── error.rs         # TrustManagerError enum
-├── axum-mux/                # vm-bridge (per-VM websocket relay)
-│   ├── Cargo.toml
-│   ├── README.md
-│   ├── ROADMAP.md
-│   └── AGENTS.md
-│   └── src/
-│       ├── lib.rs
-│       ├── proxy.rs           # WebSocket proxy for display protocols
-│       └── terminal_relay.rs  # Terminal session relay (WebSocket → stdin/stdout)
-├── crabjar-architecture/    # Mechanical dependency boundary enforcement
-│   ├── Cargo.toml
-│   ├── AGENTS.md
-│   └── src/
-│       ├── lib.rs
-│       ├── layer.rs         # 8-layer model (0-7)
-│       └── boundary.rs      # boundary::check_workspace_boundaries()
-├── crabjar-plugin/          # Plugin system (WASM runtime, lifecycle management)
-│   ├── Cargo.toml
-│   └── src/
-│       └── lib.rs
-├── crates/terminal/         # Terminal multiplexer integration (wezterm/zellij + asciinema v2)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs           # TerminalSession, TerminalManager, Snapshot types
-│       ├── backend.rs       # TerminalBackend trait + detection utilities
-│       ├── wezterm.rs       # Wezterm mux backend (spawn/send-text/get-text)
-│       ├── zellij.rs        # Zellij action protocol backend
-│       └── recording.rs     # Asciinema v2 session recorder
-
-│  File search engine
-├── file_search/             # BM25-based file indexing and search (Tantivy 0.22)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs           # Public API surface
-│       ├── indexer.rs       # BM25 document indexing with LowerCaser tokenizer
-│       └── storage.rs       # SearchStorage (index CRUD, search, reload)
-
-│  Subagent delegation framework (P1-4)
-├── crabjar-delegation/      # Hermes-compatible delegate_task tool (spawns isolated subagents)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs           # Public API surface (DelegatedTask, DelegationRequest, etc.)
-│       ├── dispatcher.rs    # TaskDispatcher — submits goals to conductor, polls for results
-│       ├── aggregation.rs   # ResultAggregator — collects and combines subagent outputs
-│       ├── timeout.rs       # TaskTimeout — tracks task deadlines
-│       └── error.rs         # DelegationError enum
+├── guard/                   # Trust layers, annealing, execution gate (30 files)
+│   └── src/                 # 30 source files including policy engine, domain allowlist
+├── telemetry/               # Flight recorder, command executor (7 files)
+├── sandbox/                 # Agent isolation (6 files)
+├── tool_registry/           # MCP tool registry (5 files)
+├── orchestrator/            # Axum SSE server + unified LM client (16 files)
+│   ├── src/lm_studio_client/# Unified LM client with SessionStore
+│   └── prompts/             # Default system prompt templates
 │
-│  Host runtime
-├── host/host-core/          # Event bus, plugin API, WorkItem model, config
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── adapter.rs       # ProductAdapter trait + AdapterRegistry
-│       ├── config.rs
-│       ├── event_bus.rs
-│       ├── plugin.rs
-│       └── work_item.rs
-├── host/host-system/        # Notifications, clipboard, secrets, tray
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── clipboard.rs
-│       ├── notifications.rs
-│       ├── secrets.rs
-│       └── tray.rs
-├── host/host-observe/       # Metrics, tracing, health reporting
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── health.rs
-│       ├── metrics.rs
-│       └── tracing_setup.rs
-├── host/host-agent/         # Agent loop (ReAct: observe→understand→plan→execute→verify→reflect)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── loop_engine.rs   # ReAct loop engine
-│       ├── executor.rs
-│       ├── planner.rs
-│       ├── verifier.rs
-│       ├── reflector.rs
-│       ├── work_item_store.rs
-│       ├── model_routing.rs  # ModelRouter with LoopPhase enum, phase-specific backends
-│       ├── context_compression.rs # ContextCompressor with token budget enforcement
-│       ├── decision_gate.rs  # DecisionGate (ToolCall/RespondDirectly/Defer)
-│       └── inference/
-│           ├── mod.rs
-│           ├── backend.rs
-│           └── http_backend.rs
-├── host/host-webview/       # WebView session management, OAuth2, token cache
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── auth.rs
-│       ├── controller.rs
-│       ├── cookie_store.rs
-│       ├── partition.rs
-│       ├── session.rs
-│       └── token_cache.rs
-├── host/host-mqtt/          # MQTT client + Home Assistant discovery
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── client.rs
-│       ├── config.rs
-│       ├── discovery.rs
-│       ├── handler.rs
-│       └── media_bridge.rs
-├── host/host-graph/         # Microsoft Graph API client
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── client.rs
-│       ├── config.rs
-│       └── types.rs
-├── host/host-screen/        # Screen capture + display protocol integration
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       ├── display.rs
-│       └── terminal.rs
+│  Analysis toolkit (8 crates)
+├── analyze-common/          # Shared analysis types and utilities
+├── analyze-apk/             # Android APK analysis
+├── analyze-dotnet/          # .NET assembly analysis
+├── analyze-firmware/        # Firmware image analysis
+├── analyze-har/             # HTTP Archive (HAR) file analysis
+├── analyze-js/              # JavaScript bundle analysis
+├── analyze-native/          # Native binary analysis
+├── analyze-mcp-server/      # MCP server analysis
+│
+│  VM and worker infrastructure
+├── vm/vm-core/              # VM lifecycle management (5 files)
+├── crabjar-conductor/       # Fleet orchestration service (51 files)
+├── crabjar-worker/          # Worker framework for distributed execution
+├── crabjar-durable-objects/ # Durable object storage and retrieval
+│
+│  Compression pipeline
+├── crabjar-compress/        # Content compression engine (8 files)
+├── crabjar-compress-mcp/    # MCP server for compression operations
+│
+│  ML training data pipeline
+├── crates/train-extract/    # Training data extraction from HAR/network captures
+├── crates/train-secret-stripper/ # PII/secret removal from training data
+├── crates/train-dedup/      # Training data deduplication engine
+├── crates/train-filewatcher/# File watcher for training data pipeline
+│
+│  Git operations
+├── crates/crabjar-git/      # Git operations (diff, status, add via libgit2)
+├── crates/crabjar-commit/   # Commit message generation from diffs
+├── crates/crabjar-commit-cli/ # CLI tool for commit staging and messages
+│
+│  Orchestration and scheduling
+├── scheduler/               # Cron jobs, workers, watchers with execution gating (7 files)
+├── crabjar-kanban-orchestrator/ # Kanban board orchestration
+├── slow-friend/             # Drift detection and adaptation (10 files)
+│
+│  Web tools
+├── crabjar-web-search/      # Web search integration (7 files)
+├── crabjar-web-extract/     # Web page content extraction (4 files)
+├── crates/crabjar-browser/  # Browser automation
+│
+│  Communication tools
+├── crates/email-smtp/       # SMTP email sending
+├── crabjar-skills/          # Reusable skill definitions (6 files)
+│
+│  Tooling and binding
+├── crabjar-tool-binding/    # Tool call binding layer
+├── crabjar-analyze/         # Analysis orchestration CLI
+├── crabjar-review/          # Code review tool (13 files)
+├── crabjar-mcp-tool-registry/ # MCP tool registry service
+│
+│  Remote skill discovery (Phases 8-11)
+├── crabjar-github-client/   # GitHub API client for skill search/install
+├── crabjar-clawhub-client/  # ClawHub.io registry API integration
+├── crabjar-skill-scanner/   # Security scanning pipeline + checksum verification
+├── crabjar-trust-manager/   # Trust tier management, skill cache, update detection
+│
+│  MCP servers
+├── crabjar-unsloth-mcp/     # Unsloth training data and fine-tuning jobs via MCP
+├── crabjar-herdr-mcp/       # Herdr fleet management via MCP
+│
+│  Structure analysis
+├── crabjar-structured-aux/  # Structured auxiliary analysis
+├── universal-structure/     # Universal structure definitions (11 files)
+│
+│  Infrastructure
+├── crates/ssh-bastion/      # SSH bastion host using russh (7 files)
+├── crabjar-deploy/          # Deployment tooling (8 files)
+├── crabjar-memory/          # Memory management service (7 files)
+├── crabjar-delegation/      # Subagent delegation framework (5 files)
+├── crabjar-cron/            # Cron job management (6 files)
+│
+│  Host runtime (8 crates)
+├── host/host-core/          # Event bus, plugin API, WorkItem model (7 files)
+├── host/host-system/        # Notifications, clipboard, secrets, tray (5 files)
+├── host/host-observe/       # Metrics, tracing, health reporting (4 files)
+├── host/host-agent/         # Agent loop — ReAct pattern (15 files)
+├── host/host-webview/       # WebView session management, OAuth2 (7 files)
+├── host/host-mqtt/          # MQTT client + Home Assistant discovery (6 files)
+├── host/host-graph/         # Microsoft Graph API client (4 files)
+├── host/host-screen/        # Screen capture + display protocol integration (3 files)
 │
 │  Host apps
 ├── apps/teams/              # Teams plugin (reference application)
-│   ├── Cargo.toml
-│   ├── src/
-│   │   ├── lib.rs
-│   │   └── teams_plugin.rs
-│   └── teams-for-linux/     # additional teams-for-linux subdirectory
+├── apps/terrarium/          # Terrarium isometric habitat app (10 files)
 │
-│  Orchestrator (Axum SSE server)
-├── orchestrator/            # Axum SSE server + unified LM client
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs          # Axum router: /acp/run, /acp/prompt, /acp/chat
-│       ├── backend/
-│       │   └── mod.rs       # InferenceBackend trait + BackendKind enum
-│       └── lm_studio_client/
-│           ├── mod.rs       # LM Studio client module root
-│           ├── types.rs     # Unified message/request/response types, LmStudioEndpoint
-│           ├── client.rs    # LmStudioClient::chat() + chat_with_system()
-│           ├── session.rs   # SessionState + SessionStore (SQLite)
-│           ├── error.rs     # LmStudioError + ToolCallInfo
-│           ├── endpoints.rs # Endpoint converters (native, OpenAI, Anthropic)
-│           ├── prompt_types.rs    # PromptEnvelope types + error enum (~223 LoC)
-│           ├── prompt_validator.rs # Instruction-hijack detection logic (~624 LoC)
-│           └── tests.rs     # Unit tests (40+)
-│   └── prompts/
-│       └── default_system.md # Default system prompt template
+│  GPU dashboard
+├── crates/crabjar-gpui/     # GPU-accelerated multi-agent dashboard (herdr protocol)
 │
-│  Conductor (fleet orchestration service)
-├── crabjar-conductor/       # Fleet task distribution + security model
-├── crabjar-gpui/            # GPU-accelerated multi-agent dashboard (herdr protocol)
-│   ├── Cargo.toml
-│   ├── src/
-│   │   ├── lib.rs           # Public API surface
-│   │   ├── main.rs          # Binary entry point
-│   │   ├── api.rs           # HTTP API handlers (goals, tasks, workers)
-│   │   ├── conductor.rs     # Core orchestration logic + annealing integration
-│   │   ├── auth.rs          # JWT-like token generation/validation with scopes
-│   │   ├── gate.rs          # Guard crate integration for task authorization
-│   │   ├── state_store.rs   # SQLite-backed persistent state store
-│   │   ├── task_scheduler.rs # Task-to-worker scheduling logic
-│   │   └── worker_registry.rs # Worker registration + capability matching
-│   └── tests/               # Integration tests for conductor API
-
-│  Zed ACP bridge
+│  Integration bridges
+├── axum-mux/                # vm-bridge (per-VM websocket relay, 7 files)
 ├── zed-acp-bridge/          # Wasm extension (tool call mapping + gate enforcement)
-│   ├── Cargo.toml
-│   ├── src/lib.rs
-│   └── pkg/
 ├── zed-acp-server/          # stdio JSON-RPC server (ACP protocol execution)
-│   ├── Cargo.toml
-│   └── src/
-│       ├── lib.rs
-│       └── main.rs
 │
+│  Plugin system
+├── crabjar-plugin/          # WASM runtime, lifecycle management (stub)
+│
+│  Governance and architecture
+├── crabjar-architecture/    # Mechanical dependency boundary enforcement (8-layer model)
 │
 │  Non-crate artifacts
 ├── tests/                   # CLI integration tests
 │   ├── cli.rs
-│   ├── cli/
-│   └── index.md
-├── testing/
-│   └── configs/
-├── assets/                  # assets
-│   └── crabjar-banner.png
-├── workspace/               # workspace config
-│   ├── index.md
-│   └── manifest.json
-├── ui-state-copy/           # UI state copy
-│   └── daemon/
-│       ├── index.md
-│       └── manifest.json
-├── crabjar-skills/          # reusable crabjar skills (README, install.sh, skill templates)
-├── scripts/                 # build/dev scripts
-│   └── module-sizes.py
-├── archive/                 # empty (was for experiment consolidation)
-├── .agents/skills/          # 32 agent skills (Hermes skill ecosystem)
-└── .agents/references/      # agent reference files (may be empty in some checkouts)
+│   └── e2e/                 # End-to-end test slices
+├── scripts/                 # Build/dev scripts
+├── .agents/skills/          # Agent skills (Hermes skill ecosystem)
+├── specs/                   # Architecture Decision Records (Nygard-style templates)
+├── docs/                    # Documentation (architecture, security, specs, training)
+└── state-docs/              # State documentation storage
 ```
 
 ### 2.2 Core Components
@@ -386,17 +182,26 @@ crabjar/
 | `memory` | Agent-context SQLite storage | Storage | Active |
 | `orchestrator` | Axum SSE server + unified LM client | Orchestrator | Active |
 | `crabjar-conductor` | Fleet orchestration service with capability-based security model | Orchestration | Active |
-| `crabjar-gpui` | GPU-accelerated multi-agent dashboard using herdr protocol | UI/Dashboard | Active |
+| `crabjar-worker` | Worker framework for distributed task execution | Orchestration | Active |
+| `crabjar-durable-objects` | Durable object storage and retrieval | Storage | Active |
 | `guard` | Trust layers, annealing, execution gate, scope isolation | Authorization | Active |
 | `telemetry` | Flight recorder, command executor | Telemetry | Active |
 | `sandbox` | Agent isolation (Unix user, dinit-container, cgroup) | Isolation | Active |
 | `tool_registry` | MCP tool registry | Registry | Active |
+| `crabjar-mcp-tool-registry` | MCP tool registry service | Registry | Active |
+| `scheduler` | Cron jobs, workers, watchers with execution gating | Scheduling | Active |
+| `crabjar-cron` | Cron job management interface | Scheduling | Active |
+| `analyze-*` (8 crates) | Analysis toolkit for APK/dotnet/firmware/HAR/JS/native/MCP | Analysis | Active |
+| `vm/vm-core` | VM lifecycle management | Infrastructure | Active |
+| `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
+| `crabjar-deploy` | Deployment tooling | DevOps | Active |
+| `crates/ssh-bastion` | SSH bastion host using russh | Infrastructure | Active |
 | `crabjar-github-client` | GitHub API client for skill search/install (Phase 8) | Remote Discovery | Active |
 | `crabjar-clawhub-client` | ClawHub.io registry API integration (Phase 9) | Remote Discovery | Active |
 | `crabjar-skill-scanner` | Security scanning pipeline + checksum verification (Phase 10) | Remote Discovery | Active |
-| `crabjar-trust-manager` | Trust tier management, version-aware skill cache, update detection (Phase 11) | Remote Discovery | Active |
+| `crabjar-trust-manager` | Trust tier management, skill cache, update detection (Phase 11) | Remote Discovery | Active |
 | `crabjar-delegation` | Subagent delegation framework — Hermes-compatible delegate_task tool | Orchestration | Active |
-| `axum-mux` | vm-bridge (per-VM websocket relay) | Bridge | Active |
+| `crabjar-gpui` | GPU-accelerated multi-agent dashboard using herdr protocol | UI/Dashboard | Active |
 | `crabjar-architecture` | Mechanical dependency boundary enforcement (8-layer model) | Governance | Active |
 | `file_search` | BM25-based file indexing and search (Tantivy 0.22) | Search | Active |
 | `crabjar-plugin` | Plugin system (WASM runtime, lifecycle management) | Plugin | Active |
@@ -410,33 +215,56 @@ crabjar/
 | `host/host-graph` | Microsoft Graph API client | Integration | Active |
 | `host/host-screen` | Screen capture + display protocol integration | Integration | Active |
 | `apps/teams` | Teams plugin (reference application) | App | Active |
-| `src/host-binary` | Host binary crate | Binary | Active |
+| `apps/terrarium` | Terrarium isometric habitat app | App | Active |
+| `src/host-binary` | Host binary crate with TUI | Binary | Active |
 | `src/skill-script-runner` | Skill script discovery and execution | Skill | Active |
 | `src/skill-reference-store` | Skill reference indexing and staleness | Reference | Active |
+| `src/skill-process-management` | Process management skill | Skill | Active |
 | `zed-acp-bridge` | Wasm extension (tool call mapping + gate enforcement) | Bridge | Active |
 | `zed-acp-server` | stdio JSON-RPC server (ACP protocol execution) | Bridge | Active |
+| `crabjar-compress` | Content compression engine | Pipeline | Active |
+| `crates/train-*` (4 crates) | ML training data extraction and preprocessing pipeline | Training | Active |
+| `crates/crabjar-git` | Git operations (diff, status, add via libgit2) | Integration | Active |
+| `crates/crabjar-commit` | Commit message generation from diffs | Integration | Active |
+| `crabjar-kanban-orchestrator` | Kanban board orchestration | Orchestration | Active |
+| `slow-friend` | Drift detection and adaptation | Observability | Active |
+| `crabjar-web-search` | Web search integration | Tool | Active |
+| `crabjar-web-extract` | Web page content extraction | Tool | Active |
+| `crates/email-smtp` | SMTP email sending | Communication | Active |
+| `crabjar-memory` | Memory management service | Storage | Active |
 
 ### 2.3 Workspace Members
 
-Declared in Cargo.toml `[workspace.members]`: 30 crates total.
-- **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `crabjar-conductor`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
+Declared in Cargo.toml `[workspace.members]`: 77 crates total.
+
+- **Core**: `memory`, `guard`, `telemetry`, `orchestrator`, `sandbox`, `tool_registry`, `axum-mux`, `crabjar-architecture`
+- **Analysis toolkit** (8 crates): `analyze-common`, `analyze-apk`, `analyze-dotnet`, `analyze-firmware`, `analyze-har`, `analyze-js`, `analyze-native`, `analyze-mcp-server`
+- **VM and worker infrastructure**: `vm/vm-core`, `crabjar-conductor`, `crabjar-worker`, `crabjar-durable-objects`
+- **Compression pipeline**: `crabjar-compress`, `crabjar-compress-mcp`
+- **ML training data pipeline** (4 crates): `train-extract`, `train-secret-stripper`, `train-dedup`, `train-filewatcher`
+- **Git operations** (3 crates): `crabjar-git`, `crabjar-commit`, `crabjar-commit-cli`
+- **Orchestration and scheduling**: `scheduler`, `crabjar-kanban-orchestrator`, `slow-friend`
+- **Web tools**: `crabjar-web-search`, `crabjar-web-extract`, `crates/crabjar-browser`
+- **Communication tools**: `crates/email-smtp`, `crabjar-skills`
+- **Tooling and binding**: `crabjar-tool-binding`, `crabjar-analyze`, `crabjar-review`, `crabjar-mcp-tool-registry`
 - **Remote skill discovery** (Phases 8-11): `crabjar-github-client`, `crabjar-clawhub-client`, `crabjar-skill-scanner`, `crabjar-trust-manager`
-- **Test infrastructure**: `crabjar-test-registry` — mock HTTP registry for integration testing without network dependencies
-- **Plugin system**: `crabjar-plugin` (WASM runtime, lifecycle management)
-- **File search**: `file_search` (BM25 indexing with Tantivy 0.22)
-- **Terminal**: `crates/terminal` (wezterm/zellij backends + asciinema v2 recording)
-- **Host**: `host/host-core`, `host/host-system`, `host/host-observe`, `host/host-agent`, `host/host-webview`, `host/host-mqtt`, `host/host-graph`, `host/host-screen`
-- **Apps**: `apps/teams`
+- **MCP servers**: `crabjar-unsloth-mcp`, `crabjar-herdr-mcp`
+- **Structure analysis**: `crabjar-structured-aux`, `universal-structure`
+- **Infrastructure**: `crates/ssh-bastion`, `crabjar-deploy`, `crabjar-memory`, `crabjar-delegation`, `crabjar-cron`
+- **Host runtime** (8 crates): `host/host-core`, `host/host-system`, `host/host-observe`, `host/host-agent`, `host/host-webview`, `host/host-mqtt`, `host/host-graph`, `host/host-screen`
+- **Apps**: `apps/teams`, `apps/terrarium`
+- **GPU dashboard**: `crates/crabjar-gpui`
+- **Integration bridges**: `axum-mux`, `zed-acp-bridge`, `zed-acp-server`
+- **Plugin system**: `crabjar-plugin`
+- **Terminal**: `crates/terminal`
+- **Skills** (4 crates): `src/skill-script-runner`, `src/skill-reference-store`, `src/skill-process-management`, `src/skill-struct-tok-pipeline`
 - **Binary**: `src/host-binary`
-- **Skills**: `src/skill-script-runner`, `src/skill-reference-store`
-- **Zed ACP**: `zed-acp-bridge`, `zed-acp-server`
-- **ADR process**: `specs/` (Architecture Decision Records, Nygard-style templates)
 
 ### 2.4 Shared Dependencies
 
 Declared in Cargo.toml `[workspace.dependencies]`:
 - async-trait (0.1), futures (0.3), tokio (1.51.1, full), tokio-stream (0.1, time)
-- serde (1.0, derive), serde_json (1.0), toml (0.8)
+- serde (1.0, derive), serde_json (1.0), toml (0.8), schemars (0.8)
 - thiserror (2.0), anyhow (1.0)
 - rusqlite (0.37, bundled)
 - clap (4.5, derive, env), clap_mangen (0.2)
@@ -477,7 +305,7 @@ Declared in Cargo.toml `[workspace.dependencies]`:
 | `just module-sizes-check` | CI gate — fails on >500 LoC |
 | `just reproducible-build` | locked deps + deterministic flags |
 
-**Version:** 0.12.0 (Rust 2024 edition)
+**Version:** 0.12.5 (Rust 2024 edition)
 **Total tests:** 691 passing across workspace, 0 failing
 
 ---
@@ -509,9 +337,10 @@ Declared in Cargo.toml `[workspace.dependencies]`:
 
 ## 6. CLI Binary Surface
 
-### 6.1 `crabjar` CLI (src/main.rs)
+### 6.1 `crabjar` CLI (src/main.rs → src/commands/)
 
-> Note: CLI surface is the source of truth. If a command is missing from the table, run `crabjar --help` or check `src/main.rs` directly.
+> Note: PR #3 merged — main.rs split into command modules under src/commands/.
+> CLI surface is the source of truth. If a command is missing from the table, run `crabjar --help` or check `src/commands/` directly.
 
 | Command | Status | Notes |
 |---|---|---|
@@ -605,17 +434,27 @@ Every derived output must include a `doubt` block with:
 crabjar contains:
 - agent_config.md
 - AGENTS.md
-- Cargo.toml (workspace root + crabjar binary manifest, version 0.12.0)
+- Cargo.toml (workspace root + crabjar binary manifest, version 0.12.5)
 - Justfile
 - Containerfile, Dockerfile
 - orchestrator (Axum SSE server + unified LM client with prompt envelope defense)
 - crabjar-conductor (fleet orchestration service with four-layer capability-based security model, guard integration)
+- crabjar-worker (worker framework for distributed task execution)
+- crabjar-durable-objects (durable object storage and retrieval)
 - crabjar-gpui (GPU-accelerated multi-agent dashboard using herdr protocol, CrabjarSurfaceAdapter)
 - guard (ExecutionGate + GateConcierge + TrustManager + annealing + scope isolation + fingerprint approvals + trust resolution + static policy engine + context budgeting + domain allowlist)
 - memory (agent-context crate with state_docs querier, context fragments with token budget)
 - telemetry (flight recorder + command executor)
 - sandbox (agent isolation)
 - tool_registry (MCP tool registry with 4-layer discovery)
+- crabjar-mcp-tool-registry (MCP tool registry service)
+- scheduler (cron jobs, workers, watchers with execution gating)
+- crabjar-cron (cron job management interface)
+- analyze-* (8 crates: analysis toolkit for APK/dotnet/firmware/HAR/JS/native/MCP)
+- vm/vm-core (VM lifecycle management)
+- axum-mux (vm-bridge)
+- crabjar-deploy (deployment tooling)
+- crates/ssh-bastion (SSH bastion host using russh)
 - crabjar-github-client (GitHub API client for skill search/install — Phase 8)
 - crabjar-clawhub-client (ClawHub.io registry API integration — Phase 9)
 - crabjar-skill-scanner (security scanning pipeline + checksum verification — Phase 10)
@@ -626,17 +465,39 @@ crabjar contains:
 - crabjar-plugin (WASM runtime, lifecycle management — stub)
 - host/ (8 host crates: core, system, observe, agent, webview, mqtt, graph, screen)
 - apps/teams (Teams plugin)
+- apps/terrarium (Terrarium isometric habitat app)
 - zed-acp-bridge (Wasm extension)
 - zed-acp-server (stdio JSON-RPC server)
-- axum-mux (vm-bridge)
-- crates/terminal (wezterm/zellij backends + asciinema v2 recording)
-- .agents/skills/ (32 agent skills)
-- .agents/references/ (may be empty)
+- crabjar-compress (content compression engine)
+- crabjar-compress-mcp (MCP server for compression operations)
+- crates/train-* (4 crates: ML training data extraction and preprocessing pipeline)
+- crates/crabjar-git (git operations via libgit2)
+- crates/crabjar-commit (commit message generation from diffs)
+- crates/crabjar-commit-cli (CLI tool for commit staging and messages)
+- crabjar-kanban-orchestrator (kanban board orchestration)
+- slow-friend (drift detection and adaptation)
+- crabjar-web-search (web search integration)
+- crabjar-web-extract (web page content extraction)
+- crates/crabjar-browser (browser automation)
+- crates/email-smtp (SMTP email sending)
+- crabjar-skills (reusable skill definitions)
+- crabjar-tool-binding (tool call binding layer)
+- crabjar-analyze (analysis orchestration CLI)
+- crabjar-review (code review tool)
+- crabjar-unsloth-mcp (Unsloth training data and fine-tuning jobs via MCP)
+- crabjar-herdr-mcp (Herdr fleet management via MCP)
+- crabjar-structured-aux (structured auxiliary analysis)
+- universal-structure (universal structure definitions)
+- crabjar-memory (memory management service)
+- crabjar-homeassistant (Home Assistant integration)
+- .agents/skills/ (agent skills ecosystem)
 - src/bitwarden/ (bitwarden CLI integration)
 - src/knowledge_store/ (knowledge store commands with bridge + confidence)
 - src/crabjar_config/ (workspace config crate)
 - src/skill-script-runner/ (skill script discovery)
 - src/skill-reference-store/ (skill reference indexing)
+- src/skill-process-management/ (process management skill)
+- src/skill-struct-tok-pipeline/ (structural tokenization pipeline)
 - src/host-binary/ (host binary crate with TUI, guard approval flow)
 - tests/cli.rs
 - tests/e2e/ (smoke + full E2E test slices)
@@ -654,12 +515,11 @@ crabjar contains:
 
 ### 9.2 Active Rust Surface
 
-crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + crabjar-conductor + guard + telemetry + sandbox + tool_registry + crabjar-github-client + crabjar-clawhub-client + crabjar-skill-scanner + crabjar-trust-manager + crabjar-architecture + file_search + crabjar-plugin + host/host-core + host/host-system + host/host-observe + host/host-agent + host/host-webview + host/host-mqtt + host/host-graph + host/host-screen + apps/teams + src/host-binary + src/skill-script-runner + src/skill-reference-store + zed-acp-bridge + zed-acp-server + axum-mux + crates/terminal
+crabjar (binary) + crabjar_config (library) + agent-context (library) + orchestrator + crabjar-conductor + crabjar-worker + crabjar-durable-objects + guard + telemetry + sandbox + tool_registry + crabjar-mcp-tool-registry + scheduler + crabjar-cron + analyze-* (8 crates) + vm/vm-core + axum-mux + crabjar-deploy + ssh-bastion + crabjar-github-client + crabjar-clawhub-client + crabjar-skill-scanner + crabjar-trust-manager + crabjar-delegation + crabjar-architecture + file_search + crabjar-plugin + host/ (8 crates) + apps/teams + apps/terrarium + zed-acp-bridge + zed-acp-server + crabjar-compress + crabjar-compress-mcp + train-* (4 crates) + crabjar-git + crabjar-commit + crabjar-commit-cli + crabjar-kanban-orchestrator + slow-friend + crabjar-web-search + crabjar-web-extract + crabjar-browser + email-smtp + crabjar-skills + crabjar-tool-binding + crabjar-analyze + crabjar-review + crabjar-unsloth-mcp + crabjar-herdr-mcp + crabjar-structured-aux + universal-structure + crabjar-memory + crabjar-homeassistant + crates/terminal
 
 ### Test Count
 
-**708 passing across workspace, 0 failing.** (691 baseline + 17 conductor security model tests)
-Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine, domain allowlist, context budgeting). Host-agent: ~35+ tests (model routing, context compression, decision gate, loop integration). Conductor: 17 tests (auth, gate, task assignment, annealing, persistence). File search: 6 passing. E2E: 32 total (6 smoke + 26 full). Snapshot: 6 tests.
+**691 passing across workspace, 0 failing.** Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine, domain allowlist, context budgeting). Host-agent: ~35+ tests (model routing, context compression, decision gate, loop integration). Conductor: 17 tests (auth, gate, task assignment, annealing, persistence). File search: 6 passing. E2E: 32 total (6 smoke + 26 full). Snapshot: 6 tests.
 
 ---
 
@@ -667,12 +527,33 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 
 ### Last Audit
 
+2026-11-02 — Fresh structural audit. Workspace: 77 members (+46 since last documented audit on 2026-10-17 which had 30 members). Major additions since last audit:
+- **Analysis toolkit** (8 crates): analyze-common, analyze-apk, analyze-dotnet, analyze-firmware, analyze-har, analyze-js, analyze-native, analyze-mcp-server
+- **VM and worker infrastructure**: vm/vm-core, crabjar-conductor, crabjar-worker, crabjar-durable-objects
+- **Compression pipeline**: crabjar-compress (8 files), crabjar-compress-mcp
+- **ML training data pipeline** (4 crates): train-extract, train-secret-stripper, train-dedup, train-filewatcher
+- **Git operations** (3 crates): crabjar-git, crabjar-commit, crabjar-commit-cli
+- **Orchestration and scheduling**: scheduler (7 files), crabjar-kanban-orchestrator, slow-friend (10 files)
+- **Web tools**: crabjar-web-search (7 files), crabjar-web-extract (4 files), crates/crabjar-browser
+- **Communication tools**: crates/email-smtp, crabjar-skills (6 files)
+- **Tooling and binding**: crabjar-tool-binding, crabjar-analyze, crabjar-review (13 files), crabjar-mcp-tool-registry
+- **MCP servers**: crabjar-unsloth-mcp, crabjar-herdr-mcp
+- **Structure analysis**: crabjar-structured-aux, universal-structure (11 files)
+- **Infrastructure**: crates/ssh-bastion (7 files), crabjar-deploy (8 files), crabjar-memory (7 files), crabjar-delegation (5 files), crabjar-cron (6 files)
+- **Apps**: apps/terrarium (Terrarium isometric habitat app, 10 files)
+- **Skills** (2 new): src/skill-process-management, src/skill-struct-tok-pipeline
+- **PR #3 merged**: api-module-splitting — main.rs split into command modules under src/commands/
+- Version updated: 0.12.0 → 0.12.5
+
+Prior audit entries preserved below for historical reference.
+
 2026-07-10 — Fresh filesystem scan. Workspace: 25 members + `specs/` (ADR process). Guard: 28 source files (added gate_tests.rs, concierge_types.rs, fingerprint_types.rs, trust_types.rs; all under 500 LoC). Memory/: 18 source files total (error.rs, models.rs, schema.rs, store.rs added; context/ split into mod/constants/fragment/budget; state_docs/ has extract.rs + insert.rs). Orchestrator: 11 .rs files (added backend/mod.rs for InferenceBackend trait; lm_studio_client split into prompt_types.rs + prompt_validator.rs). Host/host-agent: 13 source files (inference/ subdir with mod.rs, backend.rs, http_backend.rs). Axum-mux: gained proxy.rs and terminal_relay.rs. File search: 3 source files. crabjar-plugin: stub crate. crabjar-architecture: 3 source files. crates/terminal: 5 source files (added recording.rs). Skills: 32 agent skills. Version: 0.12.0, Rust 2024 edition. Total tests: 691 passing, 0 failing. Clippy clean — zero errors (only pre-existing vm-bridge warnings for missing lib target). ADR process established in specs/. Known phantom items removed: state-docs/, bin/, git/, gitignore/, reference_materials/, browser-tools-mcp/, llmrunner.md.
 
 2026-10-16 — Remote skill discovery infrastructure added (Phases 8-11). Workspace: 29 members (+4 new crates). Added: crabjar-github-client (GitHub API client for skill search/install), crabjar-clawhub-client (ClawHub.io registry API integration with trust tier mapping), crabjar-skill-scanner (security scanning pipeline with SHA-256 checksum verification), crabjar-trust-manager (trust tier management, version-aware skill cache in ~/.crabjar/skill-cache/, update detection). CLI commands added: tool search, tool install, tool clawhub-search, tool clawhub-install, tool scan, tool cache list/remove/clean, tool updates. All crates at version 0.12.0, Rust 2024 edition. Build clean across workspace with no errors or warnings.
 
-2026-10-17 — Conductor security model implemented (Phases 1-4). Workspace: 30 members (+1 new crate). crabjar-conductor now has four-layer capability-based access control: SSH key worker authentication, JWT-like token authorization with embedded capabilities and scopes, task-level capability matching (exact + wildcard), and trust level annealing (workers earn higher trust through successful task completion). Integrated with crabjar-guard's ExecutionGate patterns for unified provenance verificati
-2026-10-17 — Herdr-GPUI integration: CrabjarSurfaceAdapter built to translate conductor API responses to herdr protocol types; multi-agent dashboard UI with split panes and color-coded status indicators; 6 integration tests verify surface adapter behavior. Workspace: 31 members (+1 crabjar-gpui crate).on. 17 new tests added (auth, gate, task assignment, annealing, persistence). ADR-006 documents the security model design decisions.
+2026-10-17 — Conductor security model implemented (Phases 1-4). Workspace: 30 members (+1 new crate). crabjar-conductor now has four-layer capability-based access control: SSH key worker authentication, JWT-like token authorization with embedded capabilities and scopes, task-level capability matching (exact + wildcard), and trust level annealing (workers earn higher trust through successful task completion). Integrated with crabjar-guard's ExecutionGate patterns for unified provenance verification. 17 new tests added (auth, gate, task assignment, annealing, persistence). ADR-006 documents the security model design decisions.
+
+2026-10-17 — Herdr-GPUI integration: CrabjarSurfaceAdapter built to translate conductor API responses to herdr protocol types; multi-agent dashboard UI with split panes and color-coded status indicators; 6 integration tests verify surface adapter behavior. Workspace: 31 members (+1 crabjar-gpui crate).
 
 ### Known Items
 
@@ -738,13 +619,14 @@ Guard: ~240+ tests (scope isolation, trust resolution, annealing, policy engine,
 | `prov-zeroclaw-credit` | README + project_map credit: ZeroClaw docs for security model, tool receipts, microkernel, SOP, config schema | 2026-06-06 | Attribution for design influence | crabjar/README.md, crabjar/project_map.md |
 | `prov-codex-parity` | ROADMAP.md Priority 9: 5 Codex pattern imports (bounded context, module size governance, snapshot testing, file search, Starlark exec policy) | 2026-06-23 | Feature parity analysis — Codex vs CrabJar | crabjar/README.md, crabjar/project_map.md, codex/AGENTS.md, codex/codex-rs/Cargo.toml |
 | `prov-map-drift-2026-06-27` | project_map.md regenerated — 22 members, guard/src fully updated (23 files), crabjar-architecture added to tree, vm_bridge added, host/host-agent added, orchestrator backend/mod.rs documented, shared deps refreshed (async-trait, tauri, rumqttc, tracing-error, etc.), CLI commands updated with guard resolution, section 9 cleaned up (removed stale codeburn/gguf/llm-runner references) | 2026-06-27 | Roadmap 1.3 update | crabjar/project_map.md |
-| `prov-map-drift-2026-07-06` | project_map.md regenerated — 24 members (added file_search + crabjar-plugin), tree diagram updated, Core Components table populated, workspace members section refreshed, Section 9 Crabjar Context updated with new crates, Drift Report Last Audit and Known Items updated | 2026-07-06 | Structural alignment refresh | crabjar/project_map.md
-| `prov-map-drift-2026-07-08` | project_map.md regenerated — generated date updated, Section 3 Build & Test expanded (module-sizes targets, reproducible-build, test count), Section 2.3 workspace members includes specs/ ADR process, Section 2.4 shared deps consolidated to single-line format, Section 2.5 profiles renamed and simplified, guard/src file listing expanded with policy/context_budget/command_risk/risk_config/db_error files, host/host-agent updated with model_routing/context_compression/decision_gate, Section 9 structure updated (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Drift Report Last Audit and Known Items refreshed with current state | 2026-07-08 | Structural alignment refresh + ADR process addition | crabjar/project_map.md
+| `prov-map-drift-2026-07-06` | project_map.md regenerated — 24 members (added file_search + crabjar-plugin), tree diagram updated, Core Components table populated, workspace members section refreshed, Section 9 Crabjar Context updated with new crates, Drift Report Last Audit and Known Items updated | 2026-07-06 | Structural alignment refresh | crabjar/project_map.md |
+| `prov-map-drift-2026-07-08` | project_map.md regenerated — generated date updated, Section 3 Build & Test expanded (module-sizes targets, reproducible-build, test count), Section 2.3 workspace members includes specs/ ADR process, Section 2.4 shared deps consolidated to single-line format, Section 2.5 profiles renamed and simplified, guard/src file listing expanded with policy/context_budget/command_risk/risk_config/db_error files, host/host-agent updated with model_routing/context_compression/decision_gate, Section 9 structure updated (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Drift Report Last Audit and Known Items refreshed with current state | 2026-07-08 | Structural alignment refresh + ADR process addition | crabjar/project_map.md |
 | `prov-map-drift-2026-07-08b` | project_map.md regenerated — Section 9.1 structure list expanded (orchestrator prompt envelope, memory context fragments, E2E tests, snapshot baselines), Section 9.2 test count updated to 691 passing with breakdown by crate, Drift Report Known Items expanded with policy/context_budget/command_risk/risk_config/db_error files and ADR process entry | 2026-07-08 | Structural alignment refresh — second pass on Section 9 + Known Items | crabjar/project_map.md |
 | `prov-comparity-codewhale` | README + project_map parity credit: CodeWhale (monotonic authorization order, Fleet identity contract, deterministic scorers, roster-doesn't-execute) + guard/src/authorization_order.rs invariant tests (10) | 2026-08-30 | Feature parity analysis | crabjar/README.md, crabjar/project_map.md, Hmbown/CodeWhale docs (AUTHORIZATION_ORDER.md, FLEET.md) |
 | `prov-remote-skill-discovery` | Remote skill discovery infrastructure implemented (Phases 8-11): crabjar-github-client, crabjar-clawhub-client, crabjar-skill-scanner, crabjar-trust-manager crates; CLI commands: tool search/install/clawhub-search/clawhub-install/scan/cache/updates; workspace expanded from 25 to 29 members | 2026-10-16 | Remote skill discovery completion | crabjar/crabjar-github-client, crabjar/crabjar-clawhub-client, crabjar/crabjar-skill-scanner, crabjar/crabjar-trust-manager, crabjar/src/tool_registry_cli.rs, crabjar/specs/SKILLS-REMOTE-DISCOVERY.md |
-| `prov-conductor-security-model` | Conductor security model implemented (Phases 1-4): four-layer capability-based access control with SSH key auth, JWT-like tokens, task-level capability matching, and trust level annealing; integrated with crabjar-guard's ExecutionGate patterns; workspace expanded to 30 members; 17 new tests added | 2026-10-17 | Conductor security model completion | crabjar/crabjar-conductor/src/auth.rs, crabjar/crabjar-conductor/src/gate.rs, crabjar/specs/security-model-capabi
-| `prov-herdr-gpui-integration` | Herdr-GPUI integration: CrabjarSurfaceAdapter built to translate conductor API responses to herdr protocol types; multi-agent dashboard UI with split panes and color-coded status indicators (Idle=CornflowerBlue, Working=LimeGreen, Blocked=Orange, Done=SteelBlue); 6 integration tests verify surface adapter behavior; workspace expanded to 31 members | 2026-10-17 | Herdr-GPUI integration completion | crabjar/crates/crabjar-gpui/src/surface_adapter.rs, crabjar/crates/crabjar-gpui/tests/herdr_integration.rslity-based-access-control.md, crabjar/specs/ADR-006-conductor-security-guard-integration.md |
+| `prov-conductor-security-model` | Conductor security model implemented (Phases 1-4): four-layer capability-based access control with SSH key auth, JWT-like tokens, task-level capability matching, and trust level annealing; integrated with crabjar-guard's ExecutionGate patterns; workspace expanded to 30 members; 17 new tests added | 2026-10-17 | Conductor security model completion | crabjar/crabjar-conductor/src/auth.rs, crabjar/crabjar-conductor/src/gate.rs, crabjar/specs/security-model-capability-based-access-control.md, crabjar/specs/ADR-006-conductor-security-guard-integration.md |
+| `prov-herdr-gpui-integration` | Herdr-GPUI integration: CrabjarSurfaceAdapter built to translate conductor API responses to herdr protocol types; multi-agent dashboard UI with split panes and color-coded status indicators (Idle=CornflowerBlue, Working=LimeGreen, Blocked=Orange, Done=SteelBlue); 6 integration tests verify surface adapter behavior; workspace expanded to 31 members | 2026-10-17 | Herdr-GPUI integration completion | crabjar/crates/crabjar-gpui/src/surface_adapter.rs, crabjar/crates/crabjar-gpui/tests/herdr_integration.rs |
+| `prov-map-drift-2026-11-02` | project_map.md regenerated — fresh structural audit: 77 workspace members (+46 since last documented audit on 2026-10-17). Major additions: analysis toolkit (8 analyze-* crates), VM/worker infrastructure (vm-core, conductor, worker, durable-objects), compression pipeline (crabjar-compress + MCP server), ML training data pipeline (4 train-* crates), git operations (3 crabjar-git/commit crates), orchestration/scheduling (scheduler, kanban-orchestrator, slow-friend), web tools (web-search, web-extract, browser), communication tools (email-smtp, skills), tooling/binding (tool-binding, analyze CLI, review, MCP tool registry), MCP servers (unsloth-mcp, herdr-mcp), structure analysis (structured-aux, universal-structure), infrastructure (ssh-bastion, deploy, memory, delegation, cron), apps/terrarium, 2 new skill crates. PR #3 merged (api-module-splitting: main.rs split into src/commands/). Version updated to 0.12.5. | 2026-11-02 | Structural alignment refresh — complete filesystem scan reveals significant growth beyond last documented state | crabjar/Cargo.toml, filesystem scan, crabjar/project_map.md |
 
 ---
 
