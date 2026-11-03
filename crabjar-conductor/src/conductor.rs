@@ -1,6 +1,7 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
 use crate::auth;
+use crate::audit::{ConductorAuditLogger, AuditContext, AuditEventType};
 use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
 use crate::fleet_status::FleetStatusTracker;
 use crate::gate::{conductor_level_to_guard_layer, trust_sufficient_for_auto_assign};
@@ -9,7 +10,10 @@ use crate::sandbox::SandboxManager;
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, TaskStatus, Worker, WorkerStatus};
 use anyhow::Result;
 use rusqlite::Connection;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
+use serde_json::json;
 
 /// Configuration for the conductor service.
 pub struct ConductorConfig {
@@ -40,6 +44,7 @@ pub struct Conductor {
     promotion_manager: PromotionManager,
     fleet_status: FleetStatusTracker,
     sandbox_manager: SandboxManager,
+    audit_logger: Option<Arc<Mutex<ConductorAuditLogger>>>,
 }
 
 impl Conductor {
@@ -56,6 +61,7 @@ impl Conductor {
             promotion_manager,
             fleet_status: FleetStatusTracker::default(),
             sandbox_manager: SandboxManager::default(),
+            audit_logger: None,
         })
     }
 
@@ -64,6 +70,16 @@ impl Conductor {
         let store = StateStore::open(db_path)?;
         let db_conn = Connection::open(db_path)?;
         let promotion_manager = PromotionManager::new(db_conn)?;
+
+        // Initialize audit logger with the same database
+        let audit_logger = match ConductorAuditLogger::new(db_path) {
+            Ok(logger) => Some(Arc::new(Mutex::new(logger))),
+            Err(e) => {
+                warn!(error = %e, "Failed to initialize audit logger");
+                None
+            }
+        };
+
         Ok(Self {
             store,
             config,
@@ -72,6 +88,7 @@ impl Conductor {
             promotion_manager,
             fleet_status: FleetStatusTracker::default(),
             sandbox_manager: SandboxManager::default(),
+            audit_logger,
         })
     }
 
@@ -276,6 +293,23 @@ impl Conductor {
         // Create the goal record
         let goal = self.store.create_goal(description.clone())?;
         info!(goal_id = %goal.id, "Goal created");
+
+        // Audit: log goal submission
+        if let Some(logger) = &self.audit_logger {
+            let logger = logger.clone();
+            let goal_id = goal.id.clone();
+            tokio::spawn(async move {
+                let logger = logger.lock().await;
+                let ctx = AuditContext {
+                    task_id: Some(goal_id),
+                    worker_id: None,
+                    outcome: "goal_submitted".to_string(),
+                    duration_ms: None,
+                    metadata: json!({}),
+                };
+                let _ = logger.log_event(AuditEventType::GoalDecomposed, ctx).await;
+            });
+        }
 
         // Decompose into tasks using pesti-server (LLM inference)
         let tasks = self.decompose(goal.id.clone(), &description)?;
@@ -482,7 +516,25 @@ impl Conductor {
             auth::validate_ssh_public_key(key)?;
         }
 
-        let result = self.store.register_worker(name, capabilities, ssh_key)?;
+        let result = self.store.register_worker(name.clone(), capabilities, ssh_key)?;
+
+        // Audit: log worker registration
+        if let Some(logger) = &self.audit_logger {
+            let logger = logger.clone();
+            let worker_id = result.0.id.clone();
+            tokio::runtime::Handle::current().block_on(async move {
+                let logger = logger.lock().await;
+                let ctx = AuditContext {
+                    task_id: None,
+                    worker_id: Some(worker_id),
+                    outcome: "worker_registered".to_string(),
+                    duration_ms: None,
+                    metadata: json!({}),
+                };
+                let _ = logger.log_event(AuditEventType::RouteDecision, ctx).await;
+            });
+        }
+
         Ok(result)
     }
 
@@ -637,6 +689,25 @@ impl Conductor {
 
         self.store.complete_task(task_id, result)?;
 
+        // Audit: log task completion with worker and goal context
+        if let Some(logger) = &self.audit_logger {
+            let logger = logger.clone();
+            let task_id = task_id.to_string();
+            let worker_id = worker_id.clone();
+            let goal_id = task.goal_id.clone();
+            tokio::runtime::Handle::current().block_on(async move {
+                let logger = logger.lock().await;
+                let ctx = AuditContext {
+                    task_id: Some(task_id),
+                    worker_id: Some(worker_id),
+                    outcome: "task_completed".to_string(),
+                    duration_ms: None,
+                    metadata: json!({"goal_id": goal_id}),
+                };
+                let _ = logger.log_event(AuditEventType::TaskCompleted, ctx).await;
+            });
+        }
+
         // Anneal trust level based on success
         let new_trust_level = self.store.record_task_success(&worker_id)?;
 
@@ -658,6 +729,24 @@ impl Conductor {
             // Trust level was upgraded — refresh token
             let new_token = self.store.refresh_worker_token(&worker_id)?;
             info!(worker_id = %worker_id, trust_level = new_trust_level, "Worker trust level upgraded, new token issued");
+
+            // Audit: log trust level change
+            if let Some(logger) = &self.audit_logger {
+                let logger = logger.clone();
+                let worker_id = worker_id.to_string();
+                tokio::runtime::Handle::current().block_on(async move {
+                    let logger = logger.lock().await;
+                    let ctx = AuditContext {
+                        task_id: None,
+                        worker_id: Some(worker_id),
+                        outcome: format!("trust_upgrade:{}", new_trust_level),
+                        duration_ms: None,
+                        metadata: json!({}),
+                    };
+                    let _ = logger.log_event(AuditEventType::WorkerPromoted, ctx).await;
+                });
+            }
+
             Ok(Some(new_token))
         } else {
             Ok(None)
@@ -679,6 +768,25 @@ impl Conductor {
 
         self.store.fail_task(task_id, error)?;
 
+        // Audit: log task failure with worker and goal context
+        if let Some(logger) = &self.audit_logger {
+            let logger = logger.clone();
+            let task_id = task_id.to_string();
+            let worker_id = worker_id.clone();
+            let goal_id = task.goal_id.clone();
+            tokio::runtime::Handle::current().block_on(async move {
+                let logger = logger.lock().await;
+                let ctx = AuditContext {
+                    task_id: Some(task_id),
+                    worker_id: Some(worker_id),
+                    outcome: "task_failed".to_string(),
+                    duration_ms: None,
+                    metadata: json!({"goal_id": goal_id}),
+                };
+                let _ = logger.log_event(AuditEventType::TaskFailed, ctx).await;
+            });
+        }
+
         // Anneal trust level based on failure
         let new_trust_level = self.store.record_task_failure(&worker_id)?;
 
@@ -690,6 +798,24 @@ impl Conductor {
         if worker.trust_level != new_trust_level {
             let new_token = self.store.refresh_worker_token(&worker_id)?;
             warn!(worker_id = %worker_id, trust_level = new_trust_level, "Worker trust level downgraded, new token issued");
+
+            // Audit: log trust level change
+            if let Some(logger) = &self.audit_logger {
+                let logger = logger.clone();
+                let worker_id = worker_id.to_string();
+                tokio::runtime::Handle::current().block_on(async move {
+                    let logger = logger.lock().await;
+                    let ctx = AuditContext {
+                        task_id: None,
+                        worker_id: Some(worker_id),
+                        outcome: format!("trust_downgrade:{}", new_trust_level),
+                        duration_ms: None,
+                        metadata: json!({}),
+                    };
+                    let _ = logger.log_event(AuditEventType::WorkerDemoted, ctx).await;
+                });
+            }
+
             Ok(Some(new_token))
         } else {
             Ok(None)
@@ -710,6 +836,11 @@ impl Conductor {
     /// Get the promotion manager (for evidence-based worker promotions).
     pub fn promotion_manager(&self) -> &PromotionManager {
         &self.promotion_manager
+    }
+
+    /// Get the audit logger for querying audit trails.
+    pub fn audit_logger(&self) -> Option<&Arc<Mutex<ConductorAuditLogger>>> {
+        self.audit_logger.as_ref()
     }
 
     /// Get the sandbox manager (for ephemeral worker environment provisioning).

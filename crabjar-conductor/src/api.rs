@@ -98,6 +98,44 @@ async fn list_decision_capabilities(
     }
 }
 
+/// Query the audit log for training pipeline evaluation.
+async fn query_audit_log(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+) -> Json<serde_json::Value> {
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        if let Some(logger) = c.audit_logger() {
+            tokio::runtime::Handle::current().block_on(async move {
+                let guard = logger.lock().await;
+                guard.recent_events(1000).await
+            })
+        } else {
+            Ok(vec![])
+        }
+    })
+    .await;
+
+    match result {
+        Ok(Ok(events)) => Json(json!({
+            "success": true,
+            "events": events,
+            "count": events.len()
+        })),
+        Ok(Err(e)) => Json(json!({
+            "success": false,
+            "error": format!("audit query failed: {}", e),
+            "events": [],
+            "count": 0
+        })),
+        Err(e) => Json(json!({
+            "success": false,
+            "error": format!("task join error: {}", e),
+            "events": [],
+            "count": 0
+        })),
+    }
+}
+
 pub fn routes(conductor: ConductorState) -> Router {
     // Public routes (no auth required)
     let public_app: Router = Router::new()
@@ -116,6 +154,7 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/sandboxes/:id/worker", post(sandboxes::assign_worker_to_sandbox_handler))
         .route("/decide/evaluate/{id}", get(get_evaluation_status))
         .route("/decisions/capabilities", get(list_decision_capabilities))
+        .route("/audit/log", get(query_audit_log))
         .route("/jev/evaluate", post(evaluate_structural_handler))
         .route("/jev/postprocess", post(postprocess_decision_handler))
         .route("/jev/feedback", post(record_feedback_handler))
