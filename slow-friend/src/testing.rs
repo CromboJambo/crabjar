@@ -112,6 +112,8 @@ pub fn run_synthetic_test() -> Vec<ActionClass> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::autonomy::AutonomyTracker;
+    use crate::lattice::SparseLattice;
 
     #[test]
     fn synthetic_test_triggers_action() {
