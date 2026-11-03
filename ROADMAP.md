@@ -2,125 +2,63 @@
 
 This document tracks **upcoming** crabjar development priorities. Completed work moves to [CHANGELOG.md](./CHANGELOG.md).
 
-### Pre-Release Hardening & Agent Loop Expansion
+## Current State (November 2026)
 
-Final cleanup phase before first public release. Focus: eliminate all remaining technical debt, expand the agent loop with production-grade capabilities, and establish proper documentation processes.
+All P1 drop-in replacement blockers are complete. crabjar provides feature parity with Hermes Agent's core tooling suite. Recent focus has been on security hardening (ADR-045 red team analysis), clippy cleanup, and pre-release preparation.
 
-**Completed:**
-- ✅ All personal paths, secrets, offensive language, TODO stubs removed
-- ✅ Fake return values replaced with proper error types
-- ✅ Zero clippy errors across workspace
-- ✅ Release build succeeds without errors
-- ✅ No secrets in binary (verified via strings analysis)
-- ✅ ADR process established (specs/ADR-001)
+See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complete gap analysis.
 
-**Completed (July 2026):**
-- ✅ Domain allowlist enforcement in ExecutionGate step 9 with per-trust-layer configuration
-- ✅ Command risk catalog (`command_risk.rs`) — static classification of HIGH/MEDIUM_RISK_COMMANDS
-- ✅ Risk config system (`risk_config.rs`) — configurable risk levels and thresholds
-- ✅ Context budgeting (`context_budget.rs`) — ContextBudget + MAX_TOKENS_PER_FRAGMENT enforcement in ExecutionGate step 10
-- ✅ Static policy engine (`policy.rs`, `policy_types.rs`) — TOML-based declarative policies for pre-execution checks
+## Production Readiness Phase
 
-**Completed (September 2026):**
-- ✅ Conversational TUI — ratatui-based interactive chat with session persistence, scrollback, guard approval display, habitat panel
-- ✅ Model routing (`model_routing.rs`, 438 LoC) — phase-specific backend routing via `LoopPhase` enum
-- ✅ Context compression (`context_compression.rs`, 385 LoC) — token-budgeted context management with observation grouping
-- ✅ Decision gate (`decision_gate.rs`, 469 LoC) — tool call vs direct response decisions with auto-decide threshold
+### Performance Optimization & Benchmarking
+- [ ] Performance benchmarking suite for execution pipeline
+- [ ] Latency profiling across guard → concierge → telemetry path
+- [ ] Memory usage optimization for long-running orchestrator instances
 
-**Completed (October 2026):**
-- ✅ crabjar-conductor crate scaffolded with core orchestration types (Goal, Task, Worker), state store abstraction, HTTP API layer
-- ✅ SQLite-backed persistent state store for conductor (rusqlite, goals/tasks/workers tables with FK constraints)
-- ✅ vm-bridge deployed to ftw3 home-lab node as dinit service on port 8090
-- ✅ Orchestrator fine-tuning pipeline documented (orchestrator/docs/fine-tuning.md)
-- ✅ crabjar-conductor deployed to ftw3:8091 with pesti-server orchestrator integration (dinit service, SQLite state store)
-- ✅ 27B post-trained model integrated as default provider (DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF)
-- ✅ crabjar-review code review pipeline complete (Phases 1-4 + conductor integration) — deterministic pre-processing, agent review units, post-processor with position validation/deduplication, GitHub PR integration, benchmark suite with precision/recall/F1 metrics
-- ✅ Project consolidation completed (Phases 1-4) — agent-oversight archived, mirror-lab audit module integrated into crabjar-conductor, reference/early-stage repos reorganized, clear project boundaries defined for all active projects
-- ✅ Evidence-Based Worker Promotion System — promotion engine with evidence collection and scoring
-- ✅ Knowledge Compression Triad — token budget management + compression strategies
-- ✅ OTel-DAGR-Terrarium Integration — OpenTelemetry telemetry pipeline to Grafana via DAGR events
-- ✅ Habblaud Terrarium Phase 1 — rich activity states (CrabActivity enum, derivation logic, display info)
-- ✅ Subagent delegation framework (P1-4 drop-in replacement blocker) — Hermes-compatible delegate_task tool with conductor API integration
-- ✅ Interactive clarify tooling (P1-5 drop-in replacement blocker) — Hermes-compatible clarify tool with structured questions, choice-based responses, and TUI integration via knowledge store persistence
-- ✅ Session management and search tooling (P1-6 drop-in replacement blocker) — Hermes-compatible session_search tool for searching conversation history by query or retrieving specific sessions by ID
-- ✅ Process management tooling (P1-7 drop-in replacement blocker) — Hermes-compatible process_manage tool for spawning, listing, killing, and inspecting background processes via conductor API
-- ✅ Cron job management tooling (P1-8 drop-in replacement blocker) — Hermes-compatible cronjob_manage tool with SQLite persistence, cron schedule parsing, background scheduler, and conductor API integration for recurring task scheduling and execution
-- ✅ Browser automation tooling (P1-3 drop-in replacement blocker) — Hermes-compatible browser_exec tool via crabjar-browser crate using Playwright subprocess wrapper; supports navigation, JavaScript evaluation, form filling, screenshots, and content extraction
-- ✅ Memory compat layer with mirror-log integration (P2-1 productivity improvement) — CrabJar's memory system provides identical tool schema and response format to Hermes' memory tool. Supports MEMORY.md/USER.md with same character budgets, batch operations, and §-delimited format. Optional mirror-log integration for provenance tracking and attention-based decision filtering.
-- ✅ Home Assistant application-layer tools (P2-2 productivity improvement) — four HA REST API tools: ha_get_state, ha_call_service, ha_list_entities, ha_list_services for home-lab management workflows
-- ✅ Expanded built-in skill ecosystem (P2-3 productivity improvement) — added 29 new skills across 4 categories: GitHub workflow (8), development workflow (10), productivity (6), and research (5). Total skills now 61. Established SKILL-STANDARDS.md documentation standards for consistent skill authoring.
+### Comprehensive Integration Test Matrix
+- [ ] Cross-crate integration test coverage expansion
+- [ ] E2E test slices wired into GitHub Actions (smoke on PR, full on merge/nightly)
+- [ ] Regression test suite for security model changes
 
-**Upcoming:**
-- [ ] Develop security model with capability-based access control
-- [ ] Create observability stack (metrics, tracing, logging)
+### Documentation Overhaul
+- [ ] End-user documentation for TUI and CLI workflows
+- [ ] API reference for conductor HTTP endpoints
+- [ ] Deployment guides for fleet coordination setup
 
-**Deliverables:** Release-ready binary, ADR process established, proper testing infrastructure, documented agent loop with model routing/compression/decision-gate capabilities.
+### CI/CD Pipeline Hardening
+- [ ] Automated snapshot review in CI (insta baseline updates)
+- [ ] Reproducible build verification on every PR
+- [ ] Dependency security audit automation (cargo-audit integration)
 
-### Memory Crate Refactoring
-- ✅ Split `indexer.rs` into `extract.rs` (400 LoC) and `insert.rs` (152 LoC) to satisfy 500 LoC rule
-- ✅ Fixed pre-existing schema/insert column mismatches (`doc_metadata` vs `documents`, `doc_id` vs `doc_path`)
+## Nice-to-Have Features (P3 Differentiation)
 
-### crabjar-plugin Crate
-- ✅ Scaffolded WASM plugin runtime crate in `crabjar-plugin/` (stub, deferred pending concrete use case)
+These capabilities would differentiate crabjar from Hermes but are not required for drop-in replacement. See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for details.
 
-## Upcoming Phases
+### P3-1: Image Generation Tools
+**Status:** Planned  
+**Hermes equivalent:** `image_generate` tools  
+**CrabJar gap:** No image generation; agents cannot create visual content
 
-### vm-bridge Integration Phase
-- ✅ Scaffolded `vm/vm-core` crate with domain types (VmId, VmState, VmSpec), lifecycle events, typed error hierarchy
-- ✅ Implemented LibvirtBackend stub with libvirt FFI bindings for VM lifecycle operations
-- ✅ Built VmManager high-level API with policy integration hooks and state caching
-- ✅ Unit tests for domain types pass (5/5)
-- ✅ Integrate vm-core with axum-mux bridge for HTTP/WebSocket control plane (lifecycle.rs: /vms endpoints, LifecycleState, mounted in supervisor)
-- ✅ Deployed to ftw3 home-lab node as dinit service on port 8090
+### P3-2: Desktop Project Management
+**Status:** Planned  
+**Hermes equivalent:** `desktop_project` tools  
+**CrabJar gap:** No desktop project management; agents cannot organize or manipulate project files on desktop
 
-### Fleet Coordination Phase (Conductor Pattern)
-- ✅ Scaffolded `crabjar-conductor` crate with core orchestration types and HTTP API layer
-- ✅ Implemented SQLite-backed persistent state store (rusqlite, goals/tasks/workers tables, FK constraints)
-- ✅ Deployed conductor to ftw3:8091 as dinit service with pesti-server orchestrator integration
-- [ ] Develop security model with capability-based access control
-- [ ] Create observability stack (metrics, tracing, logging)
-
-### Code Review Pipeline (Deterministic Hybrid Architecture)
-- ✅ Spec finalized with all consistency issues resolved (specs/code-review-pipeline.md)
-- ✅ Phase 1: Deterministic pre-processor crate scaffolded (crabjar-review/)
-  - File selection with type classification and generated/binary filtering
-  - Smart bundling with source+test pairing and monorepo/crate boundary awareness
-  - TOML-based rule matching engine
-  - 13 unit tests passing
-- ✅ Phase 2: Agent review units with context retrieval tools and structured output
-  - Scenario-tuned prompt generation (general, security, performance, refactor)
-  - Bounded context retrieval tools (file content, surrounding context, project structure)
-  - Structured JSON output validation for agent findings
-  - 10 additional unit tests passing
-- ✅ Phase 3: Post-processor for position validation and content reflection
-  - Position validation with ±2 line tolerance window
-  - Severity validation enforcing bug→critical/major rules
-  - Finding deduplication via hash-based matching
-  - Severity reflection (downgrading security issues in test files)
-  - GitHub API client for PR comments and summaries
-  - 9 additional unit tests passing
-- ✅ Phase 4: Benchmark suite with precision/recall/F1 metrics
-  - Benchmark runner evaluating post-processor against ground-truth findings
-  - CLI tool for running benchmark suites from directory of JSON files
-  - Integration tests covering TP/FP/FN tracking and deduplication effects
-  - 4 additional unit tests passing
-- ✅ Conductor integration: POST /review endpoint wired into crabjar-conductor API
-- See: specs/code-review-pipeline.md
-
-### Production Readiness Phase
-- [ ] Performance optimization and benchmarking suite
-- [ ] Comprehensive integration test matrix
-- [ ] Documentation overhaul for end users
-- [ ] Deployment automation and CI/CD pipeline hardening
+### P3-3: Mirror-log Attention Tracking System
+**Status:** Planned  
+**Hermes equivalent:** `mirror-log-mcp` tools (15 tools for attention logging/observation tracking)  
+**CrabJar gap:** No observation/attention tracking; agents cannot track their own attention patterns or user engagement
 
 ---
 
 ## Historical Phases (Completed — see CHANGELOG.md)
 
-All phases through July 10, 2026 are complete. See [CHANGELOG.md](./CHANGELOG.md) for detailed completion records including:
+All phases through November 2026 are complete. See [CHANGELOG.md](./CHANGELOG.md) for detailed completion records including:
 
-- **Phase 1: Foundation & Core Infrastructure** — Workspace setup, crabjar-core crate, Cargo workspace configuration
-- **Phase 2: Execution Environment & Guard System** — VM lifecycle management, execution gate, trust layers
-- **Phase 3: Agent Orchestration Layer** — Agent lifecycle, task scheduling, result aggregation
-- **Phase 4: Host Integration & Telemetry** — Host binary, F(1) daemon, telemetry pipeline, CLI interface
-- **ADR Process Establishment** — specs/ADR-001 through ADR-003
+- **Pre-Release Hardening & Agent Loop Expansion** (July–November 2026)
+- **Memory Crate Refactoring** (July 2026)
+- **vm-bridge Integration Phase** (October 2026)
+- **Fleet Coordination Phase** (October 2026)
+- **Code Review Pipeline** (October 2026)
+- **P1 Drop-in Replacement Blockers** (October–November 2026) — all 8 complete
+- **P2 Productivity Improvements** (November 2026) — memory compat, Home Assistant tools, skill ecosystem expansion
