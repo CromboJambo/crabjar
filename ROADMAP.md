@@ -13,8 +13,15 @@ See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complet
 ### Performance Optimization & Benchmarking
 - [x] Performance benchmarking suite for execution pipeline — **complete** (commit 61d9ec2)
   - Baseline: gate_check_happy_path avg 1192ns, domain allowlist +209ns overhead
-  - High-risk commands show higher variance (max 100μs vs typical 5μs)
   - Trust layers have no significant latency impact
+- [x] Memory profiling benchmark — **complete** (commit f735e46)
+  - Initial spike of ~2MB (SQLite DB + first-time allocations), then stable
+  - No memory leak detected across 10,000 operations
+  - Domain allowlist and context budget add only +16KB each after 10k ops
+- [x] High-risk command latency analysis — **complete** (commit a4eeef3)
+  - Command risk assessment adds virtually no latency (~30ns overhead)
+  - Original "100μs max" variance was warmup noise, not real performance characteristic
+  - Many args (100 files) adds ~660ns due to string join in risk assessment
 - [ ] Latency profiling across guard → concierge → telemetry path
 - [ ] Memory usage optimization for long-running orchestrator instances
 
