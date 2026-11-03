@@ -1,0 +1,14 @@
+[package]
+name = "crabjar-benchmarks"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bench]]
+name = "execution_pipeline"
+harness = false
+
+[dependencies]
+crabjar-guard = { path = "../guard" }
+tracing = "0.1"
+tempfile = "3.14"

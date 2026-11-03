@@ -80,6 +80,8 @@ members = [
     "crabjar-structured-aux",
     "universal-structure",
     "crates/email-smtp", "crabjar-web-extract", "crates/crabjar-browser", "crabjar-memory", "crabjar-delegation", "crabjar-cron", "crates/crabjar-homeassistant", "crabjar-deploy",
+    # Performance benchmarks for execution pipeline
+    "benchmarks",
 ]
 
 resolver = "2"

@@ -2157,6 +2157,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crabjar-benchmarks"
+version = "0.1.0"
+dependencies = [
+ "crabjar-guard",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "crabjar-browser"
 version = "0.12.5"
 dependencies = [
