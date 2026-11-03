@@ -37,13 +37,8 @@ tarpaulin-report.html
 
 # Generated manifests
 *.manifest.json
-guard.db
-knowledge.db
-memory/knowledge.db
 llmrunner.md
 src/dinit.rs
-.agents/GitCloneResearch/
-state-docs.db
 unsloth_compiled_cache/
 
 # habitat dashboard: generated contract + triage queue data
@@ -51,15 +46,19 @@ unsloth_compiled_cache/
 attempts.jsonl
 
 # Local runtime artifacts (regenerable)
-guard.db
-knowledge.db
-state-docs.db
-_unsloth_sentencepiece_temp/
+_umsloth_sentencepiece_temp/
 
 # Abandoned experiments / local scratch — keep off git, on disk
 historical/
-conductor-state.db
 
 # Hermes Agent internal state (per-project)
-.hermes/state
-.zed/
+.hermes/*
+
+# Zed editor state
+.zed/*
+
+# Agent runtime state
+.agents/
+
+# Database files (runtime state)
+*.db
