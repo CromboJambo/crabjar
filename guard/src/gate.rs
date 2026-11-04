@@ -370,7 +370,7 @@ impl<'a> ExecutionGate<'a> {
         let exists_and_fresh: bool = conn
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM action_requests \n\
-                 WHERE source_event_id = ?1 AND created_at > ?2)",
+                 WHERE source_event_id = ?1 AND requested_at > ?2)",
                 rusqlite::params![id, chrono::Utc::now().timestamp() - 86400],
                 |r| r.get(0),
             )
@@ -381,7 +381,7 @@ impl<'a> ExecutionGate<'a> {
             let is_stale: bool = conn
                 .query_row(
                     "SELECT EXISTS(SELECT 1 FROM action_requests \n\
-                     WHERE source_event_id = ?1 AND created_at <= ?2)",
+                     WHERE source_event_id = ?1 AND requested_at <= ?2)",
                     rusqlite::params![id, chrono::Utc::now().timestamp() - 86400],
                     |r| r.get(0),
                 )
