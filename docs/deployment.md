@@ -198,6 +198,75 @@ tar czf crabjar-data-backup-$(date +%Y%m%d).tar.gz /opt/crabjar/data/
 tar xzf crabjar-data-backup-YYYYMMDD.tar.gz -C /
 ```
 
+## Podman Containerized Deployment
+
+For sandboxed deployment using Podman containers:
+
+```bash
+# Build crabjar binary
+cargo build --release -p crabjar
+
+# Create container with mounted data directory
+podman run -d \
+  --name crabjar-agent \
+  -v /opt/crabjar/data:/data \
+  -v /opt/crabjar/.crabjar_config.toml:/etc/crabjar/config.toml:ro \
+  --userns=keep-id \
+  --memory=512m \
+  --cpus=1 \
+  crabjar-base:latest \
+  crabjar agent loop
+
+# Check container status
+podman ps | grep crabjar
+podman logs crabjar-agent
+```
+
+### Container Image Requirements
+
+The `crabjar-base` image should include:
+- Rust standard library (for binary execution)
+- Podman or Docker CLI (for nested sandboxing)
+- Git (for workspace operations)
+- Basic POSIX utilities
+
+Build a custom base image:
+```dockerfile
+FROM alpine:latest
+RUN apk add --no-cache git curl bash coreutils
+COPY target/release/crabjar /usr/local/bin/
+WORKDIR /data
+CMD ["crabjar", "agent", "loop"]
+```
+
+## Shell Completion Installation
+
+Install shell completions for your preferred shell:
+
+### Bash
+```bash
+# Source the completion script
+source completions/crabjar.bash
+
+# Or install permanently
+cp completions/crabjar.bash ~/.bash_completion.d/crabjar
+```
+
+### Zsh
+```bash
+# Add to .zshrc fpath
+echo 'fpath=($HOME/.zsh/completions $fpath)' >> ~/.zshrc
+cp completions/_crabjar.zsh ~/.zsh/completions/
+compinit
+```
+
+### Fish
+```bash
+# Copy to fish completions directory
+mkdir -p ~/.config/fish/completions
+cp completions/crabjar.fish ~/.config/fish/completions/
+```
+
 ## Uninstallation
 
 ```bash
