@@ -485,6 +485,8 @@ mod tests {
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
+            .parent()
+            .unwrap()
             .to_path_buf();
         let result = enforce_boundaries(&workspace_root);
         assert!(
