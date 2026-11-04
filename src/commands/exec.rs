@@ -14,11 +14,15 @@ pub async fn handle_exec(
     container: bool,
     _otel_endpoint: &str,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-    let project_root = std::env::current_dir()?;
+    let workspace_dir = if !cwd.trim().is_empty() {
+        PathBuf::from(cwd)
+    } else {
+        std::env::current_dir()?
+    };
 
     // Config check: tool_execution_enabled must be true
     let mut loader = ProjectLoader::new();
-    loader.load_from_directory(&project_root).await.ok();
+    loader.load_from_directory(&workspace_dir).await.ok();
     let user_dinit_socket = if let Some(config) = loader.get_current_config() {
         if !config.tool_execution_enabled {
             return Ok(json!({
@@ -56,14 +60,14 @@ pub async fn handle_exec(
     }
 
     let effective_cwd = if cwd.trim().is_empty() {
-        project_root.to_string_lossy().into_owned()
+        workspace_dir.to_string_lossy().into_owned()
     } else {
         cwd.to_string()
     };
 
     // Telemetry layer: initialize flight recorder BEFORE guard check
     // so we can record the guard decision itself
-    let flight_db_path = project_root.join("telemetry/flight.db");
+    let flight_db_path = workspace_dir.join("telemetry/flight.db");
     let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
     let mut flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
         &flight_conn,
@@ -82,29 +86,63 @@ pub async fn handle_exec(
         flight_recorder = flight_recorder.with_otel(&effective_otel)?;
     }
 
-    // Guard layer: gate check before execution
-    let guard_db = crabjar_guard::GuardDb::open(project_root.join("guard/guard.db"))
-        .unwrap_or_else(|_| crabjar_guard::GuardDb::open(":memory:").expect("guard db fallback"));
+    // Guard layer: open guard database — fail-closed, no in-memory fallback.
+    // If the persistent GuardDb cannot be opened, execution must stop rather than
+    // silently continuing with ephemeral state (ADR-044 redteam finding 1.2).
+    let guard_db_path = workspace_dir.join("guard/guard.db");
+    let guard_db = match crabjar_guard::GuardDb::open(&guard_db_path) {
+        Ok(db) => db,
+        Err(e) => {
+            return Ok(json!({
+                "success": false,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "reason": reason,
+                    "gate_result": "error",
+                    "gate_reason": format!("guard database unavailable: {}", e),
+                },
+            }));
+        }
+    };
 
-    let gate = crabjar_guard::ExecutionGate::new(&guard_db, dry_run, &project_root);
+    // Create action request to establish provenance BEFORE gate check.
+    // The free-form 'reason' string is NOT a valid source_event_id; we must create
+    // a real action request record that the provenance verification can validate against.
+    let action_request_id = uuid::Uuid::new_v4().to_string();
+    guard_db.persist_action_request_with_scope(
+        &action_request_id,
+        Some(&action_request_id), // source_event_id = our own request ID
+        None,                     // no external source node for CLI exec
+        "exec",
+        &format!("{} {}", command, args.join(" ")),
+        3,                        // trust layer
+        0.9,                      // confidence
+        None,                     // scope actor
+        None,                     // scope target
+    )?;
+
+    let gate = crabjar_guard::ExecutionGate::new(&guard_db, dry_run, &workspace_dir);
 
     // Build scope from project root for scope isolation
-    let project_scope = crabjar_guard::Scope::project(
-        project_root
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "default".to_string()),
-    );
+    let workspace_name = workspace_dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "default".to_string());
+    let project_scope = crabjar_guard::Scope::project(&workspace_name);
 
     let cross_scope_auth = None;
 
+    // Use the real action request ID as source_event_id for provenance validation.
+    // Arbitrary reason text cannot satisfy provenance — only IDs that exist in
+    // action_requests table are accepted (ADR-044 redteam finding 1.2).
     let gate_result = gate.check(crabjar_guard::GateContext {
         action_type: "exec",
         command,
         args: args.to_vec(),
         trust_layer: 3,
         confidence: crabjar_guard::TrustScore::new(0.9),
-        source_event_id: Some(reason),
+        source_event_id: Some(&action_request_id),
         can_interrupt: true,
         pid: None,
         scope: Some(project_scope.clone()),
@@ -124,7 +162,7 @@ pub async fn handle_exec(
         args,
         3,
         0.9,
-        Some(reason.to_string()),
+        Some(action_request_id.clone()),
     );
 
     // Record guard decision via OTel telemetry
@@ -170,7 +208,7 @@ pub async fn handle_exec(
         }
         crabjar_guard::ActionStatus::TrustApproved => {
             // Tool registry: discover and validate tools before execution
-            let tool_registry_path = project_root.join("tool_registry/tool_registry.db");
+            let tool_registry_path = workspace_dir.join("tool_registry/tool_registry.db");
             let tool_registry_conn: Option<rusqlite::Connection> =
                 rusqlite::Connection::open(&tool_registry_path)
                     .ok()
@@ -182,7 +220,7 @@ pub async fn handle_exec(
                 let registry = crabjar_tool_registry::ToolRegistry::new(conn);
                 registry.init().ok();
                 registry
-                    .discover_tools("cli", &project_root)
+                    .discover_tools("cli", &workspace_dir)
                     .unwrap_or_default()
             } else {
                 vec![]
@@ -199,9 +237,61 @@ pub async fn handle_exec(
                 None
             };
 
-            let cmd_id = flight_recorder
-                .execute_command(command, args, &effective_cwd, reason)
-                .await?;
+            // Container mode: execute ONLY via podman, never fall back to host.
+            // If container=true and podman is unavailable, fail — do not silently
+            // run on the host (ADR-044 redteam finding 1.1).
+            let cmd_id = if container {
+                match execute_in_podman_container(command, args, &effective_cwd) {
+                    Some(podman_result) => {
+                        flight_recorder.record_guard_decision(
+                            "exec-session",
+                            "exec:container",
+                            "approved",
+                            3,
+                            0.9,
+                        );
+                        let exit_code = podman_result
+                            .get("exit_code")
+                            .and_then(|v| v.as_i64())
+                            .unwrap_or(-1);
+                        // Return podman result as backend metadata
+                        return Ok(json!({
+                            "success": true,
+                            "exec": {
+                                "command": command,
+                                "args": args,
+                                "cwd": effective_cwd,
+                                "reason": reason,
+                                "gate_result": "proceed",
+                                "exit_code": exit_code,
+                                "container": true,
+                                "backend": "podman",
+                                "podman_result": podman_result,
+                            },
+                        }));
+                    }
+                    None => {
+                        // Podman unavailable — fail, do not fall back to host
+                        return Ok(json!({
+                            "success": false,
+                            "exec": {
+                                "command": command,
+                                "args": args,
+                                "cwd": effective_cwd,
+                                "reason": reason,
+                                "gate_result": "proceed",
+                                "container": true,
+                                "error": "podman backend unavailable for container mode; refusing host fallback",
+                            },
+                        }));
+                    }
+                }
+            } else {
+                // Host execution path (unchanged)
+                flight_recorder
+                    .execute_command(command, args, &effective_cwd, reason)
+                    .await?
+            };
 
             let records = flight_recorder.query_records(1)?;
             let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
@@ -241,13 +331,6 @@ pub async fn handle_exec(
                 Ok(exit_code)
             };
 
-            // Podman container execution: run command in isolated rootless container
-            let podman_result = if container {
-                execute_in_podman_container(command, args, &effective_cwd)
-            } else {
-                None
-            };
-
             let final_exit_code = match dinit_result {
                 Ok(code) => code,
                 Err(e) => {
@@ -279,7 +362,7 @@ pub async fn handle_exec(
                     "git_diff_hash": git_diff,
                     "outcome_id": outcome_id,
                     "flight_recorder": true,
-                    "container": podman_result.is_some(),
+                    "container": false,
                     "receipt": if receipt.is_empty() {
                         None::<String>
                     } else {
