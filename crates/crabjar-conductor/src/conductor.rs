@@ -519,7 +519,7 @@ impl Conductor {
         if let Some(logger) = &self.audit_logger {
             let logger = logger.clone();
             let worker_id = result.0.id.clone();
-            tokio::runtime::Handle::current().block_on(async move {
+            tokio::spawn(async move {
                 let logger = logger.lock().await;
                 let ctx = AuditContext {
                     task_id: None,
@@ -692,7 +692,7 @@ impl Conductor {
             let task_id = task_id.to_string();
             let worker_id = worker_id.clone();
             let goal_id = task.goal_id.clone();
-            tokio::runtime::Handle::current().block_on(async move {
+            tokio::spawn(async move {
                 let logger = logger.lock().await;
                 let ctx = AuditContext {
                     task_id: Some(task_id),
@@ -733,7 +733,7 @@ impl Conductor {
             if let Some(logger) = &self.audit_logger {
                 let logger = logger.clone();
                 let worker_id = worker_id.clone();
-                tokio::runtime::Handle::current().block_on(async move {
+                tokio::spawn(async move {
                     let logger = logger.lock().await;
                     let ctx = AuditContext {
                         task_id: None,
@@ -771,7 +771,7 @@ impl Conductor {
             let task_id = task_id.to_string();
             let worker_id = worker_id.clone();
             let goal_id = task.goal_id.clone();
-            tokio::runtime::Handle::current().block_on(async move {
+            tokio::spawn(async move {
                 let logger = logger.lock().await;
                 let ctx = AuditContext {
                     task_id: Some(task_id),
@@ -802,7 +802,7 @@ impl Conductor {
             if let Some(logger) = &self.audit_logger {
                 let logger = logger.clone();
                 let worker_id = worker_id.clone();
-                tokio::runtime::Handle::current().block_on(async move {
+                tokio::spawn(async move {
                     let logger = logger.lock().await;
                     let ctx = AuditContext {
                         task_id: None,
@@ -874,6 +874,11 @@ mod tests {
 
     #[test]
     fn register_worker_validates_ssh_key() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -882,30 +887,32 @@ mod tests {
         // Valid ed25519 key should pass
         let valid_key =
             "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGFub3RoZXJrZXllbmNvZGluZw== user@host";
-        let result = conductor.register_worker(
-            "worker-valid".to_string(),
-            vec!["compute".to_string()],
-            Some(valid_key.to_string()),
-        );
-        assert!(result.is_ok());
+        rt.block_on(async {
+            let result = conductor.register_worker(
+                "worker-valid".to_string(),
+                vec!["compute".to_string()],
+                Some(valid_key.to_string()),
+            );
+            assert!(result.is_ok());
 
-        // Invalid key format should fail
-        let invalid_key = "not-a-valid-key";
-        let result = conductor.register_worker(
-            "worker-invalid".to_string(),
-            vec!["compute".to_string()],
-            Some(invalid_key.to_string()),
-        );
-        assert!(result.is_err());
+            // Invalid key format should fail
+            let invalid_key = "not-a-valid-key";
+            let result = conductor.register_worker(
+                "worker-invalid".to_string(),
+                vec!["compute".to_string()],
+                Some(invalid_key.to_string()),
+            );
+            assert!(result.is_err());
 
-        // Missing key should pass (optional)
-        let result =
-            conductor.register_worker("worker-nok".to_string(), vec!["compute".to_string()], None);
-        assert!(result.is_ok());
+            // Missing key should pass (optional)
+            let result =
+                conductor.register_worker("worker-nok".to_string(), vec!["compute".to_string()], None);
+            assert!(result.is_ok());
+        });
     }
 
-    #[test]
-    fn task_assignment_filters_by_capability() {
+    #[tokio::test]
+    async fn task_assignment_filters_by_capability() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -956,8 +963,8 @@ mod tests {
         assert_eq!(tasks_for_gpu[0].id, task.id);
     }
 
-    #[test]
-    fn annealing_upgrades_trust_level() {
+    #[tokio::test]
+    async fn annealing_upgrades_trust_level() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -994,8 +1001,8 @@ mod tests {
         assert_eq!(updated_worker.successful_tasks, 1);
     }
 
-    #[test]
-    fn worker_login_existing_refreshes_token() {
+    #[tokio::test]
+    async fn worker_login_existing_refreshes_token() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -1036,8 +1043,8 @@ mod tests {
         assert_eq!(workers[0].name, "new-worker");
     }
 
-    #[test]
-    fn task_assignment_validates_trust_level() {
+    #[tokio::test]
+    async fn task_assignment_validates_trust_level() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -1081,8 +1088,8 @@ mod tests {
         assert_eq!(untrusted_tasks.len(), 0); // Trust level too low
     }
 
-    #[test]
-    fn wildcard_capability_matching() {
+    #[tokio::test]
+    async fn wildcard_capability_matching() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -1117,8 +1124,8 @@ mod tests {
         assert_eq!(tasks.len(), 1);
     }
 
-    #[test]
-    fn trust_level_upgrades_after_threshold() {
+    #[tokio::test]
+    async fn trust_level_upgrades_after_threshold() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -1153,8 +1160,8 @@ mod tests {
         assert_eq!(updated_worker.successful_tasks, 5);
     }
 
-    #[test]
-    fn failed_task_decreases_trust_level() {
+    #[tokio::test]
+    async fn failed_task_decreases_trust_level() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -1203,8 +1210,8 @@ mod tests {
         assert_eq!(updated_worker.trust_level, 1);
     }
 
-    #[test]
-    fn idle_decay_reduces_trust_level() {
+    #[tokio::test]
+    async fn idle_decay_reduces_trust_level() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.db");
         let conductor =
@@ -1235,8 +1242,8 @@ mod tests {
         assert_eq!(updated_worker.trust_level, 1);
     }
 
-    #[test]
-    fn api_returns_new_token_on_trust_change() {
+    #[tokio::test]
+    async fn api_returns_new_token_on_trust_change() {
         use crate::api;
         use axum::body::Body;
         use axum::http::{Request, StatusCode};
