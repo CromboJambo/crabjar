@@ -25,13 +25,15 @@ impl WorkerPool {
     }
 
     /// Spawn a job on an available worker. Returns None if all workers are busy.
-    pub fn spawn<F>(&mut self, f: F) -> Option<JoinHandle<String>>
+    /// The returned tuple contains the worker ID and the join handle.
+    pub fn spawn<F>(&mut self, f: F) -> Option<(u32, JoinHandle<String>)>
     where
         F: FnOnce() -> String + Send + 'static,
     {
         let worker = self.workers.iter_mut().find(|w| !w.busy)?;
+        let worker_id = worker.id;
         worker.busy = true;
-        Some(tokio::task::spawn_blocking(f))
+        Some((worker_id, tokio::task::spawn_blocking(f)))
     }
 
     pub fn worker_count(&self) -> usize {

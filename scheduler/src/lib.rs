@@ -8,8 +8,10 @@ pub mod error;
 pub mod scheduler;
 pub mod watcher;
 pub mod worker;
+mod r#loop;
 
 pub use error::SchedulerError;
 pub use scheduler::{JobSpec, Scheduler};
 pub use watcher::Watcher;
 pub use worker::WorkerPool;
+pub use r#loop::SchedulerLoop;
