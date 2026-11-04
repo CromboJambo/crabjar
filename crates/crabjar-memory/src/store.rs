@@ -63,10 +63,11 @@ impl MemoryStore {
         })?;
 
         let canonical_path = path.canonicalize().or_else(|_| {
-            // File may not exist yet — create parent and try again
+            // File may not exist yet — create it and try again
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).ok();
             }
+            fs::write(path, "").ok();
             path.canonicalize()
         }).map_err(|e| {
             MemoryError::Io(e)
