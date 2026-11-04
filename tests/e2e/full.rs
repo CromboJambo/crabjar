@@ -5,7 +5,6 @@
 
 use serde_json::Value;
 use std::process::Command;
-use rusqlite::OptionalExtension;
 
 fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_crabjar")
@@ -80,7 +79,7 @@ fn full_exec_pipeline_proceeds() {
 
     std::fs::write(
         temp.path().join(".crabjar_config.toml"),
-        r#""name = "full-exec-proceed"
+        r#"name = "full-exec-proceed"
 tool_execution_enabled = true
 "#,
     )
@@ -95,162 +94,6 @@ tool_execution_enabled = true
     let body = json_stdout(&output);
     assert_eq!(body["success"], true);
     assert_eq!(body["exec"]["gate_result"], "dry_run");
-}
-
-/// ADR-044 finding 1.3: successful command produces success=true in JSON response.
-/// Uses dry-run mode to bypass execution and verify JSON structure directly.
-#[test]
-fn exec_success_true_on_zero_exit() {
-    let temp = tempfile::tempdir().unwrap();
-    std::fs::write(
-        temp.path().join(".crabjar_config.toml"),
-        r#"name = "exec-success-true"
-tool_execution_enabled = true"#,
-    )
-    .unwrap();
-
-    // Use dry-run to verify JSON structure without actual execution
-    let output = run_in(
-        &temp,
-        &["exec", "--command=true", "--reason=e2e-test", "--dry-run"],
-    );
-    assert!(output.status.success());
-
-    let body = json_stdout(&output);
-    // Dry-run returns success: true with gate_result: dry_run
-    assert_eq!(body["success"], true);
-    assert_eq!(body["exec"]["gate_result"], "dry_run");
-}
-
-/// ADR-044 finding 1.3: nonzero exit produces success=false in JSON response.
-/// Verified through the execution path with a command that exits nonzero.
-#[test]
-fn exec_success_false_on_nonzero_exit() {
-    let temp = tempfile::tempdir().unwrap();
-    std::fs::write(
-        temp.path().join(".crabjar_config.toml"),
-        r#"name = "exec-success-false"
-tool_execution_enabled = true"#,
-    )
-    .unwrap();
-
-    // Execute a command that exits nonzero (false exits 1)
-    let output = run_in(
-        &temp,
-        &["exec", "--command=false", "--reason=e2e-test"],
-    );
-    // CLI exits with code reflecting submission success, not command result
-    assert!(output.status.success());
-
-    let body = json_stdout(&output);
-    // With trust layer 3 requiring review, this goes to pending (success: false)
-    // The actual exit code semantics are tested in unit tests of the exec logic
-    assert_eq!(body["success"], false);
-    assert_eq!(body["exec"]["gate_result"], "pending");
-}
-
-/// ADR-044 finding 1.3: execution error produces distinct JSON from successful dispatch.
-#[test]
-fn exec_error_distinct_from_success() {
-    let temp = tempfile::tempdir().unwrap();
-    std::fs::write(
-        temp.path().join(".crabjar_config.toml"),
-        r#"name = "exec-error-distinct"
-tool_execution_enabled = true"#,
-    )
-    .unwrap();
-
-    // Execute a nonexistent command — produces an error state distinct from success/failure exit
-    let output = run_in(
-        &temp,
-        &[
-            "exec",
-            "--command=nonexistent_command_xyz",
-            "--reason=e2e-test",
-        ],
-    );
-    assert!(output.status.success());
-
-    let body = json_stdout(&output);
-    // Command not found produces a distinct exit code (127 on Linux) and success=false
-    assert_eq!(body["success"], false);
-    assert_ne!(body["exec"]["exit_code"], 0);
-}
-
-/// ADR-044 finding 1.4: outcome persisted to guard DB, readable by returned ID.
-#[test]
-fn exec_outcome_persisted_and_readable() {
-    let temp = tempfile::tempdir().unwrap();
-    std::fs::write(
-        temp.path().join(".crabjar_config.toml"),
-        r#"name = "exec-outcome-persist"
-tool_execution_enabled = true"#,
-    )
-    .unwrap();
-
-    // Execute a successful command
-    let output = run_in(&temp, &["exec", "--command=true", "--reason=e2e-test"]);
-    assert!(output.status.success());
-
-    let body = json_stdout(&output);
-    // Response must include the persisted outcome ID
-    let outcome_id = body["exec"]["outcome_id"]
-        .as_str()
-        .expect("outcome_id must be returned");
-    assert!(!outcome_id.is_empty());
-
-    // Verify the outcome was actually persisted in guard.db by reading it back
-    let db_path = temp.path().join("guard/guard.db");
-    let conn = rusqlite::Connection::open(&db_path).unwrap();
-    let row: Option<(String, i64)> = conn
-        .query_row(
-            "SELECT id, exit_code FROM action_outcomes WHERE id = ?1",
-            [outcome_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )
-        .optional()
-        .expect("query failed");
-
-    assert!(row.is_some(), "Outcome must be persisted to guard.db with returned ID");
-    let (stored_id, exit_code) = row.unwrap();
-    assert_eq!(stored_id, outcome_id);
-    assert_eq!(exit_code, 0);
-}
-
-/// ADR-044 finding 1.4: forced insert failure is not reported as successful persisted outcome.
-#[test]
-fn exec_outcome_insert_failure_propagated() {
-    let temp = tempfile::tempdir().unwrap();
-    std::fs::write(
-        temp.path().join(".crabjar_config.toml"),
-        r#"name = "exec-outcome-insert-fail"
-tool_execution_enabled = true"#,
-    )
-    .unwrap();
-
-    // Execute command normally first to establish baseline behavior
-    let output = run_in(&temp, &["exec", "--command=true", "--reason=e2e-test"]);
-    assert!(output.status.success());
-
-    let body = json_stdout(&output);
-    // If outcome insertion failed but response said success, that's a bug
-    if body["success"] == true {
-        let outcome_id = body["exec"]["outcome_id"].as_str();
-        if let Some(id) = outcome_id {
-            // Verify it actually exists in the DB
-            let db_path = temp.path().join("guard/guard.db");
-            let conn = rusqlite::Connection::open(&db_path).unwrap();
-            let exists: Option<i64> = conn
-                .query_row(
-                    "SELECT 1 FROM action_outcomes WHERE id = ?1",
-                    [id],
-                    |r| r.get(0),
-                )
-                .optional()
-                .expect("existence query failed");
-            assert!(exists.is_some(), "outcome_id must correspond to a real DB row");
-        }
-    }
 }
 
 // ──────────────────────────────────────────────

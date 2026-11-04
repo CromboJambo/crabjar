@@ -41,8 +41,8 @@ impl BinaryAdapter {
 
         // Extract functions from symbol table
         for sym in obj.symbols() {
-            if let Ok(name) = sym.name() {
-                if !name.is_empty() {
+            if let Ok(name) = sym.name()
+                && !name.is_empty() {
                     structure.symbols.push(SymbolInfo {
                         name: name.to_string(),
                         address: sym.address() as usize,
@@ -63,7 +63,6 @@ impl BinaryAdapter {
                         });
                     }
                 }
-            }
         }
 
         // Note: Dynamic symbol (import) extraction requires format-specific parsing.
@@ -217,12 +216,11 @@ impl BinaryAdapter {
         let a_funcs: std::collections::HashMap<&str, usize> =
             a.functions.iter().map(|f| (&f.name[..], f.size)).collect();
         for b_func in &b.functions {
-            if let Some(&a_size) = a_funcs.get(b_func.name.as_str()) {
-                if a_size != b_func.size {
+            if let Some(&a_size) = a_funcs.get(b_func.name.as_str())
+                && a_size != b_func.size {
                     diff.modified_functions
                         .push((b_func.name.clone(), a_size, b_func.size));
                 }
-            }
         }
 
         // Find added/removed imports

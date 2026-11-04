@@ -1,9 +1,9 @@
 //! Decision evaluation routes: /evaluations/decision
 
-use crate::api::{ConductorState};
+use crate::api::{ConductorState, bg_evaluations};
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::State,
 };
 use serde_json::json;
 use uuid::Uuid;
@@ -41,7 +41,7 @@ pub async fn evaluate_decision_handler(
             .await;
 
             // Store result for polling
-            let mut store = crate::api::bg_evaluations().lock().await;
+            let mut store = bg_evaluations().lock().unwrap();
             match result {
                 Ok(Ok(decision)) => {
                     store.insert(
@@ -124,69 +124,4 @@ pub async fn evaluate_decision_handler(
             "rationale": format!("Task join error: {}", e)
         })),
     }
-}
-
-/// GET /decide/evaluate/{id} - Poll status of a background evaluation.
-pub async fn get_evaluation_status(
-    Path(eval_id): Path<String>,
-) -> Json<serde_json::Value> {
-    let store = crate::api::bg_evaluations().lock().await;
-
-    match store.get(&eval_id) {
-        Some(result) => {
-            let status = &result["status"];
-            if status == "completed" {
-                Json(json!({
-                    "success": true,
-                    "evaluation_id": eval_id,
-                    "status": status,
-                    "result": result
-                }))
-            } else {
-                Json(json!({
-                    "success": true,
-                    "evaluation_id": eval_id,
-                    "status": status,
-                    "result": null
-                }))
-            }
-        },
-        None => Json(json!({
-            "success": false,
-            "evaluation_id": eval_id,
-            "error": "Evaluation not found or expired"
-        })),
-    }
-}
-
-/// GET /decisions/capabilities - List available decision-making capabilities.
-pub async fn list_decision_capabilities() -> Json<serde_json::Value> {
-    Json(json!({
-        "success": true,
-        "capabilities": [
-            {
-                "id": "jev-structural",
-                "name": "JEV Structural Evaluation",
-                "description": "Evaluate code regions against JEV criteria using embedding similarity"
-            },
-            {
-                "id": "decision-postprocess",
-                "name": "Decision Post-Processing",
-                "description": "Validate and refine JEV decisions with structural rule checks"
-            },
-            {
-                "id": "feedback-learning",
-                "name": "Feedback Learning",
-                "description": "Record feedback on decisions for future improvement"
-            }
-        ]
-    }))
-}
-
-/// GET /audit/log - Query the decision audit log.
-pub async fn query_audit_log() -> Json<serde_json::Value> {
-    Json(json!({
-        "success": true,
-        "entries": []
-    }))
 }

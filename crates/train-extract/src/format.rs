@@ -1,7 +1,5 @@
-use crate::extract_types::{Annotation, Chunk, ExtractedData, KnowledgeEntry, LogEvent};
+use crate::extract::{Annotation, Chunk, ExtractedData, KnowledgeEntry, LogEvent};
 use serde::{Deserialize, Serialize};
-
-use crate::format_impl;
 
 /// A single instruction-tuning sample.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,10 +18,23 @@ pub struct Sample {
 /// Where a sample came from.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SampleSource {
-    KnowledgeEntry { entry_id: i64, kind: String },
-    LogEvent { event_id: String, source: String },
-    Chunk { chunk_id: String, event_id: String },
-    Annotation { doc_name: String, annotation_id: String, annotation_kind: String },
+    KnowledgeEntry {
+        entry_id: i64,
+        kind: String,
+    },
+    LogEvent {
+        event_id: String,
+        source: String,
+    },
+    Chunk {
+        chunk_id: String,
+        event_id: String,
+    },
+    Annotation {
+        doc_name: String,
+        annotation_id: String,
+        annotation_kind: String,
+    },
 }
 
 impl SampleSource {
@@ -32,9 +43,11 @@ impl SampleSource {
             SampleSource::KnowledgeEntry { entry_id, .. } => format!("knowledge:{entry_id}"),
             SampleSource::LogEvent { event_id, .. } => format!("event:{event_id}"),
             SampleSource::Chunk { chunk_id, .. } => format!("chunk:{chunk_id}"),
-            SampleSource::Annotation { doc_name, annotation_id, .. } => {
-                format!("annotation:{doc_name}:{annotation_id}")
-            }
+            SampleSource::Annotation {
+                doc_name,
+                annotation_id,
+                ..
+            } => format!("annotation:{doc_name}:{annotation_id}"),
         }
     }
 }
@@ -42,43 +55,225 @@ impl SampleSource {
 /// Format extracted data into instruction-tuning samples.
 pub fn format_samples(data: &ExtractedData) -> Vec<Sample> {
     let mut samples = Vec::new();
+
     for entry in &data.knowledge_entries {
-        samples.extend(format_impl::format_knowledge_entry(entry));
+        samples.extend(format_knowledge_entry(entry));
     }
+
     for event in &data.events {
-        samples.extend(format_impl::format_log_event(event));
+        samples.extend(format_log_event(event));
     }
+
     for chunk in &data.chunks {
-        samples.extend(format_impl::format_chunk(chunk));
+        samples.extend(format_chunk(chunk));
     }
+
     for annotation in &data.annotations {
-        samples.extend(format_impl::format_annotation(annotation));
+        samples.extend(format_annotation(annotation));
     }
+
+    samples
+}
+
+/// Format a knowledge entry as instruction/response pair.
+fn format_knowledge_entry(entry: &KnowledgeEntry) -> Vec<Sample> {
+    let mut samples = Vec::new();
+
+    let tags_str = if entry.tags.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", entry.tags.join(", "))
+    };
+
+    let kind_label = match entry.kind {
+        agent_context::KnowledgeKind::Instruction => "instruction",
+        agent_context::KnowledgeKind::Pattern => "pattern",
+        agent_context::KnowledgeKind::Example => "example",
+        agent_context::KnowledgeKind::Context => "context",
+        agent_context::KnowledgeKind::Rule => "rule",
+        agent_context::KnowledgeKind::Procedure => "procedure",
+    };
+
+    let instruction = format!(
+        "What is the {kind_label}{tags_str}?\n\n{}",
+        entry.content.lines().next().unwrap_or("")
+    );
+
+    let response = entry
+        .content
+        .lines()
+        .skip_while(|l| l.is_empty())
+        .take_while(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let provenance = format!("knowledge:{}", entry.id);
+
+    samples.push(Sample {
+        instruction,
+        response: if response.is_empty() {
+            entry.content.clone()
+        } else {
+            response
+        },
+        source: SampleSource::KnowledgeEntry {
+            entry_id: entry.id,
+            kind: format!("{:?}", entry.kind),
+        },
+        weight: entry.weight,
+        tags: entry.tags.clone(),
+        provenance_id: provenance,
+        created_at: entry.created_at,
+    });
+
+    samples
+}
+
+/// Format a mirror-log event as instruction/response pair.
+fn format_log_event(event: &LogEvent) -> Vec<Sample> {
+    let content = event.content.trim();
+    if content.is_empty() {
+        return Vec::new();
+    }
+
+    let first_line = content.lines().next().unwrap_or(content);
+    let instruction = format!(
+        "What happened in the {source} event?\n\n{first_line}",
+        source = event.source
+    );
+
+    let response = content
+        .lines()
+        .skip_while(|l| l.is_empty())
+        .take_while(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    vec![Sample {
+        instruction,
+        response: if response.is_empty() {
+            content.to_string()
+        } else {
+            response
+        },
+        source: SampleSource::LogEvent {
+            event_id: event.id.clone(),
+            source: event.source.clone(),
+        },
+        weight: 0.5,
+        tags: vec![event.source.clone()],
+        provenance_id: format!("event:{}", event.id),
+        created_at: event.timestamp,
+    }]
+}
+
+/// Format a chunk as instruction/response pair.
+fn format_chunk(chunk: &Chunk) -> Vec<Sample> {
+    let content = chunk.content.trim();
+    if content.is_empty() {
+        return Vec::new();
+    }
+
+    let instruction = format!(
+        "What is the content of chunk {idx}?\n\n{first}",
+        idx = chunk.chunk_index + 1,
+        first = content.lines().next().unwrap_or(content)
+    );
+
+    let response = content
+        .lines()
+        .skip_while(|l| l.is_empty())
+        .take_while(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    vec![Sample {
+        instruction,
+        response: if response.is_empty() {
+            content.to_string()
+        } else {
+            response
+        },
+        source: SampleSource::Chunk {
+            chunk_id: chunk.id.clone(),
+            event_id: chunk.event_id.clone(),
+        },
+        weight: 0.3,
+        tags: vec!["chunk".to_string()],
+        provenance_id: format!("chunk:{}", chunk.id),
+        created_at: 0,
+    }]
+}
+
+/// Format a resolved annotation as instruction/response pair.
+fn format_annotation(annotation: &Annotation) -> Vec<Sample> {
+    let mut samples = Vec::new();
+
+    if annotation.status != "resolved" {
+        return samples;
+    }
+
+    let reason = match &annotation.resolution_reason {
+        Some(r) => r.clone(),
+        None => return samples,
+    };
+
+    let instruction = format!(
+        "What decision was made about the {doc} annotation ({kind})?\n\n{message}",
+        doc = annotation.doc_name,
+        kind = annotation.kind,
+        message = annotation.message
+    );
+
+    samples.push(Sample {
+        instruction,
+        response: reason,
+        source: SampleSource::Annotation {
+            doc_name: annotation.doc_name.clone(),
+            annotation_id: annotation.id.clone(),
+            annotation_kind: annotation.kind.clone(),
+        },
+        weight: annotation.confidence,
+        tags: vec!["annotation".to_string(), annotation.doc_name.clone()],
+        provenance_id: format!("annotation:{}:{}", annotation.doc_name, annotation.id),
+        created_at: annotation.created_at,
+    });
+
     samples
 }
 
 /// Apply weighting to samples based on per-sample confidence decay and tag frequency.
+///
+/// Each sample is decayed by its own age (from `created_at`):
+/// `weight * 2^(-age/half_life)`, floored at 0.01 and capped at 1.0 after
+/// tag boosts are applied. Samples with unknown timestamps (`created_at == 0`)
+/// are not decayed.
 pub fn apply_weighting(
     samples: Vec<Sample>,
     decay_half_life: f64,
     tag_boost: &std::collections::HashMap<String, f64>,
 ) -> Vec<Sample> {
     let now = chrono::Utc::now().timestamp() as f64;
+
     samples
         .into_iter()
         .map(|mut sample| {
+            // Apply time decay based on the sample's own age.
             let decayed = if sample.created_at > 0 && decay_half_life > 0.0 {
                 let age = (now - sample.created_at as f64).max(0.0);
                 sample.weight * 2.0f64.powf(-age / decay_half_life)
             } else {
                 sample.weight
             };
+
+            // Apply tag boost
             let mut tag_multiplier = 1.0;
             for tag in &sample.tags {
                 if let Some(boost) = tag_boost.get(tag) {
                     tag_multiplier *= boost;
                 }
             }
+
             sample.weight = (decayed * tag_multiplier).clamp(0.01, 1.0);
             sample
         })
@@ -88,7 +283,7 @@ pub fn apply_weighting(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extract_types::{Annotation, Chunk, ExtractedData, KnowledgeEntry, LogEvent};
+    use crate::extract::KnowledgeEntry;
     use agent_context::KnowledgeKind;
 
     fn make_sample_data() -> ExtractedData {
@@ -109,17 +304,33 @@ mod tests {
                     active: true,
                     created_at: ts,
                 },
+                KnowledgeEntry {
+                    id: 2,
+                    content: "Use snake_case for function names.".to_string(),
+                    kind: KnowledgeKind::Pattern,
+                    tags: vec!["rust".to_string(), "naming".to_string()],
+                    metadata: serde_json::json!({}),
+                    weight: 0.7,
+                    source: "user".to_string(),
+                    source_type: "user".to_string(),
+                    source_id: "test-2".to_string(),
+                    provenance_id: "prov-2".to_string(),
+                    active: true,
+                    created_at: ts,
+                },
             ],
-            events: vec![LogEvent {
-                id: "evt-1".to_string(),
-                content: "Updated Cargo.toml".to_string(),
-                source: "file".to_string(),
-                meta: None,
-                timestamp: 1000000,
-            }],
+            events: vec![
+                LogEvent {
+                    id: "evt-1".to_string(),
+                    content: "Updated Cargo.toml".to_string(),
+                    source: "file".to_string(),
+                    meta: None,
+                    timestamp: 1000000,
+                },
+            ],
             annotations: vec![],
             chunks: vec![],
-            sample_count: 2,
+            sample_count: 3,
         }
     }
 
@@ -128,7 +339,11 @@ mod tests {
         let data = make_sample_data();
         let samples = format_samples(&data);
         assert!(!samples.is_empty());
-        assert!(samples.iter().any(|s| s.provenance_id.starts_with("knowledge:")));
+        assert!(
+            samples
+                .iter()
+                .any(|s| s.provenance_id.starts_with("knowledge:"))
+        );
     }
 
     #[test]
@@ -165,7 +380,7 @@ mod tests {
             active: true,
             created_at: 1000000,
         };
-        let samples = format_impl::format_knowledge_entry(&entry);
+        let samples = format_knowledge_entry(&entry);
         assert_eq!(samples.len(), 1);
         assert!(samples[0].instruction.contains("pattern"));
         assert!(samples[0].response.contains("Test content"));
@@ -180,7 +395,7 @@ mod tests {
             meta: None,
             timestamp: 1000000,
         };
-        let samples = format_impl::format_log_event(&event);
+        let samples = format_log_event(&event);
         assert_eq!(samples.len(), 1);
         assert!(matches!(samples[0].source, SampleSource::LogEvent { .. }));
     }
@@ -194,7 +409,7 @@ mod tests {
             meta: None,
             timestamp: 1000000,
         };
-        let samples = format_impl::format_log_event(&event);
+        let samples = format_log_event(&event);
         assert!(samples.is_empty());
     }
 
@@ -210,8 +425,9 @@ mod tests {
             confidence: 0.85,
             created_at: 1000000,
         };
-        let samples = format_impl::format_annotation(&resolved);
+        let samples = format_annotation(&resolved);
         assert_eq!(samples.len(), 1);
+        assert!(matches!(samples[0].source, SampleSource::Annotation { .. }));
 
         let open = Annotation {
             id: "ann-2".to_string(),
@@ -223,7 +439,7 @@ mod tests {
             confidence: 0.5,
             created_at: 1000000,
         };
-        let samples = format_impl::format_annotation(&open);
+        let samples = format_annotation(&open);
         assert!(samples.is_empty());
     }
 
@@ -233,19 +449,106 @@ mod tests {
         let samples = vec![Sample {
             instruction: "test".to_string(),
             response: "test".to_string(),
-            source: SampleSource::KnowledgeEntry { entry_id: 1, kind: "Pattern".to_string() },
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
+            },
             weight: 1.0,
             tags: vec!["test".to_string()],
             provenance_id: "test".to_string(),
             created_at: day_ago,
         }];
+
         let decayed = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
         assert!(decayed[0].weight < 1.0);
+        assert!(decayed[0].weight > 0.0);
+    }
+
+    #[test]
+    fn apply_weighting_no_decay_when_recent() {
+        let samples = vec![Sample {
+            instruction: "test".to_string(),
+            response: "test".to_string(),
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
+            },
+            weight: 0.5,
+            tags: vec!["test".to_string()],
+            provenance_id: "test".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        }];
+
+        let result = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
+        assert!((result[0].weight - 0.5).abs() < 1e-3);
+    }
+
+    #[test]
+    fn apply_weighting_unknown_timestamp_not_decayed() {
+        let samples = vec![Sample {
+            instruction: "test".to_string(),
+            response: "test".to_string(),
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
+            },
+            weight: 0.5,
+            tags: vec!["test".to_string()],
+            provenance_id: "test".to_string(),
+            created_at: 0,
+        }];
+
+        let result = apply_weighting(samples, 86400.0, &std::collections::HashMap::new());
+        assert_eq!(result[0].weight, 0.5);
+    }
+
+    #[test]
+    fn apply_weighting_applies_tag_boost() {
+        let mut boost = std::collections::HashMap::new();
+        boost.insert("boosted".to_string(), 2.0);
+
+        let samples = vec![Sample {
+            instruction: "test".to_string(),
+            response: "test".to_string(),
+            source: SampleSource::KnowledgeEntry {
+                entry_id: 1,
+                kind: "Pattern".to_string(),
+            },
+            weight: 0.5,
+            tags: vec!["boosted".to_string()],
+            provenance_id: "test".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+        }];
+
+        let result = apply_weighting(samples, 86400.0, &boost);
+        assert_eq!(result[0].weight, 1.0); // 0.5 * 2.0 = 1.0, capped at 1.0
     }
 
     #[test]
     fn sample_source_provenance_formats_correctly() {
-        let ke = SampleSource::KnowledgeEntry { entry_id: 42, kind: "Pattern".to_string() };
+        let ke = SampleSource::KnowledgeEntry {
+            entry_id: 42,
+            kind: "Pattern".to_string(),
+        };
         assert_eq!(ke.to_provenance(), "knowledge:42");
+
+        let le = SampleSource::LogEvent {
+            event_id: "evt-99".to_string(),
+            source: "file".to_string(),
+        };
+        assert_eq!(le.to_provenance(), "event:evt-99");
+
+        let ch = SampleSource::Chunk {
+            chunk_id: "chunk-1".to_string(),
+            event_id: "evt-1".to_string(),
+        };
+        assert_eq!(ch.to_provenance(), "chunk:chunk-1");
+
+        let an = SampleSource::Annotation {
+            doc_name: "test.md".to_string(),
+            annotation_id: "ann-1".to_string(),
+            annotation_kind: "note".to_string(),
+        };
+        assert_eq!(an.to_provenance(), "annotation:test.md:ann-1");
     }
 }

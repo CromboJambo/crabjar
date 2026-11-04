@@ -4,7 +4,6 @@
 //! Detection != authorization: knowing *** happened does not grant the right to change what happens.
 
 use std::path::PathBuf;
-
 use tracing::{debug, info, warn};
 
 pub use crate::command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
@@ -13,14 +12,9 @@ pub use crate::domain_allowlist::{DomainAllowlist, DomainCheckError};
 use crate::gate_context::GateContext;
 use crate::gate_result::GateResult;
 use crate::guard_db::{GuardDb, GuardDbError};
-use crate::policy_types::PolicyEngine;
+use crate::policy_types::{PolicyContext, PolicyEngine, PolicyResult};
 use crate::risk_config::RiskConfig;
 use crate::trust::TrustManager;
-
-mod command_risk;
-mod pid_trust;
-mod policy;
-mod provenance;
 
 /// Execution gate that combines trust-layer gating with command security checks.
 pub struct ExecutionGate<'a> {
@@ -52,6 +46,55 @@ impl<'a> ExecutionGate<'a> {
         self
     }
 
+    /// Convert a GateContext into a PolicyContext for evaluation.
+    fn to_policy_context(&self, ctx: &GateContext<'_>) -> PolicyContext {
+        PolicyContext {
+            action_type: ctx.action_type.to_string(),
+            command: ctx.command.to_string(),
+            args: ctx.args.clone(),
+            trust_layer: ctx.trust_layer,
+            confidence: ctx.confidence,
+            source_event_id: ctx.source_event_id.map(|s| s.to_string()),
+            can_interrupt: ctx.can_interrupt,
+            pid: ctx.pid,
+            scope: ctx.scope.as_ref().cloned(),
+            target_scope: ctx.target_scope.as_ref().cloned(),
+            domains: ctx.domains.clone(),
+            context_budget: ctx.context_budget.clone(),
+            context_fragment_tokens: ctx.context_fragment_tokens,
+        }
+    }
+
+    /// Run the policy engine pre-check if configured.
+    /// Returns `Some(GateResult)` if the policy engine blocks or modifies the check,
+    /// or `None` to proceed with normal gate logic.
+    fn run_policy_check(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
+        let policy_engine = self.policy_engine.as_ref()?;
+        let policy_ctx = self.to_policy_context(ctx);
+
+        match policy_engine.evaluate(&policy_ctx) {
+            PolicyResult::Proceed => None, // Policy allows — proceed with normal gate logic
+            PolicyResult::Interrupted { reason } => Some(GateResult::Interrupted { reason }),
+            PolicyResult::Pending => Some(GateResult::Pending),
+            PolicyResult::DryRun => Some(GateResult::DryRun),
+            PolicyResult::Revoked { reason } => Some(GateResult::Revoked { reason }),
+            PolicyResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            } => Some(GateResult::ContextExhausted {
+                used,
+                budget,
+                remaining,
+            }),
+            PolicyResult::OversizedFragment { actual, max } => {
+                Some(GateResult::OversizedFragment { actual, max })
+            }
+        }
+    }
+}
+
+impl<'a> ExecutionGate<'a> {
     pub fn with_risk_config(mut self, risk_config: RiskConfig) -> Self {
         self.risk_config = risk_config;
         self
@@ -66,7 +109,8 @@ impl<'a> ExecutionGate<'a> {
     /// 4. Trust layer check: auto-execute only for trusted layers
     pub fn check(&self, ctx: GateContext<'_>) -> Result<GateResult, GuardDbError> {
         // Policy engine pre-check (if configured).
-        if let Some(gate_result) = policy::run_policy_check(self.policy_engine.as_deref(), &ctx) {
+        // This runs before the existing gate logic and can short-circuit with a result.
+        if let Some(gate_result) = self.run_policy_check(&ctx) {
             debug!(
                 action = %ctx.action_type,
                 policy_source = self.policy_engine.as_ref().map(|e| e.source_description()),
@@ -88,7 +132,7 @@ impl<'a> ExecutionGate<'a> {
 
         // 2. Provenance verification: source_event_id must exist in action_requests
         let provenance_exists = if let Some(id) = ctx.source_event_id {
-            provenance::verify_provenance(&self.trust.conn(), id)?
+            self.verify_provenance(id)?
         } else {
             false
         };
@@ -145,12 +189,10 @@ impl<'a> ExecutionGate<'a> {
         }
 
         // 6. PID trust check (Option B: per-process trust layers)
-        if let Some(pid) = ctx.pid {
-            if let Some(gate_result) =
-                pid_trust::check_pid_trust(&self.trust.conn(), pid, ctx.command, &self.risk_config)?
-            {
-                return Ok(gate_result);
-            }
+        if let Some(pid) = ctx.pid
+            && let Some(gate_result) = self.check_pid_trust(pid, ctx.command)?
+        {
+            return Ok(gate_result);
         }
 
         // 7. Scope isolation check
@@ -191,7 +233,7 @@ impl<'a> ExecutionGate<'a> {
         }
 
         // 8. Command risk assessment
-        let risk = command_risk::assess_command_risk(ctx.command, &ctx.args, &self.risk_config);
+        let risk = self.assess_command_risk(ctx.command, &ctx.args);
         match risk {
             CommandRisk::High => {
                 return Ok(GateResult::Interrupted {
@@ -252,13 +294,13 @@ impl<'a> ExecutionGate<'a> {
         if let (Some(budget), fragment_tokens) = (&ctx.context_budget, ctx.context_fragment_tokens)
         {
             // Per-fragment hard cap (Codex spec: 10K tokens)
-            if let Some(tokens) = fragment_tokens {
-                if tokens > crate::context_budget::MAX_TOKENS_PER_FRAGMENT {
-                    return Ok(GateResult::OversizedFragment {
-                        actual: tokens,
-                        max: crate::context_budget::MAX_TOKENS_PER_FRAGMENT,
-                    });
-                }
+            if let Some(tokens) = fragment_tokens
+                && tokens > crate::context_budget::MAX_TOKENS_PER_FRAGMENT
+            {
+                return Ok(GateResult::OversizedFragment {
+                    actual: tokens,
+                    max: crate::context_budget::MAX_TOKENS_PER_FRAGMENT,
+                });
             }
 
             // Warn at 80% utilization (loose bounds per Q12)
@@ -273,14 +315,14 @@ impl<'a> ExecutionGate<'a> {
             }
 
             // Reserve tokens for this action's context
-            if let Some(tokens) = fragment_tokens {
-                if !budget.can_fit(tokens) {
-                    return Ok(GateResult::ContextExhausted {
-                        used: budget.used(),
-                        budget: budget.budget(),
-                        remaining: budget.remaining(),
-                    });
-                }
+            if let Some(tokens) = fragment_tokens
+                && !budget.can_fit(tokens)
+            {
+                return Ok(GateResult::ContextExhausted {
+                    used: budget.used(),
+                    budget: budget.budget(),
+                    remaining: budget.remaining(),
+                });
             }
         }
 
@@ -316,5 +358,147 @@ impl<'a> ExecutionGate<'a> {
                 Ok(GateResult::Pending)
             }
         }
+    }
+
+    /// Verify provenance: source_event_id exists in GuardDb action_requests AND is recent.
+    /// Addresses redteam finding #7: stale approvals should be rejected.
+    fn verify_provenance(&self, id: &str) -> Result<bool, GuardDbError> {
+        let conn = self.trust.conn();
+
+        // Check existence and freshness in a single query
+        // Approvals older than 24 hours are considered stale
+        let exists_and_fresh: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM action_requests \n\
+                 WHERE source_event_id = ?1 AND requested_at > ?2)",
+                rusqlite::params![id, chrono::Utc::now().timestamp() - 86400],
+                |r| r.get(0),
+            )
+            .map_err(|_| GuardDbError::SchemaError("Provenance check failed".into()))?;
+
+        if !exists_and_fresh {
+            // Check if it exists but is stale
+            let is_stale: bool = conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM action_requests \n\
+                     WHERE source_event_id = ?1 AND requested_at <= ?2)",
+                    rusqlite::params![id, chrono::Utc::now().timestamp() - 86400],
+                    |r| r.get(0),
+                )
+                .map_err(|_| GuardDbError::SchemaError("Stale provenance check failed".into()))?;
+
+            if is_stale {
+                warn!(event_id = id, "Provenance exists but is stale (>24h)");
+            }
+        }
+
+        Ok(exists_and_fresh)
+    }
+
+    /// Check PID trust layer (Option B).
+    /// Returns Revoked if trust has decayed below the action's trust layer.
+    fn check_pid_trust(&self, pid: i32, command: &str) -> Result<Option<GateResult>, GuardDbError> {
+        let conn = self.trust.conn();
+
+        let row = conn.query_row(
+            "SELECT trust_layer, use_count, last_use, auto_grant, decay_interval, decay_rate
+             FROM pid_trust WHERE pid = ?1",
+            rusqlite::params![pid],
+            |row| {
+                Ok((
+                    row.get::<_, u32>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, bool>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, f64>(5)?,
+                ))
+            },
+        );
+
+        let (current_layer, _use_count, last_use, auto_grant, decay_interval, decay_rate) =
+            match row {
+                Ok(r) => r,
+                Err(rusqlite::Error::QueryReturnedNoRows) => {
+                    return Ok(Some(GateResult::Pending));
+                }
+                Err(e) => return Err(GuardDbError::Sqlite(e)),
+            };
+
+        // Compute decayed trust layer
+        let elapsed = chrono::Utc::now().timestamp() - last_use;
+        let effective_layer = if elapsed > decay_interval {
+            let decayed = (decay_rate * elapsed as f64).min(1.0);
+            let new_confidence = (current_layer as f64 / 3.0) * (1.0 - decayed);
+            (new_confidence * 3.0) as u32
+        } else {
+            current_layer
+        };
+
+        // If trust has dropped below the action's layer, revoke
+        if effective_layer < (self.risk_config.confidence_floor * 3.0) as u32 {
+            let reason = format!(
+                "PID {} trust decayed from layer {} to {} (auto_grant={})",
+                pid, current_layer, effective_layer, auto_grant
+            );
+            warn!(pid, command, %reason, "PID trust revoked");
+            return Ok(Some(GateResult::Revoked { reason }));
+        }
+
+        Ok(None)
+    }
+
+    /// Assess command risk based on name AND arguments (dynamic, context-aware).
+    /// This addresses redteam finding #5: risk must be evaluated based on what the
+    /// command is operating on, not just the command name.
+    fn assess_command_risk(&self, command: &str, args: &[String]) -> CommandRisk {
+        let basename = command.split('/').next_back().unwrap_or(command);
+
+        // Dynamic risk assessment: evaluate both command name and arguments
+        // to determine actual risk level based on context.
+
+        // Check for high-risk patterns in arguments regardless of command name
+        let args_str = args.join(" ");
+
+        // rm -rf / or similar destructive patterns are always high risk
+        if basename.eq_ignore_ascii_case("rm") {
+            if args_str.contains("-rf /") || args_str.contains("-fr /") || args_str == "/" {
+                return CommandRisk::High;
+            }
+            // rm with specific files is lower risk
+            if !args.is_empty() && !args_str.contains("/") {
+                return CommandRisk::Low;
+            }
+        }
+
+        // chmod/chown on critical paths is high risk
+        if (basename.eq_ignore_ascii_case("chmod") || basename.eq_ignore_ascii_case("chown"))
+            && (args_str.contains("/etc/") || args_str.contains("/usr/") || args_str.contains("/")) {
+                return CommandRisk::High;
+            }
+
+        // Package manager install commands are high risk (system-wide changes)
+        if ["apt", "apt-get", "yum", "dnf", "pacman", "pip", "npm", "cargo"]
+            .iter()
+            .any(|c| basename.eq_ignore_ascii_case(c))
+            && (args_str.contains("install") || args_str.contains("upgrade")) {
+                return CommandRisk::High;
+            }
+
+        // Check static high-risk list (for commands that are always risky)
+        for risk_cmd in &self.risk_config.high_risk {
+            if basename.eq_ignore_ascii_case(risk_cmd) {
+                return CommandRisk::High;
+            }
+        }
+
+        // Check static medium-risk list
+        for risk_cmd in &self.risk_config.medium_risk {
+            if basename.eq_ignore_ascii_case(risk_cmd) {
+                return CommandRisk::Medium;
+            }
+        }
+
+        CommandRisk::Low
     }
 }

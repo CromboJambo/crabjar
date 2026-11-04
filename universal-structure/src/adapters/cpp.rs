@@ -8,9 +8,6 @@
 use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
 use std::collections::HashMap;
 
-use super::cpp_keywords::CPP_KEYWORDS;
-use super::cpp_patterns::{detect_modern_cpp_patterns, detect_smart_pointer_patterns, detect_template_patterns};
-
 /// Simplified C++ token kind for internal use.
 #[derive(Debug, Clone, PartialEq)]
 enum CppTok {
@@ -137,7 +134,103 @@ impl CppAdapter {
                     }
 
                     // Check if it's a keyword (C++ keywords include C keywords plus more)
-                    if CPP_KEYWORDS.contains(&word.as_str()) {
+                    let keywords = [
+                        "alignas",
+                        "alignof",
+                        "and",
+                        "and_eq",
+                        "asm",
+                        "auto",
+                        "bitand",
+                        "bitor",
+                        "bool",
+                        "break",
+                        "case",
+                        "catch",
+                        "char",
+                        "char8_t",
+                        "char16_t",
+                        "char32_t",
+                        "class",
+                        "compl",
+                        "concept",
+                        "const",
+                        "consteval",
+                        "constexpr",
+                        "constinit",
+                        "const_cast",
+                        "continue",
+                        "co_await",
+                        "co_return",
+                        "co_yield",
+                        "decltype",
+                        "default",
+                        "delete",
+                        "do",
+                        "double",
+                        "dynamic_cast",
+                        "else",
+                        "enum",
+                        "explicit",
+                        "export",
+                        "extern",
+                        "false",
+                        "float",
+                        "for",
+                        "friend",
+                        "goto",
+                        "if",
+                        "import",
+                        "inline",
+                        "int",
+                        "long",
+                        "module",
+                        "mutable",
+                        "namespace",
+                        "new",
+                        "noexcept",
+                        "not",
+                        "not_eq",
+                        "nullptr",
+                        "operator",
+                        "or",
+                        "or_eq",
+                        "private",
+                        "protected",
+                        "public",
+                        "register",
+                        "reinterpret_cast",
+                        "requires",
+                        "return",
+                        "short",
+                        "signed",
+                        "sizeof",
+                        "static",
+                        "static_assert",
+                        "static_cast",
+                        "struct",
+                        "switch",
+                        "template",
+                        "this",
+                        "thread_local",
+                        "throw",
+                        "true",
+                        "try",
+                        "typedef",
+                        "typeid",
+                        "typename",
+                        "union",
+                        "unsigned",
+                        "using",
+                        "virtual",
+                        "void",
+                        "volatile",
+                        "while",
+                        "xor",
+                        "xor_eq",
+                    ];
+
+                    if keywords.contains(&word.as_str()) {
                         tokens.push(CppTok::Keyword(word));
                     } else {
                         tokens.push(CppTok::Identifier(word));
@@ -176,6 +269,53 @@ impl CppAdapter {
 
         tokens
     }
+
+    /// Detect template patterns.
+    fn detect_template_patterns(&self, source: &str) -> HashMap<String, String> {
+        let mut tags = HashMap::new();
+
+        if source.contains('<') && source.contains('>') {
+            tags.insert("template_usage".to_string(), "true".to_string());
+        }
+        if source.contains("template <") {
+            tags.insert("template_declaration".to_string(), "true".to_string());
+        }
+
+        tags
+    }
+
+    /// Detect smart pointer patterns.
+    fn detect_smart_pointer_patterns(&self, source: &str) -> HashMap<String, String> {
+        let mut tags = HashMap::new();
+
+        if source.contains("std::unique_ptr") || source.contains("make_unique") {
+            tags.insert("smart_pointer".to_string(), "unique_ptr".to_string());
+        } else if source.contains("std::shared_ptr") || source.contains("make_shared") {
+            tags.insert("smart_pointer".to_string(), "shared_ptr".to_string());
+        }
+
+        tags
+    }
+
+    /// Detect modern C++ features.
+    fn detect_modern_cpp_patterns(&self, source: &str) -> HashMap<String, String> {
+        let mut tags = HashMap::new();
+
+        if source.contains("auto") && (source.contains('=') || source.contains('(')) {
+            tags.insert("type_inference".to_string(), "true".to_string());
+        }
+        if source.contains("nullptr") {
+            tags.insert("modern_null".to_string(), "nullptr".to_string());
+        }
+        if source.contains("override") {
+            tags.insert("virtual_override".to_string(), "true".to_string());
+        }
+        if source.contains("final") {
+            tags.insert("class_final".to_string(), "true".to_string());
+        }
+
+        tags
+    }
 }
 
 impl LanguageAdapter for CppAdapter {
@@ -193,8 +333,8 @@ impl LanguageAdapter for CppAdapter {
             match token {
                 CppTok::Keyword(kw) if kw == "class" || kw == "struct" => {
                     // Look ahead for name
-                    if i + 1 < tokens.len() {
-                        if let CppTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let CppTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
@@ -203,7 +343,6 @@ impl LanguageAdapter for CppAdapter {
                                 source: format!("{kw} {name}"),
                             });
                         }
-                    }
                 }
                 CppTok::Keyword(kw) if kw == "enum" => {
                     spans.push(Span {
@@ -340,9 +479,9 @@ impl LanguageAdapter for CppAdapter {
         while i < tokens.len() {
             if let CppTok::Identifier(name) = &tokens[i] {
                 // Check if next token is '(' — potential function definition
-                if i + 1 < tokens.len() {
-                    if let CppTok::Punctuation(p) = &tokens[i + 1] {
-                        if p == "(" {
+                if i + 1 < tokens.len()
+                    && let CppTok::Punctuation(p) = &tokens[i + 1]
+                        && p == "(" {
                             // Look back for return type (identifier or keyword)
                             let has_return_type = i > 0
                                 && matches!(
@@ -360,17 +499,15 @@ impl LanguageAdapter for CppAdapter {
                                 });
                             }
                         }
-                    }
-                }
             }
             i += 1;
         }
 
         // Add semantic annotations
         let mut semantic_tags = HashMap::new();
-        semantic_tags.extend(detect_template_patterns(source));
-        semantic_tags.extend(detect_smart_pointer_patterns(source));
-        semantic_tags.extend(detect_modern_cpp_patterns(source));
+        semantic_tags.extend(self.detect_template_patterns(source));
+        semantic_tags.extend(self.detect_smart_pointer_patterns(source));
+        semantic_tags.extend(self.detect_modern_cpp_patterns(source));
 
         SpanTree {
             spans,

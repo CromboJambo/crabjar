@@ -8,9 +8,6 @@
 use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
 use std::collections::HashMap;
 
-use super::c_keywords::C_KEYWORDS;
-use super::c_patterns::{detect_memory_patterns, detect_pointer_patterns, detect_preprocessor_patterns};
-
 /// Simplified C token kind for internal use.
 #[derive(Debug, Clone, PartialEq)]
 enum CTok {
@@ -138,7 +135,47 @@ impl CAdapter {
                     }
 
                     // Check if it's a keyword
-                    if C_KEYWORDS.contains(&word.as_str()) {
+                    let keywords = [
+                        "auto",
+                        "break",
+                        "case",
+                        "char",
+                        "const",
+                        "continue",
+                        "default",
+                        "do",
+                        "double",
+                        "else",
+                        "enum",
+                        "extern",
+                        "float",
+                        "for",
+                        "goto",
+                        "if",
+                        "inline",
+                        "int",
+                        "long",
+                        "register",
+                        "restrict",
+                        "return",
+                        "short",
+                        "signed",
+                        "sizeof",
+                        "static",
+                        "struct",
+                        "switch",
+                        "typedef",
+                        "union",
+                        "unsigned",
+                        "void",
+                        "volatile",
+                        "while",
+                        "_Bool",
+                        "_Complex",
+                        "_Imaginary",
+                    ];
+
+                    if keywords.contains(&word.as_str()) {
                         tokens.push(CTok::Keyword(word));
                     } else {
                         tokens.push(CTok::Identifier(word));
@@ -177,6 +214,51 @@ impl CAdapter {
 
         tokens
     }
+
+    /// Detect pointer patterns.
+    fn detect_pointer_patterns(&self, source: &str) -> HashMap<String, String> {
+        let mut tags = HashMap::new();
+
+        if source.contains('*') {
+            tags.insert("pointer_usage".to_string(), "true".to_string());
+        }
+        if source.contains("**") || source.contains("(*") {
+            tags.insert("pointer_to_pointer".to_string(), "true".to_string());
+        }
+
+        tags
+    }
+
+    /// Detect memory management patterns.
+    fn detect_memory_patterns(&self, source: &str) -> HashMap<String, String> {
+        let mut tags = HashMap::new();
+
+        if source.contains("malloc") || source.contains("calloc") || source.contains("realloc") {
+            tags.insert("dynamic_allocation".to_string(), "true".to_string());
+        }
+        if source.contains("free") {
+            tags.insert("manual_deallocation".to_string(), "true".to_string());
+        }
+
+        tags
+    }
+
+    /// Detect preprocessor patterns.
+    fn detect_preprocessor_patterns(&self, source: &str) -> HashMap<String, String> {
+        let mut tags = HashMap::new();
+
+        if source.contains("#ifdef") || source.contains("#ifndef") {
+            tags.insert("conditional_compilation".to_string(), "true".to_string());
+        }
+        if source.contains("#include") {
+            tags.insert("has_includes".to_string(), "true".to_string());
+        }
+        if source.contains("#define") {
+            tags.insert("has_macros".to_string(), "true".to_string());
+        }
+
+        tags
+    }
 }
 
 impl LanguageAdapter for CAdapter {
@@ -194,8 +276,8 @@ impl LanguageAdapter for CAdapter {
             match token {
                 CTok::Keyword(kw) if kw == "struct" || kw == "enum" || kw == "union" => {
                     // Look ahead for name
-                    if i + 1 < tokens.len() {
-                        if let CTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let CTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
@@ -204,7 +286,6 @@ impl LanguageAdapter for CAdapter {
                                 source: format!("{kw} {name}"),
                             });
                         }
-                    }
                 }
                 CTok::Keyword(kw) if kw == "typedef" => {
                     spans.push(Span {
@@ -305,9 +386,9 @@ impl LanguageAdapter for CAdapter {
         while i < tokens.len() {
             if let CTok::Identifier(name) = &tokens[i] {
                 // Check if next token is '(' — potential function definition
-                if i + 1 < tokens.len() {
-                    if let CTok::Punctuation(p) = &tokens[i + 1] {
-                        if p == "(" {
+                if i + 1 < tokens.len()
+                    && let CTok::Punctuation(p) = &tokens[i + 1]
+                        && p == "(" {
                             // Look back for return type (identifier or keyword)
                             let has_return_type = i > 0
                                 && matches!(&tokens[i - 1], CTok::Keyword(_) | CTok::Identifier(_));
@@ -322,17 +403,15 @@ impl LanguageAdapter for CAdapter {
                                 });
                             }
                         }
-                    }
-                }
             }
             i += 1;
         }
 
         // Add semantic annotations
         let mut semantic_tags = HashMap::new();
-        semantic_tags.extend(detect_pointer_patterns(source));
-        semantic_tags.extend(detect_memory_patterns(source));
-        semantic_tags.extend(detect_preprocessor_patterns(source));
+        semantic_tags.extend(self.detect_pointer_patterns(source));
+        semantic_tags.extend(self.detect_memory_patterns(source));
+        semantic_tags.extend(self.detect_preprocessor_patterns(source));
 
         SpanTree {
             spans,

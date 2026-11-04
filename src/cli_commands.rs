@@ -205,8 +205,121 @@ pub enum BackendCommand {
     Get,
 }
 
-/// Tool registry management subcommands (defined in cli_tool_commands.rs)
-pub use crate::cli_tool_commands::{ToolCacheCommand, ToolCommand};
+/// Tool registry management subcommands
+#[derive(Debug, Subcommand, Clone)]
+pub enum ToolCommand {
+    /// List registered tools
+    List {
+        /// Filter by tool type (command, mcp, llm, vector_store, embedding, rag, skill)
+        #[arg(short, long)]
+        r#type: Option<String>,
+        /// Maximum number of tools to return
+        #[arg(short, long, default_value = "50")]
+        limit: usize,
+    },
+    /// Discover tools from known sources
+    Discover {
+        /// Source name to use for discovery
+        #[arg(short, long, default_value = "cli")]
+        source: String,
+    },
+    /// Install a skill from a local path (loads manifest and registers tools)
+    SkillInstall {
+        /// Path to the skill directory or manifest.json file
+        path: String,
+    },
+    /// Enable a plugin by name
+    PluginEnable {
+        /// Plugin name
+        name: String,
+    },
+    /// Disable a plugin by name
+    PluginDisable {
+        /// Plugin name
+        name: String,
+    },
+    /// Unregister (remove) a tool from the registry
+    ToolUninstall {
+        /// Tool name to remove
+        name: String,
+    },
+    /// Search for CrabJar skills on GitHub by tag
+    Search {
+        /// Search query (optional — defaults to all crabjar-skill tagged repos)
+        query: Option<String>,
+        /// Minimum star count filter
+        #[arg(long)]
+        stars: Option<u32>,
+        /// Sort field (stars, updated, name)
+        #[arg(long, default_value = "stars")]
+        sort: String,
+        /// Maximum results to return
+        #[arg(long, default_value = "10")]
+        limit: u32,
+    },
+    /// Install a skill from a GitHub repository
+    Install {
+        /// GitHub repository (owner/repo format)
+        repo: String,
+        /// Installation directory (default: ~/.crabjar/skills)
+        #[arg(long)]
+        target: Option<String>,
+    },
+    /// Search for skills on ClawHub.io registry
+    ClawhubSearch {
+        /// Search query
+        query: Option<String>,
+        /// Maximum results to return
+        #[arg(long, default_value = "10")]
+        limit: u32,
+    },
+    /// Install a skill from ClawHub.io registry with security scanning
+    ClawhubInstall {
+        /// Skill name on ClawHub
+        name: String,
+        /// Version to install (default: latest)
+        #[arg(long)]
+        version: Option<String>,
+        /// Installation directory (default: ~/.crabjar/skills)
+        #[arg(long)]
+        target: Option<String>,
+    },
+    /// Scan a skill package for security issues
+    Scan {
+        /// Path to the skill package directory or zip file
+        path: String,
+        /// Expected checksum to verify (optional)
+        #[arg(long)]
+        checksum: Option<String>,
+    },
+    /// Manage the skill cache
+    Cache {
+        /// Cache subcommand
+        #[command(subcommand)]
+        action: ToolCacheCommand,
+    },
+    /// Check for skill updates
+    Updates {
+        /// Skill name to check (optional — checks all if omitted)
+        name: Option<String>,
+    },
+    /// Show authentication status for remote registries
+    Auth,
+}
+
+/// Skill cache management subcommands
+#[derive(Debug, Subcommand, Clone)]
+pub enum ToolCacheCommand {
+    /// List cached skills
+    List,
+    /// Remove a skill from the cache
+    Remove {
+        /// Skill name to remove
+        name: String,
+    },
+    /// Clean up stale cache entries (>30 days)
+    Clean,
+}
 
 /// MCP client subcommands — connect to external MCP servers and call their tools
 #[derive(Debug, Subcommand, Clone)]
@@ -306,8 +419,97 @@ pub enum MetricsCommand {
     Modules,
 }
 
-/// Spatial habitat subcommands (ADR-003, defined in cli_habitat_commands.rs)
-pub use crate::cli_habitat_commands::HabitatCommand;
+/// Spatial habitat subcommands (ADR-003)
+#[derive(Debug, Subcommand, Clone)]
+pub enum HabitatCommand {
+    /// Render the habitat snapshot (areas, entities, divergences)
+    Snapshot {
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Create (or reuse) a coarse-geometry area
+    AddArea {
+        /// Area name (e.g. "desk")
+        name: String,
+        /// Grid width in cells
+        #[arg(long, default_value_t = 16)]
+        grid_w: i64,
+        /// Grid height in cells
+        #[arg(long, default_value_t = 4)]
+        grid_h: i64,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Place (or move) a positioned entity in the model
+    Place {
+        /// Stable entity id (e.g. a guard pending-entry id or agent id)
+        id: String,
+        /// Area name to place the entity in
+        #[arg(long)]
+        area: String,
+        /// Entity kind: agent, artifact, pending_guard_action, suspended_runtime, unresolved_decision
+        #[arg(long)]
+        kind: String,
+        /// State string (for agents: working/blocked/idle)
+        #[arg(long, default_value = "idle")]
+        state: String,
+        /// Human-readable label
+        #[arg(long, default_value = "")]
+        label: String,
+        /// Grid x position
+        #[arg(long)]
+        x: i64,
+        /// Grid y position
+        #[arg(long)]
+        y: i64,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Record a divergence between physical environment and model (exposed, never auto-corrected)
+    Divergence {
+        /// Area name the divergence concerns
+        #[arg(long)]
+        area: String,
+        /// Description of the discrepancy
+        description: String,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Resolve a divergence (the human decided which side is authoritative)
+    Resolve {
+        /// Divergence id
+        id: i64,
+        /// SQLite database path
+        #[arg(long, default_value = "habitat.db")]
+        db_path: String,
+    },
+    /// Emit the habitat run-state contract (dagr v3 run.json) — the
+    /// producer side of the habitat dashboard. Pure projection of the
+    /// triage queue, guard pending queue, and theory state-doc staleness;
+    /// the renderer (dagr pane, or a future skin) is a pure function of
+    /// the emitted file.
+    Contract {
+        /// Path to the triage queue record (JSONL)
+        #[arg(long, default_value = "attempts.jsonl")]
+        queue_path: String,
+        /// Guard database path (pending actions)
+        #[arg(long, default_value = "guard.db")]
+        guard_db: String,
+        /// Name of the theory state-doc (staleness-checked when indexed)
+        #[arg(long, default_value = "theory")]
+        theory: String,
+        /// SQLite database path for the theory state-doc
+        #[arg(long, default_value = "state-docs.db")]
+        db_path: String,
+        /// Write the contract to this path (default: stdout only)
+        #[arg(long)]
+        out: Option<String>,
+    },
+}
 
 /// Slow Friend daemon subcommands (EXPL-005)
 #[derive(Debug, Subcommand, Clone)]

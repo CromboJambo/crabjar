@@ -11,7 +11,7 @@ pub mod handlers;
 pub mod plugin;
 pub mod protocol;
 
-use crate::plugin::StructuredAuxPlugin;
+pub use crate::plugin::StructuredAuxPlugin;
 
 /// Factory function to create the structured aux plugin.
 pub fn create_structured_aux_plugin(api_key: Option<String>) -> StructuredAuxPlugin {

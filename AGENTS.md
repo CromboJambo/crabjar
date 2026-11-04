@@ -25,13 +25,13 @@ Narrow scope: `just test-crate <dir>` / `just check-crate <dir>` / `just clippy-
 
 ## Build Reproducibility
 
-Crabjar enforces deterministic builds via the `deterministic-build` CI job:
+Crabjar enforces deterministic builds via `just reproducible-build`:
 
 1. **Dependency pinning**: Cargo.lock is version-controlled and verified with `cargo update --locked` (fails if lockfile drifts from Cargo.toml)
-2. **Deterministic compilation**: Builds twice on the same runner with `CARGO_INCREMENTAL=0` and `SOURCE_DATE_EPOCH=0`, then compares binary hashes
-3. **CI gate**: The `deterministic-build` job runs on every push/PR — fails if two clean builds produce different binaries or if the lockfile is out of date
+2. **Deterministic compilation**: `CARGO_INCREMENTAL=0` disables incremental cache; `RUSTFLAGS="-C target-cpu=native"` pins CPU feature set
+3. **CI gate**: The `reproducible-build` job runs on every push/PR — fails if the build is non-deterministic or lockfile is out of date
 
-**What this guarantees:** Building the same commit twice on the same runner produces byte-identical binaries. It does *not* guarantee cross-platform reproducibility — different OSes, toolchains, or runners will produce different artifacts.
+**What this guarantees:** Building the same commit twice produces byte-identical binaries (same toolchain, same OS). It does *not* guarantee cross-platform reproducibility — different OSes/compilers will produce different artifacts.
 
 ## CLI Output Contract
 

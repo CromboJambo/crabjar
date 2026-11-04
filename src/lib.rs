@@ -357,16 +357,9 @@ pub mod skill_instrumentation;
 pub use cli_commands::*;
 
 pub mod bitwarden;
-pub mod cache_commands;
-pub mod clawhub_commands;
-pub mod cli_habitat_commands;
-pub mod cli_tool_commands;
 pub mod crabjar_config;
 pub mod doctor;
-pub mod github_commands;
 pub mod habitat_contract;
-#[cfg(test)]
-mod habitat_contract_tests;
 pub mod kanban_source;
 pub mod knowledge_store;
 pub mod metrics;

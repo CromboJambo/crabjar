@@ -199,8 +199,8 @@ impl LanguageAdapter for JavaScriptAdapter {
                                 close_token: None,
                                 source: format!("{kw} {name}"),
                             });
-                        } else if let JsToken::Punctuation(p) = &tokens[i + 1] {
-                            if p == "(" {
+                        } else if let JsToken::Punctuation(p) = &tokens[i + 1]
+                            && p == "(" {
                                 spans.push(Span {
                                     kind: SpanKind::FnDecl,
                                     open_token: None,
@@ -209,12 +209,11 @@ impl LanguageAdapter for JavaScriptAdapter {
                                     source: kw.clone(),
                                 });
                             }
-                        }
                     }
                 }
                 JsToken::Keyword(kw) if kw == "class" => {
-                    if i + 1 < tokens.len() {
-                        if let JsToken::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len()
+                        && let JsToken::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
@@ -223,7 +222,6 @@ impl LanguageAdapter for JavaScriptAdapter {
                                 source: format!("class {name}"),
                             });
                         }
-                    }
                 }
                 JsToken::Keyword(kw) if kw == "const" || kw == "let" => {
                     spans.push(Span {

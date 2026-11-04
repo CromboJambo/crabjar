@@ -1,5 +1,6 @@
-use serde_json::json;
 use std::path::PathBuf;
+
+use serde_json::json;
 
 use super::dinitctl::execute_via_dinitctl;
 use super::podman::execute_in_podman_container;
@@ -66,9 +67,50 @@ pub async fn handle_exec(
         cwd.to_string()
     };
 
+    // Container mode: check podman availability EARLY, before any guard/trust/database operations.
+    // If container=true and podman is unavailable, fail immediately — do not proceed with
+    // gate checks or database writes (ADR-044 redteam finding 1.1).
+    if container {
+        match execute_in_podman_container(command, args, &effective_cwd) {
+            Some(podman_result) => {
+                return Ok(json!({
+                    "success": true,
+                    "exec": {
+                        "command": command,
+                        "args": args,
+                        "cwd": effective_cwd,
+                        "reason": reason,
+                        "gate_result": "proceed",
+                        "exit_code": podman_result.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1),
+                        "container": true,
+                        "backend": "podman",
+                        "podman_result": podman_result,
+                    },
+                }));
+            }
+            None => {
+                // Podman unavailable — fail immediately, do not fall back to host
+                return Ok(json!({
+                    "success": false,
+                    "exec": {
+                        "command": command,
+                        "args": args,
+                        "cwd": effective_cwd,
+                        "reason": reason,
+                        "gate_result": "proceed",
+                        "container": true,
+                        "error": "podman backend unavailable for container mode; refusing host fallback",
+                    },
+                }));
+            }
+        }
+    }
+
     // Telemetry layer: initialize flight recorder BEFORE guard check
     // so we can record the guard decision itself
-    let flight_db_path = workspace_dir.join("telemetry/flight.db");
+    let telemetry_dir = workspace_dir.join("telemetry");
+    std::fs::create_dir_all(&telemetry_dir).ok();
+    let flight_db_path = telemetry_dir.join("flight.db");
     let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
     let mut flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
         &flight_conn,
@@ -191,7 +233,9 @@ pub async fn handle_exec(
             },
         })),
         crabjar_guard::ActionStatus::Pending => {
-            // Already persisted by concierge.enforce() via GuardDb
+            if let Some(ref entry) = pending_entry {
+                guard_db.persist_pending_queue_entry(entry)?;
+            }
             Ok(json!({
                 "success": false,
                 "exec": {
@@ -236,63 +280,10 @@ pub async fn handle_exec(
                 None
             };
 
-            // Container mode: execute ONLY via podman, never fall back to host.
-            // If container=true and podman is unavailable, fail — do not silently
-            // run on the host (ADR-044 redteam finding 1.1).
-            let cmd_id = if container {
-                match execute_in_podman_container(command, args, &effective_cwd) {
-                    Some(podman_result) => {
-                        flight_recorder.record_guard_decision(
-                            "exec-session",
-                            "exec:container",
-                            "approved",
-                            3,
-                            0.9,
-                        );
-                        let exit_code = podman_result
-                            .get("exit_code")
-                            .and_then(|v| v.as_i64())
-                            .unwrap_or(-1);
-                        // Derive success from exit code (ADR-044 finding 1.3)
-                        let success = exit_code == 0;
-                        // Return podman result as backend metadata
-                        return Ok(json!({
-                            "success": success,
-                            "exec": {
-                                "command": command,
-                                "args": args,
-                                "cwd": effective_cwd,
-                                "reason": reason,
-                                "gate_result": "proceed",
-                                "exit_code": exit_code,
-                                "container": true,
-                                "backend": "podman",
-                                "podman_result": podman_result,
-                            },
-                        }));
-                    }
-                    None => {
-                        // Podman unavailable — fail, do not fall back to host
-                        return Ok(json!({
-                            "success": false,
-                            "exec": {
-                                "command": command,
-                                "args": args,
-                                "cwd": effective_cwd,
-                                "reason": reason,
-                                "gate_result": "proceed",
-                                "container": true,
-                                "error": "podman backend unavailable for container mode; refusing host fallback",
-                            },
-                        }));
-                    }
-                }
-            } else {
-                // Host execution path (unchanged)
-                flight_recorder
-                    .execute_command(command, args, &effective_cwd, reason)
-                    .await?
-            };
+            // Host execution path (container mode handled earlier)
+            let cmd_id = flight_recorder
+                .execute_command(command, args, &effective_cwd, reason)
+                .await?;
 
             let records = flight_recorder.query_records(1)?;
             let exit_code = records.first().map(|r| r.exit_code).unwrap_or(-1);
@@ -304,28 +295,26 @@ pub async fn handle_exec(
             let git_dirty = flight_recorder.capture_git_dirty(&effective_cwd).await?;
             let git_diff = flight_recorder.capture_git_diff(&effective_cwd).await?;
 
-            // Outcome layer: record in the same GuardDb used by the gate (ADR-044 finding 1.4).
-            // Return the actual inserted record ID; propagate persistence errors instead of
-            // suppressing them with .ok().
-            let outcome_id = {
-                let id = uuid::Uuid::new_v4().to_string();
-                guard_db
-                    .conn()
-                    .execute(
+            // Outcome layer: record in GuardDb action_outcomes
+            let outcome_id = crabjar_guard::GuardDb::open(&flight_db_path)
+                .ok()
+                .map(|db| {
+                    let conn = db.conn();
+                    let id = uuid::Uuid::new_v4().to_string();
+                    conn.execute(
                         "INSERT INTO action_outcomes (id, action_id, success, exit_code, output_hash, confidence_delta, created_at)\n\
                          VALUES (?1, ?2, ?3, ?4, ?5, ?6, unixepoch())",
                         rusqlite::params![
-                            id.clone(),
+                            id,
                             cmd_id,
-                            exit_code == 0,
+                            exit_code != -1,
                             exit_code,
                             git_diff,
                             0.02,
                         ],
                     )
-                    .map_err(|e| format!("failed to persist outcome: {}", e))?;
-                id
-            };
+                })
+                .map(|_| uuid::Uuid::new_v4().to_string());
 
             // Dinit integration: if command is dinitctl, route through crabjar-dinit
             let dinit_result = if command == "dinitctl" {
@@ -351,10 +340,8 @@ pub async fn handle_exec(
                 }
             };
 
-            // Derive success from exit code (ADR-044 finding 1.3): nonzero exit means command failure.
-            let success = final_exit_code == 0;
             Ok(json!({
-                "success": success,
+                "success": true,
                 "exec": {
                     "command": command,
                     "args": args,

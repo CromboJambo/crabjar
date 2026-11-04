@@ -3,8 +3,6 @@
 //! Implements the observe → understand → plan → execute → verify → reflect → persist
 //! loop with pluggable inference backends and WorkItem persistence.
 #![allow(dead_code)]
-pub mod compression_config;
-pub mod compression_tests;
 pub mod context_compression;
 pub mod decision_gate;
 pub mod executor;
@@ -18,8 +16,7 @@ pub mod structural_compression;
 pub mod verifier;
 pub mod work_item_store;
 
-pub use compression_config::CompressionConfig;
-pub use context_compression::ContextCompressor;
+pub use context_compression::{CompressionConfig, ContextCompressor};
 pub use decision_gate::{Decision, DecisionConfig, DecisionGate};
 pub use executor::TaskExecutor;
 pub use inference::{HeuristicBackend, InferenceBackend};
