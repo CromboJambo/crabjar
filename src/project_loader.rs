@@ -32,17 +32,24 @@ impl ProjectLoader {
         }
     }
 
-    /// Load configuration from the specified project root directory
+    /// Load configuration from the specified project root directory.
+    ///
+    /// Only a missing config file is treated as "no workspace" (Ok with no config).
+    /// Malformed TOML or missing required fields propagate as errors so callers
+    /// see misconfiguration rather than silently running without tools.
     pub async fn load_from_directory(&mut self, path: &Path) -> ProjectResult<()> {
         self.project_root = Some(path.to_path_buf());
 
         let config = match ProjectConfig::load(path) {
             Ok(cfg) => cfg,
-            Err(
-                ConfigError::NotFound(_) | ConfigError::TomlError(_) | ConfigError::MissingName,
-            ) => {
+            Err(ConfigError::NotFound(_)) => {
+                // No config file = no workspace. This is the only silent case.
                 self.current_config = None;
                 return Ok(());
+            }
+            Err(e) => {
+                // TomlError and MissingName are real misconfigurations — propagate.
+                return Err(Box::new(e));
             }
         };
 
@@ -271,7 +278,7 @@ commands = ["cmd1"]
     }
 
     #[tokio::test]
-    async fn test_malformed_config_returns_error() {
+    async fn test_malformed_config_propagates_error() {
         let dir = tempdir().unwrap();
         let config_path = dir.path().join(".crabjar_config.toml");
 
@@ -280,8 +287,23 @@ commands = ["cmd1"]
         let mut loader = ProjectLoader::new();
         let result = loader.load_from_directory(dir.path()).await;
 
-        assert!(result.is_ok());
-        assert!(loader.get_current_config().is_none());
+        // Malformed TOML should propagate as an error, not silently succeed
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_missing_name_propagates_error() {
+        let dir = tempdir().unwrap();
+        let config_path = dir.path().join(".crabjar_config.toml");
+
+        // Valid TOML but missing required 'name' field
+        fs::write(&config_path, "description = \"no name field\"\n").unwrap();
+
+        let mut loader = ProjectLoader::new();
+        let result = loader.load_from_directory(dir.path()).await;
+
+        // Missing required 'name' should propagate as an error
+        assert!(result.is_err());
     }
 
     #[tokio::test]

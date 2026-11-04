@@ -125,10 +125,14 @@ impl HostConfig {
     }
 
     /// Load config from file, or create default at the given path.
+    ///
+    /// Only creates a default config when the file is genuinely missing.
+    /// Other read errors (permission denied, disk I/O failures) propagate
+    /// so callers can distinguish "no config yet" from "config unreadable".
     pub fn load_or_default(path: &str) -> Result<Self, ConfigError> {
         match Self::from_file(path) {
             Ok(config) => Ok(config),
-            Err(ConfigError::ReadFailed(_, _)) => {
+            Err(ref e @ ConfigError::ReadFailed(_, ref io_err)) if is_not_found(io_err) => {
                 let default = Self::default();
                 default.to_file(path)?;
                 Ok(default)
@@ -149,6 +153,11 @@ pub enum ConfigError {
     SerializeFailed(toml::ser::Error),
     #[error("failed to write config to '{0}': {1}")]
     WriteFailed(String, std::io::Error),
+}
+
+/// Check if an io error indicates the file does not exist.
+fn is_not_found(e: &std::io::Error) -> bool {
+    e.kind() == std::io::ErrorKind::NotFound
 }
 
 #[cfg(test)]
@@ -178,5 +187,49 @@ mod tests {
         assert_eq!(config.debug, loaded.debug);
         assert_eq!(config.webview_engine, loaded.webview_engine);
         assert_eq!(config.tray.enabled, loaded.tray.enabled);
+    }
+
+    #[test]
+    fn test_load_or_default_creates_when_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("missing.toml");
+
+        let config = HostConfig::load_or_default(path.to_str().unwrap()).unwrap();
+        assert_eq!(config.name, "crabjar-host");
+
+        // File should now exist with default content
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_load_or_default_propagates_read_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("readonly.toml");
+
+        // Create file with some content, then make it unreadable
+        std::fs::write(&path, "existing content").unwrap();
+
+        // On Unix, chmod 000 makes it unreadable; on Windows this is harder.
+        // Use a simpler approach: create in a directory that's not writable.
+        let readonly_dir = dir.path().join("readonly");
+        std::fs::create_dir(&readonly_dir).unwrap();
+        let ro_path = readonly_dir.join("config.toml");
+        std::fs::write(&ro_path, "name = \"test\"").unwrap();
+
+        // Try to read from a path in a directory we can't write to for defaults
+        // Actually, test the real scenario: file exists but has read error
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::metadata(&ro_path).unwrap().permissions();
+            let new_perms = perms.mode() & 0o777 & !0o444; // remove read bits
+            std::fs::set_permissions(&ro_path, std::fs::Permissions::from_mode(new_perms)).unwrap();
+
+            let result = HostConfig::load_or_default(ro_path.to_str().unwrap());
+            assert!(result.is_err(), "should fail on permission denied");
+
+            // Restore permissions to allow cleanup
+            std::fs::set_permissions(&ro_path, perms).unwrap();
+        }
     }
 }
