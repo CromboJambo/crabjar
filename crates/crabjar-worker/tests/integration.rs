@@ -82,6 +82,7 @@ fn poll_tasks(worker_id: &str) -> Option<serde_json::Value> {
     serde_json::from_str(&body).ok()
 }
 
+#[ignore] // Requires ../target/release/crabjar-conductor to be built
 #[test]
 fn test_worker_registration() {
     let mut conductor = start_conductor().expect("Failed to start conductor");
@@ -94,6 +95,7 @@ fn test_worker_registration() {
     conductor.kill().ok();
 }
 
+#[ignore] // Requires ../target/release/crabjar-conductor to be built
 #[test]
 fn test_worker_polling() {
     let mut conductor = start_conductor().expect("Failed to start conductor");
@@ -109,6 +111,7 @@ fn test_worker_polling() {
     conductor.kill().ok();
 }
 
+#[ignore] // Requires ../target/release/crabjar-conductor to be built
 #[test]
 fn test_multiple_workers() {
     let mut conductor = start_conductor().expect("Failed to start conductor");
@@ -130,6 +133,7 @@ fn test_multiple_workers() {
     conductor.kill().ok();
 }
 
+#[ignore] // Requires ../target/release/crabjar-conductor to be built
 #[test]
 fn test_worker_capabilities() {
     let mut conductor = start_conductor().expect("Failed to start conductor");

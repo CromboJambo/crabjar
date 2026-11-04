@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS agent_sandboxes (
     resource_limits TEXT NOT NULL DEFAULT '',
     sudo_policy TEXT NOT NULL DEFAULT 'no_sudo',
     mount_scopes TEXT NOT NULL DEFAULT '',
+    metadata TEXT,
     created_at INTEGER NOT NULL DEFAULT (unixepoch()),
     active INTEGER NOT NULL DEFAULT 1
 );

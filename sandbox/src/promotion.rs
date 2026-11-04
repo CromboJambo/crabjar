@@ -84,9 +84,11 @@ impl PromotionManager {
 
     /// Create a new task worker (tier 1).
     pub fn create_task_worker(&self, agent_name: &str) -> Result<WorkerMetadata, SandboxError> {
-        let _sandbox_id = self.conn.execute(
-            "INSERT INTO agent_sandboxes (agent_name, isolation_type, created_at) VALUES (?, ?, ?)",
+        let sandbox_id = uuid::Uuid::new_v4().to_string();
+        self.conn.execute(
+            "INSERT INTO agent_sandboxes (id, agent_name, isolation_type, created_at) VALUES (?, ?, ?, ?)",
             rusqlite::params![
+                sandbox_id,
                 agent_name,
                 PromotionTier::TaskWorker.name(),
                 chrono::Utc::now().timestamp()
