@@ -53,7 +53,7 @@ jobs:
     - name: Run tests
       run: cargo test --workspace --all-targets --verbose
 
-  reproducible-build:
+  deterministic-build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -62,18 +62,30 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
-    - name: Reproducible build check
+    - name: Verify Cargo.lock is up-to-date
+      run: cargo update --locked
+    - name: First deterministic build
+      env:
+        CARGO_INCREMENTAL: "0"
+        SOURCE_DATE_EPOCH: "0"
       run: |
-        echo "=== Reproducible Build Check ==="
-        echo "Step 1: Verifying Cargo.lock is up-to-date (pinned deps)..."
-        cargo update --locked || { echo "ERROR: Cargo.lock out of date. Run 'cargo update' and commit the result."; exit 1; }
-        echo "Step 2: Building with deterministic settings..."
-        CARGO_INCREMENTAL=0 \
-         RUSTFLAGS="-C target-cpu=native" \
-         cargo build --workspace --release
-        echo "Step 3: Verifying no dev-dependency drift..."
-        cargo tree --workspace --depth 1 | head -30
-        echo "=== Reproducible build verified ==="
+        cargo build --workspace --release
+        sha256sum target/release/crabjar > /tmp/build1.sha256
+    - name: Clean and rebuild
+      env:
+        CARGO_INCREMENTAL: "0"
+        SOURCE_DATE_EPOCH: "0"
+      run: |
+        cargo clean
+        cargo build --workspace --release
+        sha256sum target/release/crabjar > /tmp/build2.sha256
+    - name: Compare build artifacts
+      run: |
+        echo "Comparing build artifacts..."
+        cat /tmp/build1.sha256
+        cat /tmp/build2.sha256
+        diff /tmp/build1.sha256 /tmp/build2.sha256 || { echo "FAIL: builds produced different binaries"; exit 1; }
+        echo "PASS: builds are deterministic (same runner, same environment)"
 
   module-sizes:
     runs-on: ubuntu-latest

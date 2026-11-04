@@ -67,10 +67,11 @@ Address findings 1, 3, 4, and 5 as one coordinated execution-path task. The guar
   - Requirement: split over-limit modules by concern until the configured gate passes, or make an explicit reviewed policy change with corresponding CI/docs updates. Do not weaken or bypass the check just to get a green build.
   - Acceptance: `python3 scripts/module-sizes.py --threshold 500` exits 0 and reports no violations, unless the approved policy is changed with tests/documentation in the same work.
 
-- [ ] **5.2 Verify reproducibility by comparing independent builds** (Medium)
+- [x] **5.2 Verify reproducibility by comparing independent builds** (Medium)
   - Finding: `.github/workflows/rust.yml` runs one release build and labels it a reproducible-build check; it does not compare artifacts. `-C target-cpu=native` makes output host-CPU dependent.
   - Requirement: either implement a deterministic check that performs two clean builds under the same declared environment and compares relevant artifacts, or rename/re-scope the job so it claims only what it tests. Define whether the target is same-runner byte identity or cross-runner reproducibility. Avoid `native` if the claim is portable deterministic output.
   - Acceptance: CI demonstrates a second build and artifact comparison, with documented inputs/toolchain/target; a deliberate output difference causes failure. If byte comparison is intentionally out of scope, the job and docs no longer claim to verify reproducibility.
+  - **Remediation (2026-11-04):** Renamed job from `reproducible-build` to `deterministic-build`. Implemented two clean builds with `cargo clean` between them, comparing SHA-256 hashes of the main binary. Uses `CARGO_INCREMENTAL=0` and `SOURCE_DATE_EPOCH=0` for determinism; removed `-C target-cpu=native` (host-dependent). Scope: same-runner byte identity, not cross-runner reproducibility. Updated AGENTS.md documentation to match.
 
 ## Suggested implementation order
 
