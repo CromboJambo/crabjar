@@ -4,15 +4,22 @@ pub mod extract;
 pub mod format;
 pub mod weight;
 
+// New split modules for train-extract
+mod events;
+mod extract_types;
+mod format_impl;
+mod knowledge;
+
 pub use error::{TrainExtractError, TrainExtractResult};
 pub use export::{
-    DatasetManifest, ExportConfig, ExportFormat, export, export_jsonl, export_safetensors_manifest,
+    export, export_jsonl, export_safetensors_manifest, DatasetManifest, ExportConfig, ExportFormat,
 };
-pub use extract::{
-    Annotation, Chunk, ExtractConfig, ExtractedData, KnowledgeEntry, LogEvent, extract,
+pub use extract::extract;
+pub use extract_types::{
+    Annotation, Chunk, ExtractConfig, ExtractedData, KnowledgeEntry, LogEvent,
 };
-pub use format::{Sample, SampleSource, apply_weighting, format_samples};
-pub use weight::{WeightConfig, compute_recency, compute_tag_boost, weight_samples};
+pub use format::{apply_weighting, format_samples, Sample, SampleSource};
+pub use weight::{compute_recency, compute_tag_boost, weight_samples, WeightConfig};
 
 /// Full pipeline: extract → format → weight → export.
 ///
@@ -140,8 +147,9 @@ mod tests {
         let (kconn, mconn) = make_test_db(&dir);
 
         let output_dir = dir.path().join("output");
+        // Empty DB now produces an empty export rather than failing
         let result = quick_export(&kconn, Some(&mconn), &output_dir);
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 
     #[test]

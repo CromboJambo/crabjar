@@ -1,4 +1,4 @@
-//! Goal management routes: submit and retrieve goals.
+//! Goal management routes: submit, retrieve, and report task results.
 
 use crate::api::ConductorState;
 use axum::{
@@ -74,6 +74,55 @@ pub async fn get_goal(
         })),
         Err(e) => Json(json!({
             "goal_id": goal_id_for_response,
+            "status": "error",
+            "message": format!("task join error: {}", e)
+        })),
+    }
+}
+
+/// POST /tasks/{id}/result - Report the result of a task execution.
+pub async fn report_task_result(
+    State(conductor): State<ConductorState>,
+    Path(task_id): Path<String>,
+    body: Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let success = body["success"].as_bool().unwrap_or(false);
+    let output = body["output"]
+        .as_str()
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+
+    info!(task_id = %task_id, success, "Reporting task result");
+
+    let task_id_for_closure = task_id.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        if success {
+            c.report_task_complete(&task_id_for_closure, Some(output))
+                .map(|token| {
+                    if let Some(t) = token {
+                        json!({ "new_token": t })
+                    } else {
+                        json!({})
+                    }
+                })
+        } else {
+            c.report_task_failed(&task_id_for_closure, output)
+                .map(|_| json!({}))
+        }
+    })
+    .await;
+
+    match result {
+        Ok(Ok(_)) => Json(json!({
+            "status": "accepted",
+            "task_id": task_id
+        })),
+        Ok(Err(e)) => Json(json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+        Err(e) => Json(json!({
             "status": "error",
             "message": format!("task join error: {}", e)
         })),

@@ -8,6 +8,9 @@
 use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
 use std::collections::HashMap;
 
+use super::go_keywords::GO_KEYWORDS;
+use super::go_patterns::{detect_error_handling_patterns, detect_goroutine_patterns, detect_interface_patterns};
+
 /// Simplified Go token kind for internal use.
 #[derive(Debug, Clone, PartialEq)]
 enum GoTok {
@@ -134,35 +137,7 @@ impl GoAdapter {
                     }
 
                     // Go keywords
-                    let keywords = [
-                        "break",
-                        "case",
-                        "chan",
-                        "const",
-                        "continue",
-                        "default",
-                        "defer",
-                        "else",
-                        "fallthrough",
-                        "for",
-                        "func",
-                        "go",
-                        "goto",
-                        "if",
-                        "import",
-                        "interface",
-                        "map",
-                        "package",
-                        "range",
-                        "return",
-                        "select",
-                        "struct",
-                        "switch",
-                        "type",
-                        "var",
-                    ];
-
-                    if keywords.contains(&word.as_str()) {
+                    if GO_KEYWORDS.contains(&word.as_str()) {
                         tokens.push(GoTok::Keyword(word));
                     } else {
                         tokens.push(GoTok::Identifier(word));
@@ -197,42 +172,6 @@ impl GoAdapter {
 
         tokens
     }
-
-    /// Detect goroutine patterns.
-    fn detect_goroutine_patterns(&self, source: &str) -> HashMap<String, String> {
-        let mut tags = HashMap::new();
-
-        if source.contains("go ") && (source.contains('(') || source.contains('.')) {
-            tags.insert("goroutines".to_string(), "true".to_string());
-        }
-
-        tags
-    }
-
-    /// Detect channel patterns.
-    fn detect_channel_patterns(&self, source: &str) -> HashMap<String, String> {
-        let mut tags = HashMap::new();
-
-        if source.contains("chan ") || source.contains("<-") {
-            tags.insert("channels".to_string(), "true".to_string());
-        }
-
-        tags
-    }
-
-    /// Detect error handling patterns.
-    fn detect_error_patterns(&self, source: &str) -> HashMap<String, String> {
-        let mut tags = HashMap::new();
-
-        if source.contains("defer ") {
-            tags.insert("defer_used".to_string(), "true".to_string());
-        }
-        if source.contains("recover()") || source.contains("panic(") {
-            tags.insert("panic_recover".to_string(), "true".to_string());
-        }
-
-        tags
-    }
 }
 
 impl LanguageAdapter for GoAdapter {
@@ -250,8 +189,8 @@ impl LanguageAdapter for GoAdapter {
             match token {
                 GoTok::Keyword(kw) if kw == "package" => {
                     // Look ahead for package name
-                    if i + 1 < tokens.len()
-                        && let GoTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len() {
+                        if let GoTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ModuleDecl,
                                 open_token: None,
@@ -260,6 +199,7 @@ impl LanguageAdapter for GoAdapter {
                                 source: format!("package {name}"),
                             });
                         }
+                    }
                 }
                 GoTok::Keyword(kw) if kw == "import" => {
                     spans.push(Span {
@@ -272,8 +212,8 @@ impl LanguageAdapter for GoAdapter {
                 }
                 GoTok::Keyword(kw) if kw == "func" => {
                     // Look ahead for function name
-                    if i + 1 < tokens.len()
-                        && let GoTok::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len() {
+                        if let GoTok::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::FnDecl,
                                 open_token: None,
@@ -282,6 +222,7 @@ impl LanguageAdapter for GoAdapter {
                                 source: format!("func {name}"),
                             });
                         }
+                    }
                 }
                 GoTok::Keyword(kw) if kw == "type" => {
                     spans.push(Span {
@@ -424,9 +365,9 @@ impl LanguageAdapter for GoAdapter {
 
         // Add semantic annotations
         let mut semantic_tags = HashMap::new();
-        semantic_tags.extend(self.detect_goroutine_patterns(source));
-        semantic_tags.extend(self.detect_channel_patterns(source));
-        semantic_tags.extend(self.detect_error_patterns(source));
+        semantic_tags.extend(detect_goroutine_patterns(source));
+        semantic_tags.extend(detect_interface_patterns(source));
+        semantic_tags.extend(detect_error_handling_patterns(source));
 
         SpanTree {
             spans,

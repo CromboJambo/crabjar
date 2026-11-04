@@ -1,4 +1,5 @@
 use serde_json::json;
+use std::path::PathBuf;
 
 use super::dinitctl::execute_via_dinitctl;
 use super::podman::execute_in_podman_container;
@@ -190,9 +191,7 @@ pub async fn handle_exec(
             },
         })),
         crabjar_guard::ActionStatus::Pending => {
-            if let Some(ref entry) = pending_entry {
-                guard_db.persist_pending_queue_entry(entry)?;
-            }
+            // Already persisted by concierge.enforce() via GuardDb
             Ok(json!({
                 "success": false,
                 "exec": {
@@ -254,9 +253,11 @@ pub async fn handle_exec(
                             .get("exit_code")
                             .and_then(|v| v.as_i64())
                             .unwrap_or(-1);
+                        // Derive success from exit code (ADR-044 finding 1.3)
+                        let success = exit_code == 0;
                         // Return podman result as backend metadata
                         return Ok(json!({
-                            "success": true,
+                            "success": success,
                             "exec": {
                                 "command": command,
                                 "args": args,
@@ -303,26 +304,28 @@ pub async fn handle_exec(
             let git_dirty = flight_recorder.capture_git_dirty(&effective_cwd).await?;
             let git_diff = flight_recorder.capture_git_diff(&effective_cwd).await?;
 
-            // Outcome layer: record in GuardDb action_outcomes
-            let outcome_id = crabjar_guard::GuardDb::open(&flight_db_path)
-                .ok()
-                .map(|db| {
-                    let conn = db.conn();
-                    let id = uuid::Uuid::new_v4().to_string();
-                    conn.execute(
+            // Outcome layer: record in the same GuardDb used by the gate (ADR-044 finding 1.4).
+            // Return the actual inserted record ID; propagate persistence errors instead of
+            // suppressing them with .ok().
+            let outcome_id = {
+                let id = uuid::Uuid::new_v4().to_string();
+                guard_db
+                    .conn()
+                    .execute(
                         "INSERT INTO action_outcomes (id, action_id, success, exit_code, output_hash, confidence_delta, created_at)\n\
                          VALUES (?1, ?2, ?3, ?4, ?5, ?6, unixepoch())",
                         rusqlite::params![
-                            id,
+                            id.clone(),
                             cmd_id,
-                            exit_code != -1,
+                            exit_code == 0,
                             exit_code,
                             git_diff,
                             0.02,
                         ],
                     )
-                })
-                .map(|_| uuid::Uuid::new_v4().to_string());
+                    .map_err(|e| format!("failed to persist outcome: {}", e))?;
+                id
+            };
 
             // Dinit integration: if command is dinitctl, route through crabjar-dinit
             let dinit_result = if command == "dinitctl" {
@@ -348,8 +351,10 @@ pub async fn handle_exec(
                 }
             };
 
+            // Derive success from exit code (ADR-044 finding 1.3): nonzero exit means command failure.
+            let success = final_exit_code == 0;
             Ok(json!({
-                "success": true,
+                "success": success,
                 "exec": {
                     "command": command,
                     "args": args,

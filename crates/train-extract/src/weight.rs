@@ -1,5 +1,5 @@
-use crate::extract::ExtractedData;
-use crate::format::{Sample, apply_weighting, format_samples};
+use crate::extract_types::ExtractedData;
+use crate::format::{apply_weighting, format_samples, Sample};
 use std::collections::HashMap;
 
 /// Configuration for the weighting phase.
@@ -83,7 +83,7 @@ pub fn compute_recency(data: &ExtractedData) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extract::KnowledgeEntry;
+    use crate::KnowledgeEntry;
     use agent_context::KnowledgeKind;
 
     fn make_data_with_tags() -> ExtractedData {

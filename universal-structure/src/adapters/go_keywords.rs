@@ -1,0 +1,9 @@
+//! Go keywords for tokenization.
+
+/// All Go keywords.
+pub const GO_KEYWORDS: &[&str] = &[
+    "break", "case", "chan", "const", "continue", "default", "defer", "else",
+    "fallthrough", "for", "func", "go", "goto", "if", "import", "interface",
+    "map", "package", "range", "return", "select", "struct", "switch", "type",
+    "var",
+];

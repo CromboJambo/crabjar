@@ -8,7 +8,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::context_compression::{CompressionConfig, ContextCompressor};
+use crate::compression_config::CompressionConfig;
+use crate::context_compression::ContextCompressor;
 use crate::model_routing::{LoopPhase, ModelRouter};
 use crate::work_item_store::WorkItemStore;
 use crabjar_guard::Scope;

@@ -233,8 +233,8 @@ impl LanguageAdapter for PythonAdapter {
                         i + 1
                     };
 
-                    if start_idx < tokens.len()
-                        && let PyToken::Identifier(name) = &tokens[start_idx] {
+                    if start_idx < tokens.len() {
+                        if let PyToken::Identifier(name) = &tokens[start_idx] {
                             spans.push(Span {
                                 kind: SpanKind::FnDecl,
                                 open_token: None,
@@ -247,10 +247,11 @@ impl LanguageAdapter for PythonAdapter {
                                 ),
                             });
                         }
+                    }
                 }
                 PyToken::Keyword(kw) if kw == "class" => {
-                    if i + 1 < tokens.len()
-                        && let PyToken::Identifier(name) = &tokens[i + 1] {
+                    if i + 1 < tokens.len() {
+                        if let PyToken::Identifier(name) = &tokens[i + 1] {
                             spans.push(Span {
                                 kind: SpanKind::ClassDecl,
                                 open_token: None,
@@ -259,6 +260,7 @@ impl LanguageAdapter for PythonAdapter {
                                 source: format!("class {name}"),
                             });
                         }
+                    }
                 }
                 PyToken::Keyword(kw) if kw == "if" || kw == "elif" => {
                     spans.push(Span {
