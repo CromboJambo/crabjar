@@ -47,6 +47,19 @@ Use `just` for all workflows — see [Justfile](./Justfile).
 - **[ROADMAP.md](./ROADMAP.md)** — Development priorities and completed phases
 - **[specs/](./specs/)** — Architecture decision records and specifications
 
+### User Documentation
+
+- **[CLI Workflows Guide](docs/user/cli-workflows.md)** — Day-to-day command-line operations
+- **[TUI Guide](docs/user/tui-guide.md)** — Interactive terminal interface usage
+
+### API & Integration
+
+- **[Conductor HTTP API Reference](docs/api/conductor.md)** — Complete API endpoint documentation
+
+### Deployment
+
+- **[Fleet Coordination Deployment](docs/deployment/fleet-coordination.md)** — Multi-node deployment guide
+
 ## Build & Test
 
 ```bash
