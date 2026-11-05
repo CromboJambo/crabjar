@@ -58,7 +58,7 @@ crabjar-sandbox = { path = "../../sandbox" }
 universal-structure = { path = "../../universal-structure" }
 
 # Pesti semantic analyzers for code understanding
-pesti-structural-tokenizer = { path = "/home/crombo/projects/active/pesti/crates/pesti-structural-tokenizer" }
+pesti-structural-tokenizer = { git = "https://github.com/CromboJambo/pesti", package = "pesti-structural-tokenizer" }
 
 # Authentication
 jsonwebtoken = "9.3"
@@ -67,7 +67,7 @@ jsonwebtoken = "9.3"
 sha2 = { workspace = true }
 
 # Audit logging infrastructure (mirror-lab integration)
-mirror-log = { path = "/home/crombo/projects/active/mirror-lab/mirror-log", features = ["embedding"] }
+mirror-log = { git = "https://github.com/CromboJambo/mirror-lab", package = "mirror-log", features = ["embedding"] }
 
 [dev-dependencies]
 tempfile = "3.20"
