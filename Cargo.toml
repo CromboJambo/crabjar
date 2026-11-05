@@ -41,12 +41,12 @@ members = [
     # Host apps
     "apps/teams",
     # Host binary
-    "src/host-binary",
+    "crates/crabjar/crabjar-host",
     # Skill crates
-    "src/skill-script-runner",
-    "src/skill-reference-store",
-    "src/skill-process-management",
-    "src/skill-struct-tok-pipeline",
+    "crates/crabjar/skill-script-runner",
+    "crates/crabjar/skill-reference-store",
+    "crates/crabjar/skill-process-management",
+    "crates/crabjar/hermes-struct-tok-pipeline",
     # Scheduler — cron jobs, workers, watchers with execution gating
     "crates/scheduler",
     # Zed ACP

@@ -19,15 +19,15 @@ tracing-subscriber.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 toml.workspace = true
-crabjar-host-core = { path = "../../host/host-core" }
-crabjar-host-system = { path = "../../host/host-system" }
-crabjar-host-observe = { path = "../../host/host-observe" }
-crabjar-host-agent = { path = "../../host/host-agent" }
-crabjar-host-webview = { path = "../../host/host-webview" }
-crabjar-app-teams = { path = "../../apps/teams" }
-crabjar-terminal = { path = "../../crates/terminal" }
-crabjar-guard = { path = "../../guard" }
-agent-context = { path = "../../memory" }
+crabjar-host-core = { path = "../../../host/host-core" }
+crabjar-host-system = { path = "../../../host/host-system" }
+crabjar-host-observe = { path = "../../../host/host-observe" }
+crabjar-host-agent = { path = "../../../host/host-agent" }
+crabjar-host-webview = { path = "../../../host/host-webview" }
+crabjar-app-teams = { path = "../../../apps/teams" }
+crabjar-terminal = { path = "../../../crates/terminal" }
+crabjar-guard = { path = "../../../guard" }
+agent-context = { path = "../../../memory" }
 ratatui.workspace = true
 crossterm.workspace = true
 thiserror.workspace = true
