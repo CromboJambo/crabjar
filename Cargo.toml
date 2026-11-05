@@ -6,9 +6,9 @@ members = [
     "telemetry",
     "orchestrator",
     "sandbox",
-    "tool_registry",
+    "crates/crabjar/tool_registry",
     "crates/axum-mux",
-    "crates/crabjar-architecture",
+    "crates/crabjar/crabjar-architecture",
     "crates/podman",
     # Analysis toolkit
     "crates/analyze/analyze-common",
@@ -53,30 +53,30 @@ members = [
     "crates/zed-acp-bridge",
     "crates/zed-acp-server",
     # Plugin system
-    "crates/crabjar-plugin", "crates/slow-friend",
+    "crates/crabjar/crabjar-plugin", "crates/slow-friend",
     # GPU-accelerated agent dashboard (proof-of-concept)
-    "crates/crabjar-gpui",
+    "crates/crabjar/crabjar-gpui",
     # Git operations for crabjar IDE (diff, status, add, commit via libgit2)
-    "crates/crabjar-git",
+    "crates/crabjar/crabjar-git",
     # Commit message generation from git diffs
-    "crates/crabjar-commit",
+    "crates/crabjar/crabjar-commit",
     # CLI tool for commit message generation and staging
-    "crates/crabjar-commit-cli",
+    "crates/crabjar/crabjar-commit-cli",
     # Kanban orchestrator — maps inputs to hermes agent kanban operations
-    "crates/crabjar-kanban-orchestrator",
+    "crates/crabjar/crabjar-kanban-orchestrator",
     # SSH bastion host using russh (transparent proxy, no client app needed)
-    "crates/ssh-bastion", "vm/vm-core", "crates/crabjar-conductor", "crates/crabjar-worker", "crates/crabjar-durable-objects",
- "crates/crabjar-analyze", "crates/crabjar-review", "crates/crabjar-mcp-tool-registry",    "crates/crabjar-web-search",
-    "crates/crabjar-skills",    "crates/crabjar-tool-binding",    "crates/crabjar-github-client",
-    "crates/crabjar-clawhub-client",
-    "crates/crabjar-skill-scanner",
-    "crates/crabjar-trust-manager",    "crates/crabjar-compress",
-    "crates/crabjar-compress-mcp",
-    "crates/crabjar-unsloth-mcp",
-    "crates/crabjar-herdr-mcp",
-    "crates/crabjar-structured-aux",
+    "crates/ssh-bastion", "vm/vm-core", "crates/crabjar/crabjar-conductor", "crates/crabjar/crabjar-worker", "crates/crabjar/crabjar-durable-objects",
+ "crates/crabjar/crabjar-analyze", "crates/crabjar/crabjar-review", "crates/crabjar/crabjar-mcp-tool-registry",    "crates/crabjar/crabjar-web-search",
+    "crates/crabjar/crabjar-skills",    "crates/crabjar/crabjar-tool-binding",    "crates/crabjar/crabjar-github-client",
+    "crates/crabjar/crabjar-clawhub-client",
+    "crates/crabjar/crabjar-skill-scanner",
+    "crates/crabjar/crabjar-trust-manager",    "crates/crabjar/crabjar-compress",
+    "crates/crabjar/crabjar-compress-mcp",
+    "crates/crabjar/crabjar-unsloth-mcp",
+    "crates/crabjar/crabjar-herdr-mcp",
+    "crates/crabjar/crabjar-structured-aux",
     "crates/universal-structure",
-    "crates/email-smtp", "crates/crabjar-web-extract", "crates/crabjar-browser", "crates/crabjar-memory", "crates/crabjar-delegation", "crates/crabjar-cron", "crates/crabjar-homeassistant", "crates/crabjar-deploy",
+    "crates/email-smtp", "crates/crabjar/crabjar-web-extract", "crates/crabjar/crabjar-browser", "crates/crabjar/crabjar-memory", "crates/crabjar/crabjar-delegation", "crates/crabjar/crabjar-cron", "crates/crabjar/crabjar-homeassistant", "crates/crabjar/crabjar-deploy",
     # Performance benchmarks for execution pipeline
     "crates/benchmarks",
 ]
@@ -263,16 +263,16 @@ crabjar-podman = { path = "crates/podman" }
 crabjar-ssh-bastion = { path = "crates/ssh-bastion" }
 crabjar-lab-topology = { path = "crates/lab-topology" }
 crabjar-telemetry = { path = "telemetry", features = ["otel"] }
-crabjar-tool-registry = { path = "tool_registry" }
+crabjar-tool-registry = { path = "crates/crabjar/tool_registry" }
 crabjar-terminal = { path = "crates/terminal" }
 crabjar-slow-friend = { path = "crates/slow-friend", package = "slow-friend" }
-crabjar-skills = { path = "crates/crabjar-skills" }
-crabjar-tool-binding = { path = "crates/crabjar-tool-binding" }
-crabjar-github-client = { path = "crates/crabjar-github-client" }
-crabjar-clawhub-client = { path = "crates/crabjar-clawhub-client" }
-crabjar-skill-scanner = { path = "crates/crabjar-skill-scanner" }
-crabjar-trust-manager = { path = "crates/crabjar-trust-manager" }
-crabjar-durable-objects = { path = "crates/crabjar-durable-objects" }
+crabjar-skills = { path = "crates/crabjar/crabjar-skills" }
+crabjar-tool-binding = { path = "crates/crabjar/crabjar-tool-binding" }
+crabjar-github-client = { path = "crates/crabjar/crabjar-github-client" }
+crabjar-clawhub-client = { path = "crates/crabjar/crabjar-clawhub-client" }
+crabjar-skill-scanner = { path = "crates/crabjar/crabjar-skill-scanner" }
+crabjar-trust-manager = { path = "crates/crabjar/crabjar-trust-manager" }
+crabjar-durable-objects = { path = "crates/crabjar/crabjar-durable-objects" }
 dirs.workspace = true
 
 # Database

@@ -18,7 +18,7 @@ crabjar-host-core = { path = "../host-core" }
 crabjar-host-observe = { path = "../host-observe" }
 crabjar-guard = { path = "../../guard" }
 crabjar-podman = { path = "../../crates/podman" }
-crabjar-tool-registry = { path = "../../tool_registry" }
+crabjar-tool-registry = { path = "../../crates/crabjar/tool_registry" }
 pesti-structural-tokenizer = { version = "0.1.2", package = "pesti-structural-tokenizer" }
 rusqlite = { workspace = true, features = ["bundled"] }
 reqwest = { workspace = true, default-features = false, features = ["json", "rustls"] }

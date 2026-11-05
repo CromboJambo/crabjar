@@ -53,9 +53,9 @@ clap = { workspace = true }
 reqwest = { version = "0.12", features = ["json", "blocking"], default-features = false }
 
 # Crabjar dependencies
-crabjar-guard = { path = "../../guard" }
-crabjar-sandbox = { path = "../../sandbox" }
-universal-structure = { path = "../universal-structure" }
+crabjar-guard = { path = "../../../guard" }
+crabjar-sandbox = { path = "../../../sandbox" }
+universal-structure = { path = "../../universal-structure" }
 
 # Pesti semantic analyzers for code understanding
 pesti-structural-tokenizer = { git = "https://github.com/CromboJambo/pesti", package = "pesti-structural-tokenizer" }

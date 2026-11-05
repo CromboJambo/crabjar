@@ -49,21 +49,21 @@ crabjar-telemetry = { path = "../telemetry" }
 agent-context = { path = "../memory" }
 
 # Tool registry
-crabjar-tool-registry = { path = "../tool_registry" }
+crabjar-tool-registry = { path = "../crates/crabjar/tool_registry" }
 
 # Sandbox infrastructure for process isolation (#14)
 crabjar-sandbox = { path = "../sandbox" }
 
 # Web search tooling (P1-1)
-crabjar-web-search = { path = "../crates/crabjar-web-search" }
-crabjar-memory = { path = "../crates/crabjar-memory" }
+crabjar-web-search = { path = "../crates/crabjar/crabjar-web-search" }
+crabjar-memory = { path = "../crates/crabjar/crabjar-memory" }
 
 # Subagent delegation framework (P1-4)
-crabjar-delegation = { path = "../crates/crabjar-delegation" }
+crabjar-delegation = { path = "../crates/crabjar/crabjar-delegation" }
 
 # Browser automation tooling (P1-3)
-crabjar-browser = { path = "../crates/crabjar-browser" }
-crabjar-homeassistant = { path = "../crates/crabjar-homeassistant" }
+crabjar-browser = { path = "../crates/crabjar/crabjar-browser" }
+crabjar-homeassistant = { path = "../crates/crabjar/crabjar-homeassistant" }
 
 # Directory detection for memory tool
 dirs.workspace = true
