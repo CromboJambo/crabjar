@@ -29,4 +29,4 @@ analyze-js = { path = "../../analyze/analyze-js" }
 analyze-native = { path = "../../analyze/analyze-native" }
 analyze-firmware = { path = "../../analyze/analyze-firmware" }
 analyze-dotnet = { path = "../../analyze/analyze-dotnet" }
-crabjar-guard = { path = "../../../guard" }
+crabjar-guard = { path = "../../guard" }

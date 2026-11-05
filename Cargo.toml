@@ -2,7 +2,7 @@
 members = [
     # Core crates
     "memory",
-    "guard",
+    "crates/guard",
     "telemetry",
     "orchestrator",
     "sandbox",
@@ -258,7 +258,7 @@ thiserror.workspace = true
 
 # Knowledge store
 agent-context = { path = "memory" }
-crabjar-guard = { path = "guard" }
+crabjar-guard = { path = "crates/guard" }
 crabjar-podman = { path = "crates/podman" }
 crabjar-ssh-bastion = { path = "crates/ssh-bastion" }
 crabjar-lab-topology = { path = "crates/lab-topology" }

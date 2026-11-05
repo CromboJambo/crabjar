@@ -53,7 +53,7 @@ clap = { workspace = true }
 reqwest = { version = "0.12", features = ["json", "blocking"], default-features = false }
 
 # Crabjar dependencies
-crabjar-guard = { path = "../../../guard" }
+crabjar-guard = { path = "../../guard" }
 crabjar-sandbox = { path = "../../../sandbox" }
 universal-structure = { path = "../../universal-structure" }
 

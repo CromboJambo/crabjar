@@ -40,7 +40,7 @@ uuid.workspace = true
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 
 # Security layer
-crabjar-guard = { path = "../guard" }
+crabjar-guard = { path = "../crates/guard" }
 
 # Telemetry
 crabjar-telemetry = { path = "../telemetry" }

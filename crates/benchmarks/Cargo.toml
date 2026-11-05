@@ -17,6 +17,6 @@ name = "high_risk_latency"
 harness = false
 
 [dependencies]
-crabjar-guard = { path = "../../guard" }
+crabjar-guard = { path = "../guard" }
 tracing = "0.1"
 tempfile = "3.14"

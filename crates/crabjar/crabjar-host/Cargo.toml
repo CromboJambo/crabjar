@@ -26,7 +26,7 @@ crabjar-host-agent = { path = "../../../host/host-agent" }
 crabjar-host-webview = { path = "../../../host/host-webview" }
 crabjar-app-teams = { path = "../../../apps/teams" }
 crabjar-terminal = { path = "../../../crates/terminal" }
-crabjar-guard = { path = "../../../guard" }
+crabjar-guard = { path = "../../guard" }
 agent-context = { path = "../../../memory" }
 ratatui.workspace = true
 crossterm.workspace = true
