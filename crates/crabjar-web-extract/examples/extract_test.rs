@@ -13,7 +13,7 @@ async fn main() {
                 println!("URL: {}", result.url);
                 println!("Title: {}", result.title);
                 if let Some(err) = &result.error {
-                    println!("Error: {}", err);
+                    println!("Error: {err}");
                 } else {
                     println!("Content (first 500 chars):");
                     println!(
@@ -27,7 +27,7 @@ async fn main() {
             println!("✓ Web extraction working!");
         }
         Err(e) => {
-            println!("✗ Error: {}", e);
+            println!("✗ Error: {e}");
             std::process::exit(1);
         }
     }

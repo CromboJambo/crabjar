@@ -70,6 +70,7 @@ pub struct WorkerMetadata {
 /// Worker promotion manager.
 pub struct PromotionManager {
     conn: Connection,
+    #[allow(dead_code)]
     base_dir: PathBuf,
 }
 

@@ -58,6 +58,7 @@ pub struct ProcessResult {
 pub struct FileWatcher {
     watch_dir: PathBuf,
     output_dir: PathBuf,
+    #[allow(dead_code)]
     db_path: PathBuf,
     dedup_engine: DedupEngine,
 }

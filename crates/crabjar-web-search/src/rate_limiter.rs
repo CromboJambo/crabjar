@@ -3,6 +3,7 @@
 use std::time::{Duration, Instant};
 
 /// Simple rate limiter that tracks requests per time window.
+#[allow(dead_code)]
 pub struct RateLimiter {
     max_requests: usize,
     window_duration: Duration,
@@ -10,6 +11,7 @@ pub struct RateLimiter {
     request_count: usize,
 }
 
+#[allow(dead_code)]
 impl RateLimiter {
     pub fn new(max_requests: usize, window_duration: Duration) -> Self {
         Self {

@@ -296,6 +296,7 @@ async fn report_result(
 }
 
 struct TaskResult {
+    #[allow(dead_code)]
     exit_code: i32,
     output: Option<String>,
 }

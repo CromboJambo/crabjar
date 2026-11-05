@@ -7,6 +7,7 @@
 
 use reqwest::Client;
 use scraper::{Html, Selector};
+use std::fmt::Write;
 use std::time::Duration;
 
 use super::error::WebExtractError;
@@ -86,16 +87,13 @@ impl HtmlExtractor {
 
         let mut text = String::new();
         for selector_str in &main_selectors {
-            match Selector::parse(selector_str) {
-                Ok(sel) => {
-                    if let Some(el) = document.select(&sel).next() {
-                        text = self.extract_text_from_element(&el);
-                        if !text.is_empty() {
-                            break;
-                        }
-                    }
+            if let Ok(sel) = Selector::parse(selector_str)
+                && let Some(el) = document.select(&sel).next()
+            {
+                text = self.extract_text_from_element(&el);
+                if !text.is_empty() {
+                    break;
                 }
-                Err(_) => continue,
             }
         }
 
@@ -108,7 +106,7 @@ impl HtmlExtractor {
         }
 
         // Clean up whitespace and normalize newlines
-        let cleaned = self.cleanup_text(&text);
+        let cleaned = Self::cleanup_text(&text);
 
         // Enforce character limit
         let content = if cleaned.len() > char_limit {
@@ -129,6 +127,7 @@ impl HtmlExtractor {
         })
     }
 
+    #[allow(clippy::self_only_used_in_recursion)]
     fn extract_text_from_element(&self, element: &scraper::ElementRef) -> String {
         let mut text = String::new();
         for child in element.children() {
@@ -155,7 +154,7 @@ impl HtmlExtractor {
                         // For links, include the URL in parentheses
                         if let Some(href) = child.value().as_element().unwrap().attr("href") {
                             text.push_str(&child_text);
-                            text.push_str(&format!(" ({href}))"));
+                            let _ = write!(text, " ({href}))");
                         } else {
                             text.push_str(&child_text);
                         }
@@ -171,7 +170,7 @@ impl HtmlExtractor {
         text
     }
 
-    fn cleanup_text(&self, text: &str) -> String {
+    fn cleanup_text(text: &str) -> String {
         // Remove excessive blank lines (3+ newlines become 2)
         let mut result = String::with_capacity(text.len());
         let mut blank_count = 0;

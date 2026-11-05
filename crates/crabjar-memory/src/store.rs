@@ -61,7 +61,7 @@ impl MemoryStore {
         let canonical_base = self
             .base_dir
             .canonicalize()
-            .map_err(|e| MemoryError::Io(e))?;
+            .map_err(MemoryError::Io)?;
 
         let canonical_path = path
             .canonicalize()
@@ -73,7 +73,7 @@ impl MemoryStore {
                 fs::write(path, "").ok();
                 path.canonicalize()
             })
-            .map_err(|e| MemoryError::Io(e))?;
+            .map_err(MemoryError::Io)?;
 
         if !canonical_path.starts_with(&canonical_base) {
             return Err(MemoryError::InvalidParams(format!(
@@ -230,7 +230,6 @@ impl MemoryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
     use tempfile::tempdir;
 
     #[test]

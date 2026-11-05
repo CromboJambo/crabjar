@@ -1,4 +1,5 @@
 use crabjar_web_extract::extract;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 #[tokio::main]
 async fn main() {
@@ -37,15 +38,13 @@ async fn main() {
 
             // Read request (we don't care about it)
             let mut buf = [0u8; 4096];
-            use tokio::io::AsyncReadExt;
-            stream.read(&mut buf).await.unwrap();
+            let _ = stream.read(&mut buf).await.unwrap();
 
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
                 html_content.len(),
                 html_content
             );
-            use tokio::io::AsyncWriteExt;
             stream.write_all(response.as_bytes()).await.unwrap();
         }
     });
@@ -61,7 +60,7 @@ async fn main() {
                 println!("URL: {}", result.url);
                 println!("Title: {}", result.title);
                 if let Some(err) = &result.error {
-                    println!("Error: {}", err);
+                    println!("Error: {err}");
                 } else {
                     println!("Content:");
                     println!("{}", result.content);
@@ -72,7 +71,7 @@ async fn main() {
             println!("✓ Web extraction working!");
         }
         Err(e) => {
-            println!("✗ Error: {}", e);
+            println!("✗ Error: {e}");
             std::process::exit(1);
         }
     }

@@ -75,7 +75,7 @@ impl ReviewAgent {
         }
 
         // Phase 2: Bundle related files (deterministic)
-        let bundles = create_bundles(relevant_files);
+        let bundles = create_bundles(&relevant_files);
 
         // Phase 3: Load and match rules (deterministic)
         let rules = self.load_rules(rules_toml)?;

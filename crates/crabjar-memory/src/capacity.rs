@@ -60,7 +60,11 @@ impl MemoryCapacity {
         if self.max_chars == 0 {
             return 0;
         }
-        ((self.current_chars as f64 / self.max_chars as f64) * 100.0).round() as u32
+        // Allow cast lints: f64 division is intentional for percentage calculation,
+        // and the result is bounded to 0-100 by construction.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+        let percent = ((self.current_chars as f64 / self.max_chars as f64) * 100.0).round() as u32;
+        percent
     }
 
     /// Get remaining characters.

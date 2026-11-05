@@ -1,7 +1,6 @@
 //! StructuredAuxPlugin — bounded JEV decision-making via OpenRouter.
 
-use async_trait::async_trait;
-use crabjar_plugin::{Plugin, PluginError, ToolDefinition, ToolResult};
+use crabjar_plugin::{Plugin, PluginError};
 use reqwest::Client;
 use std::env;
 use std::fs;
@@ -262,7 +261,7 @@ impl StructuredAuxPlugin {
 
         // Parse the chat completion response.
         let parsed: serde_json::Value =
-            serde_json::from_str(&body).map_err(|e| PluginError::Serialization(e))?;
+            serde_json::from_str(&body).map_err(PluginError::Serialization)?;
 
         // Debug: log raw response for troubleshooting.
         println!("DEBUG: Raw response from {}:", base_url);

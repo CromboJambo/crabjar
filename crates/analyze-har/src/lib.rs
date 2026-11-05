@@ -210,6 +210,7 @@ pub fn analyze_har(path: &str) -> Result<AnalysisResult<HarAnalysis>, AnalyzeErr
 
 /// Simple URL parts structure.
 #[derive(Debug)]
+#[allow(dead_code)]
 struct HarUrlParts<'a> {
     scheme: &'a str,
     host: &'a str,

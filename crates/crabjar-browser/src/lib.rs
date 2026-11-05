@@ -34,6 +34,12 @@ struct Response {
     error: Option<String>,
 }
 
+impl Default for BrowserSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BrowserSession {
     /// Create a new browser session (doesn't start Playwright yet).
     pub fn new() -> Self {

@@ -183,6 +183,7 @@ impl ApkParser {
     }
 
     /// Extract manifest information from the APK.
+    #[allow(clippy::type_complexity)]
     fn extract_manifest_info(
         apk_data: &[u8],
     ) -> (
@@ -264,6 +265,7 @@ impl ApkParser {
     }
 
     /// Parse Android binary XML (AXML) format.
+    #[allow(clippy::type_complexity)]
     fn parse_axml(
         data: &[u8],
     ) -> (
