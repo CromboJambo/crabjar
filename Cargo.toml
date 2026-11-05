@@ -50,8 +50,8 @@ members = [
     # Scheduler — cron jobs, workers, watchers with execution gating
     "crates/scheduler",
     # Zed ACP
-    "crates/zed-acp-bridge",
-    "crates/zed-acp-server",
+    "crates/acp/zed-acp-bridge",
+    "crates/acp/zed-acp-server",
     # Plugin system
     "crates/crabjar/crabjar-plugin", "crates/slow-friend",
     # GPU-accelerated agent dashboard (proof-of-concept)
