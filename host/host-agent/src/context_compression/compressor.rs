@@ -1,7 +1,7 @@
 use crabjar_host_core::work_item::Observation;
 use std::collections::HashMap;
 
-use crate::semantic_compression::{compress_observations, CompressedKnowledge};
+use crate::semantic_compression::{CompressedKnowledge, compress_observations};
 use crate::structural_compression::compress_code;
 
 use super::config::CompressionConfig;

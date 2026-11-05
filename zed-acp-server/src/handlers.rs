@@ -39,19 +39,30 @@ pub async fn handle_request(
                     "version": env!("CARGO_PKG_VERSION")
                 }
             });
-            Ok(AcpResponse::Result { id, result: response })
+            Ok(AcpResponse::Result {
+                id,
+                result: response,
+            })
         }
-        AcpRequest::SessionNew { id, cwd, mcp_servers: _ } => {
+        AcpRequest::SessionNew {
+            id,
+            cwd,
+            mcp_servers: _,
+        } => {
             let session = crate::session::AcpSession::new(cwd);
             server.sessions.push(session.clone());
             let response = json!({ "sessionId": session.session_id });
-            Ok(AcpResponse::Result { id, result: response })
+            Ok(AcpResponse::Result {
+                id,
+                result: response,
+            })
         }
-        AcpRequest::SessionLoad { id, session_id, cwd: _ } => {
-            let found = server
-                .sessions
-                .iter()
-                .find(|s| s.session_id == session_id);
+        AcpRequest::SessionLoad {
+            id,
+            session_id,
+            cwd: _,
+        } => {
+            let found = server.sessions.iter().find(|s| s.session_id == session_id);
             match found {
                 Some(session) => Ok(AcpResponse::Result {
                     id,
@@ -101,10 +112,7 @@ pub async fn handle_request(
             session_id,
             prompt,
         } => {
-            let session = server
-                .sessions
-                .iter()
-                .find(|s| s.session_id == session_id);
+            let session = server.sessions.iter().find(|s| s.session_id == session_id);
             match session {
                 Some(_) => {
                     let message = prompt
@@ -151,15 +159,13 @@ pub async fn handle_request(
             function_name,
             arguments,
         } => {
-            let session = server
-                .sessions
-                .iter()
-                .find(|s| s.session_id == session_id);
+            let session = server.sessions.iter().find(|s| s.session_id == session_id);
             match session {
                 Some(s) => {
-                    let guard_db = server.guard_db.as_ref().ok_or_else(|| {
-                        AcpServerError::GuardError("no guard db".into())
-                    })?;
+                    let guard_db = server
+                        .guard_db
+                        .as_ref()
+                        .ok_or_else(|| AcpServerError::GuardError("no guard db".into()))?;
                     let gate = ExecutionGate::new(guard_db, false, s.cwd.clone());
                     let command = function_name.clone();
                     let args = arguments

@@ -5,11 +5,11 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
+    use crate::Violation;
     use crate::crate_layer;
     use crate::crates_in_layer;
     use crate::discover_workspace_members;
     use crate::enforce_boundaries;
-    use crate::Violation;
 
     #[test]
     fn test_layer_allowed_dependencies() {

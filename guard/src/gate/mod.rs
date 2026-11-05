@@ -65,10 +65,7 @@ impl<'a> ExecutionGate<'a> {
     /// 4. Trust layer check: auto-execute only for trusted layers
     pub fn check(&self, ctx: GateContext<'_>) -> Result<GateResult, GuardDbError> {
         // Policy engine pre-check (if configured).
-        if let Some(gate_result) = policy::run_policy_check(
-            self.policy_engine.as_deref(),
-            &ctx,
-        ) {
+        if let Some(gate_result) = policy::run_policy_check(self.policy_engine.as_deref(), &ctx) {
             debug!(
                 action = %ctx.action_type,
                 policy_source = self.policy_engine.as_ref().map(|e| e.source_description()),
@@ -148,12 +145,9 @@ impl<'a> ExecutionGate<'a> {
 
         // 6. PID trust check (Option B: per-process trust layers)
         if let Some(pid) = ctx.pid {
-            if let Some(gate_result) = pid_trust::check_pid_trust(
-                &self.trust.conn(),
-                pid,
-                ctx.command,
-                &self.risk_config,
-            )? {
+            if let Some(gate_result) =
+                pid_trust::check_pid_trust(&self.trust.conn(), pid, ctx.command, &self.risk_config)?
+            {
                 return Ok(gate_result);
             }
         }

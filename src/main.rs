@@ -313,7 +313,7 @@ async fn main() {
         // (gate denied, config error). If it ran but failed, communicate that
         // through JSON fields and still exit 0.
         match response["exec"].get("exit_code") {
-            Some(_) => 0,  // Command ran — success/failure in JSON only
+            Some(_) => 0, // Command ran — success/failure in JSON only
             None => {
                 // Command didn't run (gate denied, etc.) — propagate error
                 response

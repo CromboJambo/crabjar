@@ -12,7 +12,6 @@ mod compressor;
 /// 2. **Summarize older**: Group older observations by stage/kind and summarize
 /// 3. **Token budget**: Enforce a maximum token count (default: 4096)
 /// 4. **Phase-aware**: Different phases may need different compression ratios
-
 mod config;
 #[cfg(test)]
 mod tests;

@@ -34,13 +34,23 @@ tool_execution_enabled = true
     .unwrap();
 
     // Execute a command that exits with code 0
-    let output = run_in(&temp, &["exec", "--command=echo hello", "--reason=test success derivation"]);
+    let output = run_in(
+        &temp,
+        &[
+            "exec",
+            "--command=echo hello",
+            "--reason=test success derivation",
+        ],
+    );
     assert!(output.status.success());
 
     let body = json_stdout(&output);
 
     // Finding 1.3: success must be derived from exit code, not hardcoded true
-    assert_eq!(body["success"], true, "success should be true when exit code is 0");
+    assert_eq!(
+        body["success"], true,
+        "success should be true when exit code is 0"
+    );
     assert_eq!(body["exec"]["exit_code"], 0);
 }
 
@@ -57,13 +67,23 @@ tool_execution_enabled = true
     .unwrap();
 
     // Execute a command that exits with non-zero code
-    let output = run_in(&temp, &["exec", "--command=false", "--reason=test success derivation failure"]);
+    let output = run_in(
+        &temp,
+        &[
+            "exec",
+            "--command=false",
+            "--reason=test success derivation failure",
+        ],
+    );
     assert!(output.status.success());
 
     let body = json_stdout(&output);
 
     // Finding 1.3: success must be derived from exit code (not hardcoded true)
-    assert_eq!(body["success"], false, "success should be false when exit code is non-zero");
+    assert_eq!(
+        body["success"], false,
+        "success should be false when exit code is non-zero"
+    );
     assert_ne!(body["exec"]["exit_code"], 0);
 }
 
@@ -80,14 +100,24 @@ tool_execution_enabled = true
     .unwrap();
 
     // Execute a command and capture the outcome_id from the response
-    let output = run_in(&temp, &[
-        "exec", "--command=echo outcome test",
-        "--reason=test outcome persistence",
-        "--trust-layer=4"
-    ]);
+    let output = run_in(
+        &temp,
+        &[
+            "exec",
+            "--command=echo outcome test",
+            "--reason=test outcome persistence",
+            "--trust-layer=4",
+        ],
+    );
     eprintln!("Test output status: {}", output.status);
-    eprintln!("Test output stdout: {}", String::from_utf8_lossy(&output.stdout));
-    eprintln!("Test output stderr: {}", String::from_utf8_lossy(&output.stderr));
+    eprintln!(
+        "Test output stdout: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    eprintln!(
+        "Test output stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(output.status.success());
 
     let body = json_stdout(&output);
@@ -97,19 +127,27 @@ tool_execution_enabled = true
         .as_str()
         .expect("outcome_id should be a string");
     assert!(!outcome_id.is_empty(), "outcome_id should not be empty");
-    
+
     // Verify it's a valid UUID format (basic check)
-    assert!(outcome_id.contains("-"), "outcome_id should be a UUID with dashes");
+    assert!(
+        outcome_id.contains("-"),
+        "outcome_id should be a UUID with dashes"
+    );
 
     // Verify the outcome was inserted into the guard DB (same as provenance)
     let guard_db_path = temp.path().join("guard/guard.db");
     let conn = rusqlite::Connection::open(&guard_db_path).unwrap();
-    
-    let row = conn.query_row(
-        "SELECT COUNT(*) as cnt FROM action_outcomes WHERE id = ?1",
-        [&outcome_id],
-        |r| r.get::<_, i64>("cnt")
-    ).unwrap();
-    
-    assert_eq!(row, 1, "Outcome should exist in guard DB with the returned ID");
+
+    let row = conn
+        .query_row(
+            "SELECT COUNT(*) as cnt FROM action_outcomes WHERE id = ?1",
+            [&outcome_id],
+            |r| r.get::<_, i64>("cnt"),
+        )
+        .unwrap();
+
+    assert_eq!(
+        row, 1,
+        "Outcome should exist in guard DB with the returned ID"
+    );
 }

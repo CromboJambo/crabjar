@@ -128,7 +128,11 @@ impl GuardDb {
         scope_target: Option<&str>,
     ) -> Result<(), GuardDbError> {
         let conn = self.conn();
-        eprintln!("DEBUG persist: action_id={}, source_event_id={}", action_id, source_event_id.as_deref().unwrap_or("NONE"));
+        eprintln!(
+            "DEBUG persist: action_id={}, source_event_id={}",
+            action_id,
+            source_event_id.as_deref().unwrap_or("NONE")
+        );
         conn.execute(
             "INSERT INTO action_requests \
              (id, source_event_id, source_node_id, action_type, payload, trust_layer, \

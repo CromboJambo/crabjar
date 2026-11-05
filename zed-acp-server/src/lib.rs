@@ -11,11 +11,11 @@ pub mod session;
 mod tests;
 
 // Re-export protocol types at crate root for compatibility
+use crate::handlers::{AcpServerError, handle_request};
 pub use crate::protocol::{AcpRequest, AcpResponse};
 pub use crate::session::AcpSession;
 use crabjar_guard::GuardDb;
 use crabjar_lib::knowledge_store::KnowledgeBridge;
-use crate::handlers::{handle_request, AcpServerError};
 
 /// The CrabJar version string reported to Zed.
 pub const ACP_VERSION: &str = env!("CARGO_PKG_VERSION");

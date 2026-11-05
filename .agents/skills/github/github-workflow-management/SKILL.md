@@ -30,6 +30,12 @@ This skill provides comprehensive management of GitHub Actions workflows includi
 * `Fix failing GitHub Actions workflow on main branch`
 * "Create a new workflow for automated testing on PRs"
 
+## Pitfalls
+
+- **Check for existing workflow files before adding jobs**: Before adding a new job to an existing workflow file, list `.github/workflows/` to check if a separate workflow file already handles that concern. Adding a `dependency-audit` job to rust.yml when dependency-audit.yml already exists creates duplicate runs and confusing CI output. Separate workflow files often exist for independent concerns (security audits, scheduled tasks, manual dispatch) that should not run on every PR.
+
+- **cargo-audit has no --workspace flag**: Do not write `cargo audit --workspace` in workflows — cargo-audit does not accept a `--workspace` flag and will fail with "unexpected argument". Run just `cargo audit` (optionally with `--deny warnings`) to audit all workspace dependencies.
+
 ## Reference Files
 * `references/workflow-templates.md`: Templates for common workflows
 * `references/ci-best-practices.md`: CI/CD best practices and optimization tips

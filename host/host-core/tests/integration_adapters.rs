@@ -25,10 +25,7 @@ impl crabjar_host_core::ProductAdapter for TestAdapter {
         true
     }
 
-    async fn send(
-        &self,
-        _msg: &OutgoingMessage,
-    ) -> Result<(), crabjar_host_core::AdapterError> {
+    async fn send(&self, _msg: &OutgoingMessage) -> Result<(), crabjar_host_core::AdapterError> {
         if !*self.connected.read().await {
             return Err(crabjar_host_core::AdapterError::NotConnected(
                 self.adapter_type.clone(),

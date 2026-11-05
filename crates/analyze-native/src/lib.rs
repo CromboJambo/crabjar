@@ -50,7 +50,10 @@ impl ElfParser {
             .blind_spot("dynamic linking not resolved");
 
         Ok(AnalysisResult::new(
-            format!("elf-{}", std::time::SystemTime::now().elapsed().unwrap().as_millis()),
+            format!(
+                "elf-{}",
+                std::time::SystemTime::now().elapsed().unwrap().as_millis()
+            ),
             provenance,
             analysis,
             doubt,
