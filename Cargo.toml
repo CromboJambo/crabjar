@@ -3,7 +3,7 @@ members = [
     # Core crates
     "crates/memory",
     "crates/guard",
-    "telemetry",
+    "crates/telemetry",
     "crates/orchestrator",
     "crates/sandbox",
     "crates/crabjar/tool_registry",
@@ -262,7 +262,7 @@ crabjar-guard = { path = "crates/guard" }
 crabjar-podman = { path = "crates/podman" }
 crabjar-ssh-bastion = { path = "crates/ssh-bastion" }
 crabjar-lab-topology = { path = "crates/lab-topology" }
-crabjar-telemetry = { path = "telemetry", features = ["otel"] }
+crabjar-telemetry = { path = "crates/telemetry", features = ["otel"] }
 crabjar-tool-registry = { path = "crates/crabjar/tool_registry" }
 crabjar-terminal = { path = "crates/terminal" }
 crabjar-slow-friend = { path = "crates/slow-friend", package = "slow-friend" }

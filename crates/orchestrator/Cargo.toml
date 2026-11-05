@@ -43,7 +43,7 @@ axum-server = { version = "0.7", features = ["tls-rustls"] }
 crabjar-guard = { path = "../guard" }
 
 # Telemetry
-crabjar-telemetry = { path = "../../telemetry" }
+crabjar-telemetry = { path = "../telemetry" }
 
 # Knowledge store
 agent-context = { path = "../memory" }

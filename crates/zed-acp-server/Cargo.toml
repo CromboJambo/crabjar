@@ -26,7 +26,7 @@ anyhow = "1.0"
 crabjar-guard = { path = "../guard" }
 
 # Telemetry
-crabjar-telemetry = { path = "../../telemetry" }
+crabjar-telemetry = { path = "../telemetry" }
 
 # Tracing
 tracing = "0.1"

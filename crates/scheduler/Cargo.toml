@@ -18,7 +18,7 @@ uuid = { workspace = true }
 
 # crabjar internal deps
 crabjar-guard = { path = "../guard" }
-crabjar-telemetry = { path = "../../telemetry" }
+crabjar-telemetry = { path = "../telemetry" }
 
 [dev-dependencies]
 tempfile = "3.20"
