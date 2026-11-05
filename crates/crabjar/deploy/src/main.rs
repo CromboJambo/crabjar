@@ -1,10 +1,15 @@
 //! Crabjar Cross-Machine Deployment Tool
 //!
-//! Builds the release binary and deploys it to a target machine via SSH/SCP
-//! or installs it locally. Generates machine-specific configuration files.
+//! Builds and deploys crabjar packages to target machines via SSH/SCP or
+//! installs them locally. Supports dinit service management on remote targets.
 //!
-//! Replaces scripts/deploy.sh with proper error handling, structured output,
-//! and execution tracking.
+//! Usage: deploy <target> [package] [--service <name>]
+//!   target: lappy, pixel9a, artix-box, ftw3, local
+//!   package: crabjar (default), crabjar-conductor, vm-bridge, etc.
+//!   --service: dinit service name to restart after deployment
+//!
+//! Replaces scripts/deploy.sh, deploy-ftw3.sh, deploy-conductor-ftw3.sh,
+//! and deploy-vm-bridge-ftw3.sh with proper error handling and structured output.
 
 use std::env;
 use std::fs;
@@ -67,14 +72,40 @@ impl TargetConfig {
 /// Deployment configuration.
 struct DeployConfig {
     target: TargetConfig,
+    package: String,
+    binary_name: String,
     version: String,
     install_dir: PathBuf,
     data_dir: PathBuf,
+    service: Option<String>,
 }
 
 impl DeployConfig {
-    fn new(target_name: &str) -> Result<Self, String> {
+    fn new(target_name: &str, args: &[String]) -> Result<Self, String> {
         let target = TargetConfig::resolve(target_name)?;
+
+        // Parse optional package name and --service flag
+        let mut package = "crabjar".to_string();
+        let mut service = None;
+        let mut i = 0;
+        while i < args.len() {
+            if args[i] == "--service" && i + 1 < args.len() {
+                service = Some(args[i + 1].clone());
+                i += 2;
+            } else if !args[i].starts_with("--") {
+                package = args[i].clone();
+                i += 1;
+            } else {
+                return Err(format!("Unknown flag: {}", args[i]));
+            }
+        }
+
+        let binary_name = match package.as_str() {
+            "crabjar" => "crabjar".to_string(),
+            "crabjar-conductor" => "crabjar-conductor".to_string(),
+            "vm-bridge" => "vm-bridge".to_string(),
+            other => other.to_string(),
+        };
 
         // Determine version from git or environment
         let version = match env::var("CRABJAR_VERSION") {
@@ -98,9 +129,12 @@ impl DeployConfig {
 
         Ok(Self {
             target,
+            package,
+            binary_name,
             version,
             install_dir,
             data_dir,
+            service,
         })
     }
 }
@@ -125,12 +159,12 @@ fn run_command(program: &str, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-/// Build the release binary.
-fn build_release() -> Result<PathBuf, String> {
-    log_step("Building release binary...");
+/// Build the release binary for a specific package.
+fn build_release(package: &str) -> Result<PathBuf, String> {
+    log_step(&format!("Building {} release binary...", package));
 
     let output = Command::new("cargo")
-        .args(["build", "--release", "-p", "crabjar"])
+        .args(["build", "--release", "-p", package])
         .output()
         .map_err(|e| format!("Failed to run cargo build: {}", e))?;
 
@@ -140,7 +174,7 @@ fn build_release() -> Result<PathBuf, String> {
     }
 
     log_step("Build complete");
-    Ok(PathBuf::from("target/release/crabjar"))
+    Ok(PathBuf::from(format!("target/release/{}", package)))
 }
 
 /// Generate machine-specific configuration.
@@ -171,96 +205,110 @@ fn generate_config(machine_id: &str, version: &str, data_dir: &PathBuf) -> Strin
     )
 }
 
-/// Deploy to a remote host via SSH/SCP.
-fn deploy_remote(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), String> {
+/// Run an SSH command on the remote target.
+fn ssh_exec(config: &DeployConfig, command: &str) -> Result<String, String> {
     let host = config.target.host.as_ref().unwrap();
     let ssh_key = config.target.ssh_key.as_ref().unwrap();
 
-    log_step(&format!("Deploying to {}...", host));
+    let mut ssh_cmd = Command::new("ssh");
+    ssh_cmd.arg("-i").arg(ssh_key);
+    if let Some(p) = config.target.port {
+        ssh_cmd.arg("-p").arg(p.to_string());
+    }
+    ssh_cmd.args([host, command]);
+
+    let output = ssh_cmd
+        .output()
+        .map_err(|e| format!("Failed to run ssh: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "ssh failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// Copy a file to the remote target via SCP.
+fn scp_copy(config: &DeployConfig, local_path: &PathBuf, remote_path: &str) -> Result<(), String> {
+    let host = config.target.host.as_ref().unwrap();
+    let ssh_key = config.target.ssh_key.as_ref().unwrap();
+
+    let mut scp_cmd = Command::new("scp");
+    scp_cmd.arg("-i").arg(ssh_key);
+    if let Some(p) = config.target.port {
+        scp_cmd.arg("-P").arg(p.to_string());
+    }
+    scp_cmd.arg(local_path).arg(&format!("{}:{}", host, remote_path));
+
+    let output = scp_cmd
+        .output()
+        .map_err(|e| format!("Failed to run scp: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "scp failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+
+    Ok(())
+}
+
+/// Deploy to a remote host via SSH/SCP.
+fn deploy_remote(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), String> {
+    log_step(&format!("Deploying {} to {}...", config.package, config.target.name));
 
     // Create directory structure on remote
     log_step("Creating remote directories...");
-    let mut ssh_cmd = Command::new("ssh");
-    ssh_cmd.arg("-i").arg(ssh_key);
-    if let Some(p) = config.target.port {
-        ssh_cmd.arg("-p").arg(p.to_string());
-    }
-    ssh_cmd.args([host, &format!("mkdir -p {} {}", config.install_dir.display(), config.data_dir.display())]);
-
-    let output = ssh_cmd.output()
-        .map_err(|e| format!("Failed to run ssh: {}", e))?;
-    if !output.status.success() {
-        return Err(format!("ssh mkdir failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
-    }
+    ssh_exec(
+        config,
+        &format!(
+            "mkdir -p {} {}",
+            config.install_dir.display(),
+            config.data_dir.display()
+        ),
+    )?;
 
     // Copy binary to remote
     log_step("Copying binary...");
-    let mut scp_cmd = Command::new("scp");
-    scp_cmd.arg("-i").arg(ssh_key);
-    if let Some(p) = config.target.port {
-        scp_cmd.arg("-P").arg(p.to_string());
-    }
-    scp_cmd.arg(binary_path).arg(&format!("{}:{}", host, config.install_dir.display()));
+    let remote_path = format!(
+        "{}/{}",
+        config.install_dir.display(),
+        config.binary_name
+    );
+    scp_copy(config, binary_path, &remote_path)?;
 
-    let output = scp_cmd.output()
-        .map_err(|e| format!("Failed to run scp: {}", e))?;
-    if !output.status.success() {
-        return Err(format!("scp binary failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
-    }
-
-    // Make binary executable on remote
-    log_step("Setting permissions...");
-    let mut ssh_cmd = Command::new("ssh");
-    ssh_cmd.arg("-i").arg(ssh_key);
-    if let Some(p) = config.target.port {
-        ssh_cmd.arg("-p").arg(p.to_string());
-    }
-    ssh_cmd.args([host, &format!("chmod +x {}", config.install_dir.display())]);
-
-    let output = ssh_cmd.output()
-        .map_err(|e| format!("Failed to run ssh: {}", e))?;
-    if !output.status.success() {
-        return Err(format!("ssh chmod failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
+    // Restart dinit service if specified
+    if let Some(service) = &config.service {
+        log_step(&format!("Restarting dinit service: {}", service));
+        ssh_exec(config, &format!("sudo dinitctl stop {} || true", service))?;
+        ssh_exec(config, &format!("sudo dinitctl start {}", service))?;
     }
 
-    // Get machine ID from remote
-    log_step("Generating machine-specific configuration...");
-    let mut ssh_cmd = Command::new("ssh");
-    ssh_cmd.arg("-i").arg(ssh_key);
-    if let Some(p) = config.target.port {
-        ssh_cmd.arg("-p").arg(p.to_string());
+    // Generate and deploy machine-specific configuration for main crabjar package
+    if config.package == "crabjar" {
+        log_step("Generating machine-specific configuration...");
+        let machine_id = ssh_exec(config, "hostname")?;
+        let config_content = generate_config(&machine_id, &config.version, &config.data_dir);
+
+        // Write config to temp file and copy to remote
+        let tmp_config = "/tmp/crabjar_deploy_config.toml";
+        fs::write(tmp_config, &config_content)
+            .map_err(|e| format!("Failed to write temp config: {}", e))?;
+
+        let tmp_path = PathBuf::from(tmp_config);
+        scp_copy(
+            config,
+            &tmp_path,
+            &format!("{}/.crabjar_config.toml", config.install_dir.display()),
+        )?;
+
+        // Clean up temp file
+        let _ = fs::remove_file(tmp_config);
     }
-    ssh_cmd.args([host, "hostname"]);
-
-    let output = ssh_cmd.output()
-        .map_err(|e| format!("Failed to run ssh: {}", e))?;
-    if !output.status.success() {
-        return Err(format!("ssh hostname failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
-    }
-    let machine_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-    let config_content = generate_config(&machine_id, &config.version, &config.data_dir);
-
-    // Write config to temp file and copy to remote
-    let tmp_config = "/tmp/crabjar_deploy_config.toml";
-    fs::write(tmp_config, &config_content)
-        .map_err(|e| format!("Failed to write temp config: {}", e))?;
-
-    let mut scp_cmd = Command::new("scp");
-    scp_cmd.arg("-i").arg(ssh_key);
-    if let Some(p) = config.target.port {
-        scp_cmd.arg("-P").arg(p.to_string());
-    }
-    scp_cmd.args([tmp_config, &format!("{}:{}/.crabjar_config.toml", host, config.install_dir.display())]);
-
-    let output = scp_cmd.output()
-        .map_err(|e| format!("Failed to run scp: {}", e))?;
-    if !output.status.success() {
-        return Err(format!("scp config failed: {}", String::from_utf8_lossy(&output.stderr).trim()));
-    }
-
-    // Clean up temp file
-    let _ = fs::remove_file(tmp_config);
 
     log_step("Deployment complete");
     Ok(())
@@ -268,7 +316,11 @@ fn deploy_remote(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Str
 
 /// Deploy locally.
 fn deploy_local(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), String> {
-    log_step(&format!("Installing locally to {}...", config.install_dir.display()));
+    log_step(&format!(
+        "Installing {} locally to {}...",
+        config.package,
+        config.install_dir.display()
+    ));
 
     // Create directories
     fs::create_dir_all(&config.install_dir)
@@ -278,21 +330,23 @@ fn deploy_local(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Stri
 
     // Copy binary
     log_step("Copying binary...");
-    fs::copy(binary_path, config.install_dir.join("crabjar"))
-        .map_err(|e| format!("Failed to copy binary: {}", e))?;
+    let dest = config.install_dir.join(&config.binary_name);
+    fs::copy(binary_path, &dest).map_err(|e| format!("Failed to copy binary: {}", e))?;
 
     // Make executable
     let perms = std::fs::Permissions::from_mode(0o755);
-    fs::set_permissions(config.install_dir.join("crabjar"), perms)
+    fs::set_permissions(&dest, perms)
         .map_err(|e| format!("Failed to set permissions: {}", e))?;
 
-    // Generate config
-    log_step("Generating machine-specific configuration...");
-    let machine_id = run_command("hostname", &[])?;
-    let config_content = generate_config(&machine_id, &config.version, &config.data_dir);
+    // Generate config for main crabjar package
+    if config.package == "crabjar" {
+        log_step("Generating machine-specific configuration...");
+        let machine_id = run_command("hostname", &[])?;
+        let config_content = generate_config(&machine_id, &config.version, &config.data_dir);
 
-    fs::write(config.install_dir.join(".crabjar_config.toml"), &config_content)
-        .map_err(|e| format!("Failed to write config: {}", e))?;
+        fs::write(config.install_dir.join(".crabjar_config.toml"), &config_content)
+            .map_err(|e| format!("Failed to write config: {}", e))?;
+    }
 
     log_step("Local deployment complete");
     Ok(())
@@ -303,14 +357,16 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        eprintln!("Usage: deploy <target>");
+        eprintln!("Usage: deploy <target> [package] [--service <name>]");
         eprintln!("Targets: lappy, pixel9a, artix-box, ftw3, local");
+        eprintln!("Packages: crabjar (default), crabjar-conductor, vm-bridge");
         std::process::exit(1);
     }
 
     let target_name = &args[1];
+    let extra_args = &args[2..];
 
-    match run_deployment(target_name) {
+    match run_deployment(target_name, extra_args) {
         Ok(_) => {
             println!("[deploy] Done!");
         }
@@ -321,13 +377,16 @@ fn main() {
     }
 }
 
-fn run_deployment(target_name: &str) -> Result<(), String> {
-    let config = DeployConfig::new(target_name)?;
+fn run_deployment(target_name: &str, extra_args: &[String]) -> Result<(), String> {
+    let config = DeployConfig::new(target_name, extra_args)?;
 
-    log_step(&format!("Deploying crabjar v{} to {}", config.version, config.target.name));
+    log_step(&format!(
+        "Deploying {} v{} to {}",
+        config.package, config.version, config.target.name
+    ));
 
     // Build release binary
-    let binary_path = build_release()?;
+    let binary_path = build_release(&config.package)?;
 
     // Deploy based on target
     if config.target.host.is_some() {
