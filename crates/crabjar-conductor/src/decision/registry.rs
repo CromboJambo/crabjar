@@ -112,7 +112,8 @@ impl DecisionRegistry {
             capability.triggers.len()
         );
 
-        self.capabilities.insert(capability.name.clone(), capability);
+        self.capabilities
+            .insert(capability.name.clone(), capability);
     }
 
     /// Load and register all decision capabilities from a directory.
@@ -121,12 +122,17 @@ impl DecisionRegistry {
         let dir = dir.as_ref();
 
         if !dir.exists() {
-            return Err(format!("Decision capabilities directory not found: {}", dir.display()));
+            return Err(format!(
+                "Decision capabilities directory not found: {}",
+                dir.display()
+            ));
         }
 
         let mut count = 0;
 
-        for entry in std::fs::read_dir(dir).map_err(|e| format!("Failed to read directory {}: {}", dir.display(), e))? {
+        for entry in std::fs::read_dir(dir)
+            .map_err(|e| format!("Failed to read directory {}: {}", dir.display(), e))?
+        {
             let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
             let path = entry.path();
 
@@ -137,7 +143,11 @@ impl DecisionRegistry {
                         count += 1;
                     }
                     Err(e) => {
-                        warn!("Failed to load decision capability from {}: {}", path.display(), e);
+                        warn!(
+                            "Failed to load decision capability from {}: {}",
+                            path.display(),
+                            e
+                        );
                     }
                 }
             }
@@ -156,7 +166,11 @@ impl DecisionRegistry {
     pub fn load_from_file<P: AsRef<Path>>(&self, path: P) -> Result<DecisionCapability, String> {
         let path = path.as_ref();
         let content = std::fs::read_to_string(path).map_err(|e| {
-            format!("Failed to read decision capability file {}: {}", path.display(), e)
+            format!(
+                "Failed to read decision capability file {}: {}",
+                path.display(),
+                e
+            )
         })?;
 
         serde_json::from_str(&content).map_err(|e| {
@@ -178,7 +192,10 @@ impl DecisionRegistry {
                 for name in decision_names {
                     if let Some(capability) = self.capabilities.get(name) {
                         // Avoid duplicates
-                        if !matches.iter().any(|m: &&DecisionCapability| m.name == capability.name) {
+                        if !matches
+                            .iter()
+                            .any(|m: &&DecisionCapability| m.name == capability.name)
+                        {
                             matches.push(capability);
                         }
                     }

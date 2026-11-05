@@ -55,11 +55,11 @@
 
 use anyhow::{Context, Result};
 use axum::{
-    extract::ws::{self, Message, WebSocketUpgrade},
+    Router,
     extract::State,
+    extract::ws::{self, Message, WebSocketUpgrade},
     response::IntoResponse,
     routing::get,
-    Router,
 };
 use crabjar_terminal::TerminalEvent;
 use futures_util::{SinkExt, StreamExt};
@@ -67,7 +67,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{Mutex, broadcast};
 use tracing::{debug, error, info, warn};
 
 /// Broadcast channel capacity for per-session event fan-out.

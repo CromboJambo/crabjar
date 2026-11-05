@@ -3,8 +3,8 @@
 //! Exposes content-aware compression as an MCP tool that can replace Hermes'
 //! default 'compressor' tool with zero-LLM, deterministic compression.
 
+use crabjar_compress::{CompressionConfig, CompressionResult, compress_tool_result};
 use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
-use crabjar_compress::{compress_tool_result, CompressionConfig, CompressionResult};
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct CompressRequest {
@@ -24,7 +24,9 @@ pub struct CompressServer;
 
 #[tool_router(server_handler)]
 impl CompressServer {
-    #[tool(description = "Compress tool output using content-aware strategies. Detects JSON, search results, logs, diffs, HTML, or prose and applies appropriate compression. Returns compressed text with metadata about reduction achieved.")]
+    #[tool(
+        description = "Compress tool output using content-aware strategies. Detects JSON, search results, logs, diffs, HTML, or prose and applies appropriate compression. Returns compressed text with metadata about reduction achieved."
+    )]
     fn compress(&self, params: Parameters<CompressRequest>) -> String {
         let req = params.0;
 
@@ -41,7 +43,8 @@ impl CompressServer {
             "compressed_chars": result.compressed_chars,
             "reduction_percent": result.reduction_percent,
             "content_type": format!("{:?}", result.content_type)
-        })).unwrap_or_else(|e| format!("{{\"error\": \"serialization failed: {}\"}}", e))
+        }))
+        .unwrap_or_else(|e| format!("{{\"error\": \"serialization failed: {}\"}}", e))
     }
 }
 

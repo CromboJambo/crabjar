@@ -12,9 +12,9 @@
 
 pub mod capacity;
 pub mod error;
-pub mod parser;
 #[cfg(feature = "mirror-log")]
 pub mod mirror_log;
+pub mod parser;
 pub mod store;
 pub mod tool;
 

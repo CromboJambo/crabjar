@@ -14,7 +14,7 @@ mod rate_limiter;
 mod searxng_client;
 
 pub use error::WebSearchError;
-pub use models::{SearchResult, SearchResponse};
+pub use models::{SearchResponse, SearchResult};
 
 /// Select search backend based on configuration and API key availability.
 /// Priority: SearXNG (self-hosted) > Brave (API key) > DuckDuckGo (fallback)
@@ -33,7 +33,9 @@ fn select_backend() -> Result<SearchBackend, WebSearchError> {
 
     // Fallback 2: DuckDuckGo Instant Answers (no API key needed)
     tracing::warn!("No SearXNG or Brave configured; falling back to DuckDuckGo");
-    Ok(SearchBackend::DuckDuckGo(duckduckgo_client::DuckDuckGoBackend::new()))
+    Ok(SearchBackend::DuckDuckGo(
+        duckduckgo_client::DuckDuckGoBackend::new(),
+    ))
 }
 
 enum SearchBackend {

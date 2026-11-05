@@ -3,7 +3,7 @@ use serde_json::json;
 
 async fn test_kev_chat_completion(client: &Client) {
     println!("=== Test 1: Kev-9B Chat Completion ===");
-    
+
     let response = client
         .post("http://ftw3:34159/v1/chat/completions")
         .header("Content-Type", "application/json")
@@ -18,7 +18,7 @@ async fn test_kev_chat_completion(client: &Client) {
         .to_string())
         .send()
         .await;
-        
+
     if response.is_ok() {
         let resp = response.unwrap();
         let status = resp.status();
@@ -32,9 +32,9 @@ async fn test_kev_chat_completion(client: &Client) {
 
 async fn test_kev_structured_prompt(client: &Client) {
     println!("\n=== Test 2: Kev-9B with Structured Prompt ===");
-    
+
     let code = "fn add(a: i32, b: i32) -> i32 { a + b }";
-    
+
     let response = client
         .post("http://ftw3:34159/v1/chat/completions")
         .header("Content-Type", "application/json")
@@ -49,7 +49,7 @@ async fn test_kev_structured_prompt(client: &Client) {
         .to_string())
         .send()
         .await;
-        
+
     if response.is_ok() {
         let resp = response.unwrap();
         let status = resp.status();
@@ -64,11 +64,11 @@ async fn test_kev_structured_prompt(client: &Client) {
 #[tokio::main]
 async fn main() {
     println!("Testing Kev-9B chat completion capabilities\n");
-    
+
     let client = Client::new();
-    
+
     test_kev_chat_completion(&client).await;
     test_kev_structured_prompt(&client).await;
-    
+
     println!("\n=== All tests complete ===");
 }

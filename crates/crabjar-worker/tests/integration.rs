@@ -22,8 +22,10 @@ fn start_conductor() -> Result<std::process::Child, Box<dyn std::error::Error>> 
 
     let mut cmd = Command::new(CONDUCTOR_BINARY);
     cmd.args([
-        "--port", &CONDUCTOR_PORT.to_string(),
-        "--data-dir", temp_dir.to_str().unwrap(),
+        "--port",
+        &CONDUCTOR_PORT.to_string(),
+        "--data-dir",
+        temp_dir.to_str().unwrap(),
     ]);
     cmd.stdout(Stdio::null());
     cmd.stderr(Stdio::null());
@@ -42,7 +44,14 @@ fn start_conductor() -> Result<std::process::Child, Box<dyn std::error::Error>> 
 
 fn is_conductor_ready() -> bool {
     let output = Command::new("curl")
-        .args(["-s", "-o", "/dev/null", "-w", "%{http_code}", format!("{}/health", CONDUCTOR_URL).as_str()])
+        .args([
+            "-s",
+            "-o",
+            "/dev/null",
+            "-w",
+            "%{http_code}",
+            format!("{}/health", CONDUCTOR_URL).as_str(),
+        ])
         .output();
 
     match output {
@@ -54,9 +63,14 @@ fn is_conductor_ready() -> bool {
 fn register_worker(name: &str) -> Option<String> {
     let output = Command::new("curl")
         .args([
-            "-s", "-X", "POST", format!("{}/workers/register", CONDUCTOR_URL).as_str(),
-            "-H", "Content-Type: application/json",
-            "-d", &format!(
+            "-s",
+            "-X",
+            "POST",
+            format!("{}/workers/register", CONDUCTOR_URL).as_str(),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            &format!(
                 "{{\"name\":\"{}\",\"machine_id\":\"jambo\",\"capabilities\":[\"os:Linux\"]}}",
                 name
             ),
@@ -74,7 +88,10 @@ fn register_worker(name: &str) -> Option<String> {
 
 fn poll_tasks(worker_id: &str) -> Option<serde_json::Value> {
     let output = Command::new("curl")
-        .args(["-s", format!("{}/tasks/for-worker/{}", CONDUCTOR_URL, worker_id).as_str()])
+        .args([
+            "-s",
+            format!("{}/tasks/for-worker/{}", CONDUCTOR_URL, worker_id).as_str(),
+        ])
         .output()
         .ok()?;
 
@@ -141,9 +158,14 @@ fn test_worker_capabilities() {
     // Register worker with specific capabilities
     let output = Command::new("curl")
         .args([
-            "-s", "-X", "POST", format!("{}/workers/register", CONDUCTOR_URL).as_str(),
-            "-H", "Content-Type: application/json",
-            "-d", r#"{
+            "-s",
+            "-X",
+            "POST",
+            format!("{}/workers/register", CONDUCTOR_URL).as_str(),
+            "-H",
+            "Content-Type: application/json",
+            "-d",
+            r#"{
                 "name": "capable-worker",
                 "machine_id": "ftw3",
                 "capabilities": ["os:Linux", "gpu:nvidia:3070ti", "docker"]

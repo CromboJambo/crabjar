@@ -14,7 +14,7 @@ mod models;
 
 pub use error::WebExtractError;
 pub use html_extractor::HtmlExtractor;
-pub use models::{ExtractResult, ExtractResponse};
+pub use models::{ExtractResponse, ExtractResult};
 
 /// Extract readable content from web URLs.
 ///
@@ -24,7 +24,10 @@ pub use models::{ExtractResult, ExtractResponse};
 ///
 /// # Returns
 /// `ExtractResponse` with results for each URL.
-pub async fn extract(urls: &[String], char_limit: Option<usize>) -> Result<ExtractResponse, WebExtractError> {
+pub async fn extract(
+    urls: &[String],
+    char_limit: Option<usize>,
+) -> Result<ExtractResponse, WebExtractError> {
     let char_limit = char_limit.unwrap_or(15000);
     let mut results = Vec::new();
 

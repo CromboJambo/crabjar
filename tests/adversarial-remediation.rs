@@ -70,8 +70,14 @@ fn container_mode_does_not_execute_on_host() {
     let body = json_stdout(&output);
     if body["success"] == true {
         // If successful, it should report container backend
-        assert_eq!(body["exec"]["container"], true, "Should report container=true");
-        assert_eq!(body["exec"]["backend"], "podman", "Should report podman backend");
+        assert_eq!(
+            body["exec"]["container"], true,
+            "Should report container=true"
+        );
+        assert_eq!(
+            body["exec"]["backend"], "podman",
+            "Should report podman backend"
+        );
     } else {
         // If failed, it should be due to podman unavailability, not host execution
         let error_msg = body["exec"]["error"]

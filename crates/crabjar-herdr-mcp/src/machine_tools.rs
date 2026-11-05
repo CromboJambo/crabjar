@@ -8,12 +8,14 @@ pub fn list_machines(params: Parameters<ListMachinesRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose("herdr machine list") {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd("herdr machine list") {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -29,12 +31,14 @@ pub fn machine_status(params: Parameters<MachineStatusRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -43,19 +47,18 @@ pub fn machine_status(params: Parameters<MachineStatusRequest>) -> String {
 pub fn add_machine(params: Parameters<AddMachineRequest>) -> String {
     let req = params.0;
 
-    let cmd = format!(
-        "herdr machine add {} --label {}",
-        req.ssh_target, req.label
-    );
+    let cmd = format!("herdr machine add {} --label {}", req.ssh_target, req.label);
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }

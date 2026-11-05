@@ -12,9 +12,13 @@ async fn test_promotion_api_workflow() {
 
     // Register a worker
     let mut c = conductor.lock().unwrap();
-    c.register_worker("test-worker-1".to_string(), vec!["shell".to_string()], Some("ssh-ed25519 AAAA...".to_string()))
-        .unwrap();
-    
+    c.register_worker(
+        "test-worker-1".to_string(),
+        vec!["shell".to_string()],
+        Some("ssh-ed25519 AAAA...".to_string()),
+    )
+    .unwrap();
+
     // Simulate performance: 50 successful tasks + 10 accurate decisions
     let pm = c.promotion_manager();
     for _ in 0..55 {
@@ -26,12 +30,17 @@ async fn test_promotion_api_workflow() {
 
     // Evaluate eligibility
     let eval = pm.evaluate_promotion("test-worker-1", 1).unwrap();
-    assert!(eval.eligible, "Worker should be eligible for promotion to supervisor rank");
+    assert!(
+        eval.eligible,
+        "Worker should be eligible for promotion to supervisor rank"
+    );
     assert_eq!(eval.current_rank, 0);
     assert_eq!(eval.target_rank, 1);
 
     // Execute promotion
-    let record = pm.execute_promotion("test-worker-1", 1, "Automated evidence-based promotion").unwrap();
+    let record = pm
+        .execute_promotion("test-worker-1", 1, "Automated evidence-based promotion")
+        .unwrap();
     assert_eq!(record.from_rank, 0);
     assert_eq!(record.to_rank, 1);
 

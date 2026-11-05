@@ -130,8 +130,7 @@ impl KnowledgeEntry {
     pub fn update_accuracy(&mut self) {
         let total = self.evidence.supporting_examples.len() + self.evidence.counterexamples.len();
         if total > 0 {
-            self.evidence.accuracy =
-                self.evidence.supporting_examples.len() as f64 / total as f64;
+            self.evidence.accuracy = self.evidence.supporting_examples.len() as f64 / total as f64;
         } else {
             self.evidence.accuracy = 1.0;
         }

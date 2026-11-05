@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::Path;
 
 use crate::types::{CreateJobRequest, CronJob, JobStatus, UpdateJobRequest};
@@ -109,7 +109,9 @@ impl CronStore {
                         _ => JobStatus::Scheduled,
                     },
                     last_run_at: row.get::<_, Option<String>>(9)?.map(|s| s.parse().unwrap()),
-                    next_run_at: row.get::<_, Option<String>>(10)?.map(|s| s.parse().unwrap()),
+                    next_run_at: row
+                        .get::<_, Option<String>>(10)?
+                        .map(|s| s.parse().unwrap()),
                     failure_count: row.get(11)?,
                     paused_reason: row.get(12)?,
                     created_at: row.get::<_, String>(13)?.parse().unwrap(),
@@ -124,22 +126,38 @@ impl CronStore {
     /// Update a job's configuration.
     pub fn update_job(&self, id: &str, req: &UpdateJobRequest) -> Result<CronJob> {
         if let Some(schedule) = &req.schedule {
-            self.conn.execute("UPDATE jobs SET schedule = ? WHERE id = ?", params![schedule, id])?;
+            self.conn.execute(
+                "UPDATE jobs SET schedule = ? WHERE id = ?",
+                params![schedule, id],
+            )?;
         }
         if let Some(prompt) = &req.prompt {
-            self.conn.execute("UPDATE jobs SET prompt = ? WHERE id = ?", params![prompt, id])?;
+            self.conn.execute(
+                "UPDATE jobs SET prompt = ? WHERE id = ?",
+                params![prompt, id],
+            )?;
         }
         if let Some(name) = &req.name {
-            self.conn.execute("UPDATE jobs SET name = ? WHERE id = ?", params![name, id])?;
+            self.conn
+                .execute("UPDATE jobs SET name = ? WHERE id = ?", params![name, id])?;
         }
         if let Some(skills) = &req.skills {
-            self.conn.execute("UPDATE jobs SET skills = ? WHERE id = ?", params![serde_json::to_string(skills)?, id])?;
+            self.conn.execute(
+                "UPDATE jobs SET skills = ? WHERE id = ?",
+                params![serde_json::to_string(skills)?, id],
+            )?;
         }
         if let Some(script) = &req.script {
-            self.conn.execute("UPDATE jobs SET script = ? WHERE id = ?", params![script, id])?;
+            self.conn.execute(
+                "UPDATE jobs SET script = ? WHERE id = ?",
+                params![script, id],
+            )?;
         }
         if let Some(deliver) = &req.deliver {
-            self.conn.execute("UPDATE jobs SET deliver = ? WHERE id = ?", params![deliver, id])?;
+            self.conn.execute(
+                "UPDATE jobs SET deliver = ? WHERE id = ?",
+                params![deliver, id],
+            )?;
         }
         if let Some(no_agent) = req.no_agent {
             self.conn.execute(
@@ -171,7 +189,8 @@ impl CronStore {
 
     /// Remove a job.
     pub fn remove_job(&self, id: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM jobs WHERE id = ?", params![id])?;
+        self.conn
+            .execute("DELETE FROM jobs WHERE id = ?", params![id])?;
         Ok(())
     }
 

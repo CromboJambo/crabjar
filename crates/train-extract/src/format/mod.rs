@@ -1,5 +1,7 @@
-use crate::extract::{Annotation, Chunk, ExtractedData, KnowledgeEntry, LogEvent};
+use crate::extract_types::ExtractedData;
 use serde::{Deserialize, Serialize};
+
+mod format_impl;
 
 /// A single instruction-tuning sample.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,187 +59,20 @@ pub fn format_samples(data: &ExtractedData) -> Vec<Sample> {
     let mut samples = Vec::new();
 
     for entry in &data.knowledge_entries {
-        samples.extend(format_knowledge_entry(entry));
+        samples.extend(format_impl::format_knowledge_entry(entry));
     }
 
     for event in &data.events {
-        samples.extend(format_log_event(event));
+        samples.extend(format_impl::format_log_event(event));
     }
 
     for chunk in &data.chunks {
-        samples.extend(format_chunk(chunk));
+        samples.extend(format_impl::format_chunk(chunk));
     }
 
     for annotation in &data.annotations {
-        samples.extend(format_annotation(annotation));
+        samples.extend(format_impl::format_annotation(annotation));
     }
-
-    samples
-}
-
-/// Format a knowledge entry as instruction/response pair.
-fn format_knowledge_entry(entry: &KnowledgeEntry) -> Vec<Sample> {
-    let mut samples = Vec::new();
-
-    let tags_str = if entry.tags.is_empty() {
-        String::new()
-    } else {
-        format!(" ({})", entry.tags.join(", "))
-    };
-
-    let kind_label = match entry.kind {
-        agent_context::KnowledgeKind::Instruction => "instruction",
-        agent_context::KnowledgeKind::Pattern => "pattern",
-        agent_context::KnowledgeKind::Example => "example",
-        agent_context::KnowledgeKind::Context => "context",
-        agent_context::KnowledgeKind::Rule => "rule",
-        agent_context::KnowledgeKind::Procedure => "procedure",
-    };
-
-    let instruction = format!(
-        "What is the {kind_label}{tags_str}?\n\n{}",
-        entry.content.lines().next().unwrap_or("")
-    );
-
-    let response = entry
-        .content
-        .lines()
-        .skip_while(|l| l.is_empty())
-        .take_while(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let provenance = format!("knowledge:{}", entry.id);
-
-    samples.push(Sample {
-        instruction,
-        response: if response.is_empty() {
-            entry.content.clone()
-        } else {
-            response
-        },
-        source: SampleSource::KnowledgeEntry {
-            entry_id: entry.id,
-            kind: format!("{:?}", entry.kind),
-        },
-        weight: entry.weight,
-        tags: entry.tags.clone(),
-        provenance_id: provenance,
-        created_at: entry.created_at,
-    });
-
-    samples
-}
-
-/// Format a mirror-log event as instruction/response pair.
-fn format_log_event(event: &LogEvent) -> Vec<Sample> {
-    let content = event.content.trim();
-    if content.is_empty() {
-        return Vec::new();
-    }
-
-    let first_line = content.lines().next().unwrap_or(content);
-    let instruction = format!(
-        "What happened in the {source} event?\n\n{first_line}",
-        source = event.source
-    );
-
-    let response = content
-        .lines()
-        .skip_while(|l| l.is_empty())
-        .take_while(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    vec![Sample {
-        instruction,
-        response: if response.is_empty() {
-            content.to_string()
-        } else {
-            response
-        },
-        source: SampleSource::LogEvent {
-            event_id: event.id.clone(),
-            source: event.source.clone(),
-        },
-        weight: 0.5,
-        tags: vec![event.source.clone()],
-        provenance_id: format!("event:{}", event.id),
-        created_at: event.timestamp,
-    }]
-}
-
-/// Format a chunk as instruction/response pair.
-fn format_chunk(chunk: &Chunk) -> Vec<Sample> {
-    let content = chunk.content.trim();
-    if content.is_empty() {
-        return Vec::new();
-    }
-
-    let instruction = format!(
-        "What is the content of chunk {idx}?\n\n{first}",
-        idx = chunk.chunk_index + 1,
-        first = content.lines().next().unwrap_or(content)
-    );
-
-    let response = content
-        .lines()
-        .skip_while(|l| l.is_empty())
-        .take_while(|l| !l.is_empty())
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    vec![Sample {
-        instruction,
-        response: if response.is_empty() {
-            content.to_string()
-        } else {
-            response
-        },
-        source: SampleSource::Chunk {
-            chunk_id: chunk.id.clone(),
-            event_id: chunk.event_id.clone(),
-        },
-        weight: 0.3,
-        tags: vec!["chunk".to_string()],
-        provenance_id: format!("chunk:{}", chunk.id),
-        created_at: 0,
-    }]
-}
-
-/// Format a resolved annotation as instruction/response pair.
-fn format_annotation(annotation: &Annotation) -> Vec<Sample> {
-    let mut samples = Vec::new();
-
-    if annotation.status != "resolved" {
-        return samples;
-    }
-
-    let reason = match &annotation.resolution_reason {
-        Some(r) => r.clone(),
-        None => return samples,
-    };
-
-    let instruction = format!(
-        "What decision was made about the {doc} annotation ({kind})?\n\n{message}",
-        doc = annotation.doc_name,
-        kind = annotation.kind,
-        message = annotation.message
-    );
-
-    samples.push(Sample {
-        instruction,
-        response: reason,
-        source: SampleSource::Annotation {
-            doc_name: annotation.doc_name.clone(),
-            annotation_id: annotation.id.clone(),
-            annotation_kind: annotation.kind.clone(),
-        },
-        weight: annotation.confidence,
-        tags: vec!["annotation".to_string(), annotation.doc_name.clone()],
-        provenance_id: format!("annotation:{}:{}", annotation.doc_name, annotation.id),
-        created_at: annotation.created_at,
-    });
 
     samples
 }
@@ -283,7 +118,7 @@ pub fn apply_weighting(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extract::KnowledgeEntry;
+    use crate::extract_types::{Annotation, Chunk, KnowledgeEntry, LogEvent};
     use agent_context::KnowledgeKind;
 
     fn make_sample_data() -> ExtractedData {
@@ -380,7 +215,7 @@ mod tests {
             active: true,
             created_at: 1000000,
         };
-        let samples = format_knowledge_entry(&entry);
+        let samples = format_impl::format_knowledge_entry(&entry);
         assert_eq!(samples.len(), 1);
         assert!(samples[0].instruction.contains("pattern"));
         assert!(samples[0].response.contains("Test content"));
@@ -395,7 +230,7 @@ mod tests {
             meta: None,
             timestamp: 1000000,
         };
-        let samples = format_log_event(&event);
+        let samples = format_impl::format_log_event(&event);
         assert_eq!(samples.len(), 1);
         assert!(matches!(samples[0].source, SampleSource::LogEvent { .. }));
     }
@@ -409,7 +244,7 @@ mod tests {
             meta: None,
             timestamp: 1000000,
         };
-        let samples = format_log_event(&event);
+        let samples = format_impl::format_log_event(&event);
         assert!(samples.is_empty());
     }
 
@@ -425,7 +260,7 @@ mod tests {
             confidence: 0.85,
             created_at: 1000000,
         };
-        let samples = format_annotation(&resolved);
+        let samples = format_impl::format_annotation(&resolved);
         assert_eq!(samples.len(), 1);
         assert!(matches!(samples[0].source, SampleSource::Annotation { .. }));
 
@@ -439,7 +274,7 @@ mod tests {
             confidence: 0.5,
             created_at: 1000000,
         };
-        let samples = format_annotation(&open);
+        let samples = format_impl::format_annotation(&open);
         assert!(samples.is_empty());
     }
 

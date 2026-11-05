@@ -1,7 +1,7 @@
 //! Evidence collection and aggregation for worker promotion.
 
 use chrono::{DateTime, Duration, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use uuid::Uuid;
 
 use super::types::WorkerCompetenceEvidence;

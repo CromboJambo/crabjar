@@ -151,14 +151,24 @@ async fn register(client: &reqwest::Client, config: &WorkerConfig) -> Result<(St
     }
 
     let reg: RegisterResponse = resp.json().await?;
-    
+
     match reg.status.as_str() {
         "registered" => {}
-        _ => return Err(anyhow!("Registration failed: {} - {}", reg.status, reg.message.unwrap_or_default())),
+        _ => {
+            return Err(anyhow!(
+                "Registration failed: {} - {}",
+                reg.status,
+                reg.message.unwrap_or_default()
+            ));
+        }
     }
 
-    let worker_id = reg.worker_id.ok_or_else(|| anyhow!("No worker_id in registration response"))?;
-    let auth_token = reg.auth_token.ok_or_else(|| anyhow!("No auth_token in registration response"))?;
+    let worker_id = reg
+        .worker_id
+        .ok_or_else(|| anyhow!("No worker_id in registration response"))?;
+    let auth_token = reg
+        .auth_token
+        .ok_or_else(|| anyhow!("No auth_token in registration response"))?;
 
     Ok((worker_id, auth_token))
 }
@@ -273,13 +283,14 @@ async fn report_result(
     // Check for token refresh (trust level change)
     let text = resp.text().await.unwrap_or_default();
     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text)
-        && let Some(new_token) = parsed["auth_token"].as_str() {
-            {
-                let mut s = state.lock().await;
-                s.auth_token = Some(new_token.to_string());
-            }
-            info!("Auth token refreshed after task completion");
+        && let Some(new_token) = parsed["auth_token"].as_str()
+    {
+        {
+            let mut s = state.lock().await;
+            s.auth_token = Some(new_token.to_string());
         }
+        info!("Auth token refreshed after task completion");
+    }
 
     Ok(())
 }

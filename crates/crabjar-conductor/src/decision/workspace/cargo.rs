@@ -41,41 +41,43 @@ pub fn discover_crates(workspace_path: &Path) -> Vec<CrateInfo> {
     // Check root Cargo.toml
     let root_toml = workspace_path.join("Cargo.toml");
     if root_toml.exists()
-        && let Some((name, deps)) = parse_cargo_toml(&root_toml) {
-            crates.push(CrateInfo {
-                name,
-                path: root_toml.parent().unwrap().to_path_buf(),
-                dependencies: deps,
-                reverse_dependencies: Vec::new(),
-                is_library: workspace_path.join("src").join("lib.rs").exists(),
-                is_binary: workspace_path.join("src").join("main.rs").exists(),
-                evaluation_result: None,
-            });
-        }
+        && let Some((name, deps)) = parse_cargo_toml(&root_toml)
+    {
+        crates.push(CrateInfo {
+            name,
+            path: root_toml.parent().unwrap().to_path_buf(),
+            dependencies: deps,
+            reverse_dependencies: Vec::new(),
+            is_library: workspace_path.join("src").join("lib.rs").exists(),
+            is_binary: workspace_path.join("src").join("main.rs").exists(),
+            evaluation_result: None,
+        });
+    }
 
     // Check Cargo.toml members array for sub-crates
     if let Ok(content) = fs::read_to_string(&root_toml)
         && let Ok(doc) = toml::from_str::<toml::Value>(&content)
-            && let Some(workspace) = doc.get("workspace").and_then(|w| w.as_table())
-                && let Some(members) = workspace.get("members").and_then(|m| m.as_array()) {
-                    for member in members {
-                        if let Some(path_str) = member.as_str() {
-                            let member_path = workspace_path.join(path_str);
-                            let member_toml = member_path.join("Cargo.toml");
-                            if let Some((name, deps)) = parse_cargo_toml(&member_toml) {
-                                crates.push(CrateInfo {
-                                    name,
-                                    path: member_path.clone(),
-                                    dependencies: deps,
-                                    reverse_dependencies: Vec::new(),
-                                    is_library: member_path.join("src").join("lib.rs").exists(),
-                                    is_binary: member_path.join("src").join("main.rs").exists(),
-                                    evaluation_result: None,
-                                });
-                            }
-                        }
-                    }
+        && let Some(workspace) = doc.get("workspace").and_then(|w| w.as_table())
+        && let Some(members) = workspace.get("members").and_then(|m| m.as_array())
+    {
+        for member in members {
+            if let Some(path_str) = member.as_str() {
+                let member_path = workspace_path.join(path_str);
+                let member_toml = member_path.join("Cargo.toml");
+                if let Some((name, deps)) = parse_cargo_toml(&member_toml) {
+                    crates.push(CrateInfo {
+                        name,
+                        path: member_path.clone(),
+                        dependencies: deps,
+                        reverse_dependencies: Vec::new(),
+                        is_library: member_path.join("src").join("lib.rs").exists(),
+                        is_binary: member_path.join("src").join("main.rs").exists(),
+                        evaluation_result: None,
+                    });
                 }
+            }
+        }
+    }
 
     crates
 }

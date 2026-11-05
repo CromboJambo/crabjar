@@ -14,12 +14,12 @@
 //! ```
 
 mod detect;
-mod service;
 mod managers;
+mod service;
 
-pub use detect::{detect_init_systems, detect_primary_init, InitSystem};
-pub use service::{ServiceConfig, ServiceManager, ServiceResult, ServiceStatus, RestartPolicy};
-pub use managers::{DinitManager, RunitManager, SystemdManager, NullManager};
+pub use detect::{InitSystem, detect_init_systems, detect_primary_init};
+pub use managers::{DinitManager, NullManager, RunitManager, SystemdManager};
+pub use service::{RestartPolicy, ServiceConfig, ServiceManager, ServiceResult, ServiceStatus};
 
 /// Factory function to create the appropriate service manager based on the detected init system.
 #[must_use]

@@ -163,8 +163,8 @@ mod tests {
 
     #[test]
     fn test_generate_config_with_log() {
-        let config = ServiceConfig::new("test-service", "/usr/bin/test")
-            .with_log_file("/var/log/test.log");
+        let config =
+            ServiceConfig::new("test-service", "/usr/bin/test").with_log_file("/var/log/test.log");
 
         let generated = DinitManager::generate_dinit_config(&config);
         assert!(generated.contains("logfile  = /var/log/test.log"));

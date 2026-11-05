@@ -9,7 +9,6 @@
 //!
 //! Supported field names: structure, name, `ownership_mode`, `error_handling`, mutability
 
-
 use crate::decision::structural::EvaluationTarget;
 
 /// Evaluate a condition expression against an evaluation target.
@@ -67,16 +66,18 @@ fn find_top_level_operator(expr: &str, op: &str) -> Option<usize> {
         match bytes[i] {
             b'(' => depth += 1,
             b')' => depth -= 1,
-            _ if depth == 0 && i + op_bytes.len() <= bytes.len()
-                && &bytes[i..i + op_bytes.len()] == op_bytes => {
-                    // Check that this isn't part of a longer token
-                    let before_ok = i == 0 || bytes[i - 1] == b' ';
-                    let after_ok =
-                        i + op_bytes.len() >= bytes.len() || bytes[i + op_bytes.len()] == b' ';
-                    if before_ok && after_ok {
-                        return Some(i);
-                    }
+            _ if depth == 0
+                && i + op_bytes.len() <= bytes.len()
+                && &bytes[i..i + op_bytes.len()] == op_bytes =>
+            {
+                // Check that this isn't part of a longer token
+                let before_ok = i == 0 || bytes[i - 1] == b' ';
+                let after_ok =
+                    i + op_bytes.len() >= bytes.len() || bytes[i + op_bytes.len()] == b' ';
+                if before_ok && after_ok {
+                    return Some(i);
                 }
+            }
             _ => {}
         }
     }
@@ -141,23 +142,28 @@ fn resolve_value(target: &EvaluationTarget, value: &str) -> String {
 
     // Enum variant (starts with capital letter)
     if let Some(first) = value.chars().next()
-        && first.is_uppercase() && value.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            return value.to_string();
-        }
+        && first.is_uppercase()
+        && value.chars().all(|c| c.is_alphanumeric() || c == '_')
+    {
+        return value.to_string();
+    }
 
     // Field name — resolve against target (typed fields first, then semantic_tags)
     match value {
         "structure" => target.structure.as_str().to_string(),
         "name" => target.name.clone().unwrap_or("null".to_string()),
-        "error_handling" => target
-            .error_handling
-            .as_ref().map_or_else(|| resolve_semantic_tag(target, "error_handling"), |eh| eh.as_str().to_string()),
-        "mutability" => target
-            .mutability
-            .as_ref().map_or_else(|| resolve_semantic_tag(target, "mutability"), |mt| mt.as_str().to_string()),
-        "ownership_mode" => target
-            .ownership_mode
-            .as_ref().map_or_else(|| resolve_semantic_tag(target, "ownership_mode"), |om| om.as_str().to_string()),
+        "error_handling" => target.error_handling.as_ref().map_or_else(
+            || resolve_semantic_tag(target, "error_handling"),
+            |eh| eh.as_str().to_string(),
+        ),
+        "mutability" => target.mutability.as_ref().map_or_else(
+            || resolve_semantic_tag(target, "mutability"),
+            |mt| mt.as_str().to_string(),
+        ),
+        "ownership_mode" => target.ownership_mode.as_ref().map_or_else(
+            || resolve_semantic_tag(target, "ownership_mode"),
+            |om| om.as_str().to_string(),
+        ),
         // Legacy: ownership stored in semantic_tags (language-specific)
         _ => resolve_semantic_tag(target, value),
     }

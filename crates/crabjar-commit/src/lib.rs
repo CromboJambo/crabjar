@@ -3,7 +3,7 @@
 //! Generates conventional commit messages from git diffs using heuristics.
 //! Can be extended with LLM integration via crabjar-orchestrator.
 
-use crabjar_git::{GitRepo, GitError};
+use crabjar_git::{GitError, GitRepo};
 use serde::{Deserialize, Serialize};
 
 /// Commit message type (conventional commits)
@@ -56,11 +56,11 @@ impl std::fmt::Display for CommitMessage {
         } else {
             write!(f, "{}: {}", self.type_, self.subject)?;
         }
-        
+
         if let Some(body) = &self.body {
             write!(f, "\n\n{}", body)?;
         }
-        
+
         Ok(())
     }
 }
@@ -78,14 +78,14 @@ impl<'a> CommitGenerator<'a> {
     /// Generate a commit message from current staged/unstaged changes
     pub fn generate(&self) -> Result<CommitMessage, GitError> {
         let diffs = self.repo.diff()?;
-        
+
         if diffs.is_empty() {
             return Err(GitError::NoChanges);
         }
 
         // Analyze the diffs to determine commit type and message
         let (commit_type, scope, subject) = self.analyze_diffs(&diffs);
-        
+
         Ok(CommitMessage {
             type_: commit_type,
             scope,
@@ -95,9 +95,12 @@ impl<'a> CommitGenerator<'a> {
     }
 
     /// Analyze diffs to determine commit type and generate message
-    fn analyze_diffs(&self, diffs: &[crabjar_git::FileDiff]) -> (CommitType, Option<String>, String) {
+    fn analyze_diffs(
+        &self,
+        diffs: &[crabjar_git::FileDiff],
+    ) -> (CommitType, Option<String>, String) {
         // Simple heuristic analysis based on file paths and changes
-        
+
         // Count changes by type
         let mut total_added = 0;
         let mut total_deleted = 0;
@@ -138,7 +141,7 @@ impl<'a> CommitGenerator<'a> {
         let first_path = &diffs[0].path;
         if let Some(slash) = first_path.find('/') {
             let dir = &first_path[..slash];
-            
+
             // Check if all files are in the same directory
             if diffs.iter().all(|d| d.path.starts_with(dir)) {
                 return Some(dir.to_string());
@@ -169,7 +172,7 @@ mod tests {
             subject: "add commit message generation".to_string(),
             body: None,
         };
-        
+
         assert_eq!(msg.to_string(), "feat(git): add commit message generation");
     }
 
@@ -181,7 +184,7 @@ mod tests {
             subject: "resolve lifetime issue".to_string(),
             body: Some("Fixed the parent commit reference lifetime by restructuring\nthe match expression to keep the commit alive for the entire duration.".to_string()),
         };
-        
+
         let output = msg.to_string();
         assert!(output.contains("fix: resolve lifetime issue"));
         assert!(output.contains("Fixed the parent commit reference"));
@@ -191,15 +194,15 @@ mod tests {
     fn test_generate_from_real_repo() {
         let repo_path = Path::new("/home/crombo/projects/active/crabjar");
         let repo = GitRepo::open(repo_path).expect("Failed to open repo");
-        
+
         let generator = CommitGenerator::new(&repo);
         // Should not error, even if there are no changes
         let result = generator.generate();
-        
+
         // Result may be Ok or Err(NoChanges) depending on repo state
         match result {
             Ok(msg) => assert!(!msg.subject.is_empty()),
-            Err(GitError::NoChanges) => {},
+            Err(GitError::NoChanges) => {}
             Err(e) => panic!("Unexpected error: {}", e),
         }
     }

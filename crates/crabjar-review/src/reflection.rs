@@ -50,10 +50,12 @@ pub fn reflect_severity(findings: &[Value]) -> Vec<Value> {
         }
 
         // Bugs in non-test source files are at least major
-        if finding_type == "bug" && !file.contains("test")
-            && (severity == "minor" || severity == "nit") {
-                updated["severity"] = Value::String("major".to_string());
-            }
+        if finding_type == "bug"
+            && !file.contains("test")
+            && (severity == "minor" || severity == "nit")
+        {
+            updated["severity"] = Value::String("major".to_string());
+        }
 
         result.push(updated);
     }

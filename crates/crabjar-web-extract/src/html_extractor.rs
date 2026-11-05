@@ -39,13 +39,15 @@ impl HtmlExtractor {
         Self { client }
     }
 
-    pub async fn extract(&self, url: &str, char_limit: usize) -> Result<ExtractResult, WebExtractError> {
+    pub async fn extract(
+        &self,
+        url: &str,
+        char_limit: usize,
+    ) -> Result<ExtractResult, WebExtractError> {
         // Fetch the page
-        let response = self.client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| WebExtractError::HttpRequestFailed(format!("Failed to fetch {url}: {e}")))?;
+        let response = self.client.get(url).send().await.map_err(|e| {
+            WebExtractError::HttpRequestFailed(format!("Failed to fetch {url}: {e}"))
+        })?;
 
         if !response.status().is_success() {
             return Err(WebExtractError::HttpRequestFailed(format!(
@@ -55,9 +57,10 @@ impl HtmlExtractor {
             )));
         }
 
-        let html = response.text().await.map_err(|e| {
-            WebExtractError::HttpRequestFailed(format!("Failed to read body: {e}"))
-        })?;
+        let html = response
+            .text()
+            .await
+            .map_err(|e| WebExtractError::HttpRequestFailed(format!("Failed to read body: {e}")))?;
 
         // Parse HTML and extract text content
         let document = Html::parse_document(&html);
@@ -109,7 +112,11 @@ impl HtmlExtractor {
 
         // Enforce character limit
         let content = if cleaned.len() > char_limit {
-            format!("{}... (truncated from {} characters)", &cleaned[..char_limit], cleaned.len())
+            format!(
+                "{}... (truncated from {} characters)",
+                &cleaned[..char_limit],
+                cleaned.len()
+            )
         } else {
             cleaned
         };
@@ -127,17 +134,20 @@ impl HtmlExtractor {
         for child in element.children() {
             if child.value().is_element() {
                 let tag_name = child.value().as_element().unwrap().name().to_string();
-                
+
                 // Skip navigation and boilerplate
                 if ["script", "style", "nav", "footer", "header"].contains(&tag_name.as_str()) {
                     continue;
                 }
 
                 // Add extra newlines for block elements
-                if ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br"].contains(&tag_name.as_str())
-                    && !text.is_empty() && !text.ends_with('\n') {
-                        text.push('\n');
-                    }
+                if ["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br"]
+                    .contains(&tag_name.as_str())
+                    && !text.is_empty()
+                    && !text.ends_with('\n')
+                {
+                    text.push('\n');
+                }
 
                 if let Some(child_ref) = scraper::ElementRef::wrap(child) {
                     let child_text = self.extract_text_from_element(&child_ref);

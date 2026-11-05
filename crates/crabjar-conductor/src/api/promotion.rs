@@ -56,7 +56,8 @@ pub async fn execute_promotion_endpoint(
         let c = conductor.blocking_lock();
         let rationale = "Automatic evidence-based promotion";
         // Default to promoting to rank 1 (supervisor)
-        c.promotion_manager().execute_promotion(&worker_id, 1, rationale)
+        c.promotion_manager()
+            .execute_promotion(&worker_id, 1, rationale)
     })
     .await;
 

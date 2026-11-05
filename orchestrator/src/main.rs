@@ -1,8 +1,7 @@
 use agent_context::state_docs::schema as state_schema;
-use agent_context::{Store, Source, store::StoreError};
+use agent_context::{Source, Store, store::StoreError};
 use axum::{
-    Router,
-    Json,
+    Json, Router,
     extract::{Path, State},
     response::sse::{Event as SseEvent, Sse},
     routing::{get, post},
@@ -24,13 +23,13 @@ mod session_search;
 use backend::InferenceBackend;
 use lm_studio_client::LmStudioClient;
 
+use axum::middleware;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use axum::middleware;
-use std::collections::HashMap;
-use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
@@ -164,7 +163,10 @@ impl SseSubscriptionManager {
         self.sender.subscribe()
     }
 
-    fn send(&self, data: String) -> Result<usize, tokio::sync::broadcast::error::SendError<String>> {
+    fn send(
+        &self,
+        data: String,
+    ) -> Result<usize, tokio::sync::broadcast::error::SendError<String>> {
         self.sender.send(data)
     }
 
@@ -190,7 +192,10 @@ fn spawn_sse_cleanup(manager: Arc<tokio::sync::Mutex<SseSubscriptionManager>>) {
 
             let count = manager.lock().await.subscriber_count();
             if count > 50 {
-                warn!(count, "SSE subscriber count exceeds threshold — resetting channel");
+                warn!(
+                    count,
+                    "SSE subscriber count exceeds threshold — resetting channel"
+                );
                 *manager.lock().await = manager.lock().await.reset();
             } else {
                 info!(count, "SSE subscriber cleanup check");
@@ -391,7 +396,13 @@ async fn handle_chat(
                 }
             };
 
-            let tool_result = execute_tool_call(&tc.tool, &args, Arc::clone(&state.store), Arc::clone(&state.process_registry)).await;
+            let tool_result = execute_tool_call(
+                &tc.tool,
+                &args,
+                Arc::clone(&state.store),
+                Arc::clone(&state.process_registry),
+            )
+            .await;
             results.push(format!(
                 "Tool '{}' executed: {}",
                 tc.tool,
@@ -581,7 +592,8 @@ fn validate_tool_name(name: &str) -> bool {
         return false;
     }
     // Allow lowercase alphanumeric, hyphens, underscores (standard tool naming)
-    name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
+    name.chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
 /// Resolve and execute a tool call via the tool registry, falling back to
@@ -748,7 +760,11 @@ async fn execute_tool_call(
             let query = &args[0];
 
             // Security layer: check command before execution with provenance.
-            guard_tool_call("search_logs", std::slice::from_ref(query), "orchestrator-tc")?;
+            guard_tool_call(
+                "search_logs",
+                std::slice::from_ref(query),
+                "orchestrator-tc",
+            )?;
 
             let search_req: SearchLogsRequest =
                 match serde_json::from_str(&serde_json::to_string(args).unwrap_or_default()) {
@@ -905,11 +921,13 @@ async fn execute_tool_call(
             let input: crabjar_memory::MemoryToolInput = serde_json::from_str(input_json)
                 .map_err(|e| format!("Error parsing memory tool arguments: {}", e))?;
 
-            info!("Executing memory tool: action={:?}, target={}", input.action, input.target);
+            info!(
+                "Executing memory tool: action={:?}, target={}",
+                input.action, input.target
+            );
 
             // Determine memory directory (use ~/.hermes/memories/ for drop-in compatibility)
-            let home_dir = dirs::home_dir()
-                .ok_or("Error: could not determine home directory")?;
+            let home_dir = dirs::home_dir().ok_or("Error: could not determine home directory")?;
             let memories_dir = home_dir.join(".hermes").join("memories");
 
             // Create the tool and execute
@@ -932,24 +950,32 @@ async fn execute_tool_call(
             let input: crabjar_delegation::DelegationInput = serde_json::from_str(input_json)
                 .map_err(|e| format!("Error parsing delegate_task arguments: {}", e))?;
 
-            info!("Executing delegate_task: action={:?}, tasks={}", input.action, input.tasks.len());
+            info!(
+                "Executing delegate_task: action={:?}, tasks={}",
+                input.action,
+                input.tasks.len()
+            );
 
             // Create dispatcher with default config
             let dispatcher = Dispatcher::new(None);
 
             // Execute based on action type
-            
 
             match input.action {
                 crabjar_delegation::DelegationAction::Spawn => {
                     if input.tasks.is_empty() {
-                        return Err("Error: delegate_task spawn requires at least one task".to_string());
+                        return Err(
+                            "Error: delegate_task spawn requires at least one task".to_string()
+                        );
                     }
 
                     // Spawn each task
                     let mut results = Vec::new();
                     for task in &input.tasks {
-                        match dispatcher.execute_task(task.goal.clone(), task.context.clone()).await {
+                        match dispatcher
+                            .execute_task(task.goal.clone(), task.context.clone())
+                            .await
+                        {
                             Ok(task_id) => {
                                 info!("Spawned subagent task: {}", task_id);
                                 results.push(serde_json::json!({
@@ -972,27 +998,31 @@ async fn execute_tool_call(
                     serde_json::to_string_pretty(&results)
                         .map_err(|e| format!("Error serializing spawn results: {}", e))
                 }
-                crabjar_delegation::DelegationAction::List => {
-                    match dispatcher.list_tasks().await {
-                        Ok(tasks) => {
-                            let results: Vec<serde_json::Value> = tasks.iter().map(|t| {
+                crabjar_delegation::DelegationAction::List => match dispatcher.list_tasks().await {
+                    Ok(tasks) => {
+                        let results: Vec<serde_json::Value> = tasks
+                            .iter()
+                            .map(|t| {
                                 serde_json::json!({
                                     "task_id": t.task_id,
                                     "status": format!("{:?}", t.status),
                                     "goal": &t.goal[..t.goal.len().min(100)],
                                     "created_at": t.created_at.to_rfc3339()
                                 })
-                            }).collect();
+                            })
+                            .collect();
 
-                            serde_json::to_string_pretty(&results)
-                                .map_err(|e| format!("Error serializing task list: {}", e))
-                        }
-                        Err(e) => Err(format!("Error listing tasks: {}", e)),
+                        serde_json::to_string_pretty(&results)
+                            .map_err(|e| format!("Error serializing task list: {}", e))
                     }
-                }
+                    Err(e) => Err(format!("Error listing tasks: {}", e)),
+                },
                 crabjar_delegation::DelegationAction::Steer => {
                     if input.subagent_id.is_none() || input.message.is_none() {
-                        return Err("Error: delegate_task steer requires subagent_id and message".to_string());
+                        return Err(
+                            "Error: delegate_task steer requires subagent_id and message"
+                                .to_string(),
+                        );
                     }
 
                     let task_id = input.subagent_id.unwrap();
@@ -1077,7 +1107,8 @@ async fn execute_tool_call(
                 "question_id": question_id,
                 "status": "pending",
                 "note": "Question sent to user. Poll /acp/clarify/status/:id for answer."
-            }).to_string())
+            })
+            .to_string())
         }
         // P1-6: Session Management/Search
         "session_search" => {
@@ -1093,10 +1124,8 @@ async fn execute_tool_call(
 
             let response = session_search::execute_session_search(input).await;
             match response {
-                Ok(result) => {
-                    Ok(serde_json::to_string(&result)
-                        .map_err(|e| format!("Failed to serialize session search result: {}", e))?)
-                }
+                Ok(result) => Ok(serde_json::to_string(&result)
+                    .map_err(|e| format!("Failed to serialize session search result: {}", e))?),
                 Err(e) => Err(format!("Session search failed: {}", e)),
             }
         }
@@ -1113,12 +1142,12 @@ async fn execute_tool_call(
             info!("Executing process_manage tool: action='{}'", input.action);
 
             // Use the shared process registry passed from app state
-            let response = process_management::execute_process_management(input, &process_registry).await;
+            let response =
+                process_management::execute_process_management(input, &process_registry).await;
             match response {
-                Ok(result) => {
-                    Ok(serde_json::to_string(&result)
-                        .map_err(|e| format!("Failed to serialize process management result: {}", e))?)
-                }
+                Ok(result) => Ok(serde_json::to_string(&result).map_err(|e| {
+                    format!("Failed to serialize process management result: {}", e)
+                })?),
                 Err(e) => Err(format!("Process management failed: {}", e)),
             }
         }
@@ -1136,11 +1165,15 @@ async fn execute_tool_call(
             let input: BrowserExecInput = serde_json::from_str(input_json)
                 .map_err(|e| format!("Error parsing browser_exec arguments: {}", e))?;
 
-            info!("Executing browser automation ({} chars of Python)", input.code.len());
+            info!(
+                "Executing browser automation ({} chars of Python)",
+                input.code.len()
+            );
 
             // Use crabjar-browser's execute_code function
             match crabjar_browser::execute_code(&input.code).await {
-                Ok(result) => Ok(serde_json::to_string_pretty(&result).map_err(|e| format!("Failed to serialize result: {}", e))?),
+                Ok(result) => Ok(serde_json::to_string_pretty(&result)
+                    .map_err(|e| format!("Failed to serialize result: {}", e))?),
                 Err(e) => Err(format!("Browser code execution failed: {}", e)),
             }
         }
@@ -1165,7 +1198,8 @@ async fn execute_tool_call(
             };
 
             match result {
-                Ok(value) => Ok(serde_json::to_string_pretty(&value).map_err(|e| format!("Failed to serialize HA result: {}", e))?),
+                Ok(value) => Ok(serde_json::to_string_pretty(&value)
+                    .map_err(|e| format!("Failed to serialize HA result: {}", e))?),
                 Err(e) => Err(format!("Home Assistant tool failed: {}", e)),
             }
         }
@@ -1180,19 +1214,24 @@ fn format_results(response: &crabjar_web_search::SearchResponse) -> Result<Strin
     }
 
     let mut output = String::new();
-    output.push_str(&format!("Found {} search results:\n\n", response.results.len()));
+    output.push_str(&format!(
+        "Found {} search results:\n\n",
+        response.results.len()
+    ));
 
     for (i, result) in response.results.iter().enumerate() {
         output.push_str(&format!("{}. {}\n", i + 1, result.title));
         output.push_str(&format!("   URL: {}\n", result.url));
         if let Some(desc) = &result.description
-            && !desc.is_empty() {
-                output.push_str(&format!("   Description: {}\n", desc));
-            }
+            && !desc.is_empty()
+        {
+            output.push_str(&format!("   Description: {}\n", desc));
+        }
         if let Some(snippet) = &result.snippet
-            && !snippet.is_empty() {
-                output.push_str(&format!("   Snippet: {}\n", snippet));
-            }
+            && !snippet.is_empty()
+        {
+            output.push_str(&format!("   Snippet: {}\n", snippet));
+        }
         output.push('\n');
     }
 
@@ -1355,13 +1394,7 @@ async fn clarify_response(
     let store = state.store.lock().unwrap();
 
     // Find the pending question by its specific tag
-    let entries = match store.query(
-        &[&format!("clarify-{}", question_id)],
-        1,
-        "",
-        "",
-        "",
-    ) {
+    let entries = match store.query(&[&format!("clarify-{}", question_id)], 1, "", "", "") {
         Ok(entries) => entries,
         Err(e) => {
             error!("Failed to query clarify question {}: {}", question_id, e);
@@ -1377,9 +1410,10 @@ async fn clarify_response(
 
     // Check if already answered
     if let Some(status) = row.metadata.get("status").and_then(|v| v.as_str())
-        && status == "answered" {
-            return Err(axum::http::StatusCode::CONFLICT);
-        }
+        && status == "answered"
+    {
+        return Err(axum::http::StatusCode::CONFLICT);
+    }
 
     // Update the question entry with the response via raw SQL
     let updated_metadata = serde_json::json!({
@@ -1399,7 +1433,8 @@ async fn clarify_response(
         }
     };
 
-    let tags_str = serde_json::to_string(&vec![format!("clarify-{}", question_id)]).unwrap_or_default();
+    let tags_str =
+        serde_json::to_string(&vec![format!("clarify-{}", question_id)]).unwrap_or_default();
 
     match store.conn.execute(
         "UPDATE knowledge_entries SET metadata = ?, tags = ? WHERE id = ?",
@@ -1426,13 +1461,7 @@ async fn clarify_status(
     let store = state.store.lock().unwrap();
 
     // Find the question by its specific tag
-    let entries = match store.query(
-        &[&format!("clarify-{}", question_id)],
-        1,
-        "",
-        "",
-        "",
-    ) {
+    let entries = match store.query(&[&format!("clarify-{}", question_id)], 1, "", "", "") {
         Ok(entries) => entries,
         Err(e) => {
             error!("Failed to query clarify question {}: {}", question_id, e);
@@ -1455,14 +1484,8 @@ async fn clarify_status(
 
     match status {
         "answered" => {
-            let response_value = row
-                .metadata
-                .get("response_value")
-                .and_then(|v| v.as_str());
-            let response_text = row
-                .metadata
-                .get("response_text")
-                .and_then(|v| v.as_str());
+            let response_value = row.metadata.get("response_value").and_then(|v| v.as_str());
+            let response_text = row.metadata.get("response_text").and_then(|v| v.as_str());
 
             Ok(Json(AcpResponse::Output {
                 data: serde_json::json!({
@@ -1477,28 +1500,26 @@ async fn clarify_status(
         }
         _ => {
             // Check for timeout
-            let created_at = row
-                .metadata
-                .get("created_at")
-                .and_then(|v| v.as_str());
+            let created_at = row.metadata.get("created_at").and_then(|v| v.as_str());
 
             if let Some(createdAt) = created_at
-                && let Ok(dt) = chrono::DateTime::parse_from_rfc3339(createdAt) {
-                    // Convert to UTC for comparison
-                    let dt_utc = dt.with_timezone(&chrono::Utc);
-                    let elapsed = chrono::Utc::now() - dt_utc;
-                    // Default timeout is 300 seconds (5 minutes)
-                    if elapsed.num_seconds() > 300 {
-                        return Ok(Json(AcpResponse::Output {
-                            data: serde_json::json!({
-                                "status": "timed_out",
-                                "question_id": question_id,
-                                "elapsed_seconds": elapsed.num_seconds()
-                            })
-                            .to_string(),
-                        }));
-                    }
+                && let Ok(dt) = chrono::DateTime::parse_from_rfc3339(createdAt)
+            {
+                // Convert to UTC for comparison
+                let dt_utc = dt.with_timezone(&chrono::Utc);
+                let elapsed = chrono::Utc::now() - dt_utc;
+                // Default timeout is 300 seconds (5 minutes)
+                if elapsed.num_seconds() > 300 {
+                    return Ok(Json(AcpResponse::Output {
+                        data: serde_json::json!({
+                            "status": "timed_out",
+                            "question_id": question_id,
+                            "elapsed_seconds": elapsed.num_seconds()
+                        })
+                        .to_string(),
+                    }));
                 }
+            }
 
             Ok(Json(AcpResponse::Output {
                 data: serde_json::json!({
@@ -1525,10 +1546,11 @@ async fn clarify_pending(
         for entry in &all_entries {
             if let Some(created_at_str) = entry.metadata.get("created_at").and_then(|v| v.as_str())
                 && let Ok(created_at) = created_at_str.parse::<i64>()
-                    && now - created_at > twenty_four_hours_ms {
-                        // Entry is older than 24 hours — deactivate it
-                        let _ = store.deactivate(entry.id, Source::System, Some("expired: older than 24h"));
-                    }
+                && now - created_at > twenty_four_hours_ms
+            {
+                // Entry is older than 24 hours — deactivate it
+                let _ = store.deactivate(entry.id, Source::System, Some("expired: older than 24h"));
+            }
         }
     }
 
@@ -1589,12 +1611,13 @@ async fn api_key_auth(
     // Check Authorization: Bearer *** header first
     if let Some(auth_header) = req.headers().get("authorization")
         && let Ok(auth_str) = auth_header.to_str()
-            && let Some(token) = auth_str.strip_prefix("Bearer ") {
-                // Constant-time comparison to prevent timing attacks
-                if subtle::ConstantTimeEq::ct_eq(token.as_bytes(), expected.as_bytes()).into() {
-                    return Ok(next.run(req).await);
-                }
-            }
+        && let Some(token) = auth_str.strip_prefix("Bearer ")
+    {
+        // Constant-time comparison to prevent timing attacks
+        if subtle::ConstantTimeEq::ct_eq(token.as_bytes(), expected.as_bytes()).into() {
+            return Ok(next.run(req).await);
+        }
+    }
 
     // Also check api_key query parameter for simpler clients
     let uri = req.uri();
@@ -1603,9 +1626,10 @@ async fn api_key_auth(
             let mut kv = pair.splitn(2, '=');
             if let (Some(key), Some(value)) = (kv.next(), kv.next())
                 && key == "api_key"
-                    && subtle::ConstantTimeEq::ct_eq(value.as_bytes(), expected.as_bytes()).into() {
-                        return Ok(next.run(req).await);
-                    }
+                && subtle::ConstantTimeEq::ct_eq(value.as_bytes(), expected.as_bytes()).into()
+            {
+                return Ok(next.run(req).await);
+            }
         }
     }
 
@@ -1642,19 +1666,20 @@ impl RateLimiter {
 
     fn load_state(&mut self) {
         if let Ok(content) = std::fs::read_to_string(&self.state_file)
-            && let Ok(state) = serde_json::from_str::<HashMap<String, Vec<i64>>>(&content) {
-                // Filter out stale entries
-                let now = chrono::Utc::now().timestamp();
-                for (ip, timestamps) in state {
-                    let recent: Vec<i64> = timestamps
-                        .into_iter()
-                        .filter(|&t| now - t < self.window_seconds)
-                        .collect();
-                    if !recent.is_empty() {
-                        self.requests.insert(ip, recent);
-                    }
+            && let Ok(state) = serde_json::from_str::<HashMap<String, Vec<i64>>>(&content)
+        {
+            // Filter out stale entries
+            let now = chrono::Utc::now().timestamp();
+            for (ip, timestamps) in state {
+                let recent: Vec<i64> = timestamps
+                    .into_iter()
+                    .filter(|&t| now - t < self.window_seconds)
+                    .collect();
+                if !recent.is_empty() {
+                    self.requests.insert(ip, recent);
                 }
             }
+        }
     }
 
     fn save_state(&self) {
@@ -1697,7 +1722,14 @@ async fn rate_limit_middleware(
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
     // Extract client IP from headers or use default
     let ip = if let Some(x_forwarded_for) = req.headers().get("x-forwarded-for") {
-        x_forwarded_for.to_str().unwrap_or("unknown").split(",").next().unwrap_or("unknown").trim().to_string()
+        x_forwarded_for
+            .to_str()
+            .unwrap_or("unknown")
+            .split(",")
+            .next()
+            .unwrap_or("unknown")
+            .trim()
+            .to_string()
     } else {
         "unknown".to_string()
     };
@@ -1734,7 +1766,10 @@ async fn load_tls_config() -> Option<axum_server::tls_rustls::RustlsConfig> {
         }
     };
 
-    info!("Loading TLS configuration from {} / {}", cert_path, key_path);
+    info!(
+        "Loading TLS configuration from {} / {}",
+        cert_path, key_path
+    );
 
     match axum_server::tls_rustls::RustlsConfig::from_pem_file(cert_path, key_path).await {
         Ok(config) => {
@@ -1783,7 +1818,8 @@ async fn main() -> anyhow::Result<()> {
     let target_scope = actor_scope.clone();
 
     // SSE event broadcast channel (capacity 100, oldest dropped if full)
-    let event_channel: EventChannel = Arc::new(tokio::sync::Mutex::new(SseSubscriptionManager::new(100)));
+    let event_channel: EventChannel =
+        Arc::new(tokio::sync::Mutex::new(SseSubscriptionManager::new(100)));
 
     // Shared state across request handlers
     let state = AppState {
@@ -1826,14 +1862,18 @@ async fn main() -> anyhow::Result<()> {
             axum::http::HeaderValue::from_static("http://localhost:3000"),
         ))
         .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-        .allow_headers([axum::http::HeaderName::from_static("content-type"), axum::http::HeaderName::from_static("authorization")]);
+        .allow_headers([
+            axum::http::HeaderName::from_static("content-type"),
+            axum::http::HeaderName::from_static("authorization"),
+        ]);
 
     // Rate limiter: 100 requests per minute per IP (#10 security finding)
     let rate_limiter = Arc::new(Mutex::new(RateLimiter::new(100, 60)));
 
-    let app = app
-        .layer(cors)
-        .layer(middleware::from_fn_with_state(rate_limiter.clone(), rate_limit_middleware));
+    let app = app.layer(cors).layer(middleware::from_fn_with_state(
+        rate_limiter.clone(),
+        rate_limit_middleware,
+    ));
 
     // Bind to localhost:3000.
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -1842,8 +1882,13 @@ async fn main() -> anyhow::Result<()> {
     let tls_acceptor = load_tls_config().await;
 
     if let Some(tls_config) = tls_acceptor {
-        info!("ACP Orchestrator listening on https://{} (TLS enabled)", addr);
-        axum_server::bind_rustls(addr, tls_config).serve(app.into_make_service()).await?;
+        info!(
+            "ACP Orchestrator listening on https://{} (TLS enabled)",
+            addr
+        );
+        axum_server::bind_rustls(addr, tls_config)
+            .serve(app.into_make_service())
+            .await?;
     } else {
         info!("ACP Orchestrator listening on http://{} (no TLS)", addr);
         let listener = tokio::net::TcpListener::bind(addr).await?;

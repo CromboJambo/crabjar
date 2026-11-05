@@ -27,7 +27,12 @@ pub fn handle_ha_command(command: HaCommand) -> serde_json::Value {
             "data": [],
             "count": 0
         }),
-        HaCommand::CallService { domain, service, entity_id, data: _ } => json!({
+        HaCommand::CallService {
+            domain,
+            service,
+            entity_id,
+            data: _,
+        } => json!({
             "success": true,
             "message": format!("called {}.{} on {}", domain, service, entity_id.as_deref().unwrap_or_default()),
             "data": {

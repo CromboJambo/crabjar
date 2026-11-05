@@ -1,4 +1,4 @@
-use crate::extract_types::{Annotation, Chunk, ExtractedData, KnowledgeEntry, LogEvent};
+use crate::extract_types::{Annotation, Chunk, KnowledgeEntry, LogEvent};
 
 /// Format a knowledge entry as instruction/response pair.
 pub fn format_knowledge_entry(entry: &KnowledgeEntry) -> Vec<super::Sample> {

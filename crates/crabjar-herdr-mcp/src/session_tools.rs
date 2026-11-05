@@ -18,7 +18,8 @@ pub fn session_attach_info(params: Parameters<SessionAttachRequest>) -> String {
         match crate::run_cmd_verbose(&cmd) {
             Ok(verbose_result) => {
                 result["verbose"] = verbose_result;
-                serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
+                serde_json::to_string(&result)
+                    .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e))
             }
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }

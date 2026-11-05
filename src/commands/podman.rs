@@ -15,10 +15,7 @@ pub fn execute_in_podman_container(
     };
 
     // Build sandbox config for isolated execution
-    let agent_name = format!(
-        "agent-{}",
-        &uuid::Uuid::new_v4().to_string()[..8]
-    );
+    let agent_name = format!("agent-{}", &uuid::Uuid::new_v4().to_string()[..8]);
     let mut sandbox = crabjar_podman::SandboxConfig::new(&agent_name, vec![command.to_string()]);
     sandbox.command.extend(args.iter().cloned());
     sandbox.working_dir = cwd.to_string();

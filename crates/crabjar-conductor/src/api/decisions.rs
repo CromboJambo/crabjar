@@ -39,9 +39,18 @@ pub async fn get_evaluation_status(Path(eval_id): Path<String>) -> Json<serde_js
 /// GET /decisions/capabilities - List available decision evaluation capabilities.
 pub async fn list_decision_capabilities() -> Json<serde_json::Value> {
     let capabilities = [
-        ("structural-condition", "Evaluate structural conditions directly against code region"),
-        ("embedding-classification", "Classify using JEV embedding similarity matching"),
-        ("hybrid", "Try structural first, fall back to embedding-based evaluation"),
+        (
+            "structural-condition",
+            "Evaluate structural conditions directly against code region",
+        ),
+        (
+            "embedding-classification",
+            "Classify using JEV embedding similarity matching",
+        ),
+        (
+            "hybrid",
+            "Try structural first, fall back to embedding-based evaluation",
+        ),
     ];
 
     Json(json!({

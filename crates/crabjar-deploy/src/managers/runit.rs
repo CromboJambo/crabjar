@@ -117,10 +117,7 @@ impl ServiceManager for RunitManager {
 
         // Create service directory
         if let Err(e) = fs::create_dir_all(&service_dir) {
-            return ServiceResult::err(
-                format!("Failed to create service directory: {e}"),
-                -1,
-            );
+            return ServiceResult::err(format!("Failed to create service directory: {e}"), -1);
         }
 
         // Write run script
@@ -128,10 +125,7 @@ impl ServiceManager for RunitManager {
         let run_script = Self::generate_runit_script(config);
 
         if let Err(e) = fs::write(&run_path, run_script) {
-            return ServiceResult::err(
-                format!("Failed to write run script: {e}"),
-                -1,
-            );
+            return ServiceResult::err(format!("Failed to write run script: {e}"), -1);
         }
 
         // Make run script executable

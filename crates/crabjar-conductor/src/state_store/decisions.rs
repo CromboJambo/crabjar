@@ -209,7 +209,9 @@ mod tests {
             .log_decision("hash2", "criteria.jev", "option_b", 0.7, true)
             .unwrap();
 
-        let decisions = store.get_decisions_for_criteria("criteria.jev", 10).unwrap();
+        let decisions = store
+            .get_decisions_for_criteria("criteria.jev", 10)
+            .unwrap();
         assert_eq!(decisions.len(), 2);
 
         let count = store.get_decision_count("criteria.jev").unwrap();

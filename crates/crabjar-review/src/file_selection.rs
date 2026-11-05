@@ -79,9 +79,10 @@ pub fn is_generated(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     for pattern in GENERATED_PATTERNS {
         if let Ok(re) = Regex::new(pattern)
-            && re.is_match(&path_str) {
-                return true;
-            }
+            && re.is_match(&path_str)
+        {
+            return true;
+        }
     }
     false
 }
@@ -92,9 +93,10 @@ pub fn is_binary_asset(path: &Path) -> bool {
     let path_str = path.to_string_lossy();
     for pattern in BINARY_PATTERNS {
         if let Ok(re) = Regex::new(pattern)
-            && re.is_match(&path_str) {
-                return true;
-            }
+            && re.is_match(&path_str)
+        {
+            return true;
+        }
     }
     false
 }

@@ -63,7 +63,11 @@ impl CronScheduler {
 
     /// Execute a job by submitting it to conductor.
     async fn execute_job(&self, job: &crate::types::CronJob) -> Result<()> {
-        println!("[cron] Executing job {} ({})", job.id, job.name.as_deref().unwrap_or("unnamed"));
+        println!(
+            "[cron] Executing job {} ({})",
+            job.id,
+            job.name.as_deref().unwrap_or("unnamed")
+        );
 
         // Submit goal to conductor via HTTP API
         let payload = serde_json::json!({

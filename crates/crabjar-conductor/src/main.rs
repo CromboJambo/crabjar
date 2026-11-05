@@ -5,8 +5,8 @@
 
 use anyhow::Result;
 use clap::Parser;
-use crabjar_conductor::{api, conductor};
 use crabjar_conductor::decision::{BackendConfig, DecisionPolicy};
+use crabjar_conductor::{api, conductor};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
@@ -79,7 +79,11 @@ async fn main() -> Result<()> {
     let decisions_dir = std::env::var("CRABJAR_DECISIONS_DIR")
         .unwrap_or_else(|_| "/opt/crabjar/decisions".to_string());
     if let Err(e) = conductor.load_decision_capabilities(&decisions_dir) {
-        tracing::warn!("Failed to load decision capabilities from {}: {}", decisions_dir, e);
+        tracing::warn!(
+            "Failed to load decision capabilities from {}: {}",
+            decisions_dir,
+            e
+        );
     }
 
     // Wrap in Arc<Mutex<>> for shared state across API handlers

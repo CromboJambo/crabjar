@@ -179,7 +179,11 @@ pub fn compress_observations(observations: &[Observation]) -> SemanticCompressio
 
             // Calculate confidence based on cluster size (larger = more confident)
             let raw_confidence = 0.7 + (cluster.len() as f64 * 0.02);
-            let confidence = if raw_confidence > 0.95 { 0.95 } else { raw_confidence };
+            let confidence = if raw_confidence > 0.95 {
+                0.95
+            } else {
+                raw_confidence
+            };
 
             summarized.details = format!(
                 "[{}] similar {} {}: {}",
@@ -199,7 +203,11 @@ pub fn compress_observations(observations: &[Observation]) -> SemanticCompressio
                 };
 
                 let knowledge = CompressedKnowledge {
-                    id: format!("kn_{}_{}", cluster_idx, &uuid::Uuid::new_v4().to_string()[..8]),
+                    id: format!(
+                        "kn_{}_{}",
+                        cluster_idx,
+                        &uuid::Uuid::new_v4().to_string()[..8]
+                    ),
                     content: format!(
                         "If {} context with {} pattern, expect {} outcome",
                         representative.stage, representative.kind, representative.details
@@ -270,7 +278,11 @@ mod tests {
     fn test_cluster_different_observations() {
         // Use strings with completely different content to ensure low similarity
         let obs1 = make_obs("observe", "state", "checking disk usage on partition sda1");
-        let obs2 = make_obs("observe", "state", "querying remote API endpoint for weather data");
+        let obs2 = make_obs(
+            "observe",
+            "state",
+            "querying remote API endpoint for weather data",
+        );
         let observations = vec![obs1, obs2];
 
         let clusters = cluster_observations(&observations);

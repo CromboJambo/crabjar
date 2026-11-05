@@ -1,10 +1,7 @@
 //! JEV (Just-in-Time Evaluation) routes: structural evaluation, post-processing, and feedback.
 
 use crate::api::ConductorState;
-use axum::{
-    Json,
-    extract::State,
-};
+use axum::{Json, extract::State};
 use serde_json::json;
 
 /// POST /jev/evaluate - Evaluate a structural code region against JEV criteria.
@@ -121,17 +118,18 @@ fn evaluate_structural_conditions(
     if let Some(options) = criteria["options"].as_array() {
         for option in options {
             if let Some(condition) = option["conditions"].as_str()
-                && crate::decision::condition::evaluate_condition(target, condition) {
-                    return Some(Json(json!({
-                        "success": true,
-                        "evaluation": {
-                            "option": option["id"].as_str().unwrap_or("unknown"),
-                            "rationale": format!("Structural condition matched: {}", condition),
-                            "confidence": 1.0,
-                            "method": "structural-condition"
-                        }
-                    })));
-                }
+                && crate::decision::condition::evaluate_condition(target, condition)
+            {
+                return Some(Json(json!({
+                    "success": true,
+                    "evaluation": {
+                        "option": option["id"].as_str().unwrap_or("unknown"),
+                        "rationale": format!("Structural condition matched: {}", condition),
+                        "confidence": 1.0,
+                        "method": "structural-condition"
+                    }
+                })));
+            }
         }
     }
 

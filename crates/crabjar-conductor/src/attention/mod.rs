@@ -35,14 +35,12 @@ impl Default for AttentionThresholds {
 }
 
 /// Decision policy configuration for the hybrid model.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HybridDecisionPolicy {
     pub attention_thresholds: AttentionThresholds,
     /// JEV criteria files per observation source type
     pub jev_criteria_files: Option<std::collections::HashMap<String, String>>,
 }
-
 
 /// Outcome of the hybrid two-stage decision pipeline.
 #[derive(Debug, Clone)]
@@ -225,9 +223,10 @@ impl HybridDecisionLayer {
     /// Get JEV criteria file path for a given observation source type.
     fn get_criteria_for_source(&self, source: &str) -> Result<String> {
         if let Some(criteria_map) = &self.policy.jev_criteria_files
-            && let Some(file) = criteria_map.get(source) {
-                return Ok(file.clone());
-            }
+            && let Some(file) = criteria_map.get(source)
+        {
+            return Ok(file.clone());
+        }
 
         // Default criteria file for unknown sources
         Ok("specs/criteria/autonomous-routing-evaluation.json".to_string())

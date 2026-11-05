@@ -103,7 +103,8 @@ pub struct GitRepo {
 impl GitRepo {
     /// Open a git repository at the given path
     pub fn open(path: &Path) -> Result<Self, GitError> {
-        let repo = Repository::open(path).map_err(|_| GitError::RepoNotFound(path.display().to_string()))?;
+        let repo = Repository::open(path)
+            .map_err(|_| GitError::RepoNotFound(path.display().to_string()))?;
         let root_path = repo.workdir().unwrap_or(path).to_path_buf();
         Ok(Self { repo, root_path })
     }
@@ -204,7 +205,12 @@ impl GitRepo {
     }
 
     /// Create a commit with the given message
-    pub fn commit(&self, message: &str, author_name: &str, author_email: &str) -> Result<CommitResult, GitError> {
+    pub fn commit(
+        &self,
+        message: &str,
+        author_name: &str,
+        author_email: &str,
+    ) -> Result<CommitResult, GitError> {
         let mut index = self.repo.index()?;
 
         // Check if there are changes to commit
@@ -229,12 +235,14 @@ impl GitRepo {
                     )?
                 } else {
                     // No parent (initial commit)
-                    self.repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?
+                    self.repo
+                        .commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?
                 }
             }
             Err(_) => {
                 // No HEAD yet (initial commit)
-                self.repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?
+                self.repo
+                    .commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?
             }
         };
 

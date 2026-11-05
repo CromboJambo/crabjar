@@ -43,7 +43,10 @@ impl fmt::Display for MemoryError {
                 would_exceed_by,
                 ..
             } => {
-                write!(f, "Memory full: {current_chars} chars used of {max_chars} limit. Adding this entry would exceed by {would_exceed_by} characters.")
+                write!(
+                    f,
+                    "Memory full: {current_chars} chars used of {max_chars} limit. Adding this entry would exceed by {would_exceed_by} characters."
+                )
             }
             MemoryError::NotFound { old_text, .. } => {
                 write!(f, "Entry not found containing: {old_text}")

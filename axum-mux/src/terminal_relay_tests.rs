@@ -3,7 +3,7 @@
 //! These tests spin up a real relay on an ephemeral port and drive it with
 //! a real WebSocket client (`tokio-tungstenite`), so they exercise the full
 //! wire path: upgrade, join, fan-out, and cleanup.
-use crate::terminal_relay::{start, TerminalRelayState};
+use crate::terminal_relay::{TerminalRelayState, start};
 use crabjar_terminal::TerminalEvent;
 use futures_util::{SinkExt, StreamExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};

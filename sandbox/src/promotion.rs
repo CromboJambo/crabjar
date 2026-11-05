@@ -12,7 +12,7 @@
 use std::path::PathBuf;
 
 use crate::error::SandboxError;
-use crate::schema::{init_db, SandboxRow};
+use crate::schema::{SandboxRow, init_db};
 use rusqlite::Connection;
 use tracing::info;
 

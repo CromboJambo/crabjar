@@ -83,8 +83,14 @@ impl SmtpEmailProvider {
 impl EmailProvider for SmtpEmailProvider {
     async fn send(&self, message: &EmailMessage) -> Result<String, EmailError> {
         // Build email using lettre's Message builder (v0.11 API)
-        let from_addr = format!("{} <{}>", message.from.name.as_deref().unwrap_or("Agent"), message.from.address);
-        let to_addrs: Vec<String> = message.to.iter()
+        let from_addr = format!(
+            "{} <{}>",
+            message.from.name.as_deref().unwrap_or("Agent"),
+            message.from.address
+        );
+        let to_addrs: Vec<String> = message
+            .to
+            .iter()
             .map(|t| format!("{} <{}>", t.name.as_deref().unwrap_or("User"), t.address))
             .collect();
 
@@ -92,16 +98,17 @@ impl EmailProvider for SmtpEmailProvider {
         let body_text = message.body_text.as_deref().unwrap_or("");
         let body_html = message.body_html.as_deref().unwrap_or(body_text);
 
-        let email = Message::builder()
-            .from(from_addr.parse().map_err(|e| {
-                EmailError::ProviderSpecific(format!("invalid from address: {e}"))
-            })?)
-            .to(to_addrs[0].parse().map_err(|e| {
-                EmailError::ProviderSpecific(format!("invalid to address: {e}"))
-            })?)
-            .subject(&message.subject)
-            .body(body_html.to_string())
-            .map_err(|e| EmailError::ProviderSpecific(format!("failed to build email: {e}")))?;
+        let email =
+            Message::builder()
+                .from(from_addr.parse().map_err(|e| {
+                    EmailError::ProviderSpecific(format!("invalid from address: {e}"))
+                })?)
+                .to(to_addrs[0].parse().map_err(|e| {
+                    EmailError::ProviderSpecific(format!("invalid to address: {e}"))
+                })?)
+                .subject(&message.subject)
+                .body(body_html.to_string())
+                .map_err(|e| EmailError::ProviderSpecific(format!("failed to build email: {e}")))?;
 
         // Create SMTP transport
         let creds = self.build_credentials();
@@ -121,10 +128,7 @@ impl EmailProvider for SmtpEmailProvider {
 
         match result {
             Ok(response) => {
-                tracing::info!(
-                    "email sent successfully, response: {:?}",
-                    response
-                );
+                tracing::info!("email sent successfully, response: {:?}", response);
                 Ok("sent".to_string())
             }
             Err(e) => Err(EmailError::ProviderSpecific(format!("send error: {e}"))),
@@ -133,12 +137,16 @@ impl EmailProvider for SmtpEmailProvider {
 
     async fn read(&self, _message_id: &str) -> Result<EmailMessage, EmailError> {
         // SMTP only supports sending; reading requires IMAP.
-        Err(EmailError::NotFound("SMTP provider does not support reading messages".to_string()))
+        Err(EmailError::NotFound(
+            "SMTP provider does not support reading messages".to_string(),
+        ))
     }
 
     async fn list(&self, _filter: &EmailListFilter) -> Result<Vec<EmailMessage>, EmailError> {
         // SMTP only supports sending.
-        Err(EmailError::NotFound("SMTP provider does not support listing messages".to_string()))
+        Err(EmailError::NotFound(
+            "SMTP provider does not support listing messages".to_string(),
+        ))
     }
 
     async fn sync(&self, _since: Option<&str>) -> Result<usize, EmailError> {
@@ -148,7 +156,9 @@ impl EmailProvider for SmtpEmailProvider {
 
     async fn search(&self, _query: &str) -> Result<Vec<EmailMessage>, EmailError> {
         // SMTP only supports sending.
-        Err(EmailError::NotFound("SMTP provider does not support searching messages".to_string()))
+        Err(EmailError::NotFound(
+            "SMTP provider does not support searching messages".to_string(),
+        ))
     }
 }
 

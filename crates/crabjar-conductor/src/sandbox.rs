@@ -33,8 +33,7 @@ fn default_network_mode() -> String {
 }
 
 /// Resource limits for sandbox containers.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct SandboxResources {
     /// CPU limit (e.g., "0.5" for half a core).
     #[serde(default)]
@@ -43,7 +42,6 @@ pub struct SandboxResources {
     #[serde(default)]
     pub memory_limit: Option<String>,
 }
-
 
 /// State of a running sandbox environment.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -165,7 +163,10 @@ impl SandboxManager {
 
     /// Assign a worker to a sandbox.
     pub fn assign_worker(&self, sandbox_id: &str, worker_id: &str) -> Result<(), String> {
-        let mut sandboxes = self.sandboxes.lock().map_err(|e| format!("Mutex poisoned: {e}"))?;
+        let mut sandboxes = self
+            .sandboxes
+            .lock()
+            .map_err(|e| format!("Mutex poisoned: {e}"))?;
         let state = sandboxes
             .get_mut(sandbox_id)
             .ok_or_else(|| format!("Sandbox {sandbox_id} not found"))?;

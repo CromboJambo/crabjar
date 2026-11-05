@@ -80,18 +80,19 @@ fn search_dir(dir: &Path, pattern: &str, results: &mut Vec<String>) -> Result<()
         } else if path
             .extension()
             .is_some_and(|ext| ext == "rs" || ext == "toml" || ext == "md")
-            && let Ok(content) = fs::read_to_string(&path) {
-                for (line_num, line) in content.lines().enumerate() {
-                    if line.contains(pattern) {
-                        results.push(format!(
-                            "{}:{}: {}",
-                            path.display(),
-                            line_num + 1,
-                            line.trim()
-                        ));
-                    }
+            && let Ok(content) = fs::read_to_string(&path)
+        {
+            for (line_num, line) in content.lines().enumerate() {
+                if line.contains(pattern) {
+                    results.push(format!(
+                        "{}:{}: {}",
+                        path.display(),
+                        line_num + 1,
+                        line.trim()
+                    ));
                 }
             }
+        }
     }
     Ok(())
 }

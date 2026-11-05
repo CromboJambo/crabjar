@@ -1,10 +1,7 @@
 //! Decision evaluation routes: /evaluations/decision
 
 use crate::api::{ConductorState, bg_evaluations};
-use axum::{
-    Json,
-    extract::State,
-};
+use axum::{Json, extract::State};
 use serde_json::json;
 use uuid::Uuid;
 

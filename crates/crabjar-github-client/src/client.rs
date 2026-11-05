@@ -206,23 +206,25 @@ impl GitHubClient {
         if let Some(retry_after) = resp.headers().get("X-RateLimit-Reset") {
             // Parse reset time and check if we're rate limited
             if let Ok(reset_time) = retry_after.to_str()
-                && let Ok(unix_ts) = reset_time.parse::<i64>() {
-                    let now = Utc::now().timestamp();
-                    if unix_ts > now {
-                        warn!(
-                            "GitHub rate limit approaching; resets in {}s",
-                            unix_ts - now
-                        );
-                    }
+                && let Ok(unix_ts) = reset_time.parse::<i64>()
+            {
+                let now = Utc::now().timestamp();
+                if unix_ts > now {
+                    warn!(
+                        "GitHub rate limit approaching; resets in {}s",
+                        unix_ts - now
+                    );
                 }
+            }
         }
 
         // Check X-RateLimit-Remaining
         if let Some(remaining) = resp.headers().get("X-RateLimit-Remaining")
             && let Ok(val) = remaining.to_str()
-                && val == "0" {
-                    return Err(GitHubError::RateLimited { retry_after: 3600 });
-                }
+            && val == "0"
+        {
+            return Err(GitHubError::RateLimited { retry_after: 3600 });
+        }
 
         Ok(())
     }

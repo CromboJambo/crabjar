@@ -1,15 +1,19 @@
 pub mod error;
+pub mod events;
 pub mod export;
 pub mod extract;
+pub mod extract_types;
 pub mod format;
+pub mod knowledge;
 pub mod weight;
 
 pub use error::{TrainExtractError, TrainExtractResult};
 pub use export::{
     DatasetManifest, ExportConfig, ExportFormat, export, export_jsonl, export_safetensors_manifest,
 };
-pub use extract::{
-    Annotation, Chunk, ExtractConfig, ExtractedData, KnowledgeEntry, LogEvent, extract,
+pub use extract::extract;
+pub use extract_types::{
+    Annotation, Chunk, ExtractConfig, ExtractedData, KnowledgeEntry, LogEvent,
 };
 pub use format::{Sample, SampleSource, apply_weighting, format_samples};
 pub use weight::{WeightConfig, compute_recency, compute_tag_boost, weight_samples};

@@ -1,7 +1,7 @@
 //! Promotion eligibility evaluation logic.
 
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use uuid::Uuid;
 
 use super::evidence::{aggregate_evidence, record_task_completion};

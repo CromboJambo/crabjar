@@ -3,7 +3,7 @@
 //! Provides a structured API for web browsing, form filling, screenshots,
 //! and content extraction through a Python/Playwright subprocess wrapper.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -58,10 +58,22 @@ impl BrowserSession {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .spawn()
-            .map_err(|e| anyhow!("Failed to spawn Playwright subprocess with '{}': {}", python_bin, e))?;
+            .map_err(|e| {
+                anyhow!(
+                    "Failed to spawn Playwright subprocess with '{}': {}",
+                    python_bin,
+                    e
+                )
+            })?;
 
-        let stdin = child.stdin.take().ok_or_else(|| anyhow!("Failed to get stdin"))?;
-        let stdout = child.stdout.take().ok_or_else(|| anyhow!("Failed to get stdout"))?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow!("Failed to get stdin"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| anyhow!("Failed to get stdout"))?;
 
         // Store handles
         *self.child.lock().await = Some(child);
@@ -156,15 +168,21 @@ impl BrowserSession {
         // Send request
         {
             let mut stdin_guard = self.stdin.lock().await;
-            let stdin = stdin_guard.as_mut().ok_or_else(|| anyhow!("Browser not started"))?;
-            stdin.write_all(format!("{}\n", request_json).as_bytes()).await?;
+            let stdin = stdin_guard
+                .as_mut()
+                .ok_or_else(|| anyhow!("Browser not started"))?;
+            stdin
+                .write_all(format!("{}\n", request_json).as_bytes())
+                .await?;
             stdin.flush().await?;
         }
 
         // Read response
         {
             let mut reader_guard = self.stdout_reader.lock().await;
-            let reader = reader_guard.as_mut().ok_or_else(|| anyhow!("Browser not started"))?;
+            let reader = reader_guard
+                .as_mut()
+                .ok_or_else(|| anyhow!("Browser not started"))?;
             let mut line = String::new();
             reader.read_line(&mut line).await?;
 
@@ -184,7 +202,9 @@ fn find_wrapper_script() -> Result<std::path::PathBuf> {
     let possible_paths = [
         std::path::PathBuf::from("browser_wrapper.py"),
         std::path::PathBuf::from("../crabjar-browser/browser_wrapper.py"),
-        std::path::PathBuf::from("/home/crombo/projects/active/crabjar/crates/crabjar-browser/browser_wrapper.py"),
+        std::path::PathBuf::from(
+            "/home/crombo/projects/active/crabjar/crates/crabjar-browser/browser_wrapper.py",
+        ),
     ];
 
     for path in possible_paths {
@@ -201,7 +221,9 @@ fn find_python_interpreter() -> String {
     let venv_paths = [
         std::path::PathBuf::from(".venv/bin/python"),
         std::path::PathBuf::from("../.venv/bin/python"),
-        std::path::PathBuf::from("/home/crombo/projects/active/crabjar/crates/crabjar-browser/.venv/bin/python"),
+        std::path::PathBuf::from(
+            "/home/crombo/projects/active/crabjar/crates/crabjar-browser/.venv/bin/python",
+        ),
     ];
 
     for path in venv_paths {

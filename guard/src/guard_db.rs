@@ -33,6 +33,9 @@ impl GuardDb {
             std::fs::create_dir_all(parent)?;
         }
         let conn = Connection::open(path)?;
+        // Enable WAL mode for concurrent access — allows multiple readers and one writer
+        // simultaneously. Essential when crabjar processes run concurrently (fleet/MCP).
+        conn.execute_batch("PRAGMA journal_mode=WAL;")?;
         let db = Self {
             conn: Arc::new(Mutex::new(conn)),
         };

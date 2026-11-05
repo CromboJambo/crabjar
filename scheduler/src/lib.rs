@@ -5,13 +5,13 @@
 
 pub mod cron_parser;
 pub mod error;
+mod r#loop;
 pub mod scheduler;
 pub mod watcher;
 pub mod worker;
-mod r#loop;
 
 pub use error::SchedulerError;
+pub use r#loop::SchedulerLoop;
 pub use scheduler::{JobSpec, Scheduler};
 pub use watcher::Watcher;
 pub use worker::WorkerPool;
-pub use r#loop::SchedulerLoop;

@@ -69,7 +69,7 @@ impl MemoryAuditLogger {
              meta TEXT,
              ingested_at INTEGER NOT NULL,
              content_hash TEXT
-             );"
+             );",
         )?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),

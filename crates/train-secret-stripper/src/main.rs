@@ -3,7 +3,7 @@
 //! Usage: crabjar-train-secret-stripper <input> [-o <output>] [--config <json>]
 
 use clap::Parser;
-use crabjar_train_secret_stripper::{strip_with_config, StripConfig};
+use crabjar_train_secret_stripper::{StripConfig, strip_with_config};
 use std::fs;
 
 #[derive(Parser)]

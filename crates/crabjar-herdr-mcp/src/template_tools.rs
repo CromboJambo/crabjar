@@ -17,7 +17,8 @@ pub fn template_list(params: Parameters<TemplateListRequest>) -> String {
         return serde_json::to_string(&serde_json::json!({
             "success": true,
             "templates": []
-        })).unwrap();
+        }))
+        .unwrap();
     }
 
     let mut templates = Vec::new();
@@ -26,12 +27,13 @@ pub fn template_list(params: Parameters<TemplateListRequest>) -> String {
             let path = e.path();
             if path.extension().and_then(|ext| ext.to_str()) == Some("json")
                 && let Ok(content) = std::fs::read_to_string(&path)
-                    && let Ok(template) = serde_json::from_str::<serde_json::Value>(&content) {
-                        templates.push(serde_json::json!({
-                            "name": path.file_stem().and_then(|s| s.to_str()).unwrap_or(""),
-                            "template": template
-                        }));
-                    }
+                && let Ok(template) = serde_json::from_str::<serde_json::Value>(&content)
+            {
+                templates.push(serde_json::json!({
+                    "name": path.file_stem().and_then(|s| s.to_str()).unwrap_or(""),
+                    "template": template
+                }));
+            }
         }
     }
 
@@ -39,7 +41,8 @@ pub fn template_list(params: Parameters<TemplateListRequest>) -> String {
         "success": true,
         "templates": templates,
         "count": templates.len()
-    })).unwrap()
+    }))
+    .unwrap()
 }
 
 pub fn template_create_session(params: Parameters<TemplateCreateSessionRequest>) -> String {
@@ -51,28 +54,40 @@ pub fn template_create_session(params: Parameters<TemplateCreateSessionRequest>)
         return serde_json::to_string(&serde_json::json!({
             "success": false,
             "error": format!("template not found: {}", req.template_name)
-        })).unwrap();
+        }))
+        .unwrap();
     }
 
     let content = match std::fs::read_to_string(&template_path) {
         Ok(c) => c,
-        Err(e) => return serde_json::to_string(&serde_json::json!({
-            "success": false,
-            "error": format!("failed to read template: {}", e)
-        })).unwrap()
+        Err(e) => {
+            return serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("failed to read template: {}", e)
+            }))
+            .unwrap();
+        }
     };
 
     let template: serde_json::Value = match serde_json::from_str(&content) {
         Ok(t) => t,
-        Err(e) => return serde_json::to_string(&serde_json::json!({
-            "success": false,
-            "error": format!("invalid template JSON: {}", e)
-        })).unwrap()
+        Err(e) => {
+            return serde_json::to_string(&serde_json::json!({
+                "success": false,
+                "error": format!("invalid template JSON: {}", e)
+            }))
+            .unwrap();
+        }
     };
 
     // Build the session creation command from template config
-    let session_name = req.session_name.unwrap_or_else(|| format!("herdr-{}", req.template_name));
-    let cwd = req.cwd.clone().unwrap_or_else(|| std::env::var("HOME").unwrap_or_default());
+    let session_name = req
+        .session_name
+        .unwrap_or_else(|| format!("herdr-{}", req.template_name));
+    let cwd = req
+        .cwd
+        .clone()
+        .unwrap_or_else(|| std::env::var("HOME").unwrap_or_default());
 
     // Create the herdr session with the appropriate layout
     let create_cmd = format!("herdr session create {} --cwd {}", session_name, cwd);
@@ -85,12 +100,14 @@ pub fn template_create_session(params: Parameters<TemplateCreateSessionRequest>)
             "template": req.template_name,
             "config": template,
             "create_result": result
-        })).unwrap(),
+        }))
+        .unwrap(),
         Err(e) => serde_json::to_string(&serde_json::json!({
             "success": false,
             "error": format!("failed to create session: {}", e),
             "template": req.template_name
-        })).unwrap()
+        }))
+        .unwrap(),
     }
 }
 
@@ -103,7 +120,8 @@ pub fn template_save(params: Parameters<TemplateSaveRequest>) -> String {
         return serde_json::to_string(&serde_json::json!({
             "success": false,
             "error": format!("failed to create templates directory: {}", e)
-        })).unwrap();
+        }))
+        .unwrap();
     }
 
     // For now, save a basic template structure
@@ -126,11 +144,13 @@ pub fn template_save(params: Parameters<TemplateSaveRequest>) -> String {
             "success": true,
             "template": req.template_name,
             "path": path.display().to_string()
-        })).unwrap(),
+        }))
+        .unwrap(),
         Err(e) => serde_json::to_string(&serde_json::json!({
             "success": false,
             "error": format!("failed to write template: {}", e),
             "template": req.template_name
-        })).unwrap()
+        }))
+        .unwrap(),
     }
 }

@@ -6,7 +6,7 @@
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use crabjar_train_dedup::{DedupEngine, EntryStatus};
-use crabjar_train_secret_stripper::{strip_with_config, StripConfig};
+use crabjar_train_secret_stripper::{StripConfig, strip_with_config};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -113,7 +113,8 @@ impl FileWatcher {
 
         match result {
             crabjar_train_dedup::ProcessResult::New(entry) => {
-                self.dedup_engine.mark_clean(&entry.content_hash, output_path.to_string_lossy())?;
+                self.dedup_engine
+                    .mark_clean(&entry.content_hash, output_path.to_string_lossy())?;
 
                 let process_result = ProcessResult {
                     input_path: path.to_string_lossy().to_string(),
@@ -153,7 +154,11 @@ impl FileWatcher {
 
                 let event = PipelineEvent {
                     dagr: 3,
-                    id: format!("dup-{}-{}", process_result.content_hash, Utc::now().timestamp()),
+                    id: format!(
+                        "dup-{}-{}",
+                        process_result.content_hash,
+                        Utc::now().timestamp()
+                    ),
                     kind: "training_file_duplicate".to_string(),
                     source: "filewatcher".to_string(),
                     data: serde_json::to_value(&process_result)?,
@@ -173,13 +178,14 @@ impl FileWatcher {
         let mut watcher = RecommendedWatcher::new(
             move |res: notify::Result<notify::Event>| {
                 if let Ok(event) = res
-                    && let EventKind::Create(_) = event.kind {
-                        for path in event.paths {
-                            if path.extension().is_some_and(|ext| ext == "md") {
-                                let _ = tx.blocking_send(path);
-                            }
+                    && let EventKind::Create(_) = event.kind
+                {
+                    for path in event.paths {
+                        if path.extension().is_some_and(|ext| ext == "md") {
+                            let _ = tx.blocking_send(path);
                         }
                     }
+                }
             },
             notify::Config::default(),
         )
@@ -189,7 +195,10 @@ impl FileWatcher {
             .watch(&watch_dir, RecursiveMode::NonRecursive)
             .expect("Failed to watch directory");
 
-        tracing::info!("Watching {} for new training data files", watch_dir.display());
+        tracing::info!(
+            "Watching {} for new training data files",
+            watch_dir.display()
+        );
     }
 }
 
@@ -210,7 +219,11 @@ struct Args {
     output_dir: String,
 
     /// Path to SQLite registry database
-    #[arg(short, long, default_value = "/home/crombo/training-data-dump/registry.db")]
+    #[arg(
+        short,
+        long,
+        default_value = "/home/crombo/training-data-dump/registry.db"
+    )]
     db: String,
 
     #[command(subcommand)]
@@ -275,7 +288,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             println!(
                 "{} entry (occurrence {}): {}",
-                if result.is_duplicate { "Duplicate" } else { "New" },
+                if result.is_duplicate {
+                    "Duplicate"
+                } else {
+                    "New"
+                },
                 result.occurrence_count,
                 result.content_hash.chars().take(8).collect::<String>()
             );

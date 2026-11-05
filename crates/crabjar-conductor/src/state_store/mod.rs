@@ -6,16 +6,16 @@
 use std::path::Path;
 
 // Submodules split by entity type (500 LoC rule)
+pub mod decisions;
 pub mod goals;
 pub mod tasks;
 pub mod workers;
-pub mod decisions;
 
 // Re-export public types for backward compatibility
+pub use decisions::{DecisionFrequency, DecisionRecord, PromotedRule};
 pub use goals::{Goal, GoalStatus};
 pub use tasks::{Task, TaskStatus};
 pub use workers::{Worker, WorkerStatus};
-pub use decisions::{DecisionRecord, DecisionFrequency, PromotedRule};
 
 /// SQLite-backed persistent state store.
 pub struct StateStore {

@@ -2,7 +2,6 @@
 ///
 /// Provides Hermes-compatible `session_search` tool for searching conversation
 /// history by query or retrieving specific session details by ID.
-
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

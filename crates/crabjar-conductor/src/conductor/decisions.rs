@@ -17,10 +17,7 @@ impl Conductor {
     }
 
     /// Load registered decision capabilities from manifest files.
-    pub fn load_decision_capabilities(
-        &mut self,
-        decisions_dir: &str,
-    ) -> Result<usize, String> {
+    pub fn load_decision_capabilities(&mut self, decisions_dir: &str) -> Result<usize, String> {
         if let Some(gate) = &mut self.decision_gate {
             gate.load_decision_capabilities(decisions_dir)
         } else {
@@ -30,12 +27,10 @@ impl Conductor {
 
     /// List all registered decision capabilities as JSON values.
     pub fn list_decision_capabilities(&self) -> serde_json::Value {
-        self.decision_gate
-            .as_ref()
-            .map_or_else(
-                || serde_json::json!({"count": 0, "capabilities": []}),
-                |gate| gate.registry().to_json(),
-            )
+        self.decision_gate.as_ref().map_or_else(
+            || serde_json::json!({"count": 0, "capabilities": []}),
+            |gate| gate.registry().to_json(),
+        )
     }
 
     /// Configure hybrid attention + JEV decision layer.
@@ -139,9 +134,10 @@ impl Conductor {
         }
 
         // Fall back to plain JEV evaluation
-        let gate = self.decision_gate.as_ref().ok_or_else(|| {
-            anyhow::anyhow!("JEV decision gate not configured")
-        })?;
+        let gate = self
+            .decision_gate
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("JEV decision gate not configured"))?;
 
         gate.evaluate(observation, criteria_file, Some(&self.store))
             .await

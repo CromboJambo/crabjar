@@ -11,7 +11,7 @@
 //! ```
 
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 pub(crate) mod evaluation;
 pub(crate) mod evidence;

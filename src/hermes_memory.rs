@@ -20,7 +20,8 @@ pub struct MemoryStore {
 
 impl MemoryStore {
     pub fn new() -> Result<Self, String> {
-        let home = dirs::home_dir().ok_or_else(|| "could not determine home directory".to_string())?;
+        let home =
+            dirs::home_dir().ok_or_else(|| "could not determine home directory".to_string())?;
         Ok(Self {
             memories_dir: home.join(".hermes").join("memories"),
         })
@@ -35,7 +36,11 @@ impl MemoryStore {
     }
 
     fn max_chars(&self, target: &str) -> usize {
-        if target == "user" { USER_MAX_CHARS } else { MEMORY_MAX_CHARS }
+        if target == "user" {
+            USER_MAX_CHARS
+        } else {
+            MEMORY_MAX_CHARS
+        }
     }
 
     /// Read all entries from a memory file
@@ -53,7 +58,11 @@ impl MemoryStore {
         let max = self.max_chars(target);
 
         // Calculate new size (account for delimiter if not first entry)
-        let delimiter_size = if current.is_empty() { 0 } else { ENTRY_DELIMITER.chars().count() };
+        let delimiter_size = if current.is_empty() {
+            0
+        } else {
+            ENTRY_DELIMITER.chars().count()
+        };
         let new_size = current.chars().count() + delimiter_size + content.chars().count();
 
         if new_size > max {
@@ -75,7 +84,11 @@ impl MemoryStore {
         self.write(target, &updated)?;
 
         Ok(MemoryOperationResult {
-            message: format!("Added entry to {} ({} chars used)", target, updated.chars().count()),
+            message: format!(
+                "Added entry to {} ({} chars used)",
+                target,
+                updated.chars().count()
+            ),
             current_chars: updated.chars().count(),
             max_chars: max,
             used_percent: ((updated.chars().count() as f64) / (max as f64)) * 100.0,
@@ -84,7 +97,12 @@ impl MemoryStore {
     }
 
     /// Patch an existing entry (replace old_text with new_text within one entry)
-    pub fn patch_entry(&self, target: &str, old_text: &str, new_text: &str) -> Result<MemoryOperationResult, String> {
+    pub fn patch_entry(
+        &self,
+        target: &str,
+        old_text: &str,
+        new_text: &str,
+    ) -> Result<MemoryOperationResult, String> {
         let current = self.read(target)?;
         if !current.contains(old_text) {
             return Err(format!("old text not found in {} memory", target));
@@ -113,7 +131,11 @@ impl MemoryStore {
     }
 
     /// Remove an entry by matching a substring within it
-    pub fn remove_entry_by_substring(&self, target: &str, match_text: &str) -> Result<MemoryOperationResult, String> {
+    pub fn remove_entry_by_substring(
+        &self,
+        target: &str,
+        match_text: &str,
+    ) -> Result<MemoryOperationResult, String> {
         let current = self.read(target)?;
         if current.is_empty() {
             return Err(format!("{} memory is empty", target));
@@ -133,7 +155,10 @@ impl MemoryStore {
         }
 
         if !found {
-            return Err(format!("no entry containing '{}' found in {} memory", match_text, target));
+            return Err(format!(
+                "no entry containing '{}' found in {} memory",
+                match_text, target
+            ));
         }
 
         let updated = updated_entries.join(ENTRY_DELIMITER);
@@ -154,7 +179,8 @@ impl MemoryStore {
 
         // Ensure directory exists
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("failed to create dir {}: {}", parent.display(), e))?;
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("failed to create dir {}: {}", parent.display(), e))?;
         }
 
         fs::write(&path, content).map_err(|e| format!("failed to write {}: {}", path.display(), e))

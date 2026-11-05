@@ -306,13 +306,14 @@ pub fn evaluate_structural_conditions(
     if let Some(options) = criteria["options"].as_array() {
         for option in options {
             if let Some(condition) = option["conditions"].as_str()
-                && crate::decision::condition::evaluate_condition(target, condition) {
-                    return Some(DecisionResult {
-                        option: option["id"].as_str().unwrap_or("unknown").to_string(),
-                        confidence: 1.0,
-                        rationale: format!("Structural condition matched: {condition}"),
-                    });
-                }
+                && crate::decision::condition::evaluate_condition(target, condition)
+            {
+                return Some(DecisionResult {
+                    option: option["id"].as_str().unwrap_or("unknown").to_string(),
+                    confidence: 1.0,
+                    rationale: format!("Structural condition matched: {condition}"),
+                });
+            }
         }
     }
 

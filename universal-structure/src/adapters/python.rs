@@ -234,31 +234,29 @@ impl LanguageAdapter for PythonAdapter {
                     };
 
                     if start_idx < tokens.len()
-                        && let PyToken::Identifier(name) = &tokens[start_idx] {
-                            spans.push(Span {
-                                kind: SpanKind::FnDecl,
-                                open_token: None,
-                                body: Vec::new(),
-                                close_token: None,
-                                source: format!(
-                                    "{} def {}",
-                                    if is_async { "async" } else { "" },
-                                    name
-                                ),
-                            });
-                        }
+                        && let PyToken::Identifier(name) = &tokens[start_idx]
+                    {
+                        spans.push(Span {
+                            kind: SpanKind::FnDecl,
+                            open_token: None,
+                            body: Vec::new(),
+                            close_token: None,
+                            source: format!("{} def {}", if is_async { "async" } else { "" }, name),
+                        });
+                    }
                 }
                 PyToken::Keyword(kw) if kw == "class" => {
                     if i + 1 < tokens.len()
-                        && let PyToken::Identifier(name) = &tokens[i + 1] {
-                            spans.push(Span {
-                                kind: SpanKind::ClassDecl,
-                                open_token: None,
-                                body: Vec::new(),
-                                close_token: None,
-                                source: format!("class {name}"),
-                            });
-                        }
+                        && let PyToken::Identifier(name) = &tokens[i + 1]
+                    {
+                        spans.push(Span {
+                            kind: SpanKind::ClassDecl,
+                            open_token: None,
+                            body: Vec::new(),
+                            close_token: None,
+                            source: format!("class {name}"),
+                        });
+                    }
                 }
                 PyToken::Keyword(kw) if kw == "if" || kw == "elif" => {
                     spans.push(Span {

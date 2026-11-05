@@ -229,6 +229,12 @@ pub struct TemplateSaveRequest {
     pub verbose: bool,
 }
 
-pub fn default_lines() -> u32 { 50 }
-pub fn default_timeout() -> u32 { 300 }
-pub fn default_true() -> bool { true }
+pub fn default_lines() -> u32 {
+    50
+}
+pub fn default_timeout() -> u32 {
+    300
+}
+pub fn default_true() -> bool {
+    true
+}

@@ -42,27 +42,28 @@ impl BinaryAdapter {
         // Extract functions from symbol table
         for sym in obj.symbols() {
             if let Ok(name) = sym.name()
-                && !name.is_empty() {
-                    structure.symbols.push(SymbolInfo {
+                && !name.is_empty()
+            {
+                structure.symbols.push(SymbolInfo {
+                    name: name.to_string(),
+                    address: sym.address() as usize,
+                    size: sym.size() as usize,
+                    is_function: sym.kind() == SymbolKind::Text,
+                    is_global: sym.is_global(),
+                    section: sym.section_index().map(|s| s.0),
+                });
+
+                // Classify by visibility and type
+                if sym.kind() == SymbolKind::Text && sym.is_global() {
+                    structure.exports.push(name.to_string());
+                } else if sym.kind() == SymbolKind::Text {
+                    structure.functions.push(FunctionInfo {
                         name: name.to_string(),
                         address: sym.address() as usize,
                         size: sym.size() as usize,
-                        is_function: sym.kind() == SymbolKind::Text,
-                        is_global: sym.is_global(),
-                        section: sym.section_index().map(|s| s.0),
                     });
-
-                    // Classify by visibility and type
-                    if sym.kind() == SymbolKind::Text && sym.is_global() {
-                        structure.exports.push(name.to_string());
-                    } else if sym.kind() == SymbolKind::Text {
-                        structure.functions.push(FunctionInfo {
-                            name: name.to_string(),
-                            address: sym.address() as usize,
-                            size: sym.size() as usize,
-                        });
-                    }
                 }
+            }
         }
 
         // Note: Dynamic symbol (import) extraction requires format-specific parsing.
@@ -217,10 +218,11 @@ impl BinaryAdapter {
             a.functions.iter().map(|f| (&f.name[..], f.size)).collect();
         for b_func in &b.functions {
             if let Some(&a_size) = a_funcs.get(b_func.name.as_str())
-                && a_size != b_func.size {
-                    diff.modified_functions
-                        .push((b_func.name.clone(), a_size, b_func.size));
-                }
+                && a_size != b_func.size
+            {
+                diff.modified_functions
+                    .push((b_func.name.clone(), a_size, b_func.size));
+            }
         }
 
         // Find added/removed imports
@@ -344,9 +346,7 @@ impl BinaryDiff {
             let modified: Vec<String> = self
                 .modified_functions
                 .iter()
-                .map(|(name, old_size, new_size)| {
-                    format!("{name} (size {old_size} -> {new_size})")
-                })
+                .map(|(name, old_size, new_size)| format!("{name} (size {old_size} -> {new_size})"))
                 .collect();
             lines.push(format!("Modified functions: {}", modified.join(", ")));
         }

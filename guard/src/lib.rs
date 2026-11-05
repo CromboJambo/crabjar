@@ -60,7 +60,7 @@ pub use command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
 pub use context_budget::ContextBudget;
 pub use domain_allowlist::{DomainAllowlist, DomainCheckError, DomainEntry, DomainTrustLevel};
-pub use email_risk::{assess_email_action, EmailAction, EmailRisk};
+pub use email_risk::{EmailAction, EmailRisk, assess_email_action};
 pub use fingerprint::{ApprovalLease, ApprovalScope, InMemoryApprovalStore, InvocationFingerprint};
 pub use gate::ExecutionGate;
 pub use gate_context::GateContext;

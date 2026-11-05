@@ -151,14 +151,11 @@ pub async fn execute_remote(
     }
 
     // Build SSH options common to both auth methods
-    let mut ssh_options = vec![
-        "-o".to_string(),
-        "ConnectTimeout=10".to_string(),
-    ];
+    let mut ssh_options = vec!["-o".to_string(), "ConnectTimeout=10".to_string()];
 
     // Host key checking: use known_hosts by default, accept-new only if explicitly configured (#11 security finding)
-    let host_key_checking = env::var("SSH_HOST_KEY_CHECKING")
-        .unwrap_or_else(|_| "known_hosts".to_string());
+    let host_key_checking =
+        env::var("SSH_HOST_KEY_CHECKING").unwrap_or_else(|_| "known_hosts".to_string());
     ssh_options.push("-o".to_string());
     ssh_options.push(format!("StrictHostKeyChecking={}", host_key_checking));
 

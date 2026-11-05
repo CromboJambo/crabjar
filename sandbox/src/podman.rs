@@ -103,9 +103,7 @@ impl PodmanSandbox {
 
         debug!(container_name = %name, "Creating Podman container");
 
-        let output = cmd
-            .output()
-            .map_err(SandboxError::PodmanCommandFailed)?;
+        let output = cmd.output().map_err(SandboxError::PodmanCommandFailed)?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -136,9 +134,7 @@ impl PodmanSandbox {
 
         debug!(container_name = %name, "Executing command in Podman container");
 
-        let output = cmd
-            .output()
-            .map_err(SandboxError::PodmanCommandFailed)?;
+        let output = cmd.output().map_err(SandboxError::PodmanCommandFailed)?;
 
         if !output.status.success() {
             return Err(SandboxError::ContainerExecFailed(format!(
@@ -278,24 +274,33 @@ mod tests {
     fn test_container_lifecycle() {
         let sandbox = PodmanSandbox::new(PodmanConfig::default());
         let name = "crabjar-test-fixed";
-        let container_id = sandbox.create_container(name).expect("failed to create container");
-        
-        sandbox.start_container(&container_id).expect("failed to start container");
-        
-        let result = sandbox.exec_in_container(
-            &container_id,
-            &[&"echo", &"hello from podman sandbox"]
-        ).expect("failed to exec in container");
+        let container_id = sandbox
+            .create_container(name)
+            .expect("failed to create container");
+
+        sandbox
+            .start_container(&container_id)
+            .expect("failed to start container");
+
+        let result = sandbox
+            .exec_in_container(&container_id, &[&"echo", &"hello from podman sandbox"])
+            .expect("failed to exec in container");
         assert!(result.stdout.contains("hello from podman sandbox"));
-        
-        sandbox.stop_container(&container_id).expect("failed to stop container");
-        sandbox.destroy_container(&container_id).expect("failed to destroy container");
+
+        sandbox
+            .stop_container(&container_id)
+            .expect("failed to stop container");
+        sandbox
+            .destroy_container(&container_id)
+            .expect("failed to destroy container");
     }
 
     #[test]
     fn test_list_containers() {
         let sandbox = PodmanSandbox::new(PodmanConfig::default());
-        let containers = sandbox.list_containers().expect("failed to list containers");
+        let containers = sandbox
+            .list_containers()
+            .expect("failed to list containers");
         assert!(containers.len() >= 0);
     }
 }

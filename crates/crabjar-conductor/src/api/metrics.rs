@@ -5,9 +5,7 @@ use axum::{Json, extract::State};
 use serde_json::json;
 
 /// GET /metrics/cache - Get JEV decision cache statistics (public metrics endpoint).
-pub async fn get_cache_stats(
-    State(conductor): State<ConductorState>,
-) -> Json<serde_json::Value> {
+pub async fn get_cache_stats(State(conductor): State<ConductorState>) -> Json<serde_json::Value> {
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         c.cache_stats()

@@ -18,9 +18,18 @@ fn now_epoch() -> u64 {
 /// Health status of an inference server endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerHealth {
-    Healthy { response_time_ms: u64, checked_at: u64 },
-    Degraded { response_time_ms: u64, checked_at: u64 },
-    Unhealthy { last_error: String, checked_at: u64 },
+    Healthy {
+        response_time_ms: u64,
+        checked_at: u64,
+    },
+    Degraded {
+        response_time_ms: u64,
+        checked_at: u64,
+    },
+    Unhealthy {
+        last_error: String,
+        checked_at: u64,
+    },
 }
 
 /// Status of a model loaded on a machine.
@@ -90,7 +99,10 @@ impl FleetStatusTracker {
             last_heartbeat: None,
         };
 
-        self.machines.write().await.insert(status.name.clone(), status);
+        self.machines
+            .write()
+            .await
+            .insert(status.name.clone(), status);
     }
 
     /// Update heartbeat for a machine.
@@ -161,7 +173,10 @@ impl FleetStatusTracker {
     /// Find the best machine for a task requiring specific model capabilities.
     pub async fn find_best_machine(&self, required_model: &str) -> Option<String> {
         let machines = self.machines.read().await;
-        let entries: Vec<(String, MachineStatus)> = machines.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        let entries: Vec<(String, MachineStatus)> = machines
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
 
         // Prefer operational machines with the required model
         for (name, machine) in &entries {
@@ -169,9 +184,10 @@ impl FleetStatusTracker {
                 && machine.models.iter().any(|m| {
                     m.name.contains(required_model)
                         && matches!(m.health, ServerHealth::Healthy { .. })
-                }) {
-                    return Some(name.clone());
-                }
+                })
+            {
+                return Some(name.clone());
+            }
         }
 
         // Fall back to partially degraded machines
@@ -180,9 +196,10 @@ impl FleetStatusTracker {
                 && machine.models.iter().any(|m| {
                     m.name.contains(required_model)
                         && matches!(m.health, ServerHealth::Healthy { .. })
-                }) {
-                    return Some(name.clone());
-                }
+                })
+            {
+                return Some(name.clone());
+            }
         }
 
         None

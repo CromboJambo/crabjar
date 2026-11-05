@@ -1,7 +1,7 @@
 //! SQLite-backed checkpoint metadata store.
 
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use uuid::Uuid;
 
 use crate::config::CheckpointConfig;

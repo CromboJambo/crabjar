@@ -11,10 +11,10 @@ async fn test_search_returns_results() {
     }
 
     let response = search("crabjar rust agent", Some(5)).await.unwrap();
-    
+
     assert_eq!(response.query, "crabjar rust agent");
     assert!(!response.results.is_empty(), "Expected at least one result");
-    
+
     for result in &response.results {
         assert!(!result.url.is_empty());
         assert!(!result.title.is_empty());
@@ -30,7 +30,7 @@ async fn test_search_with_default_limit() {
     }
 
     let response = search("crabjar rust agent", None).await.unwrap();
-    
+
     assert_eq!(response.query, "crabjar rust agent");
     // Default limit is 5
     assert!(response.results.len() <= 5);

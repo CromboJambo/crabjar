@@ -28,16 +28,18 @@ async fn main() {
 
     // Start a simple HTTP server in the background using tokio
     let server = tokio::spawn(async move {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:8899").await.unwrap();
-        
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:8899")
+            .await
+            .unwrap();
+
         loop {
             let (mut stream, _) = listener.accept().await.unwrap();
-            
+
             // Read request (we don't care about it)
             let mut buf = [0u8; 4096];
             use tokio::io::AsyncReadExt;
             stream.read(&mut buf).await.unwrap();
-            
+
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
                 html_content.len(),

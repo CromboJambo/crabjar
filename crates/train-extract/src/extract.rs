@@ -1,110 +1,8 @@
 use crate::error::{TrainExtractError, TrainExtractResult};
-use agent_context::KnowledgeKind;
+use crate::events;
+use crate::extract_types::{ExtractConfig, ExtractedData};
+use crate::knowledge;
 use rusqlite::Connection;
-use std::collections::HashMap;
-
-/// Extracted knowledge entry from the knowledge store.
-#[derive(Debug, Clone)]
-pub struct KnowledgeEntry {
-    pub id: i64,
-    pub content: String,
-    pub kind: KnowledgeKind,
-    pub tags: Vec<String>,
-    pub metadata: serde_json::Value,
-    pub weight: f64,
-    pub source: String,
-    pub source_type: String,
-    pub source_id: String,
-    pub provenance_id: String,
-    pub active: bool,
-    /// Unix timestamp (seconds) of when the entry was created.
-    pub created_at: i64,
-}
-
-/// Extracted event from mirror-log.
-#[derive(Debug, Clone)]
-pub struct LogEvent {
-    pub id: String,
-    pub content: String,
-    pub source: String,
-    pub meta: Option<String>,
-    pub timestamp: i64,
-}
-
-/// A chunk of a state-doc section (reserved for the chunking pipeline;
-/// not populated by `extract()` yet).
-#[derive(Debug, Clone)]
-pub struct Chunk {
-    pub id: String,
-    pub event_id: String,
-    pub content: String,
-    pub chunk_index: usize,
-}
-
-/// A resolved state-doc annotation (from the agent-context state-docs store).
-#[derive(Debug, Clone)]
-pub struct Annotation {
-    pub id: String,
-    pub doc_name: String,
-    pub kind: String,
-    pub message: String,
-    pub status: String,
-    /// Reason recorded when the annotation was resolved.
-    pub resolution_reason: Option<String>,
-    pub confidence: f64,
-    pub created_at: i64,
-}
-
-/// Configuration for data extraction.
-#[derive(Debug, Clone)]
-pub struct ExtractConfig {
-    /// Only include entries with these tags (empty = all tags).
-    pub tags: Vec<String>,
-    /// Maximum number of entries to extract per source.
-    pub max_entries: usize,
-    /// Only include events with timestamp >= this unix timestamp (0 = all).
-    pub since: i64,
-    /// Include mirror-log events.
-    pub include_events: bool,
-}
-
-impl Default for ExtractConfig {
-    fn default() -> Self {
-        Self {
-            tags: Vec::new(),
-            max_entries: 10000,
-            since: 0,
-            include_events: true,
-        }
-    }
-}
-
-/// Parse a knowledge kind from the `kind` column.
-///
-/// Accepts plain strings (`pattern`) as well as JSON-quoted values
-/// (`"pattern"`), and falls back to [`KnowledgeKind::Context`] for anything
-/// unrecognized so one bad row can't fail the whole extraction.
-fn parse_kind(raw: &str) -> KnowledgeKind {
-    let trimmed = raw.trim();
-    // Plain variant name (the canonical on-disk form, per memory/src/schema.rs).
-    if let Ok(kind) = serde_json::from_str(&format!("\"{trimmed}\"")) {
-        return kind;
-    }
-    // Already JSON-quoted.
-    if let Ok(kind) = serde_json::from_str::<KnowledgeKind>(trimmed) {
-        return kind;
-    }
-    KnowledgeKind::Context
-}
-
-/// List a table's column names (via PRAGMA table_info).
-fn table_columns(conn: &Connection, table: &str) -> TrainExtractResult<Vec<String>> {
-    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
-    let cols: Vec<String> = stmt
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(cols)
-}
 
 /// Extract data from the knowledge store and mirror-log databases.
 pub fn extract(
@@ -114,11 +12,12 @@ pub fn extract(
 ) -> TrainExtractResult<ExtractedData> {
     let mut data = ExtractedData::default();
 
-    data.knowledge_entries = extract_knowledge_entries(knowledge_conn, config)?;
+    data.knowledge_entries =
+        knowledge::extract_knowledge_entries(knowledge_conn, &config.tags, config.max_entries)?;
     data.sample_count = data.knowledge_entries.len();
 
     if config.include_events {
-        data.events = extract_events(mirror_log_conn, config)?;
+        data.events = events::extract_events(mirror_log_conn, config.since, config.max_entries)?;
     }
 
     if data.is_empty() {
@@ -128,193 +27,13 @@ pub fn extract(
     Ok(data)
 }
 
-/// Extract knowledge entries from the knowledge store.
-///
-/// The canonical agent-context schema (memory/src/schema.rs) has a fixed set
-/// of columns; newer stores may add `created_at`. We probe the actual table
-/// with PRAGMA and build the SELECT to match, so both shapes work.
-fn extract_knowledge_entries(
-    conn: &Connection,
-    config: &ExtractConfig,
-) -> TrainExtractResult<Vec<KnowledgeEntry>> {
-    let columns = table_columns(conn, "knowledge_entries")?;
-
-    // Base columns that must exist (per memory/src/schema.rs).
-    const BASE: [&str; 8] = [
-        "id", "content", "kind", "tags", "metadata", "weight", "source", "active",
-    ];
-    for col in BASE {
-        if !columns.contains(&col.to_string()) {
-            return Err(TrainExtractError::Database(format!(
-                "knowledge_entries is missing required column '{col}'"
-            )));
-        }
-    }
-
-    // Optional columns: fall back to defaults when absent.
-    let optional = |col: &str, default: &str| -> String {
-        if columns.iter().any(|c| c == col) {
-            col.to_string()
-        } else {
-            format!("'{default}' AS {col}")
-        }
-    };
-
-    let sql = format!(
-        "SELECT id, content, kind, tags, metadata, weight, source, {}, {}, {}, active, {}
-         FROM knowledge_entries
-         WHERE active = 1
-         ORDER BY id DESC
-         LIMIT ?1",
-        optional("source_type", ""),
-        optional("source_id", ""),
-        optional("provenance_id", ""),
-        if columns.iter().any(|c| c == "created_at") {
-            "COALESCE(created_at, 0)".to_string()
-        } else {
-            "0 AS created_at".to_string()
-        },
-    );
-
-    let mut stmt = conn.prepare(&sql)?;
-
-    let rows = stmt.query_map([config.max_entries as i64], |row| {
-        let tags_str: String = row.get(3)?;
-        let metadata_str: String = row.get(4)?;
-        let kind_str: String = row.get(2)?;
-
-        Ok(KnowledgeEntry {
-            id: row.get(0)?,
-            content: row.get(1)?,
-            kind: parse_kind(&kind_str),
-            tags: serde_json::from_str(&tags_str).unwrap_or_default(),
-            metadata: serde_json::from_str(&metadata_str).unwrap_or_default(),
-            weight: row.get(5)?,
-            source: row.get(6)?,
-            source_type: row.get(7)?,
-            source_id: row.get(8)?,
-            provenance_id: row.get(9)?,
-            active: row.get(10)?,
-            created_at: row.get(11)?,
-        })
-    })?;
-
-    let entries: Vec<KnowledgeEntry> = rows
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| TrainExtractError::Export(format!("failed to read knowledge entries: {e}")))?;
-
-    // Apply tag filter if specified
-    let filtered = if config.tags.is_empty() {
-        entries
-    } else {
-        entries
-            .into_iter()
-            .filter(|entry| {
-                config
-                    .tags
-                    .iter()
-                    .any(|tag| entry.tags.iter().any(|t| t == tag))
-            })
-            .collect()
-    };
-
-    tracing::debug!(
-        entries_extracted = filtered.len(),
-        "Extracted knowledge entries"
-    );
-
-    Ok(filtered)
-}
-
-/// Extract events from the mirror-log database.
-fn extract_events(
-    conn: Option<&Connection>,
-    config: &ExtractConfig,
-) -> TrainExtractResult<Vec<LogEvent>> {
-    let Some(conn) = conn else {
-        return Ok(Vec::new());
-    };
-
-    let mut stmt = conn.prepare(
-        "SELECT id, content, source, meta, timestamp
-         FROM events
-         WHERE (?1 = 0 OR timestamp >= ?1)
-         ORDER BY timestamp DESC
-         LIMIT ?2",
-    )?;
-
-    let rows = stmt.query_map([config.since, config.max_entries as i64], |row| {
-        Ok(LogEvent {
-            id: row.get(0)?,
-            content: row.get(1)?,
-            source: row.get(2)?,
-            meta: row.get(3)?,
-            timestamp: row.get(4)?,
-        })
-    })?;
-
-    let events: Vec<LogEvent> = rows
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| TrainExtractError::Export(format!("failed to read events: {e}")))?;
-
-    tracing::debug!(
-        events_extracted = events.len(),
-        "Extracted mirror-log events"
-    );
-
-    Ok(events)
-}
-
-/// Combined extracted data ready for formatting.
-#[derive(Debug, Default)]
-pub struct ExtractedData {
-    pub knowledge_entries: Vec<KnowledgeEntry>,
-    pub events: Vec<LogEvent>,
-    /// State-doc chunks (reserved; not populated by `extract()` yet).
-    pub chunks: Vec<Chunk>,
-    /// Resolved state-doc annotations (reserved; not populated by `extract()` yet).
-    pub annotations: Vec<Annotation>,
-    /// Number of source samples (entries + events) extracted.
-    pub sample_count: usize,
-}
-
-impl ExtractedData {
-    /// Returns true if no data was extracted.
-    pub fn is_empty(&self) -> bool {
-        self.knowledge_entries.is_empty() && self.events.is_empty()
-    }
-
-    /// Get a summary of the extracted data.
-    pub fn summary(&self) -> serde_json::Value {
-        serde_json::json!({
-            "knowledge_entries": self.knowledge_entries.len(),
-            "events": self.events.len(),
-            "chunks": self.chunks.len(),
-            "annotations": self.annotations.len(),
-            "total_samples": self.sample_count,
-        })
-    }
-
-    /// Group knowledge entries by tag for weighted sampling.
-    pub fn tag_distribution(&self) -> HashMap<String, usize> {
-        let mut dist = HashMap::new();
-        for entry in &self.knowledge_entries {
-            for tag in &entry.tags {
-                *dist.entry(tag.clone()).or_insert(0) += 1;
-            }
-        }
-        dist
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::extract_types::ExtractConfig;
+    use agent_context::KnowledgeKind;
     use tempfile::tempdir;
 
-    /// Test fixtures matching the real schemas:
-    /// - knowledge_entries: agent-context schema (memory/src/schema.rs) — no created_at
-    /// - events: mirror-log schema (~/.mirror-log/mirror.db) — timestamp, no active
     fn make_test_db(dir: &tempfile::TempDir) -> (Connection, Connection) {
         let kconn = Connection::open(dir.path().join("knowledge.db")).unwrap();
         kconn

@@ -63,7 +63,10 @@ impl DecisionGate {
     }
 
     /// Load decision capabilities from a directory of JSON manifests
-    pub fn load_decision_capabilities<P: AsRef<std::path::Path>>(&mut self, dir: P) -> Result<usize, String> {
+    pub fn load_decision_capabilities<P: AsRef<std::path::Path>>(
+        &mut self,
+        dir: P,
+    ) -> Result<usize, String> {
         self.registry.load_from_directory(dir)
     }
 
@@ -110,18 +113,13 @@ impl DecisionGate {
         criteria_file: Option<&str>,
         state_store: Option<&StateStore>,
     ) -> Result<GateResult, Box<dyn std::error::Error>> {
-        let observation = format!(
-            "Goal: {goal_description}. Current fleet state: {fleet_state}"
-        );
+        let observation = format!("Goal: {goal_description}. Current fleet state: {fleet_state}");
 
         // First check for trigger-based decision capabilities
         let criteria = if let Some(cf) = criteria_file {
             cf.to_string()
         } else if let Some(capability) = self.find_matching_capability(&observation) {
-            tracing::info!(
-                "Trigger matched decision capability '{}'",
-                capability.name
-            );
+            tracing::info!("Trigger matched decision capability '{}'", capability.name);
             capability.criteria_file.to_string_lossy().to_string()
         } else {
             // Fall back to policy-based selection

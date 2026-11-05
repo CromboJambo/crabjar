@@ -76,7 +76,10 @@ mod tests {
         let events = emitter.events.lock().unwrap();
         assert_eq!(events.len(), 1, "Should have emitted one DAGR event");
         let event: serde_json::Value = serde_json::from_str(&events[0]).unwrap();
-        assert_eq!(event["type"], "task_completed", "Should be task_completed for exit code 0");
+        assert_eq!(
+            event["type"], "task_completed",
+            "Should be task_completed for exit code 0"
+        );
     }
 
     #[test]

@@ -45,7 +45,9 @@ pub async fn register_worker(
                 .collect()
         })
         .unwrap_or_default();
-    let ssh_key = body["ssh_key"].as_str().map(std::string::ToString::to_string);
+    let ssh_key = body["ssh_key"]
+        .as_str()
+        .map(std::string::ToString::to_string);
 
     info!(name = %name, capabilities = ?capabilities, "Worker registering");
 
@@ -79,7 +81,9 @@ pub async fn worker_login_handler(
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     let name = body["name"].as_str().unwrap_or("").to_string();
-    let ssh_key = body["ssh_key"].as_str().map(std::string::ToString::to_string);
+    let ssh_key = body["ssh_key"]
+        .as_str()
+        .map(std::string::ToString::to_string);
 
     info!(name = %name, "Worker logging in");
 

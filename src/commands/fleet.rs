@@ -18,9 +18,7 @@ pub async fn handle_fleet_submit_kanban_task(
     let task = all_tasks.iter().find(|t| t.id == task_id);
 
     match task {
-        None => {
-            error_response(&format!("kanban task '{}' not found", task_id), true)
-        }
+        None => error_response(&format!("kanban task '{}' not found", task_id), true),
         Some(task) => {
             // Build goal description from task details
             let status_info = format!("status: {}, priority: {}", task.status, task.priority);

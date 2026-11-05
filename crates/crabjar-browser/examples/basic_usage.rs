@@ -21,11 +21,17 @@ async fn main() -> anyhow::Result<()> {
     // Get page text content
     let result = browser.text_content(None).await?;
     let text = result["text"].as_str().unwrap_or("");
-    println!("Page text (first 100 chars): {}", &text[..100.min(text.len())]);
+    println!(
+        "Page text (first 100 chars): {}",
+        &text[..100.min(text.len())]
+    );
 
     // Take screenshot
     let result = browser.screenshot(None).await?;
-    println!("Screenshot captured: {} bytes", result["data"].as_str().unwrap_or("").len());
+    println!(
+        "Screenshot captured: {} bytes",
+        result["data"].as_str().unwrap_or("").len()
+    );
 
     // Close browser
     let result = browser.close().await?;

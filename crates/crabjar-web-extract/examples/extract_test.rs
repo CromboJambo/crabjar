@@ -5,9 +5,7 @@ async fn main() {
     println!("Testing crabjar web content extraction...");
     println!();
 
-    let urls = vec![
-        "https://en.wikipedia.org/wiki/Rust_(programming_language)".to_string(),
-    ];
+    let urls = vec!["https://en.wikipedia.org/wiki/Rust_(programming_language)".to_string()];
 
     match extract(&urls, Some(500)).await {
         Ok(response) => {
@@ -18,7 +16,10 @@ async fn main() {
                     println!("Error: {}", err);
                 } else {
                     println!("Content (first 500 chars):");
-                    println!("{}", &result.content[..std::cmp::min(500, result.content.len())]);
+                    println!(
+                        "{}",
+                        &result.content[..std::cmp::min(500, result.content.len())]
+                    );
                 }
                 println!();
             }

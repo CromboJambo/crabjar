@@ -21,10 +21,10 @@
 //! - [`DelegationResult`] — aggregated results from all children
 //! - [`TaskDispatcher`] — manages spawning, lifecycle, and result collection
 
-pub mod dispatcher;
 pub mod aggregation;
-pub mod timeout;
+pub mod dispatcher;
 pub mod error;
+pub mod timeout;
 
 pub use crate::dispatcher::TaskDispatcher as Dispatcher;
 
@@ -216,8 +216,16 @@ mod tests {
             goal: None,
             context: None,
             tasks: Some(vec![
-                DelegatedTask { goal: "Task 1".to_string(), context: None, model: None },
-                DelegatedTask { goal: "Task 2".to_string(), context: None, model: None },
+                DelegatedTask {
+                    goal: "Task 1".to_string(),
+                    context: None,
+                    model: None,
+                },
+                DelegatedTask {
+                    goal: "Task 2".to_string(),
+                    context: None,
+                    model: None,
+                },
             ]),
             background: false,
             model: None,

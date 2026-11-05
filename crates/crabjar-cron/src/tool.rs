@@ -1,16 +1,13 @@
 //! Hermes-compatible `cronjob_manage` tool implementation.
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::store::CronStore;
 use crate::types::{CreateJobRequest, UpdateJobRequest};
 
 /// Handle a `cronjob_manage` tool invocation.
-pub async fn handle_cronjob_manage(
-    store: &CronStore,
-    params: &Value,
-) -> Result<Value> {
+pub async fn handle_cronjob_manage(store: &CronStore, params: &Value) -> Result<Value> {
     let action = params["action"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Missing required field: action"))?;
@@ -79,18 +76,21 @@ async fn handle_create(store: &CronStore, params: &Value) -> Result<Value> {
 fn handle_list(store: &CronStore) -> Result<Value> {
     let jobs = store.list_jobs()?;
 
-    let job_values: Vec<Value> = jobs.iter().map(|job| {
-        json!({
-            "id": job.id,
-            "name": job.name,
-            "schedule": job.schedule,
-            "status": job.status.to_string(),
-            "last_run_at": job.last_run_at.map(|t| t.to_rfc3339()),
-            "next_run_at": job.next_run_at.map(|t| t.to_rfc3339()),
-            "failure_count": job.failure_count,
-            "no_agent": job.no_agent
+    let job_values: Vec<Value> = jobs
+        .iter()
+        .map(|job| {
+            json!({
+                "id": job.id,
+                "name": job.name,
+                "schedule": job.schedule,
+                "status": job.status.to_string(),
+                "last_run_at": job.last_run_at.map(|t| t.to_rfc3339()),
+                "next_run_at": job.next_run_at.map(|t| t.to_rfc3339()),
+                "failure_count": job.failure_count,
+                "no_agent": job.no_agent
+            })
         })
-    }).collect();
+        .collect();
 
     Ok(json!({
         "success": true,

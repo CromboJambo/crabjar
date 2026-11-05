@@ -33,9 +33,8 @@ pub struct HaResult<T> {
 }
 
 fn ha_url() -> Result<String, String> {
-    std::env::var("HA_URL").map_err(|_| format!(
-        "HA_URL not set (default would be {})", DEFAULT_HA_URL
-    ))
+    std::env::var("HA_URL")
+        .map_err(|_| format!("HA_URL not set (default would be {})", DEFAULT_HA_URL))
 }
 
 fn ha_token() -> Result<String, String> {
@@ -64,9 +63,9 @@ pub fn get_entity_state(entity_id: &str) -> Result<EntityState, String> {
         ));
     }
 
-    let state: EntityState = response.json().map_err(|e| format!(
-        "Failed to parse entity state JSON: {}", e
-    ))?;
+    let state: EntityState = response
+        .json()
+        .map_err(|e| format!("Failed to parse entity state JSON: {}", e))?;
     Ok(state)
 }
 
@@ -91,12 +90,13 @@ pub fn list_entities(domain: Option<&str>) -> Result<Vec<EntityState>, String> {
         ));
     }
 
-    let entities: Vec<EntityState> = response.json().map_err(|e| format!(
-        "Failed to parse entity list JSON: {}", e
-    ))?;
+    let entities: Vec<EntityState> = response
+        .json()
+        .map_err(|e| format!("Failed to parse entity list JSON: {}", e))?;
 
     match domain {
-        Some(d) => Ok(entities.into_iter()
+        Some(d) => Ok(entities
+            .into_iter()
             .filter(|e| e.entity_id.starts_with(&format!("{}.", d)))
             .collect()),
         None => Ok(entities),
@@ -114,19 +114,26 @@ pub fn call_service(
     let token = ha_token()?;
     let endpoint = format!(
         "{}/api/services/{}/{}",
-        url.trim_end_matches('/'), domain, service
+        url.trim_end_matches('/'),
+        domain,
+        service
     );
 
     // Build service data payload
     let mut payload = serde_json::Map::new();
     if let Some(eid) = entity_id {
-        payload.insert("entity_id".to_string(), serde_json::Value::String(eid.to_string()));
+        payload.insert(
+            "entity_id".to_string(),
+            serde_json::Value::String(eid.to_string()),
+        );
     }
     if let Some(d) = data {
-        let extra: serde_json::Value = serde_json::from_str(d).map_err(|e| format!(
-            "Failed to parse service data JSON: {}", e
-        ))?;
-        for (k, v) in extra.as_object().ok_or("Service data must be a JSON object")? {
+        let extra: serde_json::Value = serde_json::from_str(d)
+            .map_err(|e| format!("Failed to parse service data JSON: {}", e))?;
+        for (k, v) in extra
+            .as_object()
+            .ok_or("Service data must be a JSON object")?
+        {
             payload.insert(k.clone(), v.clone());
         }
     }
@@ -142,7 +149,9 @@ pub fn call_service(
     if !response.status().is_success() {
         return Err(format!(
             "HA API returned {} for service call {}: {}: {}",
-            response.status(), domain, service,
+            response.status(),
+            domain,
+            service,
             response.text().unwrap_or_default()
         ));
     }
@@ -171,8 +180,8 @@ pub fn list_services() -> Result<serde_json::Value, String> {
         ));
     }
 
-    let services: serde_json::Value = response.json().map_err(|e| format!(
-        "Failed to parse service list JSON: {}", e
-    ))?;
+    let services: serde_json::Value = response
+        .json()
+        .map_err(|e| format!("Failed to parse service list JSON: {}", e))?;
     Ok(services)
 }

@@ -6,7 +6,7 @@
 use crate::{Scheduler, WorkerPool};
 use chrono::Utc;
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 /// RAII guard that releases a worker back to the pool when dropped.
 /// Ensures worker capacity is restored on every terminal path: success, error,
@@ -85,7 +85,10 @@ impl SchedulerLoop {
                             tokio::spawn(async move {
                                 // Guard ensures worker is released on all terminal paths:
                                 // success, error, panic (join failure), and cancellation.
-                                let _guard = WorkerGuard { workers: &workers_for_guard, worker_id };
+                                let _guard = WorkerGuard {
+                                    workers: &workers_for_guard,
+                                    worker_id,
+                                };
 
                                 match handle.await {
                                     Ok(output) => {
@@ -148,7 +151,11 @@ mod tests {
 
         // Worker should be available again (busy_workers == 0)
         let workers = loop_.workers.lock().unwrap();
-        assert_eq!(workers.busy_workers(), 0, "Worker not released after success");
+        assert_eq!(
+            workers.busy_workers(),
+            0,
+            "Worker not released after success"
+        );
     }
 
     #[tokio::test]
@@ -184,7 +191,11 @@ mod tests {
 
         // Both jobs should have had a chance to run
         let workers = loop_.workers.lock().unwrap();
-        assert_eq!(workers.busy_workers(), 0, "Workers not released after sequential jobs");
+        assert_eq!(
+            workers.busy_workers(),
+            0,
+            "Workers not released after sequential jobs"
+        );
     }
 
     #[tokio::test]

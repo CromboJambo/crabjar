@@ -46,11 +46,16 @@ impl TaskDispatcher {
     /// Spawn multiple delegated tasks in parallel and wait for all results.
     ///
     /// Each task is submitted to the conductor as a goal, then we poll for completion.
-    pub async fn spawn(&self, request: DelegationRequest) -> Result<DelegationResult, DelegationError> {
+    pub async fn spawn(
+        &self,
+        request: DelegationRequest,
+    ) -> Result<DelegationResult, DelegationError> {
         // Validate concurrency limit
         let tasks = request.into_tasks();
         if tasks.len() > self.config.max_concurrent {
-            return Err(DelegationError::ConcurrencyLimit { limit: self.config.max_concurrent });
+            return Err(DelegationError::ConcurrencyLimit {
+                limit: self.config.max_concurrent,
+            });
         }
 
         // Submit all tasks to conductor as goals and wait for results
@@ -75,7 +80,11 @@ impl TaskDispatcher {
     }
 
     /// Execute a single delegated task via the conductor API.
-    pub async fn execute_task(&self, goal: String, _context: Option<String>) -> Result<String, DelegationError> {
+    pub async fn execute_task(
+        &self,
+        goal: String,
+        _context: Option<String>,
+    ) -> Result<String, DelegationError> {
         let task_id = uuid::Uuid::new_v4().to_string();
         // Submit goal to conductor
         let goal_id = self.submit_goal(&goal).await?;
@@ -119,7 +128,9 @@ impl TaskDispatcher {
             .map_err(|e| DelegationError::SpawnFailed(e.to_string()))?;
 
         let status = response.status();
-        let json: serde_json::Value = response.json().await
+        let json: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| DelegationError::SpawnFailed(e.to_string()))?;
 
         if status.is_success() {
@@ -128,7 +139,9 @@ impl TaskDispatcher {
             Err(DelegationError::SpawnFailed(format!(
                 "Conductor returned {}: {}",
                 status,
-                json.get("message").and_then(|m| m.as_str()).unwrap_or("no message")
+                json.get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("no message")
             )))
         }
     }
@@ -146,12 +159,15 @@ impl TaskDispatcher {
         loop {
             if start.elapsed() > timeout {
                 return Ok(TaskResult {
-            created_at: chrono::Utc::now(),
+                    created_at: chrono::Utc::now(),
                     task_id: task_id.to_string(),
                     goal: task.goal.clone(),
                     status: TaskStatus::TimedOut,
                     summary: None,
-                    error: Some(format!("Task timed out after {} seconds", self.config.task_timeout)),
+                    error: Some(format!(
+                        "Task timed out after {} seconds",
+                        self.config.task_timeout
+                    )),
                 });
             }
 
@@ -162,7 +178,9 @@ impl TaskDispatcher {
                 .await
                 .map_err(|e| DelegationError::SpawnFailed(e.to_string()))?;
 
-            let json: serde_json::Value = response.json().await
+            let json: serde_json::Value = response
+                .json()
+                .await
                 .map_err(|e| DelegationError::SpawnFailed(e.to_string()))?;
 
             let status = json["status"].as_str().unwrap_or("unknown");
@@ -170,23 +188,30 @@ impl TaskDispatcher {
             match status {
                 "completed" => {
                     return Ok(TaskResult {
-            created_at: chrono::Utc::now(),
+                        created_at: chrono::Utc::now(),
                         task_id: task_id.to_string(),
                         goal: task.goal.clone(),
                         status: TaskStatus::Completed,
-                        summary: Some(json.get("result")
-                            .and_then(|r| r.as_str()).map_or_else(|| json["result"].to_string(), std::string::ToString::to_string)),
+                        summary: Some(json.get("result").and_then(|r| r.as_str()).map_or_else(
+                            || json["result"].to_string(),
+                            std::string::ToString::to_string,
+                        )),
                         error: None,
                     });
                 }
                 "failed" => {
                     return Ok(TaskResult {
-            created_at: chrono::Utc::now(),
+                        created_at: chrono::Utc::now(),
                         task_id: task_id.to_string(),
                         goal: task.goal.clone(),
                         status: TaskStatus::Failed,
                         summary: None,
-                        error: Some(json["message"].as_str().unwrap_or("unknown error").to_string()),
+                        error: Some(
+                            json["message"]
+                                .as_str()
+                                .unwrap_or("unknown error")
+                                .to_string(),
+                        ),
                     });
                 }
                 _ => {

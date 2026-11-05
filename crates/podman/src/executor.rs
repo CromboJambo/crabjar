@@ -26,9 +26,10 @@ impl PodmanExecutor {
         let candidates = ["/usr/bin/podman", "/usr/local/bin/podman", "podman"];
         for candidate in candidates {
             if let Ok(output) = Command::new(candidate).arg("--version").output()
-                && output.status.success() {
-                    return Ok(candidate.to_string());
-                }
+                && output.status.success()
+            {
+                return Ok(candidate.to_string());
+            }
         }
         Err(PodmanError::BinaryNotFound("podman".to_string()))
     }

@@ -6,8 +6,8 @@
 //! - `ha_list_entities(domain)` — list entities by domain
 //! - `ha_list_services()` — list available services
 
-use anyhow::{anyhow, Result};
-use serde_json::{json, Value};
+use anyhow::{Result, anyhow};
+use serde_json::{Value, json};
 use std::env;
 
 /// Home Assistant REST API client.
@@ -19,10 +19,11 @@ pub struct HaClient {
 impl HaClient {
     /// Create a new HA client from environment variables or defaults.
     pub fn new() -> Result<Self> {
-        let base_url = env::var("CRABJAR_HA_URL").unwrap_or_else(|_| "http://localhost:8123".to_string());
-        let token = env::var("CRABJAR_HA_TOKEN").ok().ok_or_else(|| {
-            anyhow!("CRABJAR_HA_TOKEN environment variable not set")
-        })?;
+        let base_url =
+            env::var("CRABJAR_HA_URL").unwrap_or_else(|_| "http://localhost:8123".to_string());
+        let token = env::var("CRABJAR_HA_TOKEN")
+            .ok()
+            .ok_or_else(|| anyhow!("CRABJAR_HA_TOKEN environment variable not set"))?;
 
         Ok(Self { base_url, token })
     }
@@ -89,7 +90,8 @@ impl HaClient {
                 }
             }
 
-            self.request("POST", &path, Some(&Value::Object(merged))).await?;
+            self.request("POST", &path, Some(&Value::Object(merged)))
+                .await?;
         } else {
             self.request("POST", &path, None).await?;
         }

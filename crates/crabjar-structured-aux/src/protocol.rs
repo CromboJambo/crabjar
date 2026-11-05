@@ -1,8 +1,8 @@
 //! Plugin trait implementation for StructuredAuxPlugin.
 
+use crate::plugin::StructuredAuxPlugin;
 use async_trait::async_trait;
 use crabjar_plugin::{Plugin, ToolDefinition, ToolResult};
-use crate::plugin::StructuredAuxPlugin;
 
 #[async_trait]
 impl Plugin for StructuredAuxPlugin {
@@ -18,7 +18,8 @@ impl Plugin for StructuredAuxPlugin {
         vec![
             ToolDefinition {
                 name: format!("{}.approval", self.name),
-                description: "Bounded approval decision via JEV (approve/deny/needs_review)".to_string(),
+                description: "Bounded approval decision via JEV (approve/deny/needs_review)"
+                    .to_string(),
                 parameters: Some(serde_json::json!({
                     "type": "object",
                     "properties": {
@@ -40,7 +41,8 @@ impl Plugin for StructuredAuxPlugin {
             },
             ToolDefinition {
                 name: format!("{}.risk", self.name),
-                description: "Bounded risk assessment via JEV (low/medium/high/critical)".to_string(),
+                description: "Bounded risk assessment via JEV (low/medium/high/critical)"
+                    .to_string(),
                 parameters: Some(serde_json::json!({
                     "type": "object",
                     "properties": {

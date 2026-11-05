@@ -63,10 +63,7 @@ pub fn check_task_claim_eligibility(
 
     debug!(
         task_id,
-        worker_trust_level,
-        task_trust_required,
-        confidence,
-        "Task claim eligibility: proceed"
+        worker_trust_level, task_trust_required, confidence, "Task claim eligibility: proceed"
     );
     GateResult::Proceed
 }
@@ -177,11 +174,7 @@ mod tests {
 
     #[test]
     fn valid_provenance_allows_assignment() {
-        let result = check_task_assignment_authorization(
-            "task-1",
-            "worker-1",
-            Some("event-123"),
-        );
+        let result = check_task_assignment_authorization("task-1", "worker-1", Some("event-123"));
         assert!(matches!(result, GateResult::Proceed));
     }
 

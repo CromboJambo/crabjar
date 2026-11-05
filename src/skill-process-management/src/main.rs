@@ -204,9 +204,7 @@ fn check_process(pid: u32) -> Result<serde_json::Value> {
             }
             Ok(json!({ "alive": true }))
         }
-        _ => {
-            Ok(json!({ "alive": false, "exit_code": -1 }))
-        }
+        _ => Ok(json!({ "alive": false, "exit_code": -1 })),
     }
 }
 

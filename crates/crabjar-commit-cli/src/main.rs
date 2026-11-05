@@ -9,7 +9,10 @@ use crabjar_git::GitRepo;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[clap(name = "crabjar-commit", about = "Generate conventional commit messages from git diffs")]
+#[clap(
+    name = "crabjar-commit",
+    about = "Generate conventional commit messages from git diffs"
+)]
 struct Cli {
     /// Path to git repository (defaults to current directory)
     #[clap(short, long, default_value = ".")]

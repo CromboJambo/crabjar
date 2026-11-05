@@ -11,7 +11,9 @@ impl ResultAggregator {
     /// Create a new result aggregator.
     #[must_use]
     pub fn new() -> Self {
-        Self { results: Vec::new() }
+        Self {
+            results: Vec::new(),
+        }
     }
 
     /// Add a task result to the aggregation.
@@ -22,22 +24,30 @@ impl ResultAggregator {
     /// Check if all tasks have completed (successfully or failed).
     #[must_use]
     pub fn all_complete(&self) -> bool {
-        self.results.iter().all(|r| matches!(
-            r.status,
-            TaskStatus::Completed | TaskStatus::Failed | TaskStatus::TimedOut
-        ))
+        self.results.iter().all(|r| {
+            matches!(
+                r.status,
+                TaskStatus::Completed | TaskStatus::Failed | TaskStatus::TimedOut
+            )
+        })
     }
 
     /// Count of successfully completed tasks.
     #[must_use]
     pub fn success_count(&self) -> usize {
-        self.results.iter().filter(|r| r.status == TaskStatus::Completed).count()
+        self.results
+            .iter()
+            .filter(|r| r.status == TaskStatus::Completed)
+            .count()
     }
 
     /// Count of failed tasks.
     #[must_use]
     pub fn failure_count(&self) -> usize {
-        self.results.iter().filter(|r| matches!(r.status, TaskStatus::Failed | TaskStatus::TimedOut)).count()
+        self.results
+            .iter()
+            .filter(|r| matches!(r.status, TaskStatus::Failed | TaskStatus::TimedOut))
+            .count()
     }
 
     /// Finalize and return the aggregated delegation result.

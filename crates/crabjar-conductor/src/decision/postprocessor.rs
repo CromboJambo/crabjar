@@ -30,17 +30,20 @@ pub fn validate_decision(
 
     // Rule 1: Function declarations must have error handling analysis
     if target.structure == SpanKind::FnDecl
-        && target.error_handling.is_none() && target.semantic_tags.get("error_handling").is_none() {
-            issues.push("Function declaration lacks error handling analysis".to_string());
-            confidence_adjustment -= 0.1;
-        }
+        && target.error_handling.is_none()
+        && target.semantic_tags.get("error_handling").is_none()
+    {
+        issues.push("Function declaration lacks error handling analysis".to_string());
+        confidence_adjustment -= 0.1;
+    }
 
     // Rule 2: Struct declarations should have ownership analysis
     if target.structure == SpanKind::ClassDecl
-        && target.semantic_tags.get("ownership_mode").is_none() {
-            issues.push("Struct declaration lacks ownership analysis".to_string());
-            confidence_adjustment -= 0.05;
-        }
+        && target.semantic_tags.get("ownership_mode").is_none()
+    {
+        issues.push("Struct declaration lacks ownership analysis".to_string());
+        confidence_adjustment -= 0.05;
+    }
 
     // Rule 3: High-confidence decisions should have supporting tags
     if !target.semantic_tags.is_empty() || target.error_handling.is_some() {

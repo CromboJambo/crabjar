@@ -3,7 +3,7 @@
 //! Implements crabjar approval list, approve, reject, history commands.
 
 use crate::ApprovalCommand;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // Import our approval modules
 mod impact_assessment {
@@ -17,14 +17,23 @@ fn success_response(data: Value) -> Value {
 fn error_response(message: &str, show_usage: bool) -> Value {
     let mut response = json!({ "success": false, "error": message });
     if show_usage {
-        response["usage"] = json!(["crabjar approval list", "crabjar approval approve <id>", "crabjar approval reject <id> --reason <r>", "crabjar approval history [id]"]);
+        response["usage"] = json!([
+            "crabjar approval list",
+            "crabjar approval approve <id>",
+            "crabjar approval reject <id> --reason <r>",
+            "crabjar approval history [id]"
+        ]);
     }
     response
 }
 
 pub fn handle_approval_command(command: ApprovalCommand) -> Value {
     match command {
-        ApprovalCommand::List { owner, app_name, impact_level } => {
+        ApprovalCommand::List {
+            owner,
+            app_name,
+            impact_level,
+        } => {
             // TODO: Query approval queue for pending changes with filters
             json!({
                 "success": true,

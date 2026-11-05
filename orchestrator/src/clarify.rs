@@ -77,7 +77,8 @@ pub async fn execute_clarify(
         options: input.options,
     };
 
-    let event_json = serde_json::to_string(&event).map_err(|e| format!("Failed to serialize clarify event: {}", e))?;
+    let event_json = serde_json::to_string(&event)
+        .map_err(|e| format!("Failed to serialize clarify event: {}", e))?;
     if event_tx.send(event_json).is_err() {
         return Err("No TUI subscribers for clarify question".to_string());
     }
@@ -89,11 +90,8 @@ pub async fn execute_clarify(
     // In a real implementation, this would be stored in shared state keyed by question_id
     // For simplicity, we'll use a blocking wait here — production would use an async map of pending questions
 
-    tokio::time::timeout(
-        tokio::time::Duration::from_secs(input.timeout_secs),
-        rx
-    )
-    .await
-    .map_err(|_| "Clarify question timed out".to_string())?
-    .map_err(|_| "Clarify channel closed without response".to_string())
+    tokio::time::timeout(tokio::time::Duration::from_secs(input.timeout_secs), rx)
+        .await
+        .map_err(|_| "Clarify question timed out".to_string())?
+        .map_err(|_| "Clarify channel closed without response".to_string())
 }

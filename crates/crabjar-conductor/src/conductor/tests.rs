@@ -34,8 +34,7 @@ fn register_worker_validates_ssh_key() {
         Conductor::with_db(ConductorConfig::default(), &path.to_string_lossy()).unwrap();
 
     // Valid ed25519 key should pass
-    let valid_key =
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGFub3RoZXJrZXllbmNvZGluZw== user@host";
+    let valid_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGFub3RoZXJrZXllbmNvZGluZw== user@host";
     rt.block_on(async {
         let result = conductor.register_worker(
             "worker-valid".to_string(),

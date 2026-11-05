@@ -74,7 +74,9 @@ impl AutonomyTracker {
 
     /// Record the outcome of an action attempt.
     pub fn record_outcome(&mut self, action: &Action, result: &ActionResult) {
-        let record = if let Some(r) = self.records.get_mut(&action.class) { r } else {
+        let record = if let Some(r) = self.records.get_mut(&action.class) {
+            r
+        } else {
             let new_record = ActionClassRecord::new(action.class.clone());
             self.records.insert(action.class.clone(), new_record);
             self.records.get_mut(&action.class).unwrap()

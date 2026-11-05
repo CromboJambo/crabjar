@@ -3,7 +3,7 @@ use serde_json::json;
 
 async fn test_embedding_generation(client: &Client) {
     println!("=== Test 1: Embedding Generation ===");
-    
+
     let response = client
         .post("http://ftw3:34159/v1/embeddings")
         .header("Content-Type", "application/json")
@@ -14,7 +14,7 @@ async fn test_embedding_generation(client: &Client) {
         .to_string())
         .send()
         .await;
-        
+
     if response.is_ok() {
         let resp = response.unwrap();
         let status = resp.status();
@@ -35,7 +35,7 @@ async fn test_embedding_generation(client: &Client) {
 
 async fn test_similarity_comparison(client: &Client) {
     println!("\n=== Test 2: Similarity Comparison ===");
-    
+
     // Embed two similar sentences
     let resp1 = client
         .post("http://ftw3:34159/v1/embeddings")
@@ -47,7 +47,7 @@ async fn test_similarity_comparison(client: &Client) {
         .to_string())
         .send()
         .await;
-        
+
     let resp2 = client
         .post("http://ftw3:34159/v1/embeddings")
         .header("Content-Type", "application/json")
@@ -58,7 +58,7 @@ async fn test_similarity_comparison(client: &Client) {
         .to_string())
         .send()
         .await;
-        
+
     if resp1.is_ok() && resp2.is_ok() {
         println!("✓ Successfully embedded both sentences");
         // In a real implementation, we would compute cosine similarity here
@@ -69,9 +69,10 @@ async fn test_similarity_comparison(client: &Client) {
 
 async fn test_code_embedding(client: &Client) {
     println!("\n=== Test 3: Code Snippet Embedding ===");
-    
-    let code = "fn fibonacci(n: u32) -> u32 { if n < 2 { return n; } fibonacci(n-1) + fibonacci(n-2) }";
-    
+
+    let code =
+        "fn fibonacci(n: u32) -> u32 { if n < 2 { return n; } fibonacci(n-1) + fibonacci(n-2) }";
+
     let response = client
         .post("http://ftw3:34159/v1/embeddings")
         .header("Content-Type", "application/json")
@@ -82,7 +83,7 @@ async fn test_code_embedding(client: &Client) {
         .to_string())
         .send()
         .await;
-        
+
     if response.is_ok() {
         let resp = response.unwrap();
         let status = resp.status();
@@ -96,12 +97,12 @@ async fn test_code_embedding(client: &Client) {
 #[tokio::main]
 async fn main() {
     println!("Testing Kev-9B embedding capabilities\n");
-    
+
     let client = Client::new();
-    
+
     test_embedding_generation(&client).await;
     test_similarity_comparison(&client).await;
     test_code_embedding(&client).await;
-    
+
     println!("\n=== All tests complete ===");
 }

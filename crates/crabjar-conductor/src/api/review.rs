@@ -197,17 +197,17 @@ fn simulate_bundle_review(
             for rule in matched_rules {
                 if rule.id.as_str() == "check_errors"
                     && content.contains("unwrap()")
-                        && !file.path.to_string_lossy().contains("test")
-                    {
-                        findings.push(serde_json::json!({
-                            "file": file.path.to_string_lossy(),
-                            "line": 1,
-                            "severity": "high",
-                            "type": "bug",
-                            "rule_id": rule.id,
-                            "description": "unwrap() called without error handling"
-                        }));
-                    }
+                    && !file.path.to_string_lossy().contains("test")
+                {
+                    findings.push(serde_json::json!({
+                        "file": file.path.to_string_lossy(),
+                        "line": 1,
+                        "severity": "high",
+                        "type": "bug",
+                        "rule_id": rule.id,
+                        "description": "unwrap() called without error handling"
+                    }));
+                }
             }
         }
     }

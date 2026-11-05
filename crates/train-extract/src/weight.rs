@@ -1,4 +1,4 @@
-use crate::extract::ExtractedData;
+use crate::extract_types::ExtractedData;
 use crate::format::{Sample, apply_weighting, format_samples};
 use std::collections::HashMap;
 
@@ -83,7 +83,7 @@ pub fn compute_recency(data: &ExtractedData) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extract::KnowledgeEntry;
+    use crate::extract_types::KnowledgeEntry;
     use agent_context::KnowledgeKind;
 
     fn make_data_with_tags() -> ExtractedData {

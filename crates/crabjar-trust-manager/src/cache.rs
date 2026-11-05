@@ -168,10 +168,11 @@ impl SkillCache {
         let names: Vec<String> = self.entries.keys().cloned().collect();
         for name in names {
             if let Some(entry) = self.entries.get(&name)
-                && entry.last_used < threshold {
-                    self.remove(&name)?;
-                    removed.push(name);
-                }
+                && entry.last_used < threshold
+            {
+                self.remove(&name)?;
+                removed.push(name);
+            }
         }
 
         if !removed.is_empty() {

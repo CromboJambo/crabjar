@@ -97,7 +97,7 @@ pub struct ErrorResponse {
 
 fn find_active_board() -> Result<Connection> {
     let home = std::env::var("HOME").map_err(|e| anyhow::anyhow!("HOME not set: {}", e))?;
-    
+
     // Read the "current" file to get the active board slug
     let current_path = format!("{}/.hermes/kanban/current", home);
     let board_slug = std::fs::read_to_string(&current_path)
@@ -107,7 +107,7 @@ fn find_active_board() -> Result<Connection> {
 
     // Construct the path to the board database
     let db_path = format!("{}/.hermes/kanban/boards/{}/kanban.db", home, board_slug);
-    
+
     if !std::path::Path::new(&db_path).exists() {
         return Err(anyhow::anyhow!("kanban.db not found at {}", db_path));
     }
@@ -120,7 +120,10 @@ fn find_active_board() -> Result<Connection> {
 // ---------------------------------------------------------------------------
 
 async fn create_task(Json(req): Json<CreateTaskRequest>) -> JsonResponse<SuccessResponse> {
-    let source = req.source.clone().unwrap_or_else(|| "orchestrator".to_string());
+    let source = req
+        .source
+        .clone()
+        .unwrap_or_else(|| "orchestrator".to_string());
     info!("Creating task from {}: {}", source, req.title);
 
     match find_active_board() {
@@ -169,16 +172,20 @@ async fn update_task(
                     "UPDATE tasks SET status = ? WHERE id = ?",
                     params![status, task_id],
                 ) {
-                    Ok(rows) => return JsonResponse(SuccessResponse {
-                        success: true,
-                        message: format!("Updated status for {} row(s)", rows),
-                        task_id: None,
-                    }),
-                    Err(e) => return JsonResponse(SuccessResponse {
-                        success: false,
-                        message: format!("Failed to update status: {}", e),
-                        task_id: None,
-                    }),
+                    Ok(rows) => {
+                        return JsonResponse(SuccessResponse {
+                            success: true,
+                            message: format!("Updated status for {} row(s)", rows),
+                            task_id: None,
+                        });
+                    }
+                    Err(e) => {
+                        return JsonResponse(SuccessResponse {
+                            success: false,
+                            message: format!("Failed to update status: {}", e),
+                            task_id: None,
+                        });
+                    }
                 }
             }
 
@@ -187,16 +194,20 @@ async fn update_task(
                     "UPDATE tasks SET assignee = ? WHERE id = ?",
                     params![assignee, task_id],
                 ) {
-                    Ok(rows) => return JsonResponse(SuccessResponse {
-                        success: true,
-                        message: format!("Updated assignee for {} row(s)", rows),
-                        task_id: None,
-                    }),
-                    Err(e) => return JsonResponse(SuccessResponse {
-                        success: false,
-                        message: format!("Failed to update assignee: {}", e),
-                        task_id: None,
-                    }),
+                    Ok(rows) => {
+                        return JsonResponse(SuccessResponse {
+                            success: true,
+                            message: format!("Updated assignee for {} row(s)", rows),
+                            task_id: None,
+                        });
+                    }
+                    Err(e) => {
+                        return JsonResponse(SuccessResponse {
+                            success: false,
+                            message: format!("Failed to update assignee: {}", e),
+                            task_id: None,
+                        });
+                    }
                 }
             }
 
@@ -205,16 +216,20 @@ async fn update_task(
                     "UPDATE tasks SET priority = ? WHERE id = ?",
                     params![priority, task_id],
                 ) {
-                    Ok(rows) => return JsonResponse(SuccessResponse {
-                        success: true,
-                        message: format!("Updated priority for {} row(s)", rows),
-                        task_id: None,
-                    }),
-                    Err(e) => return JsonResponse(SuccessResponse {
-                        success: false,
-                        message: format!("Failed to update priority: {}", e),
-                        task_id: None,
-                    }),
+                    Ok(rows) => {
+                        return JsonResponse(SuccessResponse {
+                            success: true,
+                            message: format!("Updated priority for {} row(s)", rows),
+                            task_id: None,
+                        });
+                    }
+                    Err(e) => {
+                        return JsonResponse(SuccessResponse {
+                            success: false,
+                            message: format!("Failed to update priority: {}", e),
+                            task_id: None,
+                        });
+                    }
                 }
             }
 
@@ -223,16 +238,20 @@ async fn update_task(
                     "UPDATE tasks SET result = ? WHERE id = ?",
                     params![result, task_id],
                 ) {
-                    Ok(rows) => return JsonResponse(SuccessResponse {
-                        success: true,
-                        message: format!("Updated result for {} row(s)", rows),
-                        task_id: None,
-                    }),
-                    Err(e) => return JsonResponse(SuccessResponse {
-                        success: false,
-                        message: format!("Failed to update result: {}", e),
-                        task_id: None,
-                    }),
+                    Ok(rows) => {
+                        return JsonResponse(SuccessResponse {
+                            success: true,
+                            message: format!("Updated result for {} row(s)", rows),
+                            task_id: None,
+                        });
+                    }
+                    Err(e) => {
+                        return JsonResponse(SuccessResponse {
+                            success: false,
+                            message: format!("Failed to update result: {}", e),
+                            task_id: None,
+                        });
+                    }
                 }
             }
 
@@ -350,7 +369,9 @@ async fn list_tasks() -> JsonResponse<serde_json::Value> {
                 Err(e) => JsonResponse(serde_json::json!({ "error": format!("{}", e) })),
             }
         }
-        Err(e) => JsonResponse(serde_json::json!({ "error": format!("Failed to find active board: {}", e) })),
+        Err(e) => JsonResponse(
+            serde_json::json!({ "error": format!("Failed to find active board: {}", e) }),
+        ),
     }
 }
 

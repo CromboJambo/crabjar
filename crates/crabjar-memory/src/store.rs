@@ -58,20 +58,22 @@ impl MemoryStore {
     /// Validate that a path stays within the base directory (defense against path traversal).
     fn validate_path_within_base(&self, path: &PathBuf) -> MemoryResult<()> {
         // Canonicalize both paths to resolve symlinks and .. components
-        let canonical_base = self.base_dir.canonicalize().map_err(|e| {
-            MemoryError::Io(e)
-        })?;
+        let canonical_base = self
+            .base_dir
+            .canonicalize()
+            .map_err(|e| MemoryError::Io(e))?;
 
-        let canonical_path = path.canonicalize().or_else(|_| {
-            // File may not exist yet — create it and try again
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).ok();
-            }
-            fs::write(path, "").ok();
-            path.canonicalize()
-        }).map_err(|e| {
-            MemoryError::Io(e)
-        })?;
+        let canonical_path = path
+            .canonicalize()
+            .or_else(|_| {
+                // File may not exist yet — create it and try again
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent).ok();
+                }
+                fs::write(path, "").ok();
+                path.canonicalize()
+            })
+            .map_err(|e| MemoryError::Io(e))?;
 
         if !canonical_path.starts_with(&canonical_base) {
             return Err(MemoryError::InvalidParams(format!(

@@ -200,28 +200,30 @@ impl LanguageAdapter for JavaScriptAdapter {
                                 source: format!("{kw} {name}"),
                             });
                         } else if let JsToken::Punctuation(p) = &tokens[i + 1]
-                            && p == "(" {
-                                spans.push(Span {
-                                    kind: SpanKind::FnDecl,
-                                    open_token: None,
-                                    body: Vec::new(),
-                                    close_token: None,
-                                    source: kw.clone(),
-                                });
-                            }
+                            && p == "("
+                        {
+                            spans.push(Span {
+                                kind: SpanKind::FnDecl,
+                                open_token: None,
+                                body: Vec::new(),
+                                close_token: None,
+                                source: kw.clone(),
+                            });
+                        }
                     }
                 }
                 JsToken::Keyword(kw) if kw == "class" => {
                     if i + 1 < tokens.len()
-                        && let JsToken::Identifier(name) = &tokens[i + 1] {
-                            spans.push(Span {
-                                kind: SpanKind::ClassDecl,
-                                open_token: None,
-                                body: Vec::new(),
-                                close_token: None,
-                                source: format!("class {name}"),
-                            });
-                        }
+                        && let JsToken::Identifier(name) = &tokens[i + 1]
+                    {
+                        spans.push(Span {
+                            kind: SpanKind::ClassDecl,
+                            open_token: None,
+                            body: Vec::new(),
+                            close_token: None,
+                            source: format!("class {name}"),
+                        });
+                    }
                 }
                 JsToken::Keyword(kw) if kw == "const" || kw == "let" => {
                     spans.push(Span {

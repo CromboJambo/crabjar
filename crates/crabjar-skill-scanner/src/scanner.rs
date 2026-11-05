@@ -223,23 +223,24 @@ impl SkillScanner {
 
             // Check file size — non-source files > 1KB are suspicious
             if let Ok(metadata) = path.metadata()
-                && metadata.len() > 1024 {
-                    // Try to read as text to determine if it's binary
-                    match fs::read_to_string(path) {
-                        Err(_) => {
-                            result.add_finding(ScanFinding {
-                                severity: Severity::Warning,
-                                category: "binary_file".to_string(),
-                                message: format!(
-                                    "Non-text file > 1KB detected ({} bytes)",
-                                    metadata.len()
-                                ),
-                                file: Some(path.to_string_lossy().to_string()),
-                            });
-                        }
-                        Ok(_) => {} // It's text
+                && metadata.len() > 1024
+            {
+                // Try to read as text to determine if it's binary
+                match fs::read_to_string(path) {
+                    Err(_) => {
+                        result.add_finding(ScanFinding {
+                            severity: Severity::Warning,
+                            category: "binary_file".to_string(),
+                            message: format!(
+                                "Non-text file > 1KB detected ({} bytes)",
+                                metadata.len()
+                            ),
+                            file: Some(path.to_string_lossy().to_string()),
+                        });
                     }
+                    Ok(_) => {} // It's text
                 }
+            }
         }
     }
 

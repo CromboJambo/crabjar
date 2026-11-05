@@ -27,8 +27,8 @@ pub fn load_rules_from_str(content: &str) -> Result<Vec<ReviewRule>, String> {
 
 /// Load review rules from a TOML file.
 pub fn load_rules(path: &Path) -> Result<Vec<ReviewRule>, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read rules file {path:?}: {e}"))?;
+    let content =
+        fs::read_to_string(path).map_err(|e| format!("Failed to read rules file {path:?}: {e}"))?;
 
     load_rules_from_str(&content)
 }

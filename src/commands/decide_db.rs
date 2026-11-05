@@ -6,7 +6,7 @@
 //! - Confidence drift detection
 //! - Cache persistence across process restarts
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
 /// A stored decision record for the learning loop.

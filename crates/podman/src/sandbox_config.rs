@@ -3,8 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Isolation profile for agent workloads.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SandboxProfile {
     /// Minimal isolation: Unix user only. Fast, least overhead.
     User,
@@ -16,7 +15,6 @@ pub enum SandboxProfile {
     /// Fully isolated: separate network namespace, no host access.
     Isolated,
 }
-
 
 /// Complete sandbox configuration for an agent workload.
 #[derive(Debug, Clone, Serialize, Deserialize)]

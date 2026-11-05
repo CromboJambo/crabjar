@@ -13,7 +13,7 @@ mod terminal_relay;
 #[cfg(test)]
 mod terminal_relay_tests;
 
-use lifecycle::{routes, LifecycleState};
+use lifecycle::{LifecycleState, routes};
 use manifest::Manifest;
 
 const MANIFEST_PATH: &str = "manifest.toml";

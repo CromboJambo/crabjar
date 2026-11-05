@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::error::{MemoryError, MemoryResult};
-use super::store::{MemoryStore, MemoryTarget};
 #[cfg(feature = "mirror-log")]
 use super::mirror_log::{
-    log_batch_applied, log_entry_added, log_entry_patched, log_entry_removed, MemoryAuditLogger,
+    MemoryAuditLogger, log_batch_applied, log_entry_added, log_entry_patched, log_entry_removed,
 };
+use super::store::{MemoryStore, MemoryTarget};
 
 /// Tool operation types.
 #[derive(Debug, Clone, Deserialize)]
@@ -218,7 +218,8 @@ impl MemoryTool {
                 match self.store.patch_entry(&target, &old_text, &content) {
                     Ok(()) => {
                         if let Some(logger) = &self.audit_logger {
-                            let _ = log_entry_patched(logger, &input.target, &old_text, &content).await;
+                            let _ =
+                                log_entry_patched(logger, &input.target, &old_text, &content).await;
                         }
                         MemoryToolResponse::ok("Patched memory entry", &self.store, &target)
                     }
@@ -260,9 +261,10 @@ impl MemoryTool {
             match &op.action {
                 MemoryAction::Add => {
                     if let Some(content) = &op.content
-                        && !entries.iter().any(|e| e == content) {
-                            entries.push(content.clone());
-                        }
+                        && !entries.iter().any(|e| e == content)
+                    {
+                        entries.push(content.clone());
+                    }
                 }
                 MemoryAction::Patch => {
                     if let (Some(old_text), Some(new_text)) = (&op.old_text, &op.content) {

@@ -172,13 +172,14 @@ fn enumerate_types(bytes: &[u8]) -> Vec<DotnetType> {
                     .next()
                     .map(|c| c.is_uppercase())
                     .unwrap_or(false)
-                    && name.chars().any(|c| c.is_lowercase()) {
-                        types.push(DotnetType {
-                            name,
-                            is_class: true,
-                            method_count: 0,
-                        });
-                    }
+                    && name.chars().any(|c| c.is_lowercase())
+                {
+                    types.push(DotnetType {
+                        name,
+                        is_class: true,
+                        method_count: 0,
+                    });
+                }
             }
             i = j;
         } else {

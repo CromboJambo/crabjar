@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use axum::{
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    Router,
     extract::State,
+    extract::ws::{Message, WebSocket, WebSocketUpgrade},
     response::Response,
     routing::get,
-    Router,
 };
 use futures_util::{SinkExt, StreamExt};
 use std::net::SocketAddr;
@@ -158,10 +158,11 @@ where
     let drain_ws = async {
         while let Some(msg) = ws_stream.next().await {
             if let Ok(Message::Binary(data)) = msg
-                && let Err(e) = write_half.write_all(&data).await {
-                    tracing::warn!(error = %e, "drain write failed");
-                    break;
-                }
+                && let Err(e) = write_half.write_all(&data).await
+            {
+                tracing::warn!(error = %e, "drain write failed");
+                break;
+            }
         }
         anyhow::Ok(())
     };

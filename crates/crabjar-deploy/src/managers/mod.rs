@@ -1,9 +1,9 @@
 mod dinit;
+mod null;
 mod runit;
 mod systemd;
-mod null;
 
 pub use dinit::DinitManager;
+pub use null::NullManager;
 pub use runit::RunitManager;
 pub use systemd::SystemdManager;
-pub use null::NullManager;

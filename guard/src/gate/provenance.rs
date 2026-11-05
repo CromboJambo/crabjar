@@ -5,16 +5,21 @@ use tracing::warn;
 /// Verify provenance: source_event_id exists in GuardDb action_requests AND is recent.
 /// Addresses redteam finding #7: stale approvals should be rejected.
 pub fn verify_provenance(conn: &rusqlite::Connection, id: &str) -> Result<bool, GuardDbError> {
+    eprintln!("DEBUG verify: checking source_event_id={}", id);
     // Check existence and freshness in a single query
     // Approvals older than 24 hours are considered stale
+    let threshold = chrono::Utc::now().timestamp() - 86400;
+    eprintln!("DEBUG verify: threshold={}", threshold);
     let exists_and_fresh: bool = conn
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM action_requests \n\
              WHERE source_event_id = ?1 AND requested_at > ?2)",
-            rusqlite::params![id, chrono::Utc::now().timestamp() - 86400],
+            rusqlite::params![id, threshold],
             |r| r.get(0),
         )
         .map_err(|_| GuardDbError::SchemaError("Provenance check failed".into()))?;
+
+    eprintln!("DEBUG verify: exists_and_fresh={}", exists_and_fresh);
 
     if !exists_and_fresh {
         // Check if it exists but is stale

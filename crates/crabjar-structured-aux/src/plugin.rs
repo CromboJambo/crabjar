@@ -2,9 +2,9 @@
 
 use async_trait::async_trait;
 use crabjar_plugin::{Plugin, PluginError, ToolDefinition, ToolResult};
-use std::fs;
 use reqwest::Client;
 use std::env;
+use std::fs;
 
 /// OpenRouter JEV endpoint base URL.
 const OPENROUTER_JEV_BASE_URL: &str = "https://openrouter.ai/api/v1";
@@ -38,8 +38,9 @@ impl StructuredAuxPlugin {
         api_key: Option<String>,
     ) -> Self {
         // Determine criteria path from environment or default to local specs directory.
-        let criteria_path = env::var("STRUCTURED_AUX_CRITERIA_PATH")
-            .unwrap_or_else(|_| "/home/crombo/projects/active/crabjar/crabjar-structured-aux/specs/criteria".to_string());
+        let criteria_path = env::var("STRUCTURED_AUX_CRITERIA_PATH").unwrap_or_else(|_| {
+            "/home/crombo/projects/active/crabjar/crabjar-structured-aux/specs/criteria".to_string()
+        });
 
         Self {
             name: PROVIDER_NAME.to_string(),
@@ -53,7 +54,10 @@ impl StructuredAuxPlugin {
     }
 
     /// Load a criteria file by decision type name.
-    pub(crate) fn load_criteria(&self, decision_type: &str) -> Result<serde_json::Value, crabjar_plugin::PluginError> {
+    pub(crate) fn load_criteria(
+        &self,
+        decision_type: &str,
+    ) -> Result<serde_json::Value, crabjar_plugin::PluginError> {
         let path = format!("{}/{}.json", self.criteria_path, decision_type);
         match fs::read_to_string(&path) {
             Ok(content) => serde_json::from_str(&content).map_err(|e| PluginError::Execution {
@@ -81,7 +85,10 @@ impl StructuredAuxPlugin {
         }
 
         // Add evaluation factors as guidance.
-        if let Some(factors) = criteria.get("evaluation_factors").and_then(|v| v.as_array()) {
+        if let Some(factors) = criteria
+            .get("evaluation_factors")
+            .and_then(|v| v.as_array())
+        {
             prompt.push_str("Consider these factors:\n");
             for (i, factor) in factors.iter().enumerate() {
                 if let Some(factor_str) = factor.as_str() {
@@ -211,7 +218,11 @@ impl StructuredAuxPlugin {
         }));
 
         // Use higher max_tokens for compression tasks (reasoning models need more space).
-        let max_tokens = if state.get("text_to_compress").is_some() { 200 } else { 50 };
+        let max_tokens = if state.get("text_to_compress").is_some() {
+            200
+        } else {
+            50
+        };
 
         let request = serde_json::json!({
             "model": model,

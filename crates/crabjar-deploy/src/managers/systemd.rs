@@ -31,8 +31,9 @@ impl SystemdManager {
 
     fn service_file_path(&self, name: &str) -> String {
         if self.user_mode {
-            let xdg = std::env::var("XDG_CONFIG_HOME")
-                .unwrap_or_else(|_| format!("{}/.config", std::env::var("HOME").unwrap_or_default()));
+            let xdg = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| {
+                format!("{}/.config", std::env::var("HOME").unwrap_or_default())
+            });
             format!("{xdg}/systemd/user/{name}.service")
         } else {
             format!("/etc/systemd/system/{name}.service")
@@ -132,9 +133,8 @@ impl ServiceManager for SystemdManager {
 
     fn list(&self) -> Vec<String> {
         let cmd = self.systemctl_cmd();
-        let result = crate::service::exec_command(&format!(
-            "{cmd} list-units --type=service --no-pager"
-        ));
+        let result =
+            crate::service::exec_command(&format!("{cmd} list-units --type=service --no-pager"));
         if !result.success {
             return Vec::new();
         }
@@ -153,19 +153,14 @@ impl ServiceManager for SystemdManager {
 
         // Ensure directory exists
         if let Some(parent) = Path::new(&path).parent()
-            && let Err(e) = fs::create_dir_all(parent) {
-                return ServiceResult::err(
-                    format!("Failed to create directory: {e}"),
-                    -1,
-                );
-            }
+            && let Err(e) = fs::create_dir_all(parent)
+        {
+            return ServiceResult::err(format!("Failed to create directory: {e}"), -1);
+        }
 
         // Write service file
         if let Err(e) = fs::write(&path, content) {
-            return ServiceResult::err(
-                format!("Failed to write service file: {e}"),
-                -1,
-            );
+            return ServiceResult::err(format!("Failed to write service file: {e}"), -1);
         }
 
         // Reload systemd daemon

@@ -124,10 +124,10 @@ impl FeedbackCollector {
         for line in content.lines() {
             if let Ok(event) = serde_json::from_str::<Value>(line)
                 && event["type"].as_str() == Some("correction")
-                    && event["details"]["task_type"].as_str() == Some(task_type)
-                {
-                    corrections.push(event);
-                }
+                && event["details"]["task_type"].as_str() == Some(task_type)
+            {
+                corrections.push(event);
+            }
         }
 
         Ok(corrections)

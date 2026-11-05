@@ -3,7 +3,7 @@ use serde_json::json;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing::info;
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
-use zed_acp_server::{AcpAgentServer, AcpResponse, AcpRequest};
+use zed_acp_server::{AcpAgentServer, AcpRequest, AcpResponse};
 
 #[derive(Debug, Deserialize)]
 struct JsonRpcMessage {
@@ -16,10 +16,15 @@ struct JsonRpcMessage {
 }
 
 fn parse_message(line: &str) -> Result<JsonRpcMessage, anyhow::Error> {
-    serde_json::from_str(line).map_err(|e| anyhow::anyhow!("Failed to parse JSON-RPC message: {}", e))
+    serde_json::from_str(line)
+        .map_err(|e| anyhow::anyhow!("Failed to parse JSON-RPC message: {}", e))
 }
 
-fn map_method(id: serde_json::Value, method: &str, params: serde_json::Value) -> Result<AcpRequest, anyhow::Error> {
+fn map_method(
+    id: serde_json::Value,
+    method: &str,
+    params: serde_json::Value,
+) -> Result<AcpRequest, anyhow::Error> {
     match method {
         "initialize" => {
             let protocol_version = params
@@ -27,7 +32,10 @@ fn map_method(id: serde_json::Value, method: &str, params: serde_json::Value) ->
                 .and_then(|v| v.as_u64())
                 .map(|v| v as u32)
                 .unwrap_or(1);
-            let client_capabilities = params.get("clientCapabilities").cloned().unwrap_or(json!({}));
+            let client_capabilities = params
+                .get("clientCapabilities")
+                .cloned()
+                .unwrap_or(json!({}));
             let client_info = params.get("clientInfo").cloned();
             Ok(AcpRequest::Initialize {
                 id,

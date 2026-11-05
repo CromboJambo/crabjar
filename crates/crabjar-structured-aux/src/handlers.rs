@@ -1,7 +1,7 @@
 //! Handler methods for each auxiliary task type.
 
-use crabjar_plugin::ToolResult;
 use crate::plugin::StructuredAuxPlugin;
+use crabjar_plugin::ToolResult;
 
 /// Escape a string for JSON embedding.
 fn escaped_json(s: &str) -> String {
@@ -30,11 +30,20 @@ impl StructuredAuxPlugin {
         let prompt = self.build_structured_prompt(&criteria, context);
 
         // Make the decision call with the structured prompt.
-        let result = self.make_decision_call(serde_json::json!({}), vec![], Some(&prompt)).await?;
-        let verdict = result.get("answer").and_then(|v| v.as_str()).unwrap_or("needs_review");
+        let result = self
+            .make_decision_call(serde_json::json!({}), vec![], Some(&prompt))
+            .await?;
+        let verdict = result
+            .get("answer")
+            .and_then(|v| v.as_str())
+            .unwrap_or("needs_review");
 
         // Clean up the response - strip brackets if present.
-        let verdict = verdict.trim().trim_start_matches('[').trim_end_matches(']').to_string();
+        let verdict = verdict
+            .trim()
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .to_string();
 
         Ok(ToolResult {
             stdout: format!("{{\"verdict\":\"{}\"}}", verdict),
@@ -110,11 +119,20 @@ impl StructuredAuxPlugin {
         let prompt = self.build_structured_prompt(&criteria, decision_context);
 
         // Make the decision call with the structured prompt.
-        let result = self.make_decision_call(serde_json::json!({}), vec![], Some(&prompt)).await?;
-        let risk = result.get("answer").and_then(|v| v.as_str()).unwrap_or("medium");
+        let result = self
+            .make_decision_call(serde_json::json!({}), vec![], Some(&prompt))
+            .await?;
+        let risk = result
+            .get("answer")
+            .and_then(|v| v.as_str())
+            .unwrap_or("medium");
 
         // Clean up the response - strip brackets if present.
-        let risk = risk.trim().trim_start_matches('[').trim_end_matches(']').to_string();
+        let risk = risk
+            .trim()
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .to_string();
 
         Ok(ToolResult {
             stdout: format!("{{\"risk_level\":\"{}\"}}", risk),
@@ -186,11 +204,20 @@ impl StructuredAuxPlugin {
         let prompt = self.build_structured_prompt(&criteria, decision_context);
 
         // Make the decision call with the structured prompt.
-        let result = self.make_decision_call(serde_json::json!({}), vec![], Some(&prompt)).await?;
-        let decision = result.get("answer").and_then(|v| v.as_str()).unwrap_or("give_up");
+        let result = self
+            .make_decision_call(serde_json::json!({}), vec![], Some(&prompt))
+            .await?;
+        let decision = result
+            .get("answer")
+            .and_then(|v| v.as_str())
+            .unwrap_or("give_up");
 
         // Clean up the response - strip brackets if present.
-        let decision = decision.trim().trim_start_matches('[').trim_end_matches(']').to_string();
+        let decision = decision
+            .trim()
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .to_string();
 
         Ok(ToolResult {
             stdout: format!("{{\"decision\":\"{}\"}}", decision),

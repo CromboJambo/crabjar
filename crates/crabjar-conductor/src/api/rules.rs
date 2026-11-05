@@ -60,9 +60,15 @@ pub async fn promote_rule_handler(
     State(conductor): State<ConductorState>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    let pattern_id = body["pattern_id"].as_str().map(std::string::ToString::to_string);
-    let criteria_file = body["criteria_file"].as_str().map(std::string::ToString::to_string);
-    let recommended_option = body["recommended_option"].as_str().map(std::string::ToString::to_string);
+    let pattern_id = body["pattern_id"]
+        .as_str()
+        .map(std::string::ToString::to_string);
+    let criteria_file = body["criteria_file"]
+        .as_str()
+        .map(std::string::ToString::to_string);
+    let recommended_option = body["recommended_option"]
+        .as_str()
+        .map(std::string::ToString::to_string);
 
     match (pattern_id, criteria_file, recommended_option) {
         (Some(pid), Some(cf), Some(opt)) => {

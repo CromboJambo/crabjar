@@ -1,8 +1,8 @@
 //! Pane management tools: list, split, focus, run, read, send-text, close.
 
 use crate::types::{
-    PaneCloseRequest, PaneFocusRequest, PaneListRequest, PaneReadRequest,
-    PaneRunRequest, PaneSendTextRequest, PaneSplitRequest,
+    PaneCloseRequest, PaneFocusRequest, PaneListRequest, PaneReadRequest, PaneRunRequest,
+    PaneSendTextRequest, PaneSplitRequest,
 };
 use rmcp::handler::server::wrapper::Parameters;
 
@@ -16,12 +16,14 @@ pub fn pane_list(params: Parameters<PaneListRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -56,12 +58,14 @@ pub fn pane_split(params: Parameters<PaneSplitRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -80,12 +84,14 @@ pub fn pane_focus(params: Parameters<PaneFocusRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -106,12 +112,14 @@ pub fn pane_run(params: Parameters<PaneRunRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -138,12 +146,14 @@ pub fn pane_read(params: Parameters<PaneReadRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -154,7 +164,10 @@ pub fn pane_send_text(params: Parameters<PaneSendTextRequest>) -> String {
 
     // Escape single quotes for shell safety
     let escaped_text = req.text.replace("'", "'\\''");
-    let mut cmd_parts = vec![format!("herdr pane send-text {} '{}'", req.pane_id, escaped_text)];
+    let mut cmd_parts = vec![format!(
+        "herdr pane send-text {} '{}'",
+        req.pane_id, escaped_text
+    )];
 
     if !req.enter {
         cmd_parts.push("--no-enter".to_string());
@@ -168,12 +181,14 @@ pub fn pane_send_text(params: Parameters<PaneSendTextRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }
@@ -192,12 +207,14 @@ pub fn pane_close(params: Parameters<PaneCloseRequest>) -> String {
 
     if req.verbose {
         match crate::run_cmd_verbose(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     } else {
         match crate::run_cmd(&cmd) {
-            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
+            Ok(result) => serde_json::to_string(&result)
+                .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
             Err(e) => format!("{{\"error\": \"{}\"}}", e),
         }
     }

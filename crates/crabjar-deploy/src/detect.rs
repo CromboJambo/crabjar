@@ -32,7 +32,8 @@ pub fn detect_init_systems() -> Vec<InitSystem> {
     }
 
     // Check for runit
-    if Path::new("/etc/sv").exists() || Path::new("/var/service").exists() || which("sv").is_some() {
+    if Path::new("/etc/sv").exists() || Path::new("/var/service").exists() || which("sv").is_some()
+    {
         detected.push(InitSystem::Runit);
     }
 
@@ -57,20 +58,12 @@ pub fn detect_primary_init() -> InitSystem {
 
 /// Check if a specific binary is available on PATH.
 fn which(binary: &str) -> Option<String> {
-    let result = std::process::Command::new("which")
-        .arg(binary)
-        .output();
+    let result = std::process::Command::new("which").arg(binary).output();
 
     match result {
         Ok(output) if output.status.success() => {
-            let path = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .to_string();
-            if path.is_empty() {
-                None
-            } else {
-                Some(path)
-            }
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if path.is_empty() { None } else { Some(path) }
         }
         _ => None,
     }

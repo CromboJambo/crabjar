@@ -22,7 +22,7 @@ mod log_compressor;
 mod prose_compressor;
 mod search_compressor;
 
-pub use content_router::{detect_content_type, ContentType};
+pub use content_router::{ContentType, detect_content_type};
 pub use diff_compressor::compress_diff;
 pub use html_compressor::compress_html;
 pub use json_compressor::compress_json;

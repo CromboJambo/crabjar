@@ -1,6 +1,6 @@
-use crabjar_lib::KnowledgeCommand;
 use crate::knowledge_store::KnowledgeBridge;
 use crate::knowledge_store::commands::KnowledgeCommandExt;
+use crabjar_lib::KnowledgeCommand;
 
 /// Handle knowledge commands
 pub async fn handle_knowledge_command(

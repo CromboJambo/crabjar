@@ -132,7 +132,9 @@ mod tests {
     fn update_goal_status() {
         let (store, _dir) = test_store();
         let goal = store.create_goal("Status test".to_string()).unwrap();
-        store.update_goal_status(&goal.id, GoalStatus::Running).unwrap();
+        store
+            .update_goal_status(&goal.id, GoalStatus::Running)
+            .unwrap();
         let updated = store.get_goal(&goal.id).unwrap().unwrap();
         assert_eq!(updated.status, GoalStatus::Running);
     }

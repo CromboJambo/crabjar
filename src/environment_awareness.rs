@@ -112,9 +112,10 @@ impl EnvironmentDetector {
                 if line.starts_with("MemTotal:") {
                     let parts: Vec<&str> = line.split_whitespace().collect();
                     if parts.len() >= 2
-                        && let Ok(kb) = parts[1].parse::<u64>() {
-                            return kb / 1024 / 1024;
-                        }
+                        && let Ok(kb) = parts[1].parse::<u64>()
+                    {
+                        return kb / 1024 / 1024;
+                    }
                 }
             }
         }
@@ -132,9 +133,10 @@ impl EnvironmentDetector {
             for line in stdout.lines().skip(1) {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 4
-                    && let Ok(gb) = parts[3].trim_end_matches('G').parse::<u64>() {
-                        return gb;
-                    }
+                    && let Ok(gb) = parts[3].trim_end_matches('G').parse::<u64>()
+                {
+                    return gb;
+                }
             }
         }
         100 // Default assumption

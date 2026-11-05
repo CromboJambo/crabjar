@@ -23,7 +23,7 @@ impl RateLimiter {
     /// Check if a request is allowed. Returns Ok(()) if allowed, Err(WebSearchError) if rate limited.
     pub fn check(&mut self) -> Result<(), String> {
         let elapsed = self.last_reset.elapsed();
-        
+
         // Reset counter if window has passed
         if elapsed >= self.window_duration {
             self.request_count = 0;

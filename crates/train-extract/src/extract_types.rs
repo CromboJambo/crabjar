@@ -1,6 +1,4 @@
-use crate::error::{TrainExtractError, TrainExtractResult};
 use agent_context::KnowledgeKind;
-use rusqlite::Connection;
 use std::collections::HashMap;
 
 /// Extracted knowledge entry from the knowledge store.

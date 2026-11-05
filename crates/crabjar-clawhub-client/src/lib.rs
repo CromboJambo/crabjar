@@ -8,7 +8,6 @@ pub mod client;
 pub mod error;
 pub mod models;
 
-
 pub use client::ClawHubClient;
 pub use error::ClawHubError;
 pub use models::{SearchOptions, SkillInfo, SkillVersion};

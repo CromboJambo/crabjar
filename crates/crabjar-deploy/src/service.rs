@@ -138,10 +138,7 @@ pub fn exec_command(cmd: &str) -> ServiceResult {
             if output.status.success() {
                 ServiceResult::ok(combined)
             } else {
-                ServiceResult::err(
-                    combined,
-                    output.status.code().unwrap_or(-1),
-                )
+                ServiceResult::err(combined, output.status.code().unwrap_or(-1))
             }
         }
         Err(e) => ServiceResult::err(format!("Failed to execute: {e}"), -1),

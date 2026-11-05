@@ -301,7 +301,7 @@ mod tests {
     }
 
     /// An attempt rooted at `parent`, on the fine tier by default.
-    
+
     fn attempt(id: u64, parent: &str, invertible: bool) -> Attempt {
         Attempt {
             id,

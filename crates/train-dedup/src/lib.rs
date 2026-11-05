@@ -6,8 +6,8 @@
 use chrono::Utc;
 use hex::encode;
 use rusqlite::{Connection, params};
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -249,9 +249,8 @@ impl DedupEngine {
                     first_seen: row.get(4)?,
                     last_seen: row.get(5)?,
                     occurrences: row.get(6)?,
-                    secrets_found: secrets_str.map(|s| {
-                        serde_json::from_str(&s).unwrap_or_default()
-                    }),
+                    secrets_found: secrets_str
+                        .map(|s| serde_json::from_str(&s).unwrap_or_default()),
                     status: EntryStatus::from(status_str.as_str()),
                 })
             })?
@@ -264,11 +263,11 @@ impl DedupEngine {
     pub fn stats(&self) -> Result<HashMap<String, i64>, DedupError> {
         let mut stats = HashMap::new();
 
-        let total: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM training_entries",
-            [],
-            |row| row.get(0),
-        )?;
+        let total: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM training_entries", [], |row| {
+                    row.get(0)
+                })?;
         stats.insert("total".to_string(), total);
 
         for status in [
@@ -323,10 +322,14 @@ mod tests {
     fn detects_duplicates() {
         let (engine, _dir) = make_engine();
 
-        let result1 = engine.process_file("file1.txt", "Same content here", None).unwrap();
+        let result1 = engine
+            .process_file("file1.txt", "Same content here", None)
+            .unwrap();
         assert!(matches!(result1, ProcessResult::New(_)));
 
-        let result2 = engine.process_file("file2.txt", "Same content here", None).unwrap();
+        let result2 = engine
+            .process_file("file2.txt", "Same content here", None)
+            .unwrap();
         assert!(matches!(result2, ProcessResult::Duplicate(_)));
 
         if let ProcessResult::Duplicate(entry) = result2 {
@@ -349,13 +352,20 @@ mod tests {
     fn marks_entries_clean() {
         let (engine, _dir) = make_engine();
 
-        let result = engine.process_file("file1.txt", "Test content", None).unwrap();
+        let result = engine
+            .process_file("file1.txt", "Test content", None)
+            .unwrap();
         if let ProcessResult::New(entry) = result {
-            engine.mark_clean(&entry.content_hash, "/processed/path.md").unwrap();
+            engine
+                .mark_clean(&entry.content_hash, "/processed/path.md")
+                .unwrap();
 
             let clean_entries = engine.query_by_status(EntryStatus::Clean).unwrap();
             assert_eq!(clean_entries.len(), 1);
-            assert_eq!(clean_entries[0].processed_path, Some("/processed/path.md".to_string()));
+            assert_eq!(
+                clean_entries[0].processed_path,
+                Some("/processed/path.md".to_string())
+            );
         }
     }
 }

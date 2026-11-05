@@ -135,10 +135,12 @@ pub async fn assign_worker_to_sandbox_handler(
 ) -> Json<serde_json::Value> {
     let worker_id = match body["worker_id"].as_str() {
         Some(wid) => wid.to_string(),
-        None => return Json(json!({
-            "success": false,
-            "error": "Missing worker_id in request body"
-        })),
+        None => {
+            return Json(json!({
+                "success": false,
+                "error": "Missing worker_id in request body"
+            }));
+        }
     };
 
     let sandbox_id = id.0.clone();
@@ -146,7 +148,8 @@ pub async fn assign_worker_to_sandbox_handler(
     let worker_id_for_closure = worker_id.clone();
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
-        c.sandbox_manager().assign_worker(&sandbox_id_for_closure, &worker_id_for_closure)
+        c.sandbox_manager()
+            .assign_worker(&sandbox_id_for_closure, &worker_id_for_closure)
     })
     .await;
 

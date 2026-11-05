@@ -18,7 +18,11 @@ pub fn handle_memory_command(command: MemoryCommand) -> serde_json::Value {
             "target": target,
             "content_length": content.len()
         }),
-        MemoryCommand::Patch { target, old_text, new_text } => json!({
+        MemoryCommand::Patch {
+            target,
+            old_text,
+            new_text,
+        } => json!({
             "success": true,
             "message": format!("memory entry patched in {}", target),
             "target": target,

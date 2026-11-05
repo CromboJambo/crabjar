@@ -1,7 +1,7 @@
 //! Worker management methods for the conductor.
 
-use crate::auth;
 use crate::audit::{AuditContext, AuditEventType};
+use crate::auth;
 use crate::conductor::Conductor;
 use crate::gate::trust_sufficient_for_auto_assign;
 use anyhow::Result;
@@ -26,7 +26,9 @@ impl Conductor {
             auth::validate_ssh_public_key(key)?;
         }
 
-        let result = self.store.register_worker(name.clone(), capabilities, ssh_key)?;
+        let result = self
+            .store
+            .register_worker(name.clone(), capabilities, ssh_key)?;
 
         // Audit: log worker registration
         if let Some(logger) = &self.audit_logger {
@@ -71,15 +73,14 @@ impl Conductor {
 
         // Worker not found — register a new one (auto-registration on first login)
         info!(name = %name, "Auto-registering worker on first login");
-        let result = self.store.register_worker(name.to_string(), vec![], ssh_key)?;
+        let result = self
+            .store
+            .register_worker(name.to_string(), vec![], ssh_key)?;
         Ok(result)
     }
 
     /// Poll for tasks assigned to a specific worker.
-    pub fn tasks_for_worker(
-        &self,
-        worker_id: &str,
-    ) -> Result<Vec<crate::state_store::Task>> {
+    pub fn tasks_for_worker(&self, worker_id: &str) -> Result<Vec<crate::state_store::Task>> {
         // Get the worker's capabilities and trust level
         let worker = self
             .store
@@ -145,11 +146,7 @@ impl Conductor {
 
     /// Check if a worker's capabilities satisfy the task requirements.
     /// Supports exact match and wildcard matching (e.g., "gpu:nvidia:*").
-    fn capabilities_satisfy(
-        &self,
-        worker_caps: &[String],
-        required_caps: &[String],
-    ) -> bool {
+    fn capabilities_satisfy(&self, worker_caps: &[String], required_caps: &[String]) -> bool {
         for required in required_caps {
             let satisfied = worker_caps
                 .iter()
@@ -232,7 +229,9 @@ impl Conductor {
 
         // Check if all tasks for the goal are complete
         let goal_tasks = self.store.list_tasks_for_goal(&task.goal_id)?;
-        let all_complete = goal_tasks.iter().all(|t| t.status == crate::state_store::TaskStatus::Completed);
+        let all_complete = goal_tasks
+            .iter()
+            .all(|t| t.status == crate::state_store::TaskStatus::Completed);
 
         if all_complete {
             self.store
@@ -273,11 +272,7 @@ impl Conductor {
     }
 
     /// Report task failure. Returns updated auth token if trust level changed.
-    pub fn report_task_failed(
-        &self,
-        task_id: &str,
-        error: String,
-    ) -> Result<Option<String>> {
+    pub fn report_task_failed(&self, task_id: &str, error: String) -> Result<Option<String>> {
         // Get the task to find which worker failed it
         let task = self
             .store

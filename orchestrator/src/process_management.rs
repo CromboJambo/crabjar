@@ -2,7 +2,6 @@
 ///
 /// Provides Hermes-compatible `process_manage` tool for managing background
 /// processes — listing, starting, stopping, and inspecting running processes.
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::{Command, Stdio};
@@ -97,9 +96,10 @@ pub struct ProcessManageResponse {
 /// Tool names must be lowercase alphanumeric with hyphens/underscores.
 fn validate_tool_name(name: &str) -> bool {
     // Must start with letter, then alphanumeric/hyphen/underscore only
-    name.starts_with(|c: char| c.is_ascii_lowercase()) && name.chars().all(|c| {
-        c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_'
-    })
+    name.starts_with(|c: char| c.is_ascii_lowercase())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
 /// Execute a process management operation.
@@ -121,7 +121,9 @@ pub async fn execute_process_management(
             })
         }
         "start" => {
-            let cmd = request.command.ok_or_else(|| anyhow::anyhow!("command required for start"))?;
+            let cmd = request
+                .command
+                .ok_or_else(|| anyhow::anyhow!("command required for start"))?;
 
             // Validate command format (redteam finding #14)
             if !validate_tool_name(&cmd) {
@@ -137,7 +139,7 @@ pub async fn execute_process_management(
             if request.sandboxed {
                 // Sandboxed execution via Podman container (redteam finding #14)
                 let sandbox = PodmanSandbox::new(PodmanConfig::default());
-                
+
                 // Verify podman is available
                 match sandbox.verify_installation() {
                     Ok(_version) => {}
@@ -154,7 +156,10 @@ pub async fn execute_process_management(
 
                 // Generate container name if not provided
                 let container_name = request.container_name.unwrap_or_else(|| {
-                    format!("crabjar-sandbox-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap())
+                    format!(
+                        "crabjar-sandbox-{}",
+                        uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
+                    )
                 });
 
                 // Create and run container with the command
@@ -181,7 +186,7 @@ pub async fn execute_process_management(
                                 Ok(result) => {
                                     let _ = sandbox.stop_container(&container_id);
                                     let _ = sandbox.destroy_container(&container_id);
-                                    
+
                                     Ok(ProcessManageResponse {
                                         success: result.success(),
                                         action: "start".to_string(),
@@ -217,15 +222,13 @@ pub async fn execute_process_management(
                             })
                         }
                     }
-                    Err(e) => {
-                        Ok(ProcessManageResponse {
-                            success: false,
-                            action: "start".to_string(),
-                            result: serde_json::json!({
-                                "error": format!("Failed to create sandbox container: {}", e)
-                            }),
-                        })
-                    }
+                    Err(e) => Ok(ProcessManageResponse {
+                        success: false,
+                        action: "start".to_string(),
+                        result: serde_json::json!({
+                            "error": format!("Failed to create sandbox container: {}", e)
+                        }),
+                    }),
                 }
             } else {
                 // Unsandboxed execution (legacy behavior)
@@ -254,7 +257,9 @@ pub async fn execute_process_management(
             }
         }
         "stop" => {
-            let pid = request.pid.ok_or_else(|| anyhow::anyhow!("pid required for stop"))?;
+            let pid = request
+                .pid
+                .ok_or_else(|| anyhow::anyhow!("pid required for stop"))?;
 
             // Try to kill the process using Unix signal
             let result = Command::new("kill")
@@ -287,7 +292,9 @@ pub async fn execute_process_management(
             })
         }
         "inspect" => {
-            let pid = request.pid.ok_or_else(|| anyhow::anyhow!("pid required for inspect"))?;
+            let pid = request
+                .pid
+                .ok_or_else(|| anyhow::anyhow!("pid required for inspect"))?;
 
             let reg = registry.lock().await;
             if let Some(process) = reg.get(pid).await {

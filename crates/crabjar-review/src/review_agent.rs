@@ -186,7 +186,9 @@ pub fn parse_review_output(text: &str) -> Result<Vec<ReviewFinding>> {
             severity: parse_severity(f["severity"].as_str()),
             rule_id: f["rule_id"].as_str().map(std::string::ToString::to_string),
             message: f["message"].as_str().unwrap_or("").to_string(),
-            suggestion: f["suggestion"].as_str().map(std::string::ToString::to_string),
+            suggestion: f["suggestion"]
+                .as_str()
+                .map(std::string::ToString::to_string),
         };
         results.push(finding);
     }
@@ -205,9 +207,10 @@ fn parse_severity(s: Option<&str>) -> crate::types::Severity {
 fn extract_json_array(text: &str) -> Result<String> {
     // First try: parse as-is
     if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(text)
-        && parsed.is_array() {
-            return Ok(text.to_string());
-        }
+        && parsed.is_array()
+    {
+        return Ok(text.to_string());
+    }
 
     // Try to find JSON array in markdown code fences
     if let Some(start) = text.find("```") {
@@ -229,12 +232,13 @@ fn extract_json_array(text: &str) -> Result<String> {
 
     // Try to find [ that starts an array
     if let Some(start) = text.find('[')
-        && let Some(end) = text.rfind(']') {
-            let candidate = &text[start..=end];
-            if let Ok(_) = serde_json::from_str::<serde_json::Value>(candidate) {
-                return Ok(candidate.to_string());
-            }
+        && let Some(end) = text.rfind(']')
+    {
+        let candidate = &text[start..=end];
+        if let Ok(_) = serde_json::from_str::<serde_json::Value>(candidate) {
+            return Ok(candidate.to_string());
         }
+    }
 
     Ok("[]".to_string())
 }

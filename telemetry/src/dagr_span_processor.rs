@@ -16,7 +16,7 @@
 
 use opentelemetry::{KeyValue, trace::Status};
 use opentelemetry_sdk::trace::{SpanData, SpanProcessor};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -176,7 +176,7 @@ impl DagrSpanProcessor {
                         }),
                     )
                 }
-            },
+            }
             _ => (
                 events::TASK_STARTED,
                 json!({
@@ -253,16 +253,19 @@ impl SpanProcessor for DagrSpanProcessor {
         match name {
             "crabjar.execution" => {
                 self.emit_execution_event(&span);
-            },
+            }
             "crabjar.guard.evaluate" => {
                 self.emit_guard_event(&span);
-            },
+            }
             "crabjar.session.start" | "crabjar.session.end" => {
                 self.emit_session_event(&span);
-            },
+            }
             _ => {
                 // Other spans: emit as generic shell job events if they have duration
-                let duration = span.end_time.duration_since(span.start_time).unwrap_or_default();
+                let duration = span
+                    .end_time
+                    .duration_since(span.start_time)
+                    .unwrap_or_default();
                 if duration.as_millis() > 1000 {
                     // Long-running command → shell job event
                     self.emit_event(
@@ -277,7 +280,7 @@ impl SpanProcessor for DagrSpanProcessor {
                         }),
                     );
                 }
-            },
+            }
         }
     }
 

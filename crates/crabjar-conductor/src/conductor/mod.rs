@@ -1,6 +1,6 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
-use crate::audit::{ConductorAuditLogger, AuditContext, AuditEventType};
+use crate::audit::{AuditContext, AuditEventType, ConductorAuditLogger};
 use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
 use crate::fleet_status::FleetStatusTracker;
 use crate::promotion::PromotionManager;
@@ -8,10 +8,10 @@ use crate::sandbox::SandboxManager;
 use crate::state_store::{Goal, GoalStatus, StateStore, Task, Worker};
 use anyhow::Result;
 use rusqlite::Connection;
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
-use serde_json::json;
 
 pub mod decisions;
 pub mod workers;
@@ -210,7 +210,9 @@ impl Conductor {
 
         // Debug: resolve the hostname ourselves to see what IP we get
         let parsed = reqwest::Url::parse(&url).map_err(|e| anyhow::anyhow!("invalid URL: {e}"))?;
-        let host = parsed.host_str().ok_or_else(|| anyhow::anyhow!("no host in URL"))?;
+        let host = parsed
+            .host_str()
+            .ok_or_else(|| anyhow::anyhow!("no host in URL"))?;
         info!(goal_id = %goal_id, host = %host, "Resolved hostname");
 
         // Try resolving manually to see what we get
@@ -320,13 +322,14 @@ impl Conductor {
         };
 
         // Try to parse the content as JSON array of tasks
-        let task_specs: Vec<serde_json::Value> = serde_json::from_str(&json_to_parse).map_err(|e| {
-            anyhow::anyhow!(
-                "failed to parse task specs from LLM: {} - {}",
-                e,
-                &json_to_parse[..std::cmp::min(200, json_to_parse.len())]
-            )
-        })?;
+        let task_specs: Vec<serde_json::Value> =
+            serde_json::from_str(&json_to_parse).map_err(|e| {
+                anyhow::anyhow!(
+                    "failed to parse task specs from LLM: {} - {}",
+                    e,
+                    &json_to_parse[..std::cmp::min(200, json_to_parse.len())]
+                )
+            })?;
 
         // Create tasks in the store
         let mut tasks = Vec::new();
