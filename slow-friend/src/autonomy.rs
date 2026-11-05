@@ -93,6 +93,7 @@ impl AutonomyTracker {
         }
 
         // Re-evaluate permission level based on approval ratio
+        #[allow(clippy::cast_precision_loss)]
         let approval_ratio = if record.total_attempts > 0 {
             record.approved as f64 / record.total_attempts as f64
         } else {

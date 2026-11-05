@@ -36,6 +36,19 @@ pub struct OtelExporter {
     _provider: Arc<opentelemetry_sdk::trace::SdkTracerProvider>,
 }
 
+/// Execution event data for recording as a trace span.
+#[derive(Debug)]
+pub struct ExecutionEvent<'a> {
+    pub session_id: &'a str,
+    pub command_id: &'a str,
+    pub command: &'a str,
+    pub args: &'a [String],
+    pub cwd: &'a str,
+    pub exit_code: i32,
+    pub duration_ms: u64,
+    pub reason: &'a str,
+}
+
 impl OtelExporter {
     /// Create a new exporter from configuration with optional DAGR span processor.
     pub fn from_config_with_processor(
@@ -81,30 +94,20 @@ impl OtelExporter {
     }
 
     /// Record an execution event as a trace span.
-    pub fn record_execution(
-        &self,
-        session_id: &str,
-        command_id: &str,
-        command: &str,
-        args: &[String],
-        cwd: &str,
-        exit_code: i32,
-        duration_ms: u64,
-        reason: &str,
-    ) {
+    pub fn record_execution(&self, event: &ExecutionEvent) {
         let mut span = self
             .tracer
             .span_builder("crabjar.execution")
             .with_kind(SpanKind::Server)
             .with_attributes(vec![
-                KeyValue::new("session.id", session_id.to_string()),
-                KeyValue::new("command.id", command_id.to_string()),
-                KeyValue::new("command.name", command.to_string()),
-                KeyValue::new("command.args", args.join(" ")),
-                KeyValue::new("command.cwd", cwd.to_string()),
-                KeyValue::new("command.exit_code", exit_code as i64),
-                KeyValue::new("command.duration_ms", duration_ms as i64),
-                KeyValue::new("command.reason", reason.to_string()),
+                KeyValue::new("session.id", event.session_id.to_string()),
+                KeyValue::new("command.id", event.command_id.to_string()),
+                KeyValue::new("command.name", event.command.to_string()),
+                KeyValue::new("command.args", event.args.join(" ")),
+                KeyValue::new("command.cwd", event.cwd.to_string()),
+                KeyValue::new("command.exit_code", event.exit_code as i64),
+                KeyValue::new("command.duration_ms", event.duration_ms as i64),
+                KeyValue::new("command.reason", event.reason.to_string()),
             ])
             .start(&self.tracer);
 

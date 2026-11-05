@@ -201,6 +201,9 @@ agent-context = { path = "memory" }
 rstest = "0.26.1"
 serial_test = "3.2.0"
 
+# Fix xattr ENOATTR issue on newer glibc (Ubuntu 26+)
+xattr = "1.7"
+
 [profile.profiling]
 inherits = "release"
 debug = 2

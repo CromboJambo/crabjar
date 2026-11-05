@@ -16,6 +16,7 @@ const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024;
 const MAX_FILES: usize = 100;
 
 /// Skill security scanner.
+#[derive(Default)]
 pub struct SkillScanner;
 
 impl SkillScanner {
@@ -226,19 +227,16 @@ impl SkillScanner {
                 && metadata.len() > 1024
             {
                 // Try to read as text to determine if it's binary
-                match fs::read_to_string(path) {
-                    Err(_) => {
-                        result.add_finding(ScanFinding {
-                            severity: Severity::Warning,
-                            category: "binary_file".to_string(),
-                            message: format!(
-                                "Non-text file > 1KB detected ({} bytes)",
-                                metadata.len()
-                            ),
-                            file: Some(path.to_string_lossy().to_string()),
-                        });
-                    }
-                    Ok(_) => {} // It's text
+                if fs::read_to_string(path).is_err() {
+                    result.add_finding(ScanFinding {
+                        severity: Severity::Warning,
+                        category: "binary_file".to_string(),
+                        message: format!(
+                            "Non-text file > 1KB detected ({} bytes)",
+                            metadata.len()
+                        ),
+                        file: Some(path.to_string_lossy().to_string()),
+                    });
                 }
             }
         }
@@ -263,21 +261,18 @@ impl SkillScanner {
             }
 
             let path = entry.path();
-            match fs::read_to_string(path) {
-                Ok(content) => {
-                    for pattern in &patterns {
-                        if content.contains(pattern) {
-                            result.add_finding(ScanFinding {
-                                severity: Severity::Info,
-                                category: "network".to_string(),
-                                message: format!("Network access pattern detected: {}", pattern),
-                                file: Some(path.to_string_lossy().to_string()),
-                            });
-                            break;
-                        }
+            if let Ok(content) = fs::read_to_string(path) {
+                for pattern in &patterns {
+                    if content.contains(pattern) {
+                        result.add_finding(ScanFinding {
+                            severity: Severity::Info,
+                            category: "network".to_string(),
+                            message: format!("Network access pattern detected: {}", pattern),
+                            file: Some(path.to_string_lossy().to_string()),
+                        });
+                        break;
                     }
                 }
-                Err(_) => {} // Skip binary files
             }
         }
     }
@@ -294,21 +289,18 @@ impl SkillScanner {
             }
 
             let path = entry.path();
-            match fs::read_to_string(path) {
-                Ok(content) => {
-                    for pattern in &patterns {
-                        if content.contains(pattern) {
-                            result.add_finding(ScanFinding {
-                                severity: Severity::Info,
-                                category: "filesystem".to_string(),
-                                message: format!("Filesystem write pattern detected: {}", pattern),
-                                file: Some(path.to_string_lossy().to_string()),
-                            });
-                            break;
-                        }
+            if let Ok(content) = fs::read_to_string(path) {
+                for pattern in &patterns {
+                    if content.contains(pattern) {
+                        result.add_finding(ScanFinding {
+                            severity: Severity::Info,
+                            category: "filesystem".to_string(),
+                            message: format!("Filesystem write pattern detected: {}", pattern),
+                            file: Some(path.to_string_lossy().to_string()),
+                        });
+                        break;
                     }
                 }
-                Err(_) => {} // Skip binary files
             }
         }
     }
@@ -325,24 +317,21 @@ impl SkillScanner {
             }
 
             let path = entry.path();
-            match fs::read_to_string(path) {
-                Ok(content) => {
-                    for pattern in &patterns {
-                        if content.contains(pattern) {
-                            result.add_finding(ScanFinding {
-                                severity: Severity::Info,
-                                category: "environment".to_string(),
-                                message: format!(
-                                    "Environment variable access detected: {}",
-                                    pattern
-                                ),
-                                file: Some(path.to_string_lossy().to_string()),
-                            });
-                            break;
-                        }
+            if let Ok(content) = fs::read_to_string(path) {
+                for pattern in &patterns {
+                    if content.contains(pattern) {
+                        result.add_finding(ScanFinding {
+                            severity: Severity::Info,
+                            category: "environment".to_string(),
+                            message: format!(
+                                "Environment variable access detected: {}",
+                                pattern
+                            ),
+                            file: Some(path.to_string_lossy().to_string()),
+                        });
+                        break;
                     }
                 }
-                Err(_) => {} // Skip binary files
             }
         }
     }

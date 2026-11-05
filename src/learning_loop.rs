@@ -105,7 +105,7 @@ impl LearningAnalyzer {
 
         let mut results: Vec<SkillHealth> = health_map.into_values().collect();
         // Sort by invocations descending (most used first)
-        results.sort_by(|a, b| b.invocations.cmp(&a.invocations));
+        results.sort_by_key(|b| std::cmp::Reverse(b.invocations));
         Ok(results)
     }
 
@@ -131,7 +131,7 @@ impl LearningAnalyzer {
         // Pattern 2: Repeated error types
         let mut error_counts: HashMap<String, Vec<String>> = HashMap::new();
         for h in &health {
-            for (error_type, _count) in &h.error_types {
+            for error_type in h.error_types.keys() {
                 error_counts
                     .entry(error_type.clone())
                     .or_default()

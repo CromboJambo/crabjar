@@ -11,14 +11,14 @@ env:
 
 jobs:
   fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Check formatting
       run: cargo fmt --all --check
 
   clippy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -30,7 +30,7 @@ jobs:
       run: cargo clippy --workspace --all-targets -- -D warnings
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -42,7 +42,7 @@ jobs:
       run: cargo build --workspace --all-targets --verbose
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -54,7 +54,7 @@ jobs:
       run: cargo test --workspace --all-targets --verbose
 
   reproducible-build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -76,25 +76,23 @@ jobs:
         echo "=== Reproducible build verified ==="
 
   module-sizes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - name: Check module sizes
       run: python scripts/module-sizes.py --threshold 500
 
   snapshot-review:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
-    - name: Install cargo-insta (pre-built binary)
-      run: |
-        INSTA_VERSION=$(curl -s https://api.github.com/repos/mitsuhiko/insta/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/')
-        curl -L "https://github.com/mitsuhiko/insta/releases/download/v${INSTA_VERSION}/cargo-insta-${INSTA_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz -C ~/.cargo/bin
+    - name: Install cargo-insta
+      run: cargo install cargo-insta --quiet
     - name: Review snapshots (fail on pending)
       run: cargo insta test --review --test snapshot_tests
 
   e2e-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
     - uses: dtolnay/rust-toolchain@stable
@@ -106,7 +104,7 @@ jobs:
       run: cargo test --test e2e_smoke --release
 
   e2e-full:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [build, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'schedule'
     steps:

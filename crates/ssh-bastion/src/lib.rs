@@ -107,9 +107,8 @@ fn validate_ssh_key_permissions(key_path: &str) -> Result<(), Box<dyn std::error
     // Check that the key is not world-readable or group-readable
     if mode & 0o077 != 0 {
         return Err(format!(
-            "SSH key '{}' has overly permissive permissions ({}). Expected 0600 or stricter.",
-            key_path,
-            format!("{:o}", mode)
+            "SSH key '{}' has overly permissive permissions ({:o}). Expected 0600 or stricter.",
+            key_path, mode
         )
         .into());
     }

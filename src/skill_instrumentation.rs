@@ -37,6 +37,12 @@ pub struct SkillInvocationLogger {
     active: Mutex<HashMap<String, InvocationTracker>>,
 }
 
+impl Default for SkillInvocationLogger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SkillInvocationLogger {
     /// Create a new logger writing to the default instrumentation path.
     pub fn new() -> Self {

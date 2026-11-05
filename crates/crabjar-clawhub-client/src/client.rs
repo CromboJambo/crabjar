@@ -22,6 +22,12 @@ pub struct ClawHubClient {
     base_url: String,
 }
 
+impl Default for ClawHubClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ClawHubClient {
     /// Create a new ClawHub client with the default API URL.
     ///

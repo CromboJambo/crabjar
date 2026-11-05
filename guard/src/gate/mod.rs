@@ -144,12 +144,11 @@ impl<'a> ExecutionGate<'a> {
         }
 
         // 6. PID trust check (Option B: per-process trust layers)
-        if let Some(pid) = ctx.pid {
-            if let Some(gate_result) =
+        if let Some(pid) = ctx.pid
+            && let Some(gate_result) =
                 pid_trust::check_pid_trust(&self.trust.conn(), pid, ctx.command, &self.risk_config)?
-            {
-                return Ok(gate_result);
-            }
+        {
+            return Ok(gate_result);
         }
 
         // 7. Scope isolation check

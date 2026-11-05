@@ -29,6 +29,7 @@ mod events {
     /// Task failed
     pub const TASK_FAILED: &str = "task_failed";
     /// Shell job started (long-running command)
+    #[allow(dead_code)]
     pub const SHELL_JOB_STARTED: &str = "shell_job_started";
     /// Shell job finished
     pub const SHELL_JOB_FINISHED: &str = "shell_job_finished";
@@ -41,6 +42,7 @@ mod events {
     /// Agent offline (session ended)
     pub const AGENT_OFFLINE: &str = "agent_offline";
     /// Agent idle (no activity for N seconds)
+    #[allow(dead_code)]
     pub const AGENT_IDLE: &str = "agent_idle";
 }
 

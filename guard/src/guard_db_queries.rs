@@ -131,7 +131,7 @@ impl GuardDb {
         eprintln!(
             "DEBUG persist: action_id={}, source_event_id={}",
             action_id,
-            source_event_id.as_deref().unwrap_or("NONE")
+            source_event_id.unwrap_or("NONE")
         );
         conn.execute(
             "INSERT INTO action_requests \

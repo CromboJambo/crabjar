@@ -18,26 +18,26 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RiskLevel {
     /// Auto-approve: read-only, idempotent, reversible operations
-    L0_Auto = 0,
+    L0Auto = 0,
     /// Low risk: local changes that are easily reversible
-    L1_Low = 1,
+    L1Low = 1,
     /// Medium risk: changes that affect shared state or require review
-    L2_Medium = 2,
+    L2Medium = 2,
     /// High risk: destructive or hard-to-reverse operations
-    L3_High = 3,
+    L3High = 3,
     /// Critical: requires explicit user approval every time
-    L4_Critical = 4,
+    L4Critical = 4,
 }
 
 impl RiskLevel {
     pub fn auto_approve(&self) -> bool {
-        matches!(self, RiskLevel::L0_Auto | RiskLevel::L1_Low)
+        matches!(self, RiskLevel::L0Auto | RiskLevel::L1Low)
     }
 
     pub fn requires_review(&self) -> bool {
         matches!(
             self,
-            RiskLevel::L2_Medium | RiskLevel::L3_High | RiskLevel::L4_Critical
+            RiskLevel::L2Medium | RiskLevel::L3High | RiskLevel::L4Critical
         )
     }
 }
@@ -55,7 +55,7 @@ pub fn classify_action(action_type: &str) -> RiskLevel {
         | "cargo_test"
         | "cargo_clippy"
         | "crabjar_state_list"
-        | "crabjar_guard_pending" => RiskLevel::L0_Auto,
+        | "crabjar_guard_pending" => RiskLevel::L0Auto,
 
         // L1: Low risk (local, reversible)
         "file_write"
@@ -65,24 +65,24 @@ pub fn classify_action(action_type: &str) -> RiskLevel {
         | "cargo_build"
         | "cargo_fmt"
         | "create_branch"
-        | "crabjar_state_update" => RiskLevel::L1_Low,
+        | "crabjar_state_update" => RiskLevel::L1Low,
 
         // L2: Medium risk (shared state, needs review)
         "git_push" | "git_merge" | "deploy_local" | "modify_config" | "install_dependency" => {
-            RiskLevel::L2_Medium
+            RiskLevel::L2Medium
         }
 
         // L3: High risk (destructive or hard to reverse)
         "delete_file" | "git_reset" | "git_tag" | "deploy_remote" | "modify_guard_policy" => {
-            RiskLevel::L3_High
+            RiskLevel::L3High
         }
 
         // L4: Critical (always require explicit approval)
         "sudo_command" | "network_change" | "user_management" | "crabjar_guard_modify" => {
-            RiskLevel::L4_Critical
+            RiskLevel::L4Critical
         }
 
-        _ => RiskLevel::L2_Medium, // Default to review for unknown actions
+        _ => RiskLevel::L2Medium, // Default to review for unknown actions
     }
 }
 
@@ -262,31 +262,31 @@ mod tests {
 
     #[test]
     fn test_classify_action_read_only() {
-        assert_eq!(classify_action("file_read"), RiskLevel::L0_Auto);
-        assert_eq!(classify_action("git_status"), RiskLevel::L0_Auto);
+        assert_eq!(classify_action("file_read"), RiskLevel::L0Auto);
+        assert_eq!(classify_action("git_status"), RiskLevel::L0Auto);
     }
 
     #[test]
     fn test_classify_action_low_risk() {
-        assert_eq!(classify_action("file_write"), RiskLevel::L1_Low);
-        assert_eq!(classify_action("git_commit"), RiskLevel::L1_Low);
+        assert_eq!(classify_action("file_write"), RiskLevel::L1Low);
+        assert_eq!(classify_action("git_commit"), RiskLevel::L1Low);
     }
 
     #[test]
     fn test_classify_action_medium_risk() {
-        assert_eq!(classify_action("git_push"), RiskLevel::L2_Medium);
-        assert_eq!(classify_action("deploy_local"), RiskLevel::L2_Medium);
+        assert_eq!(classify_action("git_push"), RiskLevel::L2Medium);
+        assert_eq!(classify_action("deploy_local"), RiskLevel::L2Medium);
     }
 
     #[test]
     fn test_classify_action_high_risk() {
-        assert_eq!(classify_action("delete_file"), RiskLevel::L3_High);
-        assert_eq!(classify_action("git_reset"), RiskLevel::L3_High);
+        assert_eq!(classify_action("delete_file"), RiskLevel::L3High);
+        assert_eq!(classify_action("git_reset"), RiskLevel::L3High);
     }
 
     #[test]
     fn test_classify_action_critical() {
-        assert_eq!(classify_action("sudo_command"), RiskLevel::L4_Critical);
+        assert_eq!(classify_action("sudo_command"), RiskLevel::L4Critical);
     }
 
     #[test]
@@ -295,14 +295,14 @@ mod tests {
         cache.set(
             "test-key".to_string(),
             "What is the risk level of git_push?".to_string(),
-            "L2_Medium".to_string(),
+            "L2Medium".to_string(),
             3600,
             "guard".to_string(),
         );
 
         let cached = cache.get("test-key");
         assert!(cached.is_some());
-        assert_eq!(cached.unwrap().result, "L2_Medium");
+        assert_eq!(cached.unwrap().result, "L2Medium");
     }
 
     #[test]

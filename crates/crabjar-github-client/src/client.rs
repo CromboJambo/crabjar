@@ -11,13 +11,19 @@ use crate::error::GitHubError;
 use crate::models::{RepoInfo, SearchOptions, SkillInstallResult};
 
 /// GitHub API base URL.
-const GITHUB_API_URL: &str = "https://api.github.com";
+pub const GITHUB_API_URL: &str = "https://api.github.com";
 
 /// GitHub client for skill discovery and installation.
 #[derive(Clone)]
 pub struct GitHubClient {
     http: Client,
     token: Option<String>,
+}
+
+impl Default for GitHubClient {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GitHubClient {

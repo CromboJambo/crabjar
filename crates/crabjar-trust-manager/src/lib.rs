@@ -11,7 +11,7 @@ pub mod models;
 pub mod trust;
 pub mod updates;
 
-pub use cache::SkillCache;
+pub use cache::{CacheSkillOptions, SkillCache};
 pub use error::TrustManagerError;
 pub use models::{SkillCacheEntry, TrustTier, UpdateCheckResult};
 pub use trust::TrustManager;

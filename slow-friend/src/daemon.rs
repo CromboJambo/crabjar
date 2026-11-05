@@ -38,6 +38,7 @@ where
     executor: Arc<E>,
     autonomy: AutonomyTracker,
     lattice: SparseLattice,
+    #[allow(dead_code)]
     config: DaemonConfig,
 }
 
@@ -70,7 +71,7 @@ where
         // Tier 1: Check all sensors
         for sensor in &self.sensors {
             match sensor.check() {
-                SensorResult::Quiet => continue,
+                SensorResult::Quiet => {}
                 SensorResult::Alert(event) => {
                     // Tier 2: Interpret the event
                     let interpretation = self.interpreter.interpret(event);
@@ -100,7 +101,7 @@ where
                     };
 
                     match decision {
-                        JevDecision::Sleep => continue,
+                        JevDecision::Sleep => {}
                         JevDecision::Execute(action) => {
                             // Tier 4: Execute with CrabJar guard
                             let result = self.executor.execute(&action);

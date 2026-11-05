@@ -27,7 +27,7 @@ impl std::fmt::Display for TrustTier {
 
 impl TrustTier {
     /// Parse trust tier from string.
-    pub fn from_str(s: &str) -> Result<Self, crate::TrustManagerError> {
+    pub fn parse_tier(s: &str) -> Result<Self, crate::TrustManagerError> {
         match s.to_lowercase().as_str() {
             "community" => Ok(TrustTier::Community),
             "verified" => Ok(TrustTier::Verified),

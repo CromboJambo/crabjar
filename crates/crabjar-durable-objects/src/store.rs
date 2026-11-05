@@ -27,14 +27,6 @@ pub enum CheckpointStatus {
 }
 
 impl CheckpointStatus {
-    fn as_str(&self) -> &'static str {
-        match self {
-            CheckpointStatus::Active => "active",
-            CheckpointStatus::Pruned => "pruned",
-            CheckpointStatus::Failed => "failed",
-        }
-    }
-
     fn from_str(s: &str) -> Self {
         match s {
             "pruned" => CheckpointStatus::Pruned,
@@ -140,24 +132,22 @@ impl CheckpointStore {
         )?;
         let mut rows = stmt.query(params![id])?;
 
-        loop {
-            match rows.next() {
-                Ok(Some(row)) => {
-                    let created_at_str: String = row.get(2)?;
-                    let status = CheckpointStatus::from_str(&row.get::<_, String>(4)?);
-                    return Ok(Some(CheckpointMeta {
-                        id: row.get(0)?,
-                        task_id: row.get(1)?,
-                        created_at: DateTime::parse_from_rfc3339(&created_at_str)
-                            .map_err(|e| CheckpointError::Validation(e.to_string()))?
-                            .with_timezone(&Utc),
-                        size_bytes: row.get(3)?,
-                        status,
-                    }));
-                }
-                Ok(None) => return Ok(None),
-                Err(e) => return Err(CheckpointError::DbError(e)),
+        match rows.next() {
+            Ok(Some(row)) => {
+                let created_at_str: String = row.get(2)?;
+                let status = CheckpointStatus::from_str(&row.get::<_, String>(4)?);
+                Ok(Some(CheckpointMeta {
+                    id: row.get(0)?,
+                    task_id: row.get(1)?,
+                    created_at: DateTime::parse_from_rfc3339(&created_at_str)
+                        .map_err(|e| CheckpointError::Validation(e.to_string()))?
+                        .with_timezone(&Utc),
+                    size_bytes: row.get(3)?,
+                    status,
+                }))
             }
+            Ok(None) => Ok(None),
+            Err(e) => Err(CheckpointError::DbError(e)),
         }
     }
 
@@ -166,24 +156,22 @@ impl CheckpointStore {
         let mut stmt = self.db.prepare("SELECT id, task_id, created_at, size_bytes, status FROM checkpoints WHERE task_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1")?;
         let mut rows = stmt.query(params![task_id])?;
 
-        loop {
-            match rows.next() {
-                Ok(Some(row)) => {
-                    let created_at_str: String = row.get(2)?;
-                    let status = CheckpointStatus::from_str(&row.get::<_, String>(4)?);
-                    return Ok(Some(CheckpointMeta {
-                        id: row.get(0)?,
-                        task_id: row.get(1)?,
-                        created_at: DateTime::parse_from_rfc3339(&created_at_str)
-                            .map_err(|e| CheckpointError::Validation(e.to_string()))?
-                            .with_timezone(&Utc),
-                        size_bytes: row.get(3)?,
-                        status,
-                    }));
-                }
-                Ok(None) => return Ok(None),
-                Err(e) => return Err(CheckpointError::DbError(e)),
+        match rows.next() {
+            Ok(Some(row)) => {
+                let created_at_str: String = row.get(2)?;
+                let status = CheckpointStatus::from_str(&row.get::<_, String>(4)?);
+                Ok(Some(CheckpointMeta {
+                    id: row.get(0)?,
+                    task_id: row.get(1)?,
+                    created_at: DateTime::parse_from_rfc3339(&created_at_str)
+                        .map_err(|e| CheckpointError::Validation(e.to_string()))?
+                        .with_timezone(&Utc),
+                    size_bytes: row.get(3)?,
+                    status,
+                }))
             }
+            Ok(None) => Ok(None),
+            Err(e) => Err(CheckpointError::DbError(e)),
         }
     }
 

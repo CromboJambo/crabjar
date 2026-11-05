@@ -10,6 +10,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
+/// Options for caching a skill.
+#[derive(Debug)]
+pub struct CacheSkillOptions {
+    pub name: String,
+    pub version: String,
+    pub source: String,
+    pub install_path: PathBuf,
+    pub download_url: Option<String>,
+    pub checksum: Option<String>,
+    pub trust_tier: TrustTier,
+}
+
 /// Cached skill metadata stored on disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CacheMetadata {
@@ -62,22 +74,16 @@ impl SkillCache {
     /// Cache a downloaded skill with its metadata.
     pub fn cache_skill(
         &mut self,
-        name: &str,
-        version: &str,
-        source: &str,
-        install_path: PathBuf,
-        download_url: Option<String>,
-        checksum: Option<String>,
-        trust_tier: TrustTier,
+        opts: CacheSkillOptions,
     ) -> Result<SkillCacheEntry, TrustManagerError> {
         let entry = SkillCacheEntry {
-            name: name.to_string(),
-            version: version.to_string(),
-            source: source.to_string(),
-            install_path: install_path.to_string_lossy().to_string(),
-            download_url,
-            checksum,
-            trust_tier,
+            name: opts.name.clone(),
+            version: opts.version.clone(),
+            source: opts.source.clone(),
+            install_path: opts.install_path.to_string_lossy().to_string(),
+            download_url: opts.download_url.clone(),
+            checksum: opts.checksum.clone(),
+            trust_tier: opts.trust_tier,
             installed_at: Utc::now(),
             last_used: Utc::now(),
         };
@@ -95,16 +101,16 @@ impl SkillCache {
             last_used: entry.last_used,
         };
 
-        let meta_path = self.cache_dir.join(format!("{}.json", name));
+        let meta_path = self.cache_dir.join(format!("{}.json", opts.name));
         fs::write(&meta_path, serde_json::to_string_pretty(&meta)?)?;
 
         info!(
-            skill = %name,
-            version = %version,
+            skill = %opts.name,
+            version = %opts.version,
             "cached skill"
         );
 
-        self.entries.insert(name.to_string(), entry.clone());
+        self.entries.insert(opts.name, entry.clone());
         Ok(entry)
     }
 
@@ -208,7 +214,7 @@ impl SkillCache {
                 let content = fs::read_to_string(&path)?;
                 if let Ok(meta) = serde_json::from_str::<CacheMetadata>(&content) {
                     let tier =
-                        TrustTier::from_str(&meta.trust_tier).unwrap_or(TrustTier::Community);
+                        TrustTier::parse_tier(&meta.trust_tier).unwrap_or(TrustTier::Community);
                     let entry = SkillCacheEntry {
                         name: meta.name.clone(),
                         version: meta.version,
@@ -245,15 +251,15 @@ mod tests {
 
         let mut cache = SkillCache::new().unwrap();
         let entry = cache
-            .cache_skill(
-                "test-skill",
-                "1.0.0",
-                "clawhub",
-                dir.path().join("test-skill"),
-                Some("https://example.com/skill.tar.gz".to_string()),
-                Some("abc123".to_string()),
-                TrustTier::Community,
-            )
+            .cache_skill(CacheSkillOptions {
+                name: "test-skill".to_string(),
+                version: "1.0.0".to_string(),
+                source: "clawhub".to_string(),
+                install_path: dir.path().join("test-skill"),
+                download_url: Some("https://example.com/skill.tar.gz".to_string()),
+                checksum: Some("abc123".to_string()),
+                trust_tier: TrustTier::Community,
+            })
             .unwrap();
 
         assert_eq!(entry.name, "test-skill");
@@ -270,15 +276,15 @@ mod tests {
 
         let mut cache = SkillCache::new().unwrap();
         cache
-            .cache_skill(
-                "test-skill",
-                "1.0.0",
-                "clawhub",
-                dir.path().join("test-skill"),
-                None,
-                None,
-                TrustTier::Community,
-            )
+            .cache_skill(CacheSkillOptions {
+                name: "test-skill".to_string(),
+                version: "1.0.0".to_string(),
+                source: "clawhub".to_string(),
+                install_path: dir.path().join("test-skill"),
+                download_url: None,
+                checksum: None,
+                trust_tier: TrustTier::Community,
+            })
             .unwrap();
 
         assert!(cache.remove("test-skill").unwrap());

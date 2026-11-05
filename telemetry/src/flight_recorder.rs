@@ -245,16 +245,16 @@ impl<'a> FlightRecorder<'a> {
                     // Export to OpenTelemetry if enabled
                     #[cfg(feature = "otel")]
                     if let Some(otel) = &self.otel {
-                        otel.record_execution(
-                            &self.session_id,
-                            &cmd_id,
+                        otel.record_execution(&crate::otel_export::ExecutionEvent {
+                            session_id: &self.session_id,
+                            command_id: &cmd_id,
                             command,
                             args,
                             cwd,
                             exit_code,
-                            0, // duration not tracked yet
+                            duration_ms: 0, // duration not tracked yet
                             reason,
-                        );
+                        });
                     }
 
                     info!(

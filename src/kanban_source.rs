@@ -7,7 +7,7 @@
 use chrono::Utc;
 use rusqlite::Connection;
 use serde_json::Value;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// A task from the Hermes kanban board.
 #[derive(Debug, Clone)]
@@ -89,13 +89,13 @@ pub fn read_all_tasks() -> Result<Vec<KanbanTask>, String> {
     }
 
     // Sort by created_at descending (most recent first)
-    all_tasks.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    all_tasks.sort_by_key(|b| std::cmp::Reverse(b.created_at));
 
     Ok(all_tasks)
 }
 
 /// Read board configuration to check for model/provider settings.
-pub fn read_board_config(board_path: &PathBuf) -> Option<BoardConfig> {
+pub fn read_board_config(board_path: &Path) -> Option<BoardConfig> {
     let parent = board_path.parent()?;
     let config_path = parent.join("board.json");
 
@@ -153,7 +153,7 @@ pub fn detect_stuck_boards(tasks: &[KanbanTask]) -> Vec<String> {
 }
 
 /// Read all non-archived tasks from the kanban board.
-pub fn read_tasks(board_path: &PathBuf) -> Result<Vec<KanbanTask>, String> {
+pub fn read_tasks(board_path: &Path) -> Result<Vec<KanbanTask>, String> {
     let conn =
         Connection::open(board_path).map_err(|e| format!("failed to open kanban.db: {e}"))?;
 
