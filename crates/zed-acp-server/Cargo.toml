@@ -23,10 +23,10 @@ thiserror = "2.0"
 anyhow = "1.0"
 
 # Security layer
-crabjar-guard = { path = "../guard" }
+crabjar-guard = { path = "../../guard" }
 
 # Telemetry
-crabjar-telemetry = { path = "../telemetry" }
+crabjar-telemetry = { path = "../../telemetry" }
 
 # Tracing
 tracing = "0.1"

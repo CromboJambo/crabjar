@@ -48,12 +48,12 @@ members = [
     "src/skill-process-management",
     "src/skill-struct-tok-pipeline",
     # Scheduler — cron jobs, workers, watchers with execution gating
-    "scheduler",
+    "crates/scheduler",
     # Zed ACP
-    "zed-acp-bridge",
-    "zed-acp-server",
+    "crates/zed-acp-bridge",
+    "crates/zed-acp-server",
     # Plugin system
-    "crates/crabjar-plugin", "slow-friend",
+    "crates/crabjar-plugin", "crates/slow-friend",
     # GPU-accelerated agent dashboard (proof-of-concept)
     "crates/crabjar-gpui",
     # Git operations for crabjar IDE (diff, status, add, commit via libgit2)
@@ -75,10 +75,10 @@ members = [
     "crates/crabjar-unsloth-mcp",
     "crates/crabjar-herdr-mcp",
     "crates/crabjar-structured-aux",
-    "universal-structure",
+    "crates/universal-structure",
     "crates/email-smtp", "crates/crabjar-web-extract", "crates/crabjar-browser", "crates/crabjar-memory", "crates/crabjar-delegation", "crates/crabjar-cron", "crates/crabjar-homeassistant", "crates/crabjar-deploy",
     # Performance benchmarks for execution pipeline
-    "benchmarks",
+    "crates/benchmarks",
 ]
 
 resolver = "2"
@@ -265,7 +265,7 @@ crabjar-lab-topology = { path = "crates/lab-topology" }
 crabjar-telemetry = { path = "telemetry", features = ["otel"] }
 crabjar-tool-registry = { path = "tool_registry" }
 crabjar-terminal = { path = "crates/terminal" }
-crabjar-slow-friend = { path = "slow-friend", package = "slow-friend" }
+crabjar-slow-friend = { path = "crates/slow-friend", package = "slow-friend" }
 crabjar-skills = { path = "crates/crabjar-skills" }
 crabjar-tool-binding = { path = "crates/crabjar-tool-binding" }
 crabjar-github-client = { path = "crates/crabjar-github-client" }
@@ -301,6 +301,6 @@ clap_mangen = { workspace = true }
 tempfile.workspace = true
 crabjar-host-core = { path = "host/host-core" }
 crabjar-host-agent = { path = "host/host-agent" }
-universal-structure = { path = "universal-structure" }
+universal-structure = { path = "crates/universal-structure" }
 insta = { version = "1.43", features = ["json"] }
 
