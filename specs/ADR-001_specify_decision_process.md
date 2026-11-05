@@ -25,7 +25,7 @@ This creates three problems:
 2. **Lost rationale**: When someone encounters an unfamiliar pattern in the codebase, they can't easily find why it exists
 3. **Onboarding friction**: New contributors have no way to understand architectural history without reading every commit message
 
-The project already has a culture of lightweight documentation (see `agent_config.md` at 86 lines, AGENTS.md conventions). Any decision process should match that bar — concise, structured, but not bureaucratic.
+The project already has a culture of lightweight documentation (see `docs/agent_config.md` at 86 lines, AGENTS.md conventions). Any decision process should match that bar — concise, structured, but not bureaucratic.
 
 ## Decision
 
@@ -57,7 +57,7 @@ Use a dedicated knowledge base.
 ### Option 3: Markdown files in-repo (chosen)
 ADRs as Markdown files alongside the source code.
 
-- **Pros**: Version-controlled with the code; discoverable via `grep` and `find_path`; no external tooling; matches existing documentation patterns (`agent_config.md`, `AGENTS.md`); supports structured cross-referencing via `[[ADR-NNN]]` links
+- **Pros**: Version-controlled with the code; discoverable via `grep` and `find_path`; no external tooling; matches existing documentation patterns (`docs/agent_config.md`, `AGENTS.md`); supports structured cross-referencing via `[[ADR-NNN]]` links
 - **Cons**: Requires discipline to maintain; easy to forget to update the index table
 
 ### Option 4: Git commit messages as decisions
@@ -81,11 +81,11 @@ Rely on conventional commits with detailed bodies.
 
 ### Ongoing concerns
 - When should this process be revisited? If the team grows beyond ~5 contributors and ADR count exceeds 20, consider adding tags or a search index.
-- The `project_map.md` drift governance (>7 days stale) could apply to `specs/README.md`'s index table — if no new ADRs are added for >30 days while the codebase is actively changing, that's worth flagging.
+- The `docs/project_map.md` drift governance (>7 days stale) could apply to `specs/README.md`'s index table — if no new ADRs are added for >30 days while the codebase is actively changing, that's worth flagging.
 
 ## References
 
 - Nygard, M. (2011). *Documenting Architecture Decisions*. https://www.infoq.com/articles/Architecture-Decision-Lang
 - `specs/ADR_TEMPLATE.md` — template for new ADRs
 - `specs/README.md` — process conventions and index
-- `agent_config.md` — operational principles (complementary to ADRs; config captures *how* we work, ADRs capture *why* we chose specific architectures)
+- `docs/agent_config.md` — operational principles (complementary to ADRs; config captures *how* we work, ADRs capture *why* we chose specific architectures)

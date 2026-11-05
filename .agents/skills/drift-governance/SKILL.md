@@ -5,7 +5,7 @@ description: |
   pipeline collapse, duplicate layers, bounded reversibility, worst-case perturbations,
   coasting vs resisting, or says "drift-governance", "check structural integrity",
   "audit pipeline layers", "compute perturbations", or "verify drift status". Trigger
-  when project_map.md approaches >7 day stale threshold, when the user asks to detect
+  when docs/project_map.md approaches >7 day stale threshold, when the user asks to detect
   filesystem divergence, when duplicate modules are found across crates, or when
   reversibility scoring needs bounded perturbation sets instead of single-point scores.
 ---
@@ -19,28 +19,28 @@ prevention, and bounded reversibility scoring.
 
 ---
 
-## 1. Structure Audit (project_map.md staleness)
+## 1. Structure Audit (docs/project_map.md staleness)
 
 ### When to trigger
 
-`project_map.md` generated date approaching >7 day stale threshold. Any structural
+`docs/project_map.md` generated date approaching >7 day stale threshold. Any structural
 change that could invalidate the documented architecture.
 
 ### Workflow
 
-1. **Read project_map.md** — extract the documented structure and last audit date
+1. **Read docs/project_map.md** — extract the documented structure and last audit date
 2. **Scan filesystem** — perform recursive scan of workspace root and all crate paths
 3. **Compare** — identify:
    - **Path mismatch**: documented path differs from actual (e.g. flat vs nested)
    - **Missing**: documented path not found on disk
    - **Unexpected**: disk path not documented in map
    - **Naming mismatch**: documented name vs actual name differs
-4. **Update project_map.md** — write drift report section with provenance entries
+4. **Update docs/project_map.md** — write drift report section with provenance entries
 5. **Run `cargo fmt --check` and `cargo clippy -- -D warnings`** — verify no regressions
 
 ### Output format
 
-Drift report table with | Type | project_map.md | Actual | columns. Provenance entries
+Drift report table with | Type | docs/project_map.md | Actual | columns. Provenance entries
 with UUID, Item, Set At, Reason, Source columns.
 
 ---
@@ -125,7 +125,7 @@ Replaces `ReversibilityScore` (single-point worst-case) with bounded set.
 
 ### `scripts/fs_audit.sh`
 
-Filesystem vs project_map discrepancy analysis. Run before reading project_map.md.
+Filesystem vs project_map discrepancy analysis. Run before reading docs/project_map.md.
 
 ```bash
 bash "$CRABJAR_ROOT/.agents/skills/drift-governance/scripts/fs_audit.sh"

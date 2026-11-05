@@ -171,4 +171,4 @@ The critical gaps are all in the **interaction layer**, not the orchestration la
 3. Expand skill ecosystem breadth as productivity improves
 4. Nice-to-have features can be deferred until core functionality is complete
 
-**Provenance:** This spec was generated from feature parity analysis comparing crabjar's project_map.md, AGENTS.md, CHANGELOG, and ROADMAP against Hermes Agent's documented capabilities and available skills list. The comparison identified 8 critical gaps, 3 significant gaps, and 3 minor gaps that block or reduce productivity for drop-in replacement scenarios.
+**Provenance:** This spec was generated from feature parity analysis comparing crabjar's docs/project_map.md, AGENTS.md, CHANGELOG, and ROADMAP against Hermes Agent's documented capabilities and available skills list. The comparison identified 8 critical gaps, 3 significant gaps, and 3 minor gaps that block or reduce productivity for drop-in replacement scenarios.

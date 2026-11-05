@@ -1,12 +1,12 @@
 ---
 name: structure-auditor
 description: |
-  Use this skill whenever you need to verify that the actual filesystem structure matches the documented architecture in `project_map.md`. It automates the discovery process by scanning the workspace and comparing it against the "Open Book" index, identifying any moved, renamed, or missing crates or modules. Trigger this when a command fails due to a "path not found" error, or during post-refactor audits.
+  Use this skill whenever you need to verify that the actual filesystem structure matches the documented architecture in `docs/project_map.md`. It automates the discovery process by scanning the workspace and comparing it against the "Open Book" index, identifying any moved, renamed, or missing crates or modules. Trigger this when a command fails due to a "path not found" error, or during post-refactor audits.
 ---
 
 # Structure Auditor
 
-The Structure Auditor is a diagnostic tool designed to detect "structural drift"—the discrepancy between the agent's mental model (defined in `project_map.md`) and the reality of the filesystem.
+The Structure Auditor is a diagnostic tool designed to detect "structural drift"—the discrepancy between the agent's mental model (defined in `docs/project_map.md`) and the reality of the filesystem.
 
 ## Core Workflow
 
@@ -21,7 +21,7 @@ The Structure Auditor is a diagnostic tool designed to detect "structural drift"
 ## Usage Instructions
 
 ### Input Requirements
-*   The path to the `project_map.md` file (defaults to `${PROJECT}/project_map.md`).
+*   The path to the `docs/project_map.md` file (defaults to `${PROJECT}/project_map.md`).
 *   (Optional) A target root directory to scan (defaults to the workspace root).
 
 ### Example Prompt
@@ -38,7 +38,7 @@ The Structure Auditor is a diagnostic tool designed to detect "structural drift"
 ## Skill Capabilities
 * **Path Resolution**: Resolves relative paths to absolute filesystem locations.
 * **Tree Diffing**: Performs a high-speed comparison between two directory trees.
-* **Drift Reporting**: Outputs actionable discrepancy lists for `project_map.md` updates.
+* **Drift Reporting**: Outputs actionable discrepancy lists for `docs/project_map.md` updates.
 
 ## Boundary with `drift-governance`
 `structure-auditor` is the diagnostic tool — it finds what's drifted. `drift-governance` is the governance layer — it decides what to do about it (re-index, manual review, or pipeline consolidation). Use `structure-auditor` when a command fails with "path not found" or after a refactor. Use `drift-governance` when you need to assess structural integrity, compute perturbations, or prevent pipeline collapse.

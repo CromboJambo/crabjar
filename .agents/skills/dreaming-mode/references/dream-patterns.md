@@ -3,7 +3,7 @@
 ## Analysis steps
 
 1. **Analyze patterns**: identify recurring errors or structural shifts
-2. **Update knowledge**: synthesize into agent_config.md or project_map.md
+2. **Update knowledge**: synthesize into docs/agent_config.md or docs/project_map.md
 3. **Summarize changes**: concise bullet list of proposed updates
 
 ## Pattern types
@@ -17,7 +17,7 @@
 
 - **Patterns Identified**: list of recurring patterns
 - **Structural Shifts**: list of architectural changes
-- **Proposed Updates**: list of updates to agent_config.md or project_map.md
+- **Proposed Updates**: list of updates to docs/agent_config.md or docs/project_map.md
 
 ## Constraints
 

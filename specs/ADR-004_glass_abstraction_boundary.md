@@ -51,7 +51,7 @@ Forces at play:
 - **Dependency direction is the ground truth.** The substrate is what is
   depended on; the concrete is what depends. That is mechanically checkable
   from `Cargo.toml`, unlike any naming convention.
-- **Detection ≠ authorization (principle 0, `agent_config.md`).** The glass is
+- **Detection ≠ authorization (principle 0, `docs/agent_config.md`).** The glass is
   where that boundary physically lives: observations (outside) report data in;
   the gate (inside) emits decisions out. The two must not be coupled.
 - **Generic over the wire representation.** The concrete (the wire
@@ -169,7 +169,7 @@ keep the mechanical footgun fix (Justfile resolver) separate.
   boundary; the concrete is the flywheel side).
 - [[ADR-003]] — Spatial habitat layer (clutter as memory; the same
   "representation downstream of state" discipline).
-- `agent_config.md` principle 0 — detection ≠ authorization (the glass is this,
+- `docs/agent_config.md` principle 0 — detection ≠ authorization (the glass is this,
   made spatial).
 - Crabjar design preference — "generic over the wire representation, not over
   versions."

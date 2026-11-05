@@ -54,7 +54,7 @@ Forces at play:
   it to low-power sensors. The physical truth layer already has a home in this
   workspace.
 - **Detection ≠ authorization already forbids the failure mode.** Principle 0
-  in `agent_config.md` says observer reports must not trigger execution. The
+  in `docs/agent_config.md` says observer reports must not trigger execution. The
   habitat extends the same principle to *representation*: observation of
   physical change must not silently rewrite the spatial model.
 - **The rendering temptation.** A realistic render invites the user to
@@ -209,6 +209,6 @@ Put the habitat inside Home Assistant (custom dashboard / 3D floorplan).
 - [[ADR-002]] — Herdr as execution substrate (flywheel/mechanism/clutch/
   frontend nouns)
 - `host/host-mqtt/AGENTS.md` — MQTT + HA discovery (the physical truth seam)
-- `agent_config.md` principle 0 — detection ≠ authorization
+- `docs/agent_config.md` principle 0 — detection ≠ authorization
 - `memory/src/state_docs/models.rs` — staleness tiers (the habitat needs an
   analogue)

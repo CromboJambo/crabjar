@@ -2,7 +2,7 @@ mod module_sizes;
 /// Workspace metrics module.
 ///
 /// Provides dynamic queries for test counts, module sizes, LoC totals,
-/// and clippy status — replacing stale snapshot values in project_map.md
+/// and clippy status — replacing stale snapshot values in docs/project_map.md
 /// and ROADMAP.md.
 mod test_count;
 

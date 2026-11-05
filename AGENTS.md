@@ -155,7 +155,7 @@ If you get `insta` not found, install it: `cargo install cargo-insta`.
 
 ## Drift Governance
 
-`project_map.md` stale after >7 days without modification. Divergence between documented structure and actual filesystem is a structural integrity concern.
+`docs/project_map.md` stale after >7 days without modification. Divergence between documented structure and actual filesystem is a structural integrity concern.
 
 ### State-Doc Staleness (Three-Tier Thresholds)
 
@@ -181,8 +181,8 @@ CLI: `crabjar state staleness <doc_name>` returns structured JSON with status, d
 
 ## Navigation
 
-- **`project_map.md`**: Structural map. Has its own freshness tracking (last audit date in Section 10). If >7 days old, treat as potentially stale.
-- **`agent_config.md`**: Agent philosophy and behavior guidelines.
+- **`docs/project_map.md`**: Structural map. Has its own freshness tracking (last audit date in Section 10). If >7 days old, treat as potentially stale.
+- **`docs/agent_config.md`**: Agent philosophy and behavior guidelines.
 - **`ROADMAP.md`**: Development priorities and completed phases.
 - **`<crate>/AGENTS.md`**: Per-crate documentation.
 
