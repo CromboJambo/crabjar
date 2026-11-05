@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: Check formatting
       run: cargo fmt --all --check
 
@@ -21,6 +23,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - uses: dtolnay/rust-toolchain@stable
     - name: Install system dependencies
       run: |
@@ -33,6 +37,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - uses: dtolnay/rust-toolchain@stable
     - name: Install system dependencies
       run: |
@@ -45,6 +51,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - uses: dtolnay/rust-toolchain@stable
     - name: Install system dependencies
       run: |
@@ -57,6 +65,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - uses: dtolnay/rust-toolchain@stable
     - name: Install system dependencies
       run: |
@@ -79,6 +89,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: Check module sizes
       run: python scripts/module-sizes.py --threshold 500
 
@@ -86,6 +98,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: Install cargo-insta
       run: cargo install cargo-insta --quiet
     - name: Review snapshots (fail on pending)
@@ -95,6 +109,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - uses: dtolnay/rust-toolchain@stable
     - name: Install system dependencies
       run: |
@@ -109,6 +125,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'schedule'
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - uses: dtolnay/rust-toolchain@stable
     - name: Install system dependencies
       run: |
