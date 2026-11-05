@@ -42,7 +42,7 @@ mod tests {
 
     #[test]
     fn timeout_not_expired_immediately() {
-        let t = TaskTimeout::new(Duration::from_secs(60));
+        let t = TaskTimeout::new(Duration::from_mins(1));
         assert!(!t.is_expired());
     }
 

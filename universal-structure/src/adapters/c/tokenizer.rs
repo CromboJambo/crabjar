@@ -13,6 +13,7 @@ pub enum CTok {
 }
 
 /// Tokenize C source into simplified tokens using regex patterns.
+#[allow(clippy::too_many_lines)]
 pub fn tokenize(source: &str) -> Vec<CTok> {
     let mut tokens = Vec::new();
     let lines: Vec<&str> = source.lines().collect();
@@ -162,25 +163,17 @@ pub fn tokenize(source: &str) -> Vec<CTok> {
             let mut punct = String::new();
             punct.push(ch);
             // Handle multi-char operators
-            if ch == '=' && chars.peek() == Some(&'=') {
-                punct.push(chars.next().unwrap());
-            } else if ch == '!' && chars.peek() == Some(&'=') {
-                punct.push(chars.next().unwrap());
-            } else if ch == '<' && (chars.peek() == Some(&'=') || chars.peek() == Some(&'<')) {
-                punct.push(chars.next().unwrap());
-            } else if ch == '>' && (chars.peek() == Some(&'=') || chars.peek() == Some(&'>')) {
-                punct.push(chars.next().unwrap());
-            } else if ch == '&' && chars.peek() == Some(&'&') {
-                punct.push(chars.next().unwrap());
-            } else if ch == '|' && chars.peek() == Some(&'|') {
-                punct.push(chars.next().unwrap());
-            } else if ch == '+' && chars.peek() == Some(&'+') {
-                punct.push(chars.next().unwrap());
-            } else if ch == '-' && chars.peek() == Some(&'-') {
-                punct.push(chars.next().unwrap());
-            } else if ch == '*' && chars.peek() == Some(&'=') {
-                punct.push(chars.next().unwrap());
-            } else if ch == '/' && chars.peek() == Some(&'=') {
+            if (ch == '=' && chars.peek() == Some(&'='))
+                || (ch == '!' && chars.peek() == Some(&'='))
+                || (ch == '<' && (chars.peek() == Some(&'=') || chars.peek() == Some(&'<')))
+                || (ch == '>' && (chars.peek() == Some(&'=') || chars.peek() == Some(&'>')))
+                || (ch == '&' && chars.peek() == Some(&'&'))
+                || (ch == '|' && chars.peek() == Some(&'|'))
+                || (ch == '+' && chars.peek() == Some(&'+'))
+                || (ch == '-' && chars.peek() == Some(&'-'))
+                || (ch == '*' && chars.peek() == Some(&'='))
+                || (ch == '/' && chars.peek() == Some(&'='))
+            {
                 punct.push(chars.next().unwrap());
             }
             tokens.push(CTok::Punctuation(punct));

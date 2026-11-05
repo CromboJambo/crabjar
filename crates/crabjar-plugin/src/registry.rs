@@ -1,7 +1,7 @@
 //! Plugin registry — discovers and loads plugins.
 
 use crate::plugin_trait::Plugin;
-use crate::types::{HealthStatus, PluginError, ToolDefinition, ToolResult};
+use crate::types::{PluginError, ToolDefinition, ToolResult};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

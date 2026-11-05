@@ -231,10 +231,7 @@ impl SkillScanner {
                     result.add_finding(ScanFinding {
                         severity: Severity::Warning,
                         category: "binary_file".to_string(),
-                        message: format!(
-                            "Non-text file > 1KB detected ({} bytes)",
-                            metadata.len()
-                        ),
+                        message: format!("Non-text file > 1KB detected ({} bytes)", metadata.len()),
                         file: Some(path.to_string_lossy().to_string()),
                     });
                 }
@@ -323,10 +320,7 @@ impl SkillScanner {
                         result.add_finding(ScanFinding {
                             severity: Severity::Info,
                             category: "environment".to_string(),
-                            message: format!(
-                                "Environment variable access detected: {}",
-                                pattern
-                            ),
+                            message: format!("Environment variable access detected: {}", pattern),
                             file: Some(path.to_string_lossy().to_string()),
                         });
                         break;

@@ -114,7 +114,9 @@ fn bench_telemetry_db_write_latency() {
     recorder.init().expect("flight recorder init failed");
 
     // Warmup
-    recorder.checkpoint_before("warmup_hash", 0).expect("warmup checkpoint failed");
+    recorder
+        .checkpoint_before("warmup_hash", 0)
+        .expect("warmup checkpoint failed");
 
     let iterations = 100;
     let start = Instant::now();
@@ -128,7 +130,10 @@ fn bench_telemetry_db_write_latency() {
     let ns_per_op = elapsed.as_nanos() as f64 / iterations as f64;
     println!("telemetry_db_write_latency: {:.0} ns/op", ns_per_op);
     // DB writes are filesystem-bound — use generous threshold
-    assert!(ns_per_op < 100_000_000.0, "flight recorder DB write exceeded 100ms");
+    assert!(
+        ns_per_op < 100_000_000.0,
+        "flight recorder DB write exceeded 100ms"
+    );
 
     drop(flight_conn);
 }

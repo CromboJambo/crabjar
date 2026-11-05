@@ -23,6 +23,7 @@ impl BinaryAdapter {
     }
 
     /// Parse an ELF binary and extract its structural information.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn parse_elf(&self) -> Result<BinaryStructure, String> {
         let contents = std::fs::read(&self.path)
             .map_err(|e| format!("Failed to read binary {}: {}", self.path, e))?;

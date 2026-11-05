@@ -32,6 +32,7 @@ impl BenchmarkResults {
         }
     }
 
+    #[allow(clippy::cast_precision_loss)]
     fn compute_metrics(&mut self) {
         let tp = self.true_positives as f64;
         let fp = self.false_positives as f64;
@@ -100,20 +101,23 @@ pub fn run_all_benchmarks(prs: &[BenchmarkPR]) -> Vec<BenchmarkResults> {
 
     // Aggregate metrics
     let total_tp: usize = all_results.iter().map(|r| r.true_positives).sum();
-    let total_fp: usize = all_results.iter().map(|r| r.false_positives).sum();
+    let total_false_pos: usize = all_results.iter().map(|r| r.false_positives).sum();
     let total_fn: usize = all_results.iter().map(|r| r.false_negatives).sum();
 
+    #[allow(clippy::cast_precision_loss)]
     let avg_precision: f64 =
         all_results.iter().map(|r| r.precision).sum::<f64>() / all_results.len() as f64;
+    #[allow(clippy::cast_precision_loss)]
     let avg_recall: f64 =
         all_results.iter().map(|r| r.recall).sum::<f64>() / all_results.len() as f64;
+    #[allow(clippy::cast_precision_loss)]
     let avg_f1: f64 =
         all_results.iter().map(|r| r.f1_score).sum::<f64>() / all_results.len() as f64;
 
     println!("\n=== Benchmark Summary ===");
     println!("PRs tested: {}", prs.len());
     println!("True positives: {total_tp}");
-    println!("False positives: {total_fp}");
+    println!("False positives: {total_false_pos}");
     println!("False negatives: {total_fn}");
     println!("Average precision: {avg_precision:.2}");
     println!("Average recall: {avg_recall:.2}");

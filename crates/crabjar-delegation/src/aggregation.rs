@@ -7,6 +7,12 @@ pub struct ResultAggregator {
     results: Vec<TaskResult>,
 }
 
+impl Default for ResultAggregator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ResultAggregator {
     /// Create a new result aggregator.
     #[must_use]

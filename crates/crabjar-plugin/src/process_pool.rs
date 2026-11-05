@@ -3,7 +3,6 @@
 use crate::process_types::{PluginHandle, RestartPolicy, SpawnError};
 use crate::types::{HealthStatus, PluginError, ToolResult};
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
 use tokio::sync::RwLock;

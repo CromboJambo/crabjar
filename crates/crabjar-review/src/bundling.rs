@@ -22,26 +22,25 @@ fn get_crate_name(path: &Path) -> Option<String> {
 /// Pair source files with their corresponding test files.
 fn pair_source_with_tests(files: &[ChangedFile]) -> HashMap<usize, Vec<usize>> {
     let mut pairs = HashMap::new();
-    let n = files.len();
 
-    for i in 0..n {
-        if files[i].file_type != FileType::Source {
+    for (i, file) in files.iter().enumerate() {
+        if file.file_type != FileType::Source {
             continue;
         }
 
-        let source_path = &files[i].path;
+        let source_path = &file.path;
         let source_stem = source_path
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("");
 
         // Look for test files with matching stem
-        for j in 0..n {
-            if i == j || files[j].file_type != FileType::Test {
+        for (j, other_file) in files.iter().enumerate() {
+            if i == j || other_file.file_type != FileType::Test {
                 continue;
             }
 
-            let test_path = &files[j].path;
+            let test_path = &other_file.path;
             let test_stem = test_path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
             // Match patterns: foo.rs + foo_test.rs, or foo.rs + tests/foo.rs
@@ -56,32 +55,32 @@ fn pair_source_with_tests(files: &[ChangedFile]) -> HashMap<usize, Vec<usize>> {
 
 /// Create review bundles from changed files.
 #[must_use]
-pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
+pub fn create_bundles(files: &[ChangedFile]) -> Vec<ReviewBundle> {
     if files.is_empty() {
         return vec![];
     }
 
     // Pair source files with their tests
-    let test_pairs = pair_source_with_tests(&files);
+    let test_pairs = pair_source_with_tests(files);
 
     // Track which files have been bundled
-    let mut bundled = vec![false; files.len()];
+    let mut in_bundle = vec![false; files.len()];
     let mut bundles = Vec::new();
     let mut bundle_id = 0;
 
     // First pass: bundle source+test pairs
     for (source_idx, test_indices) in &test_pairs {
-        if bundled[*source_idx] {
+        if in_bundle[*source_idx] {
             continue;
         }
 
         let mut bundle_files = vec![files[*source_idx].clone()];
-        bundled[*source_idx] = true;
+        in_bundle[*source_idx] = true;
 
         for &test_idx in test_indices {
-            if !bundled[test_idx] {
+            if !in_bundle[test_idx] {
                 bundle_files.push(files[test_idx].clone());
-                bundled[test_idx] = true;
+                in_bundle[test_idx] = true;
             }
         }
 
@@ -99,7 +98,7 @@ pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
     let mut current_bundle = Vec::new();
 
     for (i, file) in files.iter().enumerate() {
-        if bundled[i] {
+        if in_bundle[i] {
             continue;
         }
 
@@ -108,7 +107,7 @@ pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
         // If crate changed or we're at capacity, flush current bundle
         if current_bundle.is_empty() || file_crate == current_crate {
             current_bundle.push(file.clone());
-            bundled[i] = true;
+            in_bundle[i] = true;
             current_crate = file_crate;
         } else {
             // Flush existing bundle
@@ -121,7 +120,7 @@ pub fn create_bundles(files: Vec<ChangedFile>) -> Vec<ReviewBundle> {
 
             // Start new bundle
             current_bundle.push(file.clone());
-            bundled[i] = true;
+            in_bundle[i] = true;
             current_crate = file_crate;
         }
     }

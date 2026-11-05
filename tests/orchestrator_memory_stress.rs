@@ -16,10 +16,7 @@ use std::time::{Duration, Instant};
 
 fn get_process_rss_kb() -> Option<u64> {
     // Read /proc/self/status for RSS (Resident Set Size)
-    let output = Command::new("cat")
-        .arg("/proc/self/status")
-        .output()
-        .ok()?;
+    let output = Command::new("cat").arg("/proc/self/status").output().ok()?;
 
     let status = String::from_utf8_lossy(&output.stdout);
     for line in status.lines() {
@@ -82,7 +79,10 @@ fn stress_guard_checks_sustained() {
         }
     }
 
-    println!("stress_guard_checks_sustained: PASSED ({:?} iterations)", iterations);
+    println!(
+        "stress_guard_checks_sustained: PASSED ({:?} iterations)",
+        iterations
+    );
 }
 
 /// Stress test 2: Telemetry DB writes under sustained load.
@@ -126,7 +126,10 @@ fn stress_telemetry_writes_sustained() {
     }
 
     drop(flight_conn);
-    println!("stress_telemetry_writes_sustained: PASSED ({:?} iterations)", iterations);
+    println!(
+        "stress_telemetry_writes_sustained: PASSED ({:?} iterations)",
+        iterations
+    );
 }
 
 /// Stress test 3: Guard DB open/close cycles.
@@ -162,7 +165,10 @@ fn stress_guard_db_open_close_cycles() {
         }
     }
 
-    println!("stress_guard_db_open_close_cycles: PASSED ({:?} iterations)", iterations);
+    println!(
+        "stress_guard_db_open_close_cycles: PASSED ({:?} iterations)",
+        iterations
+    );
 }
 
 /// Stress test 4: Full pipeline under sustained load.
@@ -221,5 +227,8 @@ fn stress_full_pipeline_sustained() {
     }
 
     drop(flight_conn);
-    println!("stress_full_pipeline_sustained: PASSED ({:?} iterations)", iterations);
+    println!(
+        "stress_full_pipeline_sustained: PASSED ({:?} iterations)",
+        iterations
+    );
 }

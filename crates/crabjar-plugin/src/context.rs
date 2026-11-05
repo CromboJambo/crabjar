@@ -1,10 +1,12 @@
 //! Plugin context: environment available to plugins during lifecycle.
+//!
+//! Pending integration — not yet wired into the plugin lifecycle flow.
 
-use crate::types::PluginError;
 use crabjar_guard::{ExecutionGate, GuardDb};
 use std::path::PathBuf;
 
 /// Context available to plugins during their lifecycle.
+#[expect(dead_code)]
 pub struct PluginContext {
     pub cwd: PathBuf,
     pub guard_db: GuardDb,
@@ -13,6 +15,7 @@ pub struct PluginContext {
     pub telemetry_handle: Option<String>, // Simplified; would be TelemetryHandle in full impl
 }
 
+#[expect(dead_code)]
 impl PluginContext {
     pub fn new(cwd: PathBuf, guard_db: GuardDb) -> Self {
         Self {

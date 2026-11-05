@@ -96,18 +96,21 @@ impl TaskDispatcher {
     }
 
     /// List all tasks (returns empty for now — conductor doesn't have a list endpoint yet).
+    #[allow(clippy::unused_async)] // Stub awaiting conductor endpoint
     pub async fn list_tasks(&self) -> Result<Vec<TaskResult>, DelegationError> {
         // TODO: Implement when conductor adds a goals listing endpoint
         Ok(Vec::new())
     }
 
     /// Steer a running task (send course-correction message).
+    #[allow(clippy::unused_async)] // Stub awaiting conductor endpoint
     pub async fn steer_task(&self, _task_id: &str, _message: &str) -> Result<(), DelegationError> {
         // TODO: Implement when conductor adds steering capability
         Ok(())
     }
 
     /// Stop a running task.
+    #[allow(clippy::unused_async)] // Stub awaiting conductor endpoint
     pub async fn stop_task(&self, _task_id: &str) -> Result<(), DelegationError> {
         // TODO: Implement when conductor adds goal cancellation
         Ok(())

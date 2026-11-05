@@ -1,7 +1,6 @@
 //! Plugin types: errors, results, health status, tool definitions.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use thiserror::Error;
 
 /// Health status of a plugin.

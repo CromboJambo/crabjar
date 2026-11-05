@@ -21,6 +21,7 @@ impl LeanAdapter {
     }
 
     /// Map a simple regex pattern to a universal `SpanKind` for Lean constructs.
+    #[allow(dead_code)]
     fn map_pattern(pattern: &str, _text: &str) -> Option<SpanKind> {
         match pattern {
             "theorem" => Some(SpanKind::FnDecl),
