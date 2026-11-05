@@ -204,13 +204,11 @@ impl BrowserSession {
 }
 
 fn find_wrapper_script() -> Result<std::path::PathBuf> {
-    // Look for wrapper script relative to this crate's directory
+    // Look for wrapper script relative to this crate's directory using CARGO_MANIFEST_DIR
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let possible_paths = [
         std::path::PathBuf::from("browser_wrapper.py"),
-        std::path::PathBuf::from("../crabjar-browser/browser_wrapper.py"),
-        std::path::PathBuf::from(
-            "/home/crombo/projects/active/crabjar/crates/crabjar-browser/browser_wrapper.py",
-        ),
+        manifest_dir.join("browser_wrapper.py"),
     ];
 
     for path in possible_paths {
@@ -219,17 +217,19 @@ fn find_wrapper_script() -> Result<std::path::PathBuf> {
         }
     }
 
-    Err(anyhow!("Could not find browser_wrapper.py"))
+    Err(anyhow!(
+        "Could not find browser_wrapper.py. Looked in: {:?} and {:?}",
+        std::path::PathBuf::from("browser_wrapper.py"),
+        manifest_dir.join("browser_wrapper.py")
+    ))
 }
 
 fn find_python_interpreter() -> String {
     // Check for venv first (relative to crate directory)
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let venv_paths = [
         std::path::PathBuf::from(".venv/bin/python"),
-        std::path::PathBuf::from("../.venv/bin/python"),
-        std::path::PathBuf::from(
-            "/home/crombo/projects/active/crabjar/crates/crabjar-browser/.venv/bin/python",
-        ),
+        manifest_dir.join(".venv/bin/python"),
     ];
 
     for path in venv_paths {

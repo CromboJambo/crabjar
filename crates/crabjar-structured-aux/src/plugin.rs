@@ -36,10 +36,10 @@ impl StructuredAuxPlugin {
         model: Option<String>,
         api_key: Option<String>,
     ) -> Self {
-        // Determine criteria path from environment or default to local specs directory.
-        let criteria_path = env::var("STRUCTURED_AUX_CRITERIA_PATH").unwrap_or_else(|_| {
-            "/home/crombo/projects/active/crabjar/crabjar-structured-aux/specs/criteria".to_string()
-        });
+        // Determine criteria path from environment, then relative paths.
+        let criteria_path = env::var("STRUCTURED_AUX_CRITERIA_PATH")
+            .or_else(|_| env::current_dir().map(|p| p.join("crabjar-structured-aux/specs/criteria").to_string_lossy().to_string()))
+            .expect("STRUCTURED_AUX_CRITERIA_PATH must be set or run from repo root");
 
         Self {
             name: PROVIDER_NAME.to_string(),

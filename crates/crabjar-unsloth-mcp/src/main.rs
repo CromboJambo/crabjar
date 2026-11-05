@@ -6,8 +6,17 @@
 use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
 use std::process::Command;
 
-const TRAINING_DATA_DIR: &str = "/home/crombo/training-data-dump";
-const UNSLOTH_OUTPUTS_DIR: &str = "~/.unsloth/studio/outputs";
+use std::env;
+
+fn get_training_data_dir() -> String {
+    std::env::var("CRABJAR_TRAINING_DATA_DIR")
+        .expect("CRABJAR_TRAINING_DATA_DIR environment variable must be set")
+}
+
+fn get_unsloth_outputs_dir() -> String {
+    std::env::var("UNSLOTH_OUTPUTS_DIR")
+        .expect("UNSLOTH_OUTPUTS_DIR environment variable must be set")
+}
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct ListDatasetsRequest {
@@ -108,7 +117,7 @@ impl UnslothServer {
 
         let cmd = format!(
             "cd {} && find . -maxdepth 1 -name '{}' -type f | sort | while read f; do echo \"=== $f ===\"; wc -l \"$f\" 2>/dev/null || echo '(not text)'; du -h \"$f\" 2>/dev/null | cut -f1; done",
-            TRAINING_DATA_DIR, ext_filter
+            get_training_data_dir(), ext_filter
         );
 
         match run_cmd(&cmd) {
@@ -126,7 +135,7 @@ impl UnslothServer {
 
         let cmd = format!(
             "cd {} && echo '=== Metadata ===' && ls -lh '{}' 2>&1 && echo '=== Line Count ===' && wc -l '{}' 2>&1 && echo '=== Format Detection ===' && file '{}' 2>&1 && echo '=== Sample (first 3 lines) ===' && head -n 3 '{}' 2>&1",
-            TRAINING_DATA_DIR, req.filename, req.filename, req.filename, req.filename
+            get_training_data_dir(), req.filename, req.filename, req.filename, req.filename
         );
 
         match run_cmd(&cmd) {
@@ -143,7 +152,7 @@ impl UnslothServer {
         let req = params.0;
 
         // Unsloth CLI uses `unsloth train` with various flags
-        let dataset_path = format!("{}/{}", TRAINING_DATA_DIR, req.dataset);
+        let dataset_path = format!("{}/{}", get_training_data_dir(), req.dataset);
         let cmd = format!(
             "unsloth train --model {} --data '{}' --epochs {} --learning-rate {} --batch-size {}",
             req.base_model, dataset_path, req.epochs, req.learning_rate, req.batch_size
@@ -173,7 +182,7 @@ impl UnslothServer {
             }
             None => {
                 // List recent runs from outputs directory
-                let cmd = format!("ls -lt {} | head -10", UNSLOTH_OUTPUTS_DIR);
+                let cmd = format!("ls -lt {} | head -10", get_unsloth_outputs_dir());
                 match run_cmd(&cmd) {
                     Ok(result) => serde_json::to_string(&result)
                         .unwrap_or_else(|e| format!("{{\"error\": \"{}\"}}", e)),
@@ -189,7 +198,7 @@ impl UnslothServer {
     fn list_checkpoints(&self) -> String {
         let cmd = format!(
             "find {} -maxdepth 2 -name 'adapter_model.safetensors' -type f 2>/dev/null | head -20",
-            UNSLOTH_OUTPUTS_DIR
+            get_unsloth_outputs_dir()
         );
 
         match run_cmd(&cmd) {

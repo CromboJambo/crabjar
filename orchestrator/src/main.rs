@@ -6,6 +6,8 @@ use axum::{
     response::sse::{Event as SseEvent, Sse},
     routing::{get, post},
 };
+use std::env;
+
 use crabjar_delegation::Dispatcher;
 use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
 use futures_util::StreamExt;
@@ -1653,7 +1655,9 @@ struct RateLimiter {
 
 impl RateLimiter {
     fn new(max_requests: u32, window_seconds: i64) -> Self {
-        let state_file = std::path::PathBuf::from("/tmp/crabjar_rate_limits.json");
+        let state_dir = env::var("CRABJAR_STATE_DIR")
+            .expect("CRABJAR_STATE_DIR environment variable must be set");
+        let state_file = std::path::PathBuf::from(state_dir).join("crabjar_rate_limits.json");
         let mut limiter = Self {
             state_file,
             max_requests,
