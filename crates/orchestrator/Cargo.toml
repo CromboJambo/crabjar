@@ -40,30 +40,30 @@ uuid.workspace = true
 axum-server = { version = "0.7", features = ["tls-rustls"] }
 
 # Security layer
-crabjar-guard = { path = "../crates/guard" }
+crabjar-guard = { path = "../guard" }
 
 # Telemetry
-crabjar-telemetry = { path = "../telemetry" }
+crabjar-telemetry = { path = "../../telemetry" }
 
 # Knowledge store
-agent-context = { path = "../crates/memory" }
+agent-context = { path = "../memory" }
 
 # Tool registry
-crabjar-tool-registry = { path = "../crates/crabjar/tool_registry" }
+crabjar-tool-registry = { path = "../crabjar/tool_registry" }
 
 # Sandbox infrastructure for process isolation (#14)
-crabjar-sandbox = { path = "../sandbox" }
+crabjar-sandbox = { path = "../../sandbox" }
 
 # Web search tooling (P1-1)
-crabjar-web-search = { path = "../crates/crabjar/crabjar-web-search" }
-crabjar-memory = { path = "../crates/crabjar/crabjar-memory" }
+crabjar-web-search = { path = "../crabjar/crabjar-web-search" }
+crabjar-memory = { path = "../crabjar/crabjar-memory" }
 
 # Subagent delegation framework (P1-4)
-crabjar-delegation = { path = "../crates/crabjar/crabjar-delegation" }
+crabjar-delegation = { path = "../crabjar/crabjar-delegation" }
 
 # Browser automation tooling (P1-3)
-crabjar-browser = { path = "../crates/crabjar/crabjar-browser" }
-crabjar-homeassistant = { path = "../crates/crabjar/crabjar-homeassistant" }
+crabjar-browser = { path = "../crabjar/crabjar-browser" }
+crabjar-homeassistant = { path = "../crabjar/crabjar-homeassistant" }
 
 # Directory detection for memory tool
 dirs.workspace = true
