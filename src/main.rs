@@ -1,17 +1,17 @@
 use clap::Parser;
+use commands::attempts::handle as handle_attempts_command;
 use commands::backend::handle_backend_command;
 use commands::dotfile::handle as handle_dotfile_command;
-use commands::ha::handle_ha_command;
-use commands::habitat::handle as handle_habitat_command;
-use commands::metrics::handle_metrics_command;
-use commands::memory::handle_memory_command;
-use commands::state::handle as handle_state_command;
+use commands::exec::handle_exec;
 use commands::fleet::handle_fleet_submit_kanban_task;
 use commands::guard::handle as handle_guard_command;
+use commands::ha::handle_ha_command;
+use commands::habitat::handle as handle_habitat_command;
 use commands::knowledge::handle_knowledge_command;
+use commands::memory::handle_memory_command;
+use commands::metrics::handle_metrics_command;
 use commands::slow_friend::handle as handle_slow_friend_command;
-use commands::attempts::handle as handle_attempts_command;
-use commands::exec::handle_exec;
+use commands::state::handle as handle_state_command;
 use commands::workspace::handle_workspace_status;
 use serde_json::json;
 
@@ -30,7 +30,8 @@ mod tool_registry_cli;
 use bitwarden::commands::handle_bitwarden_command;
 mod commands;
 use crabjar_lib::{
-    ApprovalCommand, BitwardenCommand, Cli, CliCommand, DoctorCommand, KnowledgeCommand, WorkspaceCommand,
+    ApprovalCommand, BitwardenCommand, Cli, CliCommand, DoctorCommand, KnowledgeCommand,
+    WorkspaceCommand,
 };
 use doctor::handle_doctor_command;
 use mcp_client_cli::handle_mcp_command;
@@ -83,6 +84,7 @@ async fn main() {
             container,
             otel_endpoint,
             target,
+            trust_layer,
         }) => {
             if let Some(t) = &target {
                 // Remote execution via SSH bastion (Phase 1 MVP)
@@ -106,6 +108,7 @@ async fn main() {
                     dry_run,
                     container,
                     &otel_endpoint,
+                    trust_layer,
                 )
                 .await
                 .unwrap_or_else(|err| error_response(&err.to_string(), true))
@@ -159,21 +162,26 @@ async fn main() {
                 error_response("Missing --criteria-file for decide evaluate", true)
             }
             ("feedback", _, _) => {
-                match commands::semantic::handle_feedback(obs_hash.as_deref(), outcome.as_deref()) {
+                match commands::decide_learning::handle_feedback(
+                    obs_hash.as_deref(),
+                    outcome.as_deref(),
+                ) {
                     Ok(json) => json,
                     Err(err) => error_response(&err.to_string(), true),
                 }
             }
-            ("metrics", _, _) => match commands::semantic::handle_metrics(&last) {
+            ("metrics", _, _) => match commands::decide_learning::handle_metrics(&last) {
                 Ok(json) => json,
                 Err(err) => error_response(&err.to_string(), true),
             },
-            ("promote-rule", _, _) => match commands::semantic::handle_promote_rule(decision_id) {
-                Ok(json) => json,
-                Err(err) => error_response(&err.to_string(), true),
-            },
+            ("promote-rule", _, _) => {
+                match commands::decide_learning::handle_promote_rule(decision_id) {
+                    Ok(json) => json,
+                    Err(err) => error_response(&err.to_string(), true),
+                }
+            }
             ("learnings", _, _) => {
-                match commands::semantic::handle_learnings(component.as_deref()) {
+                match commands::decide_learning::handle_learnings(component.as_deref()) {
                     Ok(json) => json,
                     Err(err) => error_response(&err.to_string(), true),
                 }
@@ -291,18 +299,37 @@ async fn main() {
             commands::checkpoint::handle_checkpoint_command(command)
                 .unwrap_or_else(|err| error_response(&err.to_string(), true))
         }
-        Some(CliCommand::Approval { command }) => commands::approval::handle_approval_command(command),
+        Some(CliCommand::Approval { command }) => {
+            commands::approval::handle_approval_command(command)
+        }
         None => {
             print_json(&error_response("missing command", true));
             std::process::exit(1);
         }
     };
 
-    let exit_code = response
-        .get("success")
-        .and_then(|value| value.as_bool())
-        .map(|success| if success { 0 } else { 1 })
-        .unwrap_or(1);
+    let exit_code = if response.get("exec").is_some() {
+        // For exec commands, only exit non-zero if the command couldn't run
+        // (gate denied, config error). If it ran but failed, communicate that
+        // through JSON fields and still exit 0.
+        match response["exec"].get("exit_code") {
+            Some(_) => 0,  // Command ran — success/failure in JSON only
+            None => {
+                // Command didn't run (gate denied, etc.) — propagate error
+                response
+                    .get("success")
+                    .and_then(|value| value.as_bool())
+                    .map(|success| if success { 0 } else { 1 })
+                    .unwrap_or(1)
+            }
+        }
+    } else {
+        response
+            .get("success")
+            .and_then(|value| value.as_bool())
+            .map(|success| if success { 0 } else { 1 })
+            .unwrap_or(1)
+    };
 
     print_json(&response);
     if exit_code != 0 {

@@ -77,6 +77,10 @@ pub enum CliCommand {
         /// OpenTelemetry endpoint for fleet-scale observability (optional)
         #[arg(long, default_value = "")]
         otel_endpoint: String,
+
+        /// Trust layer for execution gate (1-5; 4=auto-execute, 3=requires review)
+        #[arg(long, default_value_t = 4)]
+        trust_layer: u8,
     },
 
     /// Manage bitwarden credentials
@@ -213,10 +217,7 @@ pub enum CliCommand {
 #[derive(Debug, Subcommand, Clone)]
 pub enum MemoryCommand {
     /// Add a new memory entry
-    Add {
-        target: String,
-        content: String,
-    },
+    Add { target: String, content: String },
     /// Patch an existing entry
     Patch {
         target: String,
@@ -224,10 +225,7 @@ pub enum MemoryCommand {
         new_text: String,
     },
     /// Remove an entry by matching text within it
-    Remove {
-        target: String,
-        old_text: String,
-    },
+    Remove { target: String, old_text: String },
 }
 
 /// Home Assistant application-layer tools (P2-2 drop-in replacement blocker)
@@ -273,9 +271,7 @@ pub enum ApprovalCommand {
         impact_level: Option<String>,
     },
     /// Approve a change
-    Approve {
-        change_id: String,
-    },
+    Approve { change_id: String },
     /// Reject a change with reason
     Reject {
         change_id: String,
@@ -348,6 +344,8 @@ pub enum SessionCommand {
 
 pub mod autonomy;
 pub mod cli_commands;
+pub mod cli_habitat_commands;
+pub mod cli_tool_commands;
 pub mod environment_awareness;
 pub mod feedback_integration;
 pub mod learning_loop;

@@ -1,0 +1,30 @@
+---
+source: tests/snapshot_tests.rs
+assertion_line: 34
+expression: messages
+---
+[
+  {
+    "User": {
+      "text": "Hello, world!"
+    }
+  },
+  {
+    "Agent": {
+      "text": "I'm processing your request..."
+    }
+  },
+  {
+    "ToolCall": {
+      "name": "read_file",
+      "args": "{\"path\": \"/test.txt\"}",
+      "result": "File contents here"
+    }
+  },
+  {
+    "Guard": {
+      "action": "execute_command",
+      "pending": true
+    }
+  }
+]

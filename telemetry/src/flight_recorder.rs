@@ -1,6 +1,6 @@
-use crate::error::{FlightRecorderError, TelemetryError};
 #[cfg(feature = "otel")]
 use crate::dagr_span_processor::{DagrEventEmitter, DagrSpanProcessor};
+use crate::error::{FlightRecorderError, TelemetryError};
 #[cfg(feature = "otel")]
 use crate::otel_export::{OtelConfig, OtelExporter};
 use crate::schema::{

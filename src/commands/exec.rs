@@ -15,6 +15,7 @@ pub async fn handle_exec(
     dry_run: bool,
     container: bool,
     _otel_endpoint: &str,
+    trust_layer: u8,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let workspace_dir = if !cwd.trim().is_empty() {
         PathBuf::from(cwd)
@@ -112,10 +113,8 @@ pub async fn handle_exec(
     std::fs::create_dir_all(&telemetry_dir).ok();
     let flight_db_path = telemetry_dir.join("flight.db");
     let flight_conn = rusqlite::Connection::open(&flight_db_path)?;
-    let mut flight_recorder = crabjar_telemetry::flight_recorder::FlightRecorder::new(
-        &flight_conn,
-        "exec-session",
-    );
+    let mut flight_recorder =
+        crabjar_telemetry::flight_recorder::FlightRecorder::new(&flight_conn, "exec-session");
     flight_recorder.init()?;
 
     // Enable OTel export if endpoint provided (CLI flag or env var)
@@ -159,10 +158,10 @@ pub async fn handle_exec(
         None,                     // no external source node for CLI exec
         "exec",
         &format!("{} {}", command, args.join(" ")),
-        3,                        // trust layer
-        0.9,                      // confidence
-        None,                     // scope actor
-        None,                     // scope target
+        trust_layer as u32,
+        0.9,  // confidence
+        None, // scope actor
+        None, // scope target
     )?;
 
     let gate = crabjar_guard::ExecutionGate::new(&guard_db, dry_run, &workspace_dir);
@@ -183,7 +182,7 @@ pub async fn handle_exec(
         action_type: "exec",
         command,
         args: args.to_vec(),
-        trust_layer: 3,
+        trust_layer: trust_layer as u32,
         confidence: crabjar_guard::TrustScore::new(0.9),
         source_event_id: Some(&action_request_id),
         can_interrupt: true,
@@ -195,6 +194,7 @@ pub async fn handle_exec(
         context_budget: None,
         context_fragment_tokens: None,
     })?;
+    eprintln!("DEBUG gate_result: {:?}", gate_result);
 
     // Concierge layer: persist gate result to GuardDb
     let mut concierge = crabjar_guard::GateConcierge::default().with_db(guard_db.clone());
@@ -233,9 +233,7 @@ pub async fn handle_exec(
             },
         })),
         crabjar_guard::ActionStatus::Pending => {
-            if let Some(ref entry) = pending_entry {
-                guard_db.persist_pending_queue_entry(entry)?;
-            }
+            // Concierge already persisted the pending entry via with_db()
             Ok(json!({
                 "success": false,
                 "exec": {
@@ -280,9 +278,27 @@ pub async fn handle_exec(
                 None
             };
 
+            // Parse command string into binary + args if not already split
+            let (cmd_name, cmd_args): (String, Vec<String>) = if !args.is_empty() {
+                // Already split via CLI flags (-a/--args)
+                (command.to_string(), args.to_vec())
+            } else {
+                // Need to parse the command string ourselves
+                let parts: Vec<&str> = command.split_whitespace().collect();
+                if parts.is_empty() {
+                    return Ok(json!({
+                        "success": false,
+                        "exec": { "error": "empty command" }
+                    }));
+                }
+                let cmd = parts[0].to_string();
+                let rest: Vec<String> = parts[1..].iter().map(|s| s.to_string()).collect();
+                (cmd, rest)
+            };
+
             // Host execution path (container mode handled earlier)
             let cmd_id = flight_recorder
-                .execute_command(command, args, &effective_cwd, reason)
+                .execute_command(&cmd_name, &cmd_args, &effective_cwd, reason)
                 .await?;
 
             let records = flight_recorder.query_records(1)?;
@@ -294,27 +310,6 @@ pub async fn handle_exec(
 
             let git_dirty = flight_recorder.capture_git_dirty(&effective_cwd).await?;
             let git_diff = flight_recorder.capture_git_diff(&effective_cwd).await?;
-
-            // Outcome layer: record in GuardDb action_outcomes
-            let outcome_id = crabjar_guard::GuardDb::open(&flight_db_path)
-                .ok()
-                .map(|db| {
-                    let conn = db.conn();
-                    let id = uuid::Uuid::new_v4().to_string();
-                    conn.execute(
-                        "INSERT INTO action_outcomes (id, action_id, success, exit_code, output_hash, confidence_delta, created_at)\n\
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, unixepoch())",
-                        rusqlite::params![
-                            id,
-                            cmd_id,
-                            exit_code != -1,
-                            exit_code,
-                            git_diff,
-                            0.02,
-                        ],
-                    )
-                })
-                .map(|_| uuid::Uuid::new_v4().to_string());
 
             // Dinit integration: if command is dinitctl, route through crabjar-dinit
             let dinit_result = if command == "dinitctl" {
@@ -340,8 +335,30 @@ pub async fn handle_exec(
                 }
             };
 
+            // Outcome layer: record in GuardDb action_outcomes (same DB as provenance)
+            let success = final_exit_code == 0;
+            let outcome_id = {
+                let conn = guard_db.conn();
+                let id = uuid::Uuid::new_v4().to_string();
+                match conn.execute(
+                    "INSERT INTO action_outcomes (id, action_id, success, exit_code, output_hash, confidence_delta) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    rusqlite::params![
+                        id,
+                        action_request_id,  // ← use the action request ID, not cmd_id
+                        success,
+                        final_exit_code,
+                        git_diff,
+                        0.02
+                    ],
+                ) {
+                    Ok(_) => eprintln!("DEBUG outcome: inserted {}", id),
+                    Err(e) => eprintln!("DEBUG outcome: INSERT failed: {}", e),
+                }
+                id
+            };
+
             Ok(json!({
-                "success": true,
+                "success": success,
                 "exec": {
                     "command": command,
                     "args": args,
