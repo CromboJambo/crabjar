@@ -52,7 +52,7 @@ agent-context = { path = "../memory" }
 crabjar-tool-registry = { path = "../crabjar/tool_registry" }
 
 # Sandbox infrastructure for process isolation (#14)
-crabjar-sandbox = { path = "../../sandbox" }
+crabjar-sandbox = { path = "../sandbox" }
 
 # Web search tooling (P1-1)
 crabjar-web-search = { path = "../crabjar/crabjar-web-search" }

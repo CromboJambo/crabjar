@@ -5,7 +5,7 @@ members = [
     "crates/guard",
     "telemetry",
     "crates/orchestrator",
-    "sandbox",
+    "crates/sandbox",
     "crates/crabjar/tool_registry",
     "vm/axum-mux",
     "crates/crabjar/crabjar-architecture",
