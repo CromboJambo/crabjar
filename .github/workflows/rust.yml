@@ -92,3 +92,29 @@ jobs:
         curl -L "https://github.com/mitsuhiko/insta/releases/download/v${INSTA_VERSION}/cargo-insta-${INSTA_VERSION}-x86_64-unknown-linux-musl.tar.gz" | tar xz -C ~/.cargo/bin
     - name: Review snapshots (fail on pending)
       run: cargo insta test --review --test snapshot_tests
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
+    - name: Run E2E smoke tests (~30s)
+      run: cargo test --test e2e_smoke --release
+
+  e2e-full:
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'schedule'
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
+    - name: Run full E2E integration suite (~5min)
+      run: cargo test --test e2e_full --release
