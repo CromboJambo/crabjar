@@ -22,11 +22,11 @@ chrono.workspace = true
 uuid.workspace = true
 
 # Crabjar infrastructure
-analyze-common = { path = "../analyze-common" }
-analyze-apk = { path = "../analyze-apk" }
-analyze-har = { path = "../analyze-har" }
-analyze-js = { path = "../analyze-js" }
-analyze-native = { path = "../analyze-native" }
-analyze-firmware = { path = "../analyze-firmware" }
-analyze-dotnet = { path = "../analyze-dotnet" }
+analyze-common = { path = "../analyze/analyze-common" }
+analyze-apk = { path = "../analyze/analyze-apk" }
+analyze-har = { path = "../analyze/analyze-har" }
+analyze-js = { path = "../analyze/analyze-js" }
+analyze-native = { path = "../analyze/analyze-native" }
+analyze-firmware = { path = "../analyze/analyze-firmware" }
+analyze-dotnet = { path = "../analyze/analyze-dotnet" }
 crabjar-guard = { path = "../../guard" }
