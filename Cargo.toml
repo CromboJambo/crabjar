@@ -1,7 +1,7 @@
 [workspace]
 members = [
     # Core crates
-    "memory",
+    "crates/memory",
     "crates/guard",
     "telemetry",
     "orchestrator",
@@ -195,7 +195,7 @@ tiktoken-rs = "0.11.0"
 
 # Model weights (dataset manifests; same crate pesti uses)
 safetensors = { version = "0.7.0", default-features = false, features = ["std"] }
-agent-context = { path = "memory" }
+agent-context = { path = "crates/memory" }
 
 # Testing
 rstest = "0.26.1"
@@ -257,7 +257,7 @@ toml.workspace = true
 thiserror.workspace = true
 
 # Knowledge store
-agent-context = { path = "memory" }
+agent-context = { path = "crates/memory" }
 crabjar-guard = { path = "crates/guard" }
 crabjar-podman = { path = "crates/podman" }
 crabjar-ssh-bastion = { path = "crates/ssh-bastion" }

@@ -12,7 +12,7 @@ path = "src/main.rs"
 # Crabjar workspace crates
 crabjar-guard = { path = "../../guard" }
 crabjar-tool-registry = { path = "../tool_registry" }
-agent-context = { path = "../../../memory" }
+agent-context = { path = "../../memory" }
 
 # HTTP server
 axum = { workspace = true, features = ["ws"] }
