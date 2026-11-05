@@ -35,7 +35,7 @@ pub async fn submit_review(
     );
 
     // Smart bundling
-    let bundles = crabjar_review::bundling::create_bundles(changed_files);
+    let bundles = crabjar_review::bundling::create_bundles(&changed_files);
     info!(bundles = bundles.len(), "Files bundled for review");
 
     // Load default rules
