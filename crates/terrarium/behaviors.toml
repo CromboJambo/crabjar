@@ -1,0 +1,67 @@
+# behaviors.toml — the taste layer (spec §5). Edit freely; no renderer code changes.
+#
+# The terrarium is a pure function of (run.json, behaviors.toml, width).
+# This file is the "abstraction of the abstraction": it assigns contract
+# state to crab behavior. The behavior vocabulary (the values) is the stable
+# Level-1 set from spec §4; the assignment here is your taste.
+
+schema_version = 1
+
+# effective_state → behavior. The effective state is derived per crab (spec §5):
+#   blocked  — task.needs_user, or a blocked task with no attempt
+#   running  — latest attempt.state == "running"
+#   done     — latest attempt outcome.result in {done, pass}
+#   failed   — latest attempt outcome.result in {failed, fail, error}
+#   review   — attempt settled but not done/failed (awaiting judgment)
+#   queued   — no attempt yet, task.state == "queued"
+[behavior]
+queued  = "wait"
+running = "work"
+review  = "inspect"
+done    = "deliver"
+failed  = "dig"
+blocked = "stuck"
+
+# AI agent exhaust behaviors (derived from token/cost metrics in attempt payload)
+# burning   — high sustained token burn (>3000 tokens or >$10/min)
+# spinning  — rapid retry loop (future: detect from attempt clustering)
+# stalled   — no output for threshold time (future: idle detection)
+# switching — model changed mid-task (future: detect model_id changes)
+# pressured — context window >80% full (future: context_usage_ratio metric)
+burning   = "smoke"
+spinning  = "flicker"
+stalled   = "idle"
+switching = "glitch"
+pressured = "puff"
+
+# evidence tier → certainty signal (tint + posture). NOT a behavior — it tints
+# the crab. Unknown tiers fall back to `reported`.
+[evidence]
+verified  = { tint = "green",  posture = "upright" }
+reported  = { tint = "amber",  posture = "neutral" }
+heuristic = { tint = "orange", posture = "hunched" }
+asserted  = { tint = "gray",   posture = "shell-up" }
+
+# Cost tier tints (applied when cost_cents metric is present in attempt)
+# cheap     — <$0.01/min (local inference, small models)
+# moderate  — $0.01-0.10/min (medium usage)
+# expensive — >$0.10/min (large models, high throughput)
+
+# project → habitat zone (spatial placement, spec §6). `x`/`y` are the zone's
+# origin tile in the isometric floor. A task with no project (e.g. THEORY)
+# falls into the `root` zone.
+[zone]
+triage = { label = "Triage Burrow", x = 0, y = 0 }
+guard  = { label = "Guard Reef",    x = 6, y = 0 }
+theory = { label = "Theory Grotto", x = 12, y = 0 }
+root   = { label = "Open Floor",    x = 0, y = 6 }
+
+# station glyph per behavior (the floor marker a crab works at). Optional —
+# the renderer derives a default when absent.
+[station]
+work    = { glyph = "▛", label = "terminal" }
+inspect = { glyph = "⌕", label = "review" }
+dig     = { glyph = "⌗", label = "dig site" }
+sew     = { glyph = "✂", label = "loom" }
+stuck   = { glyph = "!", label = "blocked" }
+smoke   = { glyph = "☁", label = "burning" }

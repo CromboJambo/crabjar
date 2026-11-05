@@ -1,0 +1,30 @@
+# An alternate taste — same contract, different crabs.
+# Failures "sew" instead of "dig"; done crabs "rest" instead of "deliver".
+schema_version = 1
+
+[behavior]
+queued  = "rest"
+running = "work"
+review  = "inspect"
+done    = "rest"
+failed  = "sew"
+blocked = "stuck"
+
+[evidence]
+verified  = { tint = "green",  posture = "upright" }
+reported  = { tint = "amber",  posture = "neutral" }
+heuristic = { tint = "orange", posture = "hunched" }
+asserted  = { tint = "gray",   posture = "shell-up" }
+
+[zone]
+triage = { label = "The Workshop", x = 0, y = 0 }
+guard  = { label = "The Gate",     x = 6, y = 0 }
+theory = { label = "The Library",  x = 12, y = 0 }
+root   = { label = "The Yard",     x = 0, y = 6 }
+
+[station]
+work    = { glyph = "▛", label = "terminal" }
+sew     = { glyph = "✂", label = "loom" }
+rest    = { glyph = "☾", label = "shell" }
+inspect = { glyph = "⌕", label = "review" }
+stuck   = { glyph = "!", label = "blocked" }

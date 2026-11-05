@@ -1,0 +1,99 @@
+{
+  "dagr": 3,
+  "run": {
+    "id": "crabjar-demo",
+    "title": "Demo Habitat - Triage & Guard"
+  },
+  "generated_at": "2026-09-03T15:00:00Z",
+  "projects": [
+    {"id": "triage", "title": "Triage Burrow"},
+    {"id": "guard", "title": "Guard Reef"}
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "get the workspace test suite green",
+      "kind": "review",
+      "owner": "maintainer",
+      "project": "triage",
+      "state": "review",
+      "deps": [],
+      "note": "make the test suite pass",
+      "attempts": [
+        {
+          "id": "T1·a1",
+          "n": 1,
+          "actor": "agent",
+          "state": "done",
+          "started_at": "2026-09-01T00:00:30Z",
+          "ended_at": "2026-09-01T00:01:00Z",
+          "outcome": {
+            "result": "done",
+            "evidence": "reported",
+            "receipt": "exit 0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "refresh the dependency lockfile",
+      "kind": "review",
+      "owner": "maintainer",
+      "project": "triage",
+      "state": "review",
+      "deps": [],
+      "note": "keep Cargo.lock pinned",
+      "attempts": [
+        {
+          "id": "T2·a1",
+          "n": 1,
+          "actor": "agent",
+          "state": "failed",
+          "started_at": "2026-09-01T00:02:00Z",
+          "ended_at": "2026-09-01T00:02:10Z",
+          "outcome": {
+            "result": "failed",
+            "evidence": "reported",
+            "reason": "exit 0; lockfile-pinned"
+          }
+        }
+      ]
+    },
+    {
+      "id": "G1",
+      "title": "rm -rf target",
+      "kind": "question",
+      "owner": "user",
+      "project": "guard",
+      "state": "blocked",
+      "deps": [],
+      "unblock": "user",
+      "note": "destructive · trust L2 · conf 0.40",
+      "attempts": []
+    },
+    {
+      "id": "THEORY",
+      "title": "theory state-doc",
+      "kind": "docs",
+      "owner": "maintainer",
+      "state": "queued",
+      "deps": [],
+      "note": "not yet indexed",
+      "attempts": []
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-09-01T00:01:00Z",
+      "type": "attempt_settled",
+      "attempt": "T1·a1",
+      "detail": "settled — exit 0"
+    },
+    {
+      "at": "2026-09-01T00:16:00Z",
+      "type": "note",
+      "detail": "habitat contract generated"
+    }
+  ]
+}

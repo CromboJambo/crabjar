@@ -1,0 +1,47 @@
+{
+  "dagr": 3,
+  "run": { "id": "test", "title": "Test Habitat" },
+  "generated_at": "2026-09-03T12:00:00Z",
+  "projects": [
+    { "id": "triage", "title": "Triage Burrow" },
+    { "id": "guard", "title": "Guard Reef" }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "get the workspace test suite green",
+      "kind": "review",
+      "owner": "maintainer",
+      "project": "triage",
+      "state": "review",
+      "deps": [],
+      "note": "make the test suite pass",
+      "attempts": [
+        {
+          "id": "T1·a1",
+          "n": 1,
+          "actor": "agent",
+          "state": "done",
+          "started_at": "2026-09-01T00:00:30Z",
+          "ended_at": "2026-09-01T00:01:00Z",
+          "outcome": { "result": "done", "evidence": "reported", "receipt": "exit 0" }
+        }
+      ]
+    },
+    {
+      "id": "G1",
+      "title": "rm -rf target",
+      "kind": "question",
+      "owner": "user",
+      "project": "guard",
+      "state": "blocked",
+      "deps": [],
+      "unblock": "user",
+      "note": "destructive · trust L2 · conf 0.40",
+      "attempts": []
+    }
+  ],
+  "events": [
+    { "at": "2026-09-01T00:01:00Z", "type": "attempt_settled", "attempt": "T1·a1", "detail": "settled — exit 0" }
+  ]
+}
