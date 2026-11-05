@@ -7,7 +7,7 @@ members = [
     "orchestrator",
     "sandbox",
     "crates/crabjar/tool_registry",
-    "crates/axum-mux",
+    "vm/axum-mux",
     "crates/crabjar/crabjar-architecture",
     "crates/podman",
     # Analysis toolkit

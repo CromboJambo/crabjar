@@ -16,9 +16,9 @@ tracing-subscriber = "0.3"
 chrono = { workspace = true }
 # Typed terminal event stream (ADR-005 substrate) — the relay forwards
 # TerminalEvent frames; it owns no session state.
-crabjar-terminal = { path = "../terminal" }
+crabjar-terminal = { path = "../../crates/terminal" }
 # VM lifecycle management substrate
-vm-core = { path = "../../vm/vm-core" }
+vm-core = { path = "../vm-core" }
 
 [[bin]]
 name = "vm-bridge"
