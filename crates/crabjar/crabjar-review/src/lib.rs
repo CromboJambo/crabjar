@@ -150,7 +150,7 @@ Let me know if you need more details."#;
         ];
 
         // Bundle them together (source + test)
-        let bundles = bundling::create_bundles(changed_files);
+        let bundles = bundling::create_bundles(&changed_files);
         assert_eq!(bundles.len(), 1, "Source and test should be in one bundle");
         assert_eq!(bundles[0].file_count(), 2);
 

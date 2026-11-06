@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_create_bundles_empty() {
-        let bundles = create_bundles(vec![]);
+        let bundles = create_bundles(&[]);
         assert_eq!(bundles.len(), 0);
     }
 
@@ -183,7 +183,7 @@ mod tests {
             make_file("src/bar.rs", FileType::Source),
         ];
 
-        let bundles = create_bundles(files);
+        let bundles = create_bundles(&files);
         // Should have 2 bundles: foo+test, bar
         assert_eq!(bundles.len(), 2);
         assert_eq!(bundles[0].file_count(), 2);
@@ -197,7 +197,7 @@ mod tests {
             make_file("crate-b/src/main.rs", FileType::Source),
         ];
 
-        let bundles = create_bundles(files);
+        let bundles = create_bundles(&files);
         // Should have 2 bundles (different crates)
         assert_eq!(bundles.len(), 2);
     }

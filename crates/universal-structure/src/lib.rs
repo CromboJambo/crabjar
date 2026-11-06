@@ -4,6 +4,8 @@
 //! differences. Language-specific tags are preserved alongside universal tokens
 //! for nuanced analysis while maintaining cross-language compatibility.
 
+#![allow(clippy::return_self_not_must_use)]
+
 pub mod adapters;
 pub mod comparison;
 mod evaluation;

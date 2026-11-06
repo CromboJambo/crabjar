@@ -44,6 +44,7 @@ pub mod guard_db_types;
 pub mod inference;
 pub mod memory;
 pub mod memory_types;
+pub mod pid_trust_impl;
 pub mod risk_config;
 pub mod scope;
 pub mod trust;
