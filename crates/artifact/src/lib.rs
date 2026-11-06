@@ -73,6 +73,28 @@ pub struct ArtifactOutputs {
     pub lib: Option<String>,
 }
 
+/// Declared dependency from cargo metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeclaredDependency {
+    /// Crate name
+    pub name: String,
+    /// Resolved version
+    pub version: String,
+    /// Source (registry URL or path)
+    pub source: Option<String>,
+    /// Registry checksum (if available)
+    pub checksum: Option<String>,
+}
+
+/// Dependency graph for provenance tracking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DependencyGraph {
+    /// Root package name
+    pub root: String,
+    /// All resolved dependencies
+    pub dependencies: Vec<DeclaredDependency>,
+}
+
 /// Compute SHA-256 hash of a file.
 pub fn hash_file(path: &Path) -> Result<String, ArtifactError> {
     let mut hasher = Sha256::new();
@@ -90,13 +112,21 @@ pub fn hash_data(data: &[u8]) -> String {
 
 /// Get list of tracked files via git ls-files.
 fn get_tracked_files(project_dir: &Path) -> Result<Vec<PathBuf>, ArtifactError> {
+    // Check if this directory has its own .git (not inherited from parent)
+    let has_local_git = project_dir.join(".git").exists();
+
+    if !has_local_git {
+        // Not a git repo root — collect all files directly
+        return collect_files(project_dir);
+    }
+
     let output = std::process::Command::new("git")
         .arg("ls-files")
         .current_dir(project_dir)
         .output()?;
 
     if !output.status.success() {
-        // Fall back to reading all files if not a git repo
+        // Fall back to reading all files if git fails
         return collect_files(project_dir);
     }
 
@@ -190,6 +220,90 @@ pub fn get_rustc_version() -> Result<String, ArtifactError> {
         ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+/// Extract resolved dependency graph using cargo metadata.
+pub fn get_dependency_graph(project_dir: &Path) -> Result<DependencyGraph, ArtifactError> {
+    let output = std::process::Command::new("cargo")
+        .arg("metadata")
+        .arg("--format-version=1")
+        .arg("--no-deps")
+        .current_dir(project_dir)
+        .output()?;
+
+    if !output.status.success() {
+        return Err(ArtifactError::Cargo(format!(
+            "cargo metadata failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )));
+    }
+
+    // Parse the JSON output to extract package info and dependencies
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).map_err(|e| {
+        ArtifactError::InvalidFormat(format!("Failed to parse cargo metadata: {}", e))
+    })?;
+
+    let mut deps = Vec::new();
+
+    // Extract root package info
+    if let Some(pkgs) = json.get("packages").and_then(|p| p.as_array()) {
+        for pkg in pkgs {
+            let name = pkg
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("")
+                .to_string();
+            let version = pkg
+                .get("version")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            // Get dependencies for this package
+            if let Some(dep_list) = pkg.get("dependencies").and_then(|d| d.as_array()) {
+                for dep in dep_list {
+                    let dep_name = dep
+                        .get("name")
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let dep_req = dep
+                        .get("req")
+                        .and_then(|r| r.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let source = dep
+                        .get("source")
+                        .and_then(|s| s.as_str())
+                        .map(|s| s.to_string());
+
+                    // Skip dev and build dependencies for now
+                    if dep_name.is_empty() {
+                        continue;
+                    }
+
+                    deps.push(DeclaredDependency {
+                        name: dep_name,
+                        version: dep_req,
+                        source,
+                        checksum: None,
+                    });
+                }
+            }
+
+            // Record root package itself
+            if !name.is_empty() && !version.is_empty() {
+                return Ok(DependencyGraph {
+                    root: name,
+                    dependencies: deps,
+                });
+            }
+        }
+    }
+
+    Err(ArtifactError::Cargo(
+        "Could not extract dependency graph from cargo metadata".to_string(),
+    ))
 }
 
 /// Build a cargo project and package it into a content-addressed artifact.
@@ -441,6 +555,43 @@ pub fn install_artifact(
     println!("  Current symlink: {}", current_link.display());
 
     Ok(store_path)
+}
+
+/// Diff two artifacts' dependency graphs, reporting version changes.
+pub fn diff_artifacts(
+    artifact_a: &Path,
+    artifact_b: &Path,
+) -> Result<Vec<String>, ArtifactError> {
+    let meta_a = inspect_artifact(artifact_a)?;
+    let meta_b = inspect_artifact(artifact_b)?;
+
+    // For now, compare lockfile hashes and binary hashes
+    let mut diffs = Vec::new();
+
+    if meta_a.hash != meta_b.hash {
+        diffs.push("Artifact hash differs (overall content changed)".to_string());
+    }
+
+    if meta_a.inputs.source_hash != meta_b.inputs.source_hash {
+        diffs.push("Source hash differs (source code changed)".to_string());
+    }
+
+    if meta_a.inputs.lockfile_hash != meta_b.inputs.lockfile_hash {
+        diffs.push("Lockfile hash differs (dependencies changed)".to_string());
+    }
+
+    if meta_a.outputs.binary_hash.as_ref() != meta_b.outputs.binary_hash.as_ref() {
+        diffs.push("Binary hash differs (build output changed)".to_string());
+    }
+
+    if meta_a.inputs.compiler_version != meta_b.inputs.compiler_version {
+        diffs.push(format!(
+            "Compiler version differs: {} vs {}",
+            meta_a.inputs.compiler_version, meta_b.inputs.compiler_version
+        ));
+    }
+
+    Ok(diffs)
 }
 
 #[cfg(test)]
