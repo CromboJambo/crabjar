@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use crabjar_artifact::{build_artifact, inspect_artifact, verify_artifact};
+use crabjar_artifact::{build_artifact, inspect_artifact, install_artifact, rebuild_check, verify_artifact};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -59,6 +59,17 @@ enum Commands {
         /// Path to the .ca artifact file
         path: PathBuf,
     },
+
+    /// Rebuild and check reproducibility
+    RebuildCheck {
+        /// Path to the Cargo project (default: current directory)
+        #[clap(default_value = ".")]
+        path: PathBuf,
+
+        /// Target triple (default: x86_64-unknown-linux-musl)
+        #[clap(long)]
+        target: Option<String>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -89,15 +100,8 @@ fn main() -> Result<()> {
         }
 
         Commands::Install { path, prefix } => {
-            let metadata = inspect_artifact(&path)?;
-
-            // Verify before installing
-            if !verify_artifact(&path)? {
-                anyhow::bail!("Artifact verification failed");
-            }
-
-            println!("Installing {} to {}", metadata.name, prefix.display());
-            // TODO: actual installation logic (extract binary, set permissions)
+            println!("Installing artifact from {}", path.display());
+            install_artifact(&path, &prefix)?;
         }
 
         Commands::Verify { path } => {
@@ -106,6 +110,14 @@ fn main() -> Result<()> {
                 println!("Artifact is valid");
             } else {
                 anyhow::bail!("Artifact verification failed");
+            }
+        }
+
+        Commands::RebuildCheck { path, target } => {
+            println!("Checking reproducibility for project at {}", path.display());
+            let reproducible = rebuild_check(&path, target.as_deref())?;
+            if !reproducible {
+                anyhow::bail!("Artifact is not reproducible");
             }
         }
     }

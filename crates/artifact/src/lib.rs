@@ -347,6 +347,102 @@ pub fn verify_artifact(artifact_path: &Path) -> Result<bool, ArtifactError> {
     Ok(computed_hash == expected)
 }
 
+/// Rebuild the artifact and check if output matches (reproducibility test).
+pub fn rebuild_check(
+    project_dir: &Path,
+    target_triple: Option<&str>,
+) -> Result<bool, ArtifactError> {
+    let target = target_triple.unwrap_or("x86_64-unknown-linux-musl");
+
+    // Read package name to find existing artifact
+    let cargo_toml = project_dir.join("Cargo.toml");
+    let name = read_package_name(&cargo_toml)?;
+
+    // Check if existing .ca file exists
+    let ca_path = project_dir.join(format!("{}.ca", name));
+    if !ca_path.exists() {
+        return Err(ArtifactError::InvalidFormat(format!(
+            "No existing artifact found at {}",
+            ca_path.display()
+        )));
+    }
+
+    let original_metadata = inspect_artifact(&ca_path)?;
+
+    // Rebuild
+    println!("Rebuilding {} for reproducibility check...", name);
+    let new_metadata = build_artifact(project_dir, target_triple)?;
+
+    // Compare hashes
+    if original_metadata.hash == new_metadata.hash {
+        println!("✓ Reproducible: rebuild produced identical artifact");
+        Ok(true)
+    } else {
+        println!("✗ Not reproducible!");
+        println!("  Original: {}", original_metadata.hash);
+        println!("  Rebuilt:  {}", new_metadata.hash);
+
+        // Show which parts differ
+        if original_metadata.outputs.binary_hash != new_metadata.outputs.binary_hash {
+            println!("  Binary hash differs (expected — builds aren't bit-identical)");
+        }
+        Ok(false)
+    }
+}
+
+/// Install artifact into store path with current symlink.
+pub fn install_artifact(
+    artifact_path: &Path,
+    store_root: &Path,
+) -> Result<PathBuf, ArtifactError> {
+    let metadata = inspect_artifact(artifact_path)?;
+
+    // Verify tarball integrity before installing
+    if !verify_artifact(artifact_path)? {
+        return Err(ArtifactError::VerifyFailed {
+            expected: metadata.hash.clone(),
+            actual: "recomputed hash differs".to_string(),
+        });
+    }
+
+    // Compute store path from content address
+    let hash = metadata
+        .hash
+        .strip_prefix("sha256:")
+        .unwrap_or(&metadata.hash);
+    let store_path = store_root.join(hash);
+
+    // Create store path if it doesn't exist
+    fs::create_dir_all(&store_path)?;
+
+    // Extract tarball to store path
+    let stem = artifact_path
+        .file_stem()
+        .ok_or(ArtifactError::InvalidFormat("No file stem".to_string()))?;
+    let tarball_path = artifact_path.with_extension("tar.gz");
+
+    {
+        use flate2::read::GzDecoder;
+
+        let file = fs::File::open(&tarball_path)?;
+        let decoder = GzDecoder::new(file);
+        let mut archive = tar::Archive::new(decoder);
+        archive.unpack(&store_path)?;
+    }
+
+    // Create/update current symlink
+    let current_link = store_root.join("current");
+    if current_link.exists() {
+        fs::remove_file(&current_link)?;
+    }
+    std::os::unix::fs::symlink(&store_path, &current_link)?;
+
+    println!("Installed artifact to {}", store_path.display());
+    println!("  Current symlink: {}", current_link.display());
+
+    Ok(store_path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
