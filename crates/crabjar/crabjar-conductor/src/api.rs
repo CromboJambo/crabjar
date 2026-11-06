@@ -21,6 +21,7 @@ pub mod route;
 pub mod rules;
 pub mod sandboxes;
 pub mod schema;
+pub mod seed_reports;
 pub mod security;
 pub mod tasks;
 pub mod upgrade;
@@ -142,6 +143,9 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/workers/login", post(workers::worker_login_handler))
         .route("/workers/poll", post(workers::worker_poll_handler))
         .route("/workers/heartbeat", post(workers::worker_heartbeat_public))
+        // Seed container environment reporting
+        .route("/api/report", post(seed_reports::seed_report_handler))
+        .route("/api/reports", get(seed_reports::list_seed_reports_handler))
         .route(
             "/evaluations/decision",
             post(evaluations::evaluate_decision_handler),
@@ -149,10 +153,10 @@ pub fn routes(conductor: ConductorState) -> Router {
         // Sandbox management endpoints (Phase 1)
         .route("/sandboxes", post(sandboxes::create_sandbox_handler))
         .route("/sandboxes", get(sandboxes::list_sandboxes_handler))
-        .route("/sandboxes/:id", get(sandboxes::get_sandbox_handler))
-        .route("/sandboxes/:id", delete(sandboxes::destroy_sandbox_handler))
+        .route("/sandboxes/{id}", get(sandboxes::get_sandbox_handler))
+        .route("/sandboxes/{id}", delete(sandboxes::destroy_sandbox_handler))
         .route(
-            "/sandboxes/:id/worker",
+            "/sandboxes/{id}/worker",
             post(sandboxes::assign_worker_to_sandbox_handler),
         )
         .route("/decide/evaluate/{id}", get(get_evaluation_status))
