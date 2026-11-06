@@ -76,6 +76,7 @@ members = [
     "crates/crabjar/crabjar-unsloth-mcp",
     "crates/crabjar/crabjar-herdr-mcp",
     "crates/crabjar/crabjar-structured-aux",
+    "code-audit",
     "crates/universal-structure",
     "crates/email-smtp", "crates/crabjar/crabjar-web-extract", "crates/crabjar/crabjar-browser", "crates/crabjar/crabjar-memory", "crates/crabjar/crabjar-delegation", "crates/crabjar/crabjar-cron", "crates/crabjar/crabjar-homeassistant", "crates/crabjar/crabjar-deploy",
     # Performance benchmarks for execution pipeline
