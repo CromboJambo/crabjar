@@ -55,6 +55,9 @@ pub enum PluginError {
 
     #[error("serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
+
+    #[error("internal plugin error: {0}")]
+    Internal(String),
 }
 
 /// Definition of a tool that a plugin can execute.

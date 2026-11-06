@@ -16,9 +16,12 @@ pub mod registry;
 pub mod types;
 pub mod wasm;
 pub mod bindings;
+pub mod wasm_plugin;
 
 // Re-export main types at top level for backward compatibility
 pub use plugin_trait::*;
 pub use process_pool::*;
 pub use registry::*;
 pub use types::*;
+pub use wasm::WasmEngine;
+pub use wasm_plugin::WasmPluginAdapter;
