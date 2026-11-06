@@ -20,6 +20,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   cargo-audit:
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.audit }}
