@@ -5,7 +5,7 @@ async fn test_embedding_generation(client: &Client) {
     println!("=== Test 1: Embedding Generation ===");
 
     let response = client
-        .post("http://ftw3:34159/v1/embeddings")
+        .post("https://ftw3:34159/v1/embeddings")
         .header("Content-Type", "application/json")
         .body(json!({
             "model": "/home/crombo/.cache/huggingface/hub/models--ggml-org--Kev-9B-GGUF/Kev-9B-Q4_K_M.gguf",
@@ -38,7 +38,7 @@ async fn test_similarity_comparison(client: &Client) {
 
     // Embed two similar sentences
     let resp1 = client
-        .post("http://ftw3:34159/v1/embeddings")
+        .post("https://ftw3:34159/v1/embeddings")
         .header("Content-Type", "application/json")
         .body(json!({
             "model": "/home/crombo/.cache/huggingface/hub/models--ggml-org--Kev-9B-GGUF/Kev-9B-Q4_K_M.gguf",
@@ -49,7 +49,7 @@ async fn test_similarity_comparison(client: &Client) {
         .await;
 
     let resp2 = client
-        .post("http://ftw3:34159/v1/embeddings")
+        .post("https://ftw3:34159/v1/embeddings")
         .header("Content-Type", "application/json")
         .body(json!({
             "model": "/home/crombo/.cache/huggingface/hub/models--ggml-org--Kev-9B-GGUF/Kev-9B-Q4_K_M.gguf",
@@ -74,7 +74,7 @@ async fn test_code_embedding(client: &Client) {
         "fn fibonacci(n: u32) -> u32 { if n < 2 { return n; } fibonacci(n-1) + fibonacci(n-2) }";
 
     let response = client
-        .post("http://ftw3:34159/v1/embeddings")
+        .post("https://ftw3:34159/v1/embeddings")
         .header("Content-Type", "application/json")
         .body(json!({
             "model": "/home/crombo/.cache/huggingface/hub/models--ggml-org--Kev-9B-GGUF/Kev-9B-Q4_K_M.gguf",

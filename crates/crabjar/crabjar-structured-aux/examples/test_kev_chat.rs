@@ -5,7 +5,7 @@ async fn test_kev_chat_completion(client: &Client) {
     println!("=== Test 1: Kev-9B Chat Completion ===");
 
     let response = client
-        .post("http://ftw3:34159/v1/chat/completions")
+        .post("https://ftw3:34159/v1/chat/completions")
         .header("Content-Type", "application/json")
         .body(json!({
             "model": "/home/crombo/.cache/huggingface/hub/models--ggml-org--Kev-9B-GGUF/Kev-9B-Q4_K_M.gguf",
@@ -36,7 +36,7 @@ async fn test_kev_structured_prompt(client: &Client) {
     let code = "fn add(a: i32, b: i32) -> i32 { a + b }";
 
     let response = client
-        .post("http://ftw3:34159/v1/chat/completions")
+        .post("https://ftw3:34159/v1/chat/completions")
         .header("Content-Type", "application/json")
         .body(json!({
             "model": "/home/crombo/.cache/huggingface/hub/models--ggml-org--Kev-9B-GGUF/Kev-9B-Q4_K_M.gguf",
