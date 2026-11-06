@@ -2,6 +2,29 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 6, 2026 — v0.12.6: Dynamic Component Loading (Wasmtime Embedding)
+
+### Wasm Plugin Infrastructure
+- **crabjar-plugin crate** — Complete Wasm plugin runtime using embedded wasmtime engine
+- **WasmEngine wrapper** (`wasm.rs`) — Engine creation, component loading/instantiation from bytes or files
+- **Host binding implementations** (`bindings.rs`) — State management (get/set/delete), event dispatch, logging via host functions
+- **WasmPluginAdapter** (`wasm_plugin.rs`) — Bridges Wasm components to crabjar's Plugin trait; supports loading from .wasm files
+- **PluginManager/Registry** (`registry.rs`) — Plugin discovery, lifecycle management, tool routing across multiple plugins
+
+### Example Plugins
+- **Counter plugin** — Stateful counter demonstrating WIT interface definition and integration testing
+- **File operations plugin** — Real-world fs_ops plugin (read_file, write_file, list_dir, exists, remove_file) compiled to wasm32-unknown-unknown with 6 integration tests validating full pipeline
+
+### Testing & Validation
+- 17 passing tests across unit, dynamic component integration, and fs_ops plugin integration suites
+- Integration tests validate complete pipeline: .wasm file → WasmEngine → WasmPluginAdapter → PluginRegistry → tool execution
+- Counter plugin validates infrastructure; fs_ops plugin demonstrates real-world plugin loading with actual host operations
+
+### Architecture
+- Follows crabjar's glass abstraction boundary pattern — stable substrate inside, disposable integrations outside
+- Complements existing plugin trait system rather than replacing it
+- Enables hot-pluggable tools without rebuilding the main binary
+
 ## November 2, 2026 — v0.12.5: Browser Automation Integration (P1-3)
 
 ### crabjar-browser Crate

@@ -4,7 +4,7 @@ This document tracks **upcoming** crabjar development priorities. Completed work
 
 ## Current State (November 2026)
 
-All P1 drop-in replacement blockers are complete. crabjar provides feature parity with Hermes Agent's core tooling suite. Recent focus has been on security hardening (ADR-045 red team analysis), clippy cleanup, and pre-release preparation.
+All P1 drop-in replacement blockers are complete. crabjar provides feature parity with Hermes Agent's core tooling suite. Recent focus has been on security hardening (ADR-045 red team analysis), clippy cleanup, dynamic component loading infrastructure (v0.12.6), and pre-release preparation.
 
 See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complete gap analysis.
 

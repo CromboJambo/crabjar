@@ -90,7 +90,7 @@ The chicken-and-egg problem: how can an agent self-correct if it can't identify 
 
 ## Version
 
-0.12.5
+0.12.6
 
 ## Repository
 
