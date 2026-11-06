@@ -3,6 +3,7 @@
 //! Wraps llama-server HTTP API for embedding-based semantic decision-making.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{Result, anyhow};
@@ -11,6 +12,35 @@ use sha2::{Digest, Sha256};
 
 use super::cache::DecisionCache;
 use crate::state_store::StateStore;
+
+/// Validate a file path to prevent path injection attacks.
+/// Checks for traversal sequences and ensures the path is absolute.
+pub fn validate_path(path: &str) -> Result<()> {
+    // Reject empty paths
+    if path.is_empty() {
+        return Err(anyhow!("Empty path provided"));
+    }
+
+    let p = Path::new(path);
+
+    // Must be an absolute path for criteria files
+    if !p.is_absolute() {
+        return Err(anyhow!(
+            "Path must be absolute, got: {}",
+            p.display()
+        ));
+    }
+
+    // Reject paths with traversal sequences
+    if path.contains("..") {
+        return Err(anyhow!(
+            "Path contains traversal sequence: {}",
+            p.display()
+        ));
+    }
+
+    Ok(())
+}
 
 /// Embedding backend configuration
 #[derive(Debug, Clone)]
@@ -191,6 +221,9 @@ impl JevEvaluator {
 
     /// Load decision criteria from file (with caching)
     async fn load_criteria(&self, path: &str) -> Result<DecisionCriteria> {
+        // Validate path to prevent injection
+        validate_path(path)?;
+
         // Simple cache check (not thread-safe, but sufficient for single-threaded use)
         if let Some(cached) = self.criteria_cache.get(path) {
             return Ok(cached.clone());
@@ -291,6 +324,12 @@ pub fn evaluate_structural_conditions(
     target: &crate::decision::structural::EvaluationTarget,
     criteria_path: &str,
 ) -> Option<DecisionResult> {
+    // Validate path to prevent injection
+    if let Err(e) = validate_path(criteria_path) {
+        tracing::debug!("Invalid criteria path: {}", e);
+        return None;
+    }
+
     // Read and parse the criteria file
     let criteria_content = match std::fs::read_to_string(criteria_path) {
         Ok(content) => content,

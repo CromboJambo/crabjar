@@ -1,6 +1,7 @@
 //! JEV (Just-in-Time Evaluation) routes: structural evaluation, post-processing, and feedback.
 
 use crate::api::ConductorState;
+use crate::decision::evaluate::validate_path;
 use axum::{Json, extract::State};
 use serde_json::json;
 
@@ -103,6 +104,12 @@ fn evaluate_structural_conditions(
     target: &crate::decision::structural::EvaluationTarget,
     criteria_path: &str,
 ) -> Option<Json<serde_json::Value>> {
+    // Validate path to prevent injection
+    if let Err(e) = validate_path(criteria_path) {
+        tracing::debug!("Invalid criteria path: {}", e);
+        return None;
+    }
+
     // Read and parse the criteria file
     let criteria_content = match std::fs::read_to_string(criteria_path) {
         Ok(content) => content,
