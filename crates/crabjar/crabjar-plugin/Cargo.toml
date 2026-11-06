@@ -26,6 +26,9 @@ chrono = { workspace = true }
 # Tracing
 tracing = { workspace = true }
 
+# Wasmtime for component model plugin execution
+wasmtime = { version = "51.0.0-rc.1", features = ["component-model"] }
+
 # CrabJar libs (for shared types)
 crabjar-guard = { path = "../../guard" }
 crabjar-telemetry = { path = "../../telemetry" }

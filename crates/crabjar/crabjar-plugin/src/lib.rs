@@ -14,6 +14,8 @@ pub mod process_pool;
 mod process_types;
 pub mod registry;
 pub mod types;
+pub mod wasm;
+pub mod bindings;
 
 // Re-export main types at top level for backward compatibility
 pub use plugin_trait::*;

@@ -1,0 +1,132 @@
+package crabjar:plugin@0.1.0;
+
+/// Shared types used by both host imports and guest exports.
+interface types {
+    /// An event delivered to a plugin from the host event bus.
+    record event {
+        /// Event type, e.g. "session.started" or "tool.result".
+        kind: string,
+        /// Opaque payload. The schema is defined per `kind`; prefer
+        /// promoting hot event kinds to typed records over time.
+        payload: list<u8>,
+        /// Correlates this event with the host-side ledger entry.
+        correlation-id: option<string>,
+    }
+
+    /// What a plugin declares about itself. The host compares this against
+    /// the capability manifest and decides what to grant. Declaring a
+    /// capability here grants nothing.
+    record descriptor {
+        name: string,
+        version: string,
+        /// Event kinds the plugin wants to receive.
+        subscribes: list<string>,
+        /// Host capabilities the plugin asks for (e.g. "state", "events-publish").
+        requests: list<string>,
+    }
+
+    variant plugin-error {
+        invalid-config(string),
+        denied(string),
+        /// The guest could not handle the event; the host may retry or drop.
+        failed(string),
+    }
+}
+
+/// Host-owned, per-component key/value state.
+///
+/// The host scopes every call to the calling component's identity (carried
+/// in the Store's data, never passed by the guest) and appends each write
+/// to the ledger. Reload and rollback therefore need no guest cooperation.
+interface state {
+    variant state-error {
+        /// Quota or size limit hit.
+        limit-exceeded(string),
+        /// Capability not granted, or the host is mid-teardown.
+        denied(string),
+        /// Ledger or backing store failure.
+        backend(string),
+    }
+
+    get: func(key: string) -> result<option<list<u8>>, state-error>;
+    put: func(key: string, value: list<u8>) -> result<_, state-error>;
+    delete: func(key: string) -> result<_, state-error>;
+    list-keys: func(prefix: string) -> result<list<string>, state-error>;
+
+    /// Schema version of the stored data. Zero means no state yet.
+    schema-version: func() -> u32;
+    set-schema-version: func(version: u32) -> result<_, state-error>;
+}
+
+/// Publishing back onto the host event bus. Gated separately from `state`
+/// because it lets a plugin cause effects in other components.
+interface events {
+    use types.{plugin-error};
+
+    publish: func(kind: string, payload: list<u8>) -> result<_, plugin-error>;
+}
+
+/// Structured logging into the host's audit stream.
+interface log {
+    enum level { trace, debug, info, warn, error }
+
+    emit: func(level: level, message: string);
+}
+
+/// What the host calls on a plugin.
+interface lifecycle {
+    use types.{event, descriptor, plugin-error};
+
+    /// Called once after instantiation, before `activate`. Pure metadata;
+    /// the host reads it to build the capability decision.
+    describe: func() -> descriptor;
+
+    /// Called after the host has linked only the granted imports.
+    activate: func(config: string) -> result<_, plugin-error>;
+
+    /// Called before teardown. The host drops the instance regardless of
+    /// the result; state lives host-side, so nothing here is load-bearing.
+    deactivate: func() -> result<_, plugin-error>;
+
+    /// Called when stored `schema-version` is older than this build expects.
+    /// The guest reads old data through `state`, rewrites it, and bumps the
+    /// version. If it fails, the host keeps the old instance.
+    migrate: func(from-version: u32) -> result<_, plugin-error>;
+
+    handle-event: func(ev: event) -> result<option<list<u8>>, plugin-error>;
+}
+
+/// A full agent plugin: reacts to events, keeps state, may publish.
+world plugin {
+    import types;
+    import state;
+    import events;
+    import log;
+
+    export lifecycle;
+}
+
+/// Pure computation, e.g. crabjar-compress. No imports at all, so the
+/// capability story is "none": nothing to grant, nothing to audit.
+interface compressor {
+    record compress-request {
+        content: string,
+        max-tokens: u32,
+    }
+
+    record compress-result {
+        compressed: string,
+        original-chars: u64,
+        compressed-chars: u64,
+        reduction-percent: f64,
+        /// Mirrors the Debug name of the native ContentType for now; promote
+        /// to an enum once the variant set is stable.
+        content-type: string,
+    }
+
+    compress: func(req: compress-request) -> compress-result;
+}
+
+world tool {
+    export compressor;
+}
