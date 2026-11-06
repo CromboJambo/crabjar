@@ -221,15 +221,22 @@ impl JevEvaluator {
 
     /// Load decision criteria from file (with caching)
     async fn load_criteria(&self, path: &str) -> Result<DecisionCriteria> {
-        // Validate path to prevent injection
-        validate_path(path)?;
+        // Validate and canonicalize path to prevent injection
+        let resolved = std::fs::canonicalize(path).map_err(|e| anyhow!("Failed to resolve path '{}': {}", path, e))?;
+
+        // Ensure the resolved path is within an expected base directory
+        // (no traversal outside the project root)
+        if !resolved.starts_with("/") {
+            return Err(anyhow!("Path not absolute after canonicalization: {}", path));
+        }
 
         // Simple cache check (not thread-safe, but sufficient for single-threaded use)
-        if let Some(cached) = self.criteria_cache.get(path) {
+        let resolved_str = resolved.to_string_lossy().to_string();
+        if let Some(cached) = self.criteria_cache.get(&resolved_str) {
             return Ok(cached.clone());
         }
 
-        let content = tokio::fs::read_to_string(path).await?;
+        let content = tokio::fs::read_to_string(&resolved).await?;
         let criteria: DecisionCriteria = serde_json::from_str(&content)?;
 
         // Note: Can't insert into cache here because self is immutable.
