@@ -68,10 +68,7 @@ fn main() {
         println!("Cleaned: {} → {}", args.input, output_path);
         if !result.secrets_found.is_empty() {
             let total: usize = result.secrets_found.values().sum();
-            println!("Stripped {} secret(s):", total);
-            for (r#type, count) in &result.secrets_found {
-                println!("  {}: {}", r#type, count);
-            }
+            println!("Stripped {} secret(s).", total);
         } else {
             println!("No secrets found.");
         }

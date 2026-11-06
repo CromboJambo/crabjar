@@ -299,10 +299,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
 
             if !result.secrets_found.is_empty() {
-                println!("Secrets found:");
-                for (secret_type, count) in &result.secrets_found {
-                    println!("  {}: {}", secret_type, count);
-                }
+                let total: usize = result.secrets_found.values().sum();
+                println!("Stripped {} secret(s).", total);
             }
         }
         None => {
