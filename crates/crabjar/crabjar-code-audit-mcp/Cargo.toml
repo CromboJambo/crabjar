@@ -1,0 +1,14 @@
+[package]
+name = "crabjar-code-audit-mcp"
+version = "0.1.0"
+edition = "2024"
+description = "MCP server wrapping code-audit for automated vulnerability discovery"
+
+[dependencies]
+rmcp = { version = "3.5", features = ["server"] }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+anyhow = "1.0"
+code-audit = { path = "../../code-audit" }
