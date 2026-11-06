@@ -1,0 +1,17 @@
+[package]
+name = "fs-ops-plugin"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/plugin.rs"
+
+[dependencies]
+serde_json = "1.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
