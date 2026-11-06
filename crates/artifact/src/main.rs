@@ -8,9 +8,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use crabjar_artifact::{
-    build_artifact, inspect_artifact, verify_artifact, write_artifact_metadata,
-};
+use crabjar_artifact::{build_artifact, inspect_artifact, verify_artifact};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -67,26 +65,15 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Build {
-            path,
-            target,
-            output,
-        } => {
+        Commands::Build { path, target, .. } => {
             println!("Building artifact for project at {}", path.display());
 
             let metadata = build_artifact(&path, target.as_deref())?;
-
-            // Determine output path
-            let output_path =
-                output.unwrap_or_else(|| PathBuf::from(format!("{}.ca", metadata.name)));
-
-            write_artifact_metadata(&output_path, &metadata)?;
 
             println!("Artifact built successfully!");
             println!("  Name: {}", metadata.name);
             println!("  Hash: {}", metadata.hash);
             println!("  Target: {}", metadata.target);
-            println!("  Output: {}", output_path.display());
         }
 
         Commands::Inspect { path } => {

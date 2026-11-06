@@ -1,11 +1,13 @@
 //! crabjar-artifact: Content-addressed artifact packaging for Rust projects.
 //!
 //! Provides Guix/Nix-style reproducible build artifacts that are self-contained,
-//! versioned, and portable across machines.
+//! versioned, and portable across machines. Artifacts include the binary itself,
+//! addressed by the hash of the complete tarball (binary + metadata).
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// Error types for artifact operations.
@@ -25,6 +27,9 @@ pub enum ArtifactError {
 
     #[error("Invalid artifact format: {0}")]
     InvalidFormat(String),
+
+    #[error("Binary not found at expected location")]
+    BinaryNotFound,
 }
 
 /// Metadata for a content-addressed artifact.
@@ -32,7 +37,7 @@ pub enum ArtifactError {
 pub struct ArtifactMetadata {
     /// Format version
     pub version: u32,
-    /// Content-addressed hash of the entire artifact
+    /// Content-addressed hash of the entire tarball (binary + metadata)
     pub hash: String,
     /// Package name from Cargo.toml
     pub name: String,
@@ -47,7 +52,7 @@ pub struct ArtifactMetadata {
 /// Inputs that determine the artifact's content.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtifactInputs {
-    /// Hash of the source tree
+    /// Hash of tracked source files (via git ls-files)
     pub source_hash: String,
     /// Hash of Cargo.lock
     pub lockfile_hash: String,
@@ -62,62 +67,116 @@ pub struct ArtifactInputs {
 pub struct ArtifactOutputs {
     /// Primary binary name
     pub binary: Option<String>,
+    /// Hash of the built binary (for reproducibility checking)
+    pub binary_hash: Option<String>,
     /// Shared library name (if any)
     pub lib: Option<String>,
-    /// Data files included
-    pub data_files: Vec<String>,
 }
 
 /// Compute SHA-256 hash of a file.
 pub fn hash_file(path: &Path) -> Result<String, ArtifactError> {
     let mut hasher = Sha256::new();
-    let mut file = std::fs::File::open(path)?;
+    let mut file = fs::File::open(path)?;
     std::io::copy(&mut file, &mut hasher)?;
     Ok(hex::encode(hasher.finalize()))
 }
 
-/// Compute SHA-256 hash of a directory tree.
-pub fn hash_directory(path: &Path) -> Result<String, ArtifactError> {
+/// Compute SHA-256 hash of data.
+pub fn hash_data(data: &[u8]) -> String {
     let mut hasher = Sha256::new();
-    walk_and_hash(path, &mut hasher)?;
+    hasher.update(data);
+    hex::encode(hasher.finalize())
+}
+
+/// Get list of tracked files via git ls-files.
+fn get_tracked_files(project_dir: &Path) -> Result<Vec<PathBuf>, ArtifactError> {
+    let output = std::process::Command::new("git")
+        .arg("ls-files")
+        .current_dir(project_dir)
+        .output()?;
+
+    if !output.status.success() {
+        // Fall back to reading all files if not a git repo
+        return collect_files(project_dir);
+    }
+
+    let files = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|f| !f.is_empty())
+        .map(|f| project_dir.join(f))
+        .collect();
+
+    Ok(files)
+}
+
+/// Collect all files in a directory (non-git fallback).
+fn collect_files(dir: &Path) -> Result<Vec<PathBuf>, ArtifactError> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            files.push(path);
+        } else if path.is_dir() {
+            // Skip target/ and .git/ directories
+            if let Some(name) = path.file_name() {
+                if name == "target" || name == ".git" {
+                    continue;
+                }
+            }
+            files.extend(collect_files(&path)?);
+        }
+    }
+    Ok(files)
+}
+
+/// Compute deterministic hash of source tree.
+pub fn hash_source_tree(project_dir: &Path) -> Result<String, ArtifactError> {
+    let mut hasher = Sha256::new();
+
+    let files = get_tracked_files(project_dir)?;
+
+    // Sort files for deterministic ordering
+    let mut sorted_files = files;
+    sorted_files.sort();
+
+    for file in &sorted_files {
+        // Hash relative path with length prefix
+        if let Ok(rel) = file.strip_prefix(project_dir) {
+            let rel_str = rel.to_string_lossy();
+            hasher.update((rel_str.len() as u32).to_le_bytes());
+            hasher.update(rel_str.as_bytes());
+        }
+
+        // Hash file content with length prefix
+        if file.is_file() {
+            let content = fs::read(file)?;
+            hasher.update((content.len() as u64).to_le_bytes());
+            hasher.update(&content);
+        }
+    }
+
     Ok(hex::encode(hasher.finalize()))
 }
 
-fn walk_and_hash(dir: &Path, hasher: &mut Sha256) -> Result<(), ArtifactError> {
-    let entries = std::fs::read_dir(dir)?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            // Hash filename + content
-            hasher.update(path.file_name().unwrap().to_string_lossy().as_bytes());
-            let file_hash = hash_file(&path)?;
-            hasher.update(file_hash.as_bytes());
-        } else if path.is_dir() {
-            // Recurse into subdirectories
-            hasher.update(path.file_name().unwrap().to_string_lossy().as_bytes());
-            walk_and_hash(&path, hasher)?;
-        }
-    }
-    Ok(())
-}
-
-/// Read Cargo.toml to extract package name.
+/// Read package name from Cargo.toml using toml crate.
 pub fn read_package_name(cargo_toml_path: &Path) -> Result<String, ArtifactError> {
-    let content = std::fs::read_to_string(cargo_toml_path)?;
-    // Simple parsing - find [package] section and name field
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("name") && trimmed.contains("=") {
-            let parts: Vec<&str> = trimmed.split('=').collect();
-            if parts.len() == 2 {
-                let value = parts[1].trim().trim_matches('"');
-                return Ok(value.to_string());
-            }
-        }
+    let content = fs::read_to_string(cargo_toml_path)?;
+    let parsed: toml::Value = content
+        .parse()
+        .map_err(|e| ArtifactError::InvalidFormat(format!("Failed to parse Cargo.toml: {}", e)))?;
+
+    if let Some(name) = parsed
+        .get("package")
+        .and_then(|p| p.get("name"))
+        .and_then(|n| n.as_str())
+    {
+        Ok(name.to_string())
+    } else {
+        Err(ArtifactError::InvalidFormat(
+            "Could not find package name in Cargo.toml".to_string(),
+        ))
     }
-    Err(ArtifactError::InvalidFormat(
-        "Could not find package name in Cargo.toml".to_string(),
-    ))
 }
 
 /// Get rustc version string.
@@ -133,19 +192,19 @@ pub fn get_rustc_version() -> Result<String, ArtifactError> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-/// Build a cargo artifact and package it.
+/// Build a cargo project and package it into a content-addressed artifact.
 pub fn build_artifact(
     project_dir: &Path,
     target_triple: Option<&str>,
 ) -> Result<ArtifactMetadata, ArtifactError> {
     let target = target_triple.unwrap_or("x86_64-unknown-linux-musl");
 
-    // Read package name
+    // Read package name using proper TOML parsing
     let cargo_toml = project_dir.join("Cargo.toml");
     let name = read_package_name(&cargo_toml)?;
 
-    // Compute source and lockfile hashes
-    let source_hash = hash_directory(project_dir)?;
+    // Compute source and lockfile hashes (deterministic)
+    let source_hash = hash_source_tree(project_dir)?;
     let lockfile = project_dir.join("Cargo.lock");
     let lockfile_hash = if lockfile.exists() {
         hash_file(&lockfile)?
@@ -177,24 +236,18 @@ pub fn build_artifact(
     // Locate built binary
     let target_dir = project_dir.join("target").join(target).join("release");
     let binary_path = target_dir.join(&name);
-    let binary_name = if binary_path.exists() {
-        Some(name.clone())
-    } else {
-        None
-    };
+    if !binary_path.exists() {
+        return Err(ArtifactError::BinaryNotFound);
+    }
 
-    // Compute artifact hash (source + lockfile + compiler)
-    let mut hasher = Sha256::new();
-    hasher.update(source_hash.as_bytes());
-    hasher.update(lockfile_hash.as_bytes());
-    hasher.update(compiler_version.as_bytes());
-    let artifact_hash = hex::encode(hasher.finalize());
+    // Hash the built binary for reproducibility tracking
+    let binary_hash = hash_file(&binary_path)?;
 
-    // Create metadata
-    let metadata = ArtifactMetadata {
+    // Create metadata (without final artifact hash yet)
+    let mut metadata = ArtifactMetadata {
         version: 1,
-        hash: format!("sha256:{}", artifact_hash),
-        name,
+        hash: String::new(), // Will be set after tarball creation
+        name: name.clone(),
         target: target.to_string(),
         inputs: ArtifactInputs {
             source_hash,
@@ -203,48 +256,94 @@ pub fn build_artifact(
             features: vec![], // TODO: parse from Cargo.toml
         },
         outputs: ArtifactOutputs {
-            binary: binary_name,
+            binary: Some(name.clone()),
+            binary_hash: Some(binary_hash),
             lib: None,
-            data_files: vec![],
         },
     };
+
+    // Create tarball containing binary + metadata
+    let tarball_path = project_dir.join(format!("{}.tar.gz", name));
+
+    {
+        use flate2::Compression;
+        use flate2::write::GzEncoder;
+
+        let encoder = GzEncoder::new(fs::File::create(&tarball_path)?, Compression::default());
+        let mut tar = tar::Builder::new(encoder);
+
+        // Add binary to tarball
+        tar.append_path_with_name(&binary_path, "bin")?;
+
+        // Add metadata as JSON file in tarball
+        let metadata_json = serde_json::to_string_pretty(&metadata)?;
+        {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(metadata_json.len() as u64);
+            header.set_mode(0o644);
+            header.set_mtime(0);
+            header.set_cksum();
+            tar.append_data(&mut header, "metadata.json", metadata_json.as_bytes())?;
+        }
+
+        tar.finish()?;
+    }
+
+    // Compute content-addressed hash of the tarball
+    let tarball_hash = hash_file(&tarball_path)?;
+    metadata.hash = format!("sha256:{}", tarball_hash);
+
+    // Write final metadata with correct hash
+    let final_metadata_json = serde_json::to_string_pretty(&metadata)?;
+    fs::write(
+        project_dir.join(format!("{}.ca", name)),
+        final_metadata_json,
+    )?;
+
+    println!("Artifact built successfully!");
+    println!("  Name: {}", metadata.name);
+    println!("  Hash: {}", metadata.hash);
+    println!("  Target: {}", metadata.target);
+    println!(
+        "  Binary hash: {}",
+        metadata.outputs.binary_hash.as_ref().unwrap()
+    );
+    println!("  Output: {}.ca", name);
 
     Ok(metadata)
 }
 
 /// Inspect an artifact file and return its metadata.
 pub fn inspect_artifact(artifact_path: &Path) -> Result<ArtifactMetadata, ArtifactError> {
-    let content = std::fs::read_to_string(artifact_path)?;
+    let content = fs::read_to_string(artifact_path)?;
     let metadata: ArtifactMetadata = serde_json::from_str(&content)?;
     Ok(metadata)
 }
 
-/// Write artifact metadata to a .ca file.
-pub fn write_artifact_metadata(
-    path: &Path,
-    metadata: &ArtifactMetadata,
-) -> Result<(), ArtifactError> {
-    let content = serde_json::to_string_pretty(metadata)?;
-    std::fs::write(path, content)?;
-    Ok(())
-}
-
-/// Verify artifact integrity by recomputing hash.
+/// Verify artifact integrity by re-hashing the tarball.
 pub fn verify_artifact(artifact_path: &Path) -> Result<bool, ArtifactError> {
     let metadata = inspect_artifact(artifact_path)?;
 
-    // Recompute hash from inputs
-    let mut hasher = Sha256::new();
-    hasher.update(metadata.inputs.source_hash.as_bytes());
-    hasher.update(metadata.inputs.lockfile_hash.as_bytes());
-    hasher.update(metadata.inputs.compiler_version.as_bytes());
-    let computed_hash = hex::encode(hasher.finalize());
+    // The .ca file should be alongside a .tar.zst with the same base name
+    let stem = artifact_path
+        .file_stem()
+        .ok_or(ArtifactError::InvalidFormat("No file stem".to_string()))?;
+    let tarball_path = artifact_path.with_extension("tar.gz");
 
-    // Compare with stored hash
+    if !tarball_path.exists() {
+        return Err(ArtifactError::InvalidFormat(format!(
+            "Tarball not found: {}",
+            tarball_path.display()
+        )));
+    }
+
+    // Re-hash the tarball and compare with stored hash
+    let computed_hash = hash_file(&tarball_path)?;
     let expected = metadata
         .hash
         .strip_prefix("sha256:")
         .unwrap_or(&metadata.hash);
+
     Ok(computed_hash == expected)
 }
 
@@ -254,23 +353,23 @@ mod tests {
 
     #[test]
     fn test_hash_file() {
-        // Create a temp file and hash it
         let dir = tempfile::tempdir().unwrap();
         let file_path = dir.path().join("test.txt");
-        std::fs::write(&file_path, "hello world").unwrap();
+        fs::write(&file_path, "hello world").unwrap();
 
         let hash = hash_file(&file_path).unwrap();
         assert_eq!(hash.len(), 64); // SHA-256 hex is 64 chars
     }
 
     #[test]
-    fn test_hash_directory() {
+    fn test_hash_source_tree_deterministic() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("file1.txt"), "content1").unwrap();
-        std::fs::write(dir.path().join("file2.txt"), "content2").unwrap();
+        fs::write(dir.path().join("file1.txt"), "content1").unwrap();
+        fs::write(dir.path().join("file2.txt"), "content2").unwrap();
 
-        let hash = hash_directory(dir.path()).unwrap();
-        assert_eq!(hash.len(), 64);
+        let hash1 = hash_source_tree(dir.path()).unwrap();
+        let hash2 = hash_source_tree(dir.path()).unwrap();
+        assert_eq!(hash1, hash2); // Same content should produce same hash
     }
 
     #[test]
@@ -288,13 +387,14 @@ mod tests {
             },
             outputs: ArtifactOutputs {
                 binary: Some("test-binary".to_string()),
+                binary_hash: Some("hash123".to_string()),
                 lib: None,
-                data_files: vec![],
             },
         };
 
         let json = serde_json::to_string(&metadata).unwrap();
         let restored: ArtifactMetadata = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.name, "test-package");
+        assert_eq!(restored.outputs.binary_hash.as_ref().unwrap(), "hash123");
     }
 }
