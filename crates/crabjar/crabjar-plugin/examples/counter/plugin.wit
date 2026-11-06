@@ -1,0 +1,9 @@
+package crabjar.examples.counter;
+
+export interface plugin {
+    // Called by host to invoke a tool
+    handle_tool_call(tool_name: string, args_json: string): string;
+    
+    // Called by host to list available tools
+    list_tools(): string;
+}
