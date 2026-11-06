@@ -8,7 +8,10 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use crabjar_artifact::{build_artifact, inspect_artifact, install_artifact, rebuild_check, verify_artifact};
+use crabjar_artifact::{
+    build_artifact, diff_artifacts, inspect_artifact, install_artifact, rebuild_check,
+    verify_artifact,
+};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -70,6 +73,14 @@ enum Commands {
         #[clap(long)]
         target: Option<String>,
     },
+
+    /// Diff two artifacts to find dependency changes
+    Diff {
+        /// First artifact file
+        first: PathBuf,
+        /// Second artifact file
+        second: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -118,6 +129,18 @@ fn main() -> Result<()> {
             let reproducible = rebuild_check(&path, target.as_deref())?;
             if !reproducible {
                 anyhow::bail!("Artifact is not reproducible");
+            }
+        }
+
+        Commands::Diff { first, second } => {
+            println!("Comparing artifacts...");
+            let diffs = diff_artifacts(&first, &second)?;
+            if diffs.is_empty() {
+                println!("Artifacts are identical");
+            } else {
+                for diff in &diffs {
+                    println!("- {}", diff);
+                }
             }
         }
     }

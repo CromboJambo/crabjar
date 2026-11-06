@@ -194,6 +194,27 @@ impl Conductor {
     fn decompose(&self, goal_id: String, description: &str) -> Result<Vec<Task>> {
         info!(goal_id = %goal_id, pesti_url = %self.config.pesti_server_url, "Decomposing goal via pesti-server");
 
+        // Try LLM decomposition first, fall back to single-task if pesti-server fails
+        let tasks = self.try_llm_decomposition(&goal_id, description);
+
+        match tasks {
+            Ok(t) => {
+                info!(goal_id = %goal_id, task_count = t.len(), "LLM decomposition succeeded");
+                Ok(t)
+            }
+            Err(e) => {
+                warn!(goal_id = %goal_id, error = %e, "LLM decomposition failed, falling back to single-task");
+                // Fallback: create a single task with the goal description as the command
+                let task = self
+                    .store
+                    .create_task(&goal_id, format!("[{}] {}", description, description))?;
+                Ok(vec![task])
+            }
+        }
+    }
+
+    /// Attempt LLM-based decomposition via pesti-server.
+    fn try_llm_decomposition(&self, goal_id: &str, description: &str) -> Result<Vec<Task>> {
         // Call pesti-server to break the goal into steps via LLM inference.
         let prompt = format!(
             "You are a task planner that breaks goals into executable shell commands.\n\
@@ -208,25 +229,6 @@ impl Conductor {
         let url = format!("{}/v1/chat/completions", self.config.pesti_server_url);
         info!(goal_id = %goal_id, url = %url, "Connecting to pesti-server");
 
-        // Debug: resolve the hostname ourselves to see what IP we get
-        let parsed = reqwest::Url::parse(&url).map_err(|e| anyhow::anyhow!("invalid URL: {e}"))?;
-        let host = parsed
-            .host_str()
-            .ok_or_else(|| anyhow::anyhow!("no host in URL"))?;
-        info!(goal_id = %goal_id, host = %host, "Resolved hostname");
-
-        // Try resolving manually to see what we get
-        match std::net::ToSocketAddrs::to_socket_addrs(&format!("{host}:8081")) {
-            Ok(addrs) => {
-                for addr in addrs {
-                    info!(goal_id = %goal_id, addr = ?addr, "DNS resolution result");
-                }
-            }
-            Err(e) => {
-                error!(goal_id = %goal_id, err = %e, host = %host, "Manual DNS resolution failed");
-            }
-        }
-
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_mins(2))
             .connect_timeout(std::time::Duration::from_secs(10))
@@ -234,7 +236,7 @@ impl Conductor {
             .map_err(|e| anyhow::anyhow!("failed to build HTTP client: {e}"))?;
 
         let body = serde_json::json!({
-            "model": "orchestrator_merged",
+            "model": "",
             "messages": [
                 {
                     "role": "system",
@@ -343,7 +345,7 @@ impl Conductor {
             debug!(goal_id = %goal_id, command = %command, "Creating task from LLM spec");
             let task = self
                 .store
-                .create_task(&goal_id, format!("[{description}] {command}"))?;
+                .create_task(goal_id, format!("[{}] {}", description, command))?;
             tasks.push(task);
         }
 

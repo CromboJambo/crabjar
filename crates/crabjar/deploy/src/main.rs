@@ -201,7 +201,11 @@ fn generate_config(machine_id: &str, version: &str, data_dir: &PathBuf) -> Strin
          enabled = true\n\
          log_level = \"info\"\n\
          output_dir = \"{}/logs\"\n",
-        machine_id, now, machine_id, version, data_dir.display()
+        machine_id,
+        now,
+        machine_id,
+        version,
+        data_dir.display()
     )
 }
 
@@ -241,7 +245,9 @@ fn scp_copy(config: &DeployConfig, local_path: &PathBuf, remote_path: &str) -> R
     if let Some(p) = config.target.port {
         scp_cmd.arg("-P").arg(p.to_string());
     }
-    scp_cmd.arg(local_path).arg(&format!("{}:{}", host, remote_path));
+    scp_cmd
+        .arg(local_path)
+        .arg(&format!("{}:{}", host, remote_path));
 
     let output = scp_cmd
         .output()
@@ -259,7 +265,10 @@ fn scp_copy(config: &DeployConfig, local_path: &PathBuf, remote_path: &str) -> R
 
 /// Deploy to a remote host via SSH/SCP.
 fn deploy_remote(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), String> {
-    log_step(&format!("Deploying {} to {}...", config.package, config.target.name));
+    log_step(&format!(
+        "Deploying {} to {}...",
+        config.package, config.target.name
+    ));
 
     // Create directory structure on remote
     log_step("Creating remote directories...");
@@ -274,11 +283,7 @@ fn deploy_remote(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Str
 
     // Copy binary to remote
     log_step("Copying binary...");
-    let remote_path = format!(
-        "{}/{}",
-        config.install_dir.display(),
-        config.binary_name
-    );
+    let remote_path = format!("{}/{}", config.install_dir.display(), config.binary_name);
     scp_copy(config, binary_path, &remote_path)?;
 
     // Restart dinit service if specified
@@ -335,8 +340,7 @@ fn deploy_local(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Stri
 
     // Make executable
     let perms = std::fs::Permissions::from_mode(0o755);
-    fs::set_permissions(&dest, perms)
-        .map_err(|e| format!("Failed to set permissions: {}", e))?;
+    fs::set_permissions(&dest, perms).map_err(|e| format!("Failed to set permissions: {}", e))?;
 
     // Generate config for main crabjar package
     if config.package == "crabjar" {
@@ -344,8 +348,11 @@ fn deploy_local(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Stri
         let machine_id = run_command("hostname", &[])?;
         let config_content = generate_config(&machine_id, &config.version, &config.data_dir);
 
-        fs::write(config.install_dir.join(".crabjar_config.toml"), &config_content)
-            .map_err(|e| format!("Failed to write config: {}", e))?;
+        fs::write(
+            config.install_dir.join(".crabjar_config.toml"),
+            &config_content,
+        )
+        .map_err(|e| format!("Failed to write config: {}", e))?;
     }
 
     log_step("Local deployment complete");

@@ -14,7 +14,10 @@ use tracing::{info, warn};
 
 /// Load persistent host key for the bastion (avoids host-key mismatch on restart)
 fn load_bastion_key() -> russh::keys::PrivateKey {
-    let key_path = PathBuf::from(std::env::var("CRABJAR_BASTION_KEY_PATH").expect("CRABJAR_BASTION_KEY_PATH environment variable must be set"));
+    let key_path = PathBuf::from(
+        std::env::var("CRABJAR_BASTION_KEY_PATH")
+            .expect("CRABJAR_BASTION_KEY_PATH environment variable must be set"),
+    );
     match russh::keys::load_secret_key(&key_path, None) {
         Ok(key) => {
             info!("Loaded bastion host key from {}", key_path.display());
@@ -414,7 +417,10 @@ async fn main() {
 
     info!("CrabJar SSH Bastion starting");
 
-    let key_path = PathBuf::from(std::env::var("CRABJAR_SSH_KEY_PATH").expect("CRABJAR_SSH_KEY_PATH environment variable must be set"));
+    let key_path = PathBuf::from(
+        std::env::var("CRABJAR_SSH_KEY_PATH")
+            .expect("CRABJAR_SSH_KEY_PATH environment variable must be set"),
+    );
 
     // Define all targets with their bastion ports
     // User is crombo for now; later hermes/crabjar users will have their own routing

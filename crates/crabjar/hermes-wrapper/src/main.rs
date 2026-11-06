@@ -11,7 +11,7 @@
 
 use std::env;
 use std::fs::{self, OpenOptions};
-use std::io::{Write, BufWriter};
+use std::io::{BufWriter, Write};
 use std::process::Command;
 use std::time::SystemTime;
 
@@ -61,26 +61,29 @@ struct ExecutionResult {
 
 impl ExecutionResult {
     fn to_json(&self) -> String {
-        let ts = self.timestamp
+        let ts = self
+            .timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
-        
+
         let exit_code = match &self.exit_code {
             Some(code) => format!("\"{}\"", code),
             None => "null".to_string(),
         };
-        
+
         let error_message = match &self.error_message {
             Some(msg) => format!("\"{}\"", escape_json_string(msg)),
             None => "null".to_string(),
         };
-        
-        let args_json = self.hermes_args.iter()
+
+        let args_json = self
+            .hermes_args
+            .iter()
             .map(|arg| format!("\"{}\"", escape_json_string(arg)))
             .collect::<Vec<_>>()
             .join(", ");
-        
+
         format!(
             "{{\"success\": {}, \"exit_code\": {}, \"error\": {}, \"timestamp\": {}, \"args\": [{}]}}",
             self.success, exit_code, error_message, ts, args_json
@@ -90,10 +93,10 @@ impl ExecutionResult {
 
 fn escape_json_string(s: &str) -> String {
     s.replace('\\', "\\\\")
-     .replace('"', "\\\"")
-     .replace('\n', "\\n")
-     .replace('\r', "\\r")
-     .replace('\t', "\\t")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
 }
 
 fn ensure_dir(path: &str) -> Result<(), String> {
@@ -105,12 +108,8 @@ fn ensure_dir(path: &str) -> Result<(), String> {
 
 fn append_telemetry(config: &AgentConfig, result: &ExecutionResult) -> Result<(), String> {
     let path = config.telemetry_path();
-    
-    match OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
+
+    match OpenOptions::new().create(true).append(true).open(&path) {
         Ok(file) => {
             let mut writer = BufWriter::new(file);
             let json = result.to_json();
@@ -126,7 +125,7 @@ fn append_telemetry(config: &AgentConfig, result: &ExecutionResult) -> Result<()
 fn write_status(config: &AgentConfig, result: &ExecutionResult) -> Result<(), String> {
     let path = config.status_path();
     let json = result.to_json();
-    
+
     fs::write(&path, format!("{}\n", json))
         .map_err(|e| format!("Failed to write status file {}: {}", path, e))
 }
@@ -165,75 +164,73 @@ fn main() {
             timestamp: SystemTime::now(),
             hermes_args: hermes_args.clone(),
         };
-        
+
         // Try to write status even if dir creation failed (use /tmp as fallback)
         let _ = fs::write("/tmp/crabjar-hermes-wrapper-status.json", result.to_json());
-        
+
         eprintln!("ERROR: {}", result.error_message.as_ref().unwrap());
         std::process::exit(1);
     }
 
     // Spawn hermes with environment variables
     let mut cmd = Command::new("hermes");
-    
+
     // Set crabjar environment variables
     cmd.env("AGENT_USER", &config.user)
-       .env("AGENT_HOME", &config.home)
-       .env("CRABJAR_INBOX", &config.inbox)
-       .env("CRABJAR_OUTBOX", &config.outbox)
-       .env("CRABJAR_LOG", &config.log_dir)
-       .env("CRABJAR_WORKSPACE", &config.workspace)
-       .env("CRABJAR_CONFIG", &config.config)
-       .env("HERMES_TELEMETRY_ENABLED", "true")
-       .env("HERMES_TELEMETRY_OUTPUT", config.telemetry_path());
-    
+        .env("AGENT_HOME", &config.home)
+        .env("CRABJAR_INBOX", &config.inbox)
+        .env("CRABJAR_OUTBOX", &config.outbox)
+        .env("CRABJAR_LOG", &config.log_dir)
+        .env("CRABJAR_WORKSPACE", &config.workspace)
+        .env("CRABJAR_CONFIG", &config.config)
+        .env("HERMES_TELEMETRY_ENABLED", "true")
+        .env("HERMES_TELEMETRY_OUTPUT", config.telemetry_path());
+
     // Pass through any arguments
     for arg in &hermes_args {
         cmd.arg(arg);
     }
 
     let result = match cmd.spawn() {
-        Ok(mut child) => {
-            match child.wait() {
-                Ok(status) => {
-                    let success = status.success();
-                    let exit_code = status.code();
-                    
-                    ExecutionResult {
-                        success,
-                        exit_code,
-                        error_message: if !success {
-                            Some(format!("hermes exited with code {:?}", exit_code))
-                        } else {
-                            None
-                        },
-                        timestamp: SystemTime::now(),
-                        hermes_args: hermes_args.clone(),
-                    }
-                }
-                Err(e) => ExecutionResult {
-                    success: false,
-                    exit_code: None,
-                    error_message: Some(format!("Failed to wait for hermes: {}", e)),
+        Ok(mut child) => match child.wait() {
+            Ok(status) => {
+                let success = status.success();
+                let exit_code = status.code();
+
+                ExecutionResult {
+                    success,
+                    exit_code,
+                    error_message: if !success {
+                        Some(format!("hermes exited with code {:?}", exit_code))
+                    } else {
+                        None
+                    },
                     timestamp: SystemTime::now(),
                     hermes_args: hermes_args.clone(),
                 }
             }
-        }
+            Err(e) => ExecutionResult {
+                success: false,
+                exit_code: None,
+                error_message: Some(format!("Failed to wait for hermes: {}", e)),
+                timestamp: SystemTime::now(),
+                hermes_args: hermes_args.clone(),
+            },
+        },
         Err(e) => ExecutionResult {
             success: false,
             exit_code: None,
             error_message: Some(format!("Failed to spawn hermes: {}", e)),
             timestamp: SystemTime::now(),
             hermes_args: hermes_args.clone(),
-        }
+        },
     };
 
     // Write telemetry and status
     if let Err(e) = append_telemetry(&config, &result) {
         eprintln!("Warning: {}", e);
     }
-    
+
     if let Err(e) = write_status(&config, &result) {
         eprintln!("Warning: {}", e);
     }

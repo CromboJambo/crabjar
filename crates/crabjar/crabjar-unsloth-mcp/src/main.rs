@@ -117,7 +117,8 @@ impl UnslothServer {
 
         let cmd = format!(
             "cd {} && find . -maxdepth 1 -name '{}' -type f | sort | while read f; do echo \"=== $f ===\"; wc -l \"$f\" 2>/dev/null || echo '(not text)'; du -h \"$f\" 2>/dev/null | cut -f1; done",
-            get_training_data_dir(), ext_filter
+            get_training_data_dir(),
+            ext_filter
         );
 
         match run_cmd(&cmd) {
@@ -135,7 +136,11 @@ impl UnslothServer {
 
         let cmd = format!(
             "cd {} && echo '=== Metadata ===' && ls -lh '{}' 2>&1 && echo '=== Line Count ===' && wc -l '{}' 2>&1 && echo '=== Format Detection ===' && file '{}' 2>&1 && echo '=== Sample (first 3 lines) ===' && head -n 3 '{}' 2>&1",
-            get_training_data_dir(), req.filename, req.filename, req.filename, req.filename
+            get_training_data_dir(),
+            req.filename,
+            req.filename,
+            req.filename,
+            req.filename
         );
 
         match run_cmd(&cmd) {

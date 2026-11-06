@@ -21,8 +21,8 @@ pub mod route;
 pub mod rules;
 pub mod sandboxes;
 pub mod schema;
-pub mod seed_reports;
 pub mod security;
+pub mod seed_reports;
 pub mod tasks;
 pub mod upgrade;
 pub mod workers;
@@ -154,7 +154,10 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/sandboxes", post(sandboxes::create_sandbox_handler))
         .route("/sandboxes", get(sandboxes::list_sandboxes_handler))
         .route("/sandboxes/{id}", get(sandboxes::get_sandbox_handler))
-        .route("/sandboxes/{id}", delete(sandboxes::destroy_sandbox_handler))
+        .route(
+            "/sandboxes/{id}",
+            delete(sandboxes::destroy_sandbox_handler),
+        )
         .route(
             "/sandboxes/{id}/worker",
             post(sandboxes::assign_worker_to_sandbox_handler),

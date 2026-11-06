@@ -505,10 +505,7 @@ pub fn rebuild_check(
 }
 
 /// Install artifact into store path with current symlink.
-pub fn install_artifact(
-    artifact_path: &Path,
-    store_root: &Path,
-) -> Result<PathBuf, ArtifactError> {
+pub fn install_artifact(artifact_path: &Path, store_root: &Path) -> Result<PathBuf, ArtifactError> {
     let metadata = inspect_artifact(artifact_path)?;
 
     // Verify tarball integrity before installing
@@ -558,10 +555,7 @@ pub fn install_artifact(
 }
 
 /// Diff two artifacts' dependency graphs, reporting version changes.
-pub fn diff_artifacts(
-    artifact_a: &Path,
-    artifact_b: &Path,
-) -> Result<Vec<String>, ArtifactError> {
+pub fn diff_artifacts(artifact_a: &Path, artifact_b: &Path) -> Result<Vec<String>, ArtifactError> {
     let meta_a = inspect_artifact(artifact_a)?;
     let meta_b = inspect_artifact(artifact_b)?;
 

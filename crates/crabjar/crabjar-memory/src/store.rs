@@ -58,10 +58,7 @@ impl MemoryStore {
     /// Validate that a path stays within the base directory (defense against path traversal).
     fn validate_path_within_base(&self, path: &PathBuf) -> MemoryResult<()> {
         // Canonicalize both paths to resolve symlinks and .. components
-        let canonical_base = self
-            .base_dir
-            .canonicalize()
-            .map_err(MemoryError::Io)?;
+        let canonical_base = self.base_dir.canonicalize().map_err(MemoryError::Io)?;
 
         let canonical_path = path
             .canonicalize()

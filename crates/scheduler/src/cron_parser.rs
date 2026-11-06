@@ -48,7 +48,8 @@ fn parse_field(field: &str, min: u8, max: u8) -> Result<HashSet<u8>, SchedulerEr
                 set.insert(v);
             }
         } else if part.starts_with("*/") {
-            let step: u8 = part.strip_prefix("*/")
+            let step: u8 = part
+                .strip_prefix("*/")
                 .unwrap()
                 .parse()
                 .map_err(|_| SchedulerError::InvalidCron(part.to_string()))?;
