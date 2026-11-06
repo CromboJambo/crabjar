@@ -117,7 +117,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
     - name: Run E2E smoke tests (~30s)
-      run: cargo test --test e2e_smoke --release
+      run: cargo test --test e2e --release
 
   e2e-full:
     runs-on: ubuntu-24.04
