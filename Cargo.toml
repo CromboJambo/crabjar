@@ -10,6 +10,7 @@ members = [
     "vm/axum-mux",
     "crates/crabjar/crabjar-architecture",
     "crates/podman",
+    "crates/artifact",
     # Analysis toolkit
     "crates/analyze/analyze-common",
     "crates/analyze/analyze-apk",
@@ -78,7 +79,7 @@ members = [
     "crates/universal-structure",
     "crates/email-smtp", "crates/crabjar/crabjar-web-extract", "crates/crabjar/crabjar-browser", "crates/crabjar/crabjar-memory", "crates/crabjar/crabjar-delegation", "crates/crabjar/crabjar-cron", "crates/crabjar/crabjar-homeassistant", "crates/crabjar/crabjar-deploy",
     # Performance benchmarks for execution pipeline
-    "crates/benchmarks", "crates/crabjar/hermes-wrapper",
+    "crates/benchmarks", "crates/crabjar/hermes-wrapper", "crates/crabjar/deploy",
 ]
 
 resolver = "2"
