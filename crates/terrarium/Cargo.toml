@@ -1,9 +1,11 @@
 [package]
 name = "terrarium"
 version = "0.1.0"
-edition.workspace = true
+edition = "2024"
 description = "The terrarium — an isometric hermit-crab skin over the crabjar habitat contract (dagr v3). Phase 0: headless behavior simulator."
 license = "MIT"
+
+[workspace]
 
 [[bin]]
 name = "terrarium"
@@ -14,7 +16,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
 clap = { version = "4", features = ["derive"] }
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = { version = "0.28", features = ["event-stream"] }
 notify = "7.0"
 unicode-width = "0.2"

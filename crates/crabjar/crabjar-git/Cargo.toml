@@ -6,7 +6,7 @@ license.workspace = true
 description = "Git operations for crabjar IDE — diff, status, add, commit via libgit2"
 
 [dependencies]
-git2 = { version = "0.19", features = ["https"] }
+git2 = { version = "0.20.4", features = ["https"] }
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true

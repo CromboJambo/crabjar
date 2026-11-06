@@ -4,7 +4,7 @@
 // Routes by port: each target gets its own listener port
 // Supports multiple users (hermes, crombo) with pass-through auth
 
-use russh::server::Server as _;
+use russh::server::{Server as _, VerifiedPublicKey};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -91,7 +91,7 @@ impl russh::server::Handler for Bastion {
     async fn auth_publickey(
         &mut self,
         user: &str,
-        _public_key: &russh::keys::ssh_key::PublicKey,
+        _public_key: VerifiedPublicKey<'_>,
     ) -> Result<russh::server::Auth, Self::Error> {
         if self.auth_user.is_empty() {
             self.auth_user = user.to_string();

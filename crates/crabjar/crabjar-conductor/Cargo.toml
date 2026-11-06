@@ -61,7 +61,7 @@ universal-structure = { path = "../../universal-structure" }
 pesti-structural-tokenizer = { git = "https://github.com/CromboJambo/pesti", package = "pesti-structural-tokenizer" }
 
 # Authentication
-jsonwebtoken = "9.3"
+jsonwebtoken = "10.3"
 
 # Caching (SHA-256 for decision cache keys)
 sha2 = { workspace = true }
