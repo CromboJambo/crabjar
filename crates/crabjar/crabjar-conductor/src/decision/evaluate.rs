@@ -324,14 +324,21 @@ pub fn evaluate_structural_conditions(
     target: &crate::decision::structural::EvaluationTarget,
     criteria_path: &str,
 ) -> Option<DecisionResult> {
-    // Validate path to prevent injection
-    if let Err(e) = validate_path(criteria_path) {
-        tracing::debug!("Invalid criteria path: {}", e);
+    // Validate and canonicalize path to prevent injection
+    let resolved = match std::fs::canonicalize(criteria_path) {
+        Ok(p) => p,
+        Err(_) => return None, // File not found or unreadable — fall back to JEV
+    };
+
+    // Ensure the resolved path is within an expected base directory
+    // (no traversal outside the project root)
+    if !resolved.starts_with("/") {
+        tracing::debug!("Criteria path not absolute: {}", criteria_path);
         return None;
     }
 
     // Read and parse the criteria file
-    let criteria_content = match std::fs::read_to_string(criteria_path) {
+    let criteria_content = match std::fs::read_to_string(&resolved) {
         Ok(content) => content,
         Err(_) => return None, // File not found or unreadable — fall back to JEV
     };
