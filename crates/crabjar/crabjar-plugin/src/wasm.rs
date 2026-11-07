@@ -39,10 +39,7 @@ pub enum WasmError {
 
     /// Type mismatch when calling an exported function.
     #[error("type error calling export '{name}': {details}")]
-    TypeError {
-        name: String,
-        details: String,
-    },
+    TypeError { name: String, details: String },
 
     /// Error during execution of wasm code.
     #[error("wasm execution error: {0}")]
@@ -78,9 +75,8 @@ impl WasmEngine {
         // Enable garbage collection for future proposals
         config.wasm_gc(true);
 
-        let engine = Engine::new(&config).map_err(|e| {
-            WasmError::EngineCreation(format!("{:?}", e))
-        })?;
+        let engine =
+            Engine::new(&config).map_err(|e| WasmError::EngineCreation(format!("{:?}", e)))?;
 
         info!("Wasmtime engine created successfully");
 
@@ -112,9 +108,7 @@ impl WasmEngine {
     /// host-provided functions. For production plugins, use `instantiate_with_imports`.
     pub fn instantiate(&self, module: &Module) -> Result<Instance, WasmError> {
         let store = Store::new(&self.engine, ());
-        Instance::new(store, module, &[]).map_err(|e| {
-            WasmError::Instantiation(format!("{:?}", e))
-        })
+        Instance::new(store, module, &[]).map_err(|e| WasmError::Instantiation(format!("{:?}", e)))
     }
 
     /// Get the underlying wasmtime Engine reference.
@@ -141,9 +135,7 @@ mod tests {
         bytes.extend_from_slice(&[0x03, 0x02, 0x01, 0x00]);
 
         // Export section: export "add" as function 0
-        bytes.extend_from_slice(&[
-            0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64, 0x00, 0x00,
-        ]);
+        bytes.extend_from_slice(&[0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64, 0x00, 0x00]);
 
         // Code section: function body that adds two i32s and returns
         bytes.extend_from_slice(&[
@@ -156,7 +148,10 @@ mod tests {
     #[test]
     fn test_engine_creation() {
         let engine = WasmEngine::new();
-        assert!(engine.is_ok(), "Wasmtime engine should be created successfully");
+        assert!(
+            engine.is_ok(),
+            "Wasmtime engine should be created successfully"
+        );
     }
 
     #[test]

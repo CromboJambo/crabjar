@@ -25,18 +25,12 @@ pub fn validate_path(path: &str) -> Result<()> {
 
     // Must be an absolute path for criteria files
     if !p.is_absolute() {
-        return Err(anyhow!(
-            "Path must be absolute, got: {}",
-            p.display()
-        ));
+        return Err(anyhow!("Path must be absolute, got: {}", p.display()));
     }
 
     // Reject paths with traversal sequences
     if path.contains("..") {
-        return Err(anyhow!(
-            "Path contains traversal sequence: {}",
-            p.display()
-        ));
+        return Err(anyhow!("Path contains traversal sequence: {}", p.display()));
     }
 
     Ok(())
@@ -222,12 +216,16 @@ impl JevEvaluator {
     /// Load decision criteria from file (with caching)
     async fn load_criteria(&self, path: &str) -> Result<DecisionCriteria> {
         // Validate and canonicalize path to prevent injection
-        let resolved = std::fs::canonicalize(path).map_err(|e| anyhow!("Failed to resolve path '{}': {}", path, e))?;
+        let resolved = std::fs::canonicalize(path)
+            .map_err(|e| anyhow!("Failed to resolve path '{}': {}", path, e))?;
 
         // Ensure the resolved path is within an expected base directory
         // (no traversal outside the project root)
         if !resolved.starts_with("/") {
-            return Err(anyhow!("Path not absolute after canonicalization: {}", path));
+            return Err(anyhow!(
+                "Path not absolute after canonicalization: {}",
+                path
+            ));
         }
 
         // Simple cache check (not thread-safe, but sufficient for single-threaded use)

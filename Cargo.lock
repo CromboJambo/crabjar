@@ -1689,6 +1689,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "code-audit"
+version = "0.1.0"
+dependencies = [
+ "analyze-common",
+ "async-trait",
+ "chrono",
+ "pesti-structural-tokenizer 0.1.3",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "syn 2.0.119",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "codespan-reporting"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2211,6 +2230,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "crabjar-code-audit-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "code-audit",
+ "rmcp",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "crabjar-commit"
 version = "0.1.0"
 dependencies = [
@@ -2269,7 +2301,7 @@ dependencies = [
  "crabjar-sandbox",
  "jsonwebtoken",
  "mirror-log",
- "pesti-structural-tokenizer 0.1.3",
+ "pesti-structural-tokenizer 0.1.3 (git+https://github.com/CromboJambo/pesti)",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
@@ -7924,6 +7956,17 @@ dependencies = [
 [[package]]
 name = "pesti-structural-tokenizer"
 version = "0.1.3"
+dependencies = [
+ "serde",
+ "serde_json",
+ "syn 2.0.119",
+ "thiserror 2.0.21",
+ "tiktoken-rs",
+]
+
+[[package]]
+name = "pesti-structural-tokenizer"
+version = "0.1.3"
 source = "git+https://github.com/CromboJambo/pesti#8d3ff44f4dbc215a714fc21aac58c6c764e8ef30"
 dependencies = [
  "serde",
@@ -11795,7 +11838,7 @@ name = "universal-structure"
 version = "0.12.5"
 dependencies = [
  "object 0.36.7",
- "pesti-structural-tokenizer 0.1.3",
+ "pesti-structural-tokenizer 0.1.3 (git+https://github.com/CromboJambo/pesti)",
  "serde",
  "serde_json",
 ]

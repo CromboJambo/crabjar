@@ -81,7 +81,10 @@ impl StateStore {
     }
 
     pub fn set_schema_version(&mut self, version: u32) {
-        debug!(plugin_state_schema_version = version, "state.set_schema_version");
+        debug!(
+            plugin_state_schema_version = version,
+            "state.set_schema_version"
+        );
         self.schema_version = version;
     }
 }

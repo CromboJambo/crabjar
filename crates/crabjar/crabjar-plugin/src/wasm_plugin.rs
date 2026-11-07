@@ -42,7 +42,11 @@ impl WasmPluginAdapter {
         path: &std::path::Path,
     ) -> Result<Self, PluginError> {
         let bytes = std::fs::read(path).map_err(|e| {
-            PluginError::Internal(format!("Failed to read wasm file '{}': {}", path.display(), e))
+            PluginError::Internal(format!(
+                "Failed to read wasm file '{}': {}",
+                path.display(),
+                e
+            ))
         })?;
         Self::new(name, version, engine, &bytes)
     }
@@ -112,7 +116,7 @@ mod tests {
     #[test]
     fn test_adapter_creation() {
         let engine = WasmEngine::new().unwrap();
-        
+
         // Create a minimal Wasm module for testing (same as wasm.rs tests)
         let wasm_bytes: Vec<u8> = vec![
             0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // magic + version
@@ -121,7 +125,7 @@ mod tests {
             0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64, 0x00, 0x00, // export section
             0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b, // code section
         ];
-        
+
         let adapter = WasmPluginAdapter::new("test_wasm", "1.0.0", engine, &wasm_bytes);
         assert!(adapter.is_ok());
     }
@@ -130,28 +134,28 @@ mod tests {
     async fn test_plugin_trait_implementation() {
         let engine = WasmEngine::new().unwrap();
         let wasm_bytes: Vec<u8> = vec![
-            0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
-            0x01, 0x07, 0x01, 0x60, 0x02, 0x7f, 0x7f, 0x01, 0x7f,
-            0x03, 0x02, 0x01, 0x00,
-            0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64, 0x00, 0x00,
-            0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b,
+            0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x07, 0x01, 0x60, 0x02, 0x7f,
+            0x7f, 0x01, 0x7f, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64,
+            0x00, 0x00, 0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b,
         ];
-        
+
         let adapter = WasmPluginAdapter::new("test_trait", "1.0.0", engine, &wasm_bytes).unwrap();
-        
+
         // Test Plugin trait methods
         assert_eq!(adapter.name(), "test_trait");
         assert_eq!(adapter.version(), "1.0.0");
         assert!(!adapter.capabilities().is_empty());
-        
+
         // Test health check
         let status = adapter.health_check().await;
         assert_eq!(status, HealthStatus::Healthy);
-        
+
         // Test tool execution (stub)
-        let result = adapter.execute_tool("test_tool", serde_json::json!({"x": 1})).await;
+        let result = adapter
+            .execute_tool("test_tool", serde_json::json!({"x": 1}))
+            .await;
         assert!(result.is_ok());
-        
+
         // Test tool listing
         let tools = adapter.list_tools();
         assert!(!tools.is_empty());
