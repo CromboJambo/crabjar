@@ -20,10 +20,10 @@ fn test_structural_condition_evaluation() {
         ownership_mode: None,
     };
 
-    // Evaluate against the structural-function-evaluation criteria
+    // Evaluate against the structural-function-evaluation criteria (path relative to project root)
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/structural-function-evaluation.json",
+        "../../../specs/criteria/structural-function-evaluation.json",
     );
 
     assert!(
@@ -59,7 +59,7 @@ fn test_build_target_and_evaluate() {
     // Evaluate against production criteria file
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/structural-function-evaluation.json",
+        "../../../specs/criteria/structural-function-evaluation.json",
     );
 
     if result.is_none() {
@@ -93,7 +93,7 @@ fn test_build_target_panicked_error_handling() {
     // Evaluate — should match "simple-function" (not Propagated)
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/structural-function-evaluation.json",
+        "../../../specs/criteria/structural-function-evaluation.json",
     );
 
     assert!(result.is_some());
@@ -113,7 +113,7 @@ fn test_build_target_not_a_function() {
     // Evaluate — should match "not-a-function"
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/structural-function-evaluation.json",
+        "../../../specs/criteria/structural-function-evaluation.json",
     );
 
     assert!(result.is_some());
@@ -134,7 +134,7 @@ fn test_error_handling_adequacy_criteria() {
     // Evaluate against error handling adequacy criteria
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/error-handling-adequacy.json",
+        "../../../specs/criteria/error-handling-adequacy.json",
     );
 
     assert!(result.is_some(), "Should match an error handling condition");
@@ -156,7 +156,7 @@ fn test_ownership_pattern_validation_criteria() {
     // Evaluate against ownership pattern validation criteria
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/ownership-pattern-validation.json",
+        "../../../specs/criteria/ownership-pattern-validation.json",
     );
 
     assert!(result.is_some(), "Should match an ownership condition");
@@ -178,7 +178,7 @@ fn test_api_surface_documentation_criteria() {
     // Evaluate against API surface documentation criteria
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/api-surface-documentation.json",
+        "../../../specs/criteria/api-surface-documentation.json",
     );
 
     assert!(result.is_some(), "Should match a documentation condition");
@@ -205,7 +205,7 @@ fn test_documented_api_function_criteria() {
     // Evaluate against API surface documentation criteria
     let result = evaluate::evaluate_structural_conditions(
         &target,
-        "specs/criteria/api-surface-documentation.json",
+        "../../../specs/criteria/api-surface-documentation.json",
     );
 
     assert!(result.is_some(), "Should match a documentation condition");
