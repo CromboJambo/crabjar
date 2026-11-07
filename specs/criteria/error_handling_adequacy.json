@@ -1,0 +1,33 @@
+{
+  "name": "error_handling_adequacy",
+  "description": "Evaluate whether functions have adequate error handling based on semantic analysis of error propagation patterns.",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "adequate-propagated",
+      "description": "Function propagates errors properly using Result types and ? operator or explicit return Err",
+      "conditions": "structure == FnDecl && error_handling == Propagated"
+    },
+    {
+      "id": "adequate-recovered",
+      "description": "Function handles errors internally with match/recover patterns",
+      "conditions": "structure == FnDecl && error_handling == Recovered"
+    },
+    {
+      "id": "inadequate-ignored",
+      "description": "Function ignores errors (unwrap, expect without context, or silent discard)",
+      "conditions": "structure == FnDecl && error_handling == Ignored"
+    },
+    {
+      "id": "inadequate-panicked",
+      "description": "Function panics on error instead of propagating or recovering",
+      "conditions": "structure == FnDecl && error_handling == Panicked"
+    }
+  ],
+  "evaluation_factors": [
+    "Error propagation via Result types",
+    "Use of ? operator for early return",
+    "Presence of match/unwrap patterns",
+    "Context provided in expect messages"
+  ]
+}

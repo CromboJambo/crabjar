@@ -1,0 +1,38 @@
+{
+  "name": "ownership_pattern_validation",
+  "description": "Validate ownership patterns for correctness, particularly checking that borrowed references are immutable and owned values follow expected lifetime patterns.",
+  "threshold": 0.75,
+  "options": [
+    {
+      "id": "valid-borrowed-immutable",
+      "description": "Borrowed reference used immutably — safe shared access pattern",
+      "conditions": "ownership_mode == Borrowed && mutability == Immutable"
+    },
+    {
+      "id": "valid-owned-mutable",
+      "description": "Owned value with mutable access — exclusive ownership pattern",
+      "conditions": "ownership_mode == Owned && mutability == Mutable"
+    },
+    {
+      "id": "valid-boxed",
+      "description": "Heap-allocated Box<T> with proper ownership semantics",
+      "conditions": "ownership_mode == Boxed"
+    },
+    {
+      "id": "valid-refcounted",
+      "description": "Reference-counted value (Rc/Arc) with shared ownership",
+      "conditions": "ownership_mode == RefCounted"
+    },
+    {
+      "id": "invalid-borrowed-mutable",
+      "description": "Borrowed reference modified — potential aliasing violation",
+      "conditions": "ownership_mode == Borrowed && mutability == Mutable"
+    }
+  ],
+  "evaluation_factors": [
+    "Borrow checker rules compliance",
+    "Lifetime annotation correctness",
+    "Shared vs exclusive access patterns",
+    "Heap allocation necessity"
+  ]
+}

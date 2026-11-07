@@ -40,7 +40,7 @@ impl StructuredAuxPlugin {
         let criteria_path = env::var("STRUCTURED_AUX_CRITERIA_PATH")
             .or_else(|_| {
                 env::current_dir().map(|p| {
-                    p.join("crabjar-structured-aux/specs/criteria")
+                    p.join("specs/criteria")
                         .to_string_lossy()
                         .to_string()
                 })
