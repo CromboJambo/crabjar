@@ -9,14 +9,14 @@ This guide covers deploying crabjar's fleet coordination layer across multiple m
 │   Worker Node 1 │     │   Worker Node 2 │     │   Worker Node N │
 │   (crabjar)     │     │   (crabjar)     │     │   (crabjar)     │
 └────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                        │                        │
-         └────────────────────────┼────────────────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │   Conductor Service        │
-                    │   (crabjar-conductor)      │
-                    │   :8090/api/v1             │
-                    └───────────────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                   ┌─────────────▼─────────────┐
+                   │   Conductor Service       │
+                   │   (crabjar-conductor)     │
+                   │   :8090/api/v1            │
+                   └───────────────────────────┘
 ```
 
 ## Prerequisites
