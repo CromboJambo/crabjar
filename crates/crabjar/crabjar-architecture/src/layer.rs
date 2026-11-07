@@ -41,7 +41,6 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     map.insert("crabjar-guard", 1); // guard
     map.insert("crabjar-gpui", 1);
     map.insert("crabjar-homeassistant", 1);
-    map.insert("crabjar-lab-topology", 1);
     map.insert("crabjar-memory", 1);
     map.insert("crabjar-podman", 1);
     map.insert("crabjar-review", 1);
