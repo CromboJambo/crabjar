@@ -1,0 +1,42 @@
+# Crabjar Adaptive Seed Container
+# Starts minimal, detects environment, grows capabilities via setup wizard,
+# reports back to jambo for review and hardening.
+
+FROM ubuntu:24.04
+
+# Install detection and growth tools (minimal but capable)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libssl3 libgcc-s1 libstdc++6 zlib1g libbrotli1 libzstd1 \
+        ca-certificates curl wget git \
+        lshw pciutils dmidecode sysfsutils \
+        jq ssh-client && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create crabjar user and directories
+RUN useradd -m -s /bin/bash crabjar-agent && \
+    mkdir -p /opt/crabjar /var/log/crabjar /etc/crabjar && \
+    chown -R crabjar-agent:crabjar-agent /opt/crabjar /var/log/crabjar /etc/crabjar
+
+WORKDIR /opt/crabjar
+
+# Copy the binary
+COPY target/release/crabjar ./crabjar
+RUN chmod +x ./crabjar && chown crabjar-agent:crabjar-agent ./crabjar
+
+# Environment variables inherited from host
+ENV CRABJAR_HOME=/opt/crabjar
+ENV CRABJAR_LOG_DIR=/var/log/crabjar
+ENV CRABJAR_CONFIG_DIR=/etc/crabjar
+ENV JAMBO_REPORT_URL=http://jambo:8091/api/report
+ENV JAMBO_TOKEN=${JAMBO_TOKEN}
+
+# Startup script that runs setup wizard and grows capabilities
+COPY docker/seed-entrypoint.sh /usr/local/bin/seed-entrypoint.sh
+RUN chmod +x /usr/local/bin/seed-entrypoint.sh && \
+    chown crabjar-agent:crabjar-agent /usr/local/bin/seed-entrypoint.sh
+
+USER crabjar-agent
+
+ENTRYPOINT ["/usr/local/bin/seed-entrypoint.sh"]
+CMD ["./crabjar", "--help"]

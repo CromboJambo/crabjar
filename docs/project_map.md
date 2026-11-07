@@ -25,7 +25,7 @@ crabjar/
 ├── README.md                # Project overview
 ├── agent_config.md          # Agent configuration
 ├── Justfile                 # Task runner shortcuts
-├── Containerfile, Dockerfile
+├── docker/deploy/           # Containerfile, Dockerfile (moved from root)
 ├── rust-toolchain.toml      # Rust nightly toolchain
 ├── .crabjar_config.toml     # Workspace config (tool_execution_enabled)
 ├── index.md                 # Root index
@@ -442,7 +442,7 @@ crabjar contains:
 - AGENTS.md
 - Cargo.toml (workspace root + crabjar binary manifest, version 0.12.5)
 - Justfile
-- Containerfile, Dockerfile
+- docker/deploy/ (Containerfile, Dockerfile — moved from root)
 - orchestrator (Axum SSE server + unified LM client with prompt envelope defense)
 - crabjar-conductor (fleet orchestration service with four-layer capability-based security model, guard integration)
 - crabjar-worker (worker framework for distributed task execution)

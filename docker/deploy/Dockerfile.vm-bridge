@@ -1,0 +1,16 @@
+# Minimal vm-bridge container
+FROM ubuntu:24.04
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libssl3 libgcc-s1 libstdc++6 zlib1g libbrotli1 libzstd1 ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -s /bin/bash crabjar-agent
+
+WORKDIR /opt/vm-bridge
+COPY target/release/vm-bridge ./vm-bridge
+RUN chmod +x ./vm-bridge && chown -R crabjar-agent:crabjar-agent .
+
+USER crabjar-agent
+CMD ["./vm-bridge", "--help"]
