@@ -127,3 +127,7 @@ dep-audit-quick:
     @echo ""
     @echo "Licenses:"
     @cargo deny check licenses 2>&1 || true
+
+# Validate all skills against documentation standards
+validate-skills:
+    python scripts/validate-skills.py
