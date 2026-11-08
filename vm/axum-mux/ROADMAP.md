@@ -2,27 +2,47 @@
 
 ## Architecture
 
-Per-VM websocket-to-display-socket bridge. One OS process per VM,
-supervised by a parent process for isolation.
+Per-VM websocket relay for display protocols and terminal sessions.
+One OS process per VM (supervisor/worker re-exec model), plus dedicated
+modes for terminal relay and live review.
+
+### Modes
+
+| Mode | Invocation | Purpose |
+|------|-----------|---------|
+| Supervisor | (default) | Spawns one worker per VM from manifest.toml, restarts on crash |
+| Worker | `--worker <name>` | Single-VM display proxy (byte-transparent websocket relay) |
+| Terminal Relay | `--terminal-relay [port]` | Multi-client terminal session sync (typed event stream) |
+| Review Bridge | `--review <port> <session> <cmd...>` | Run commands in herdr session, publish events to relay |
+
+### APIs
+
+- **Display proxy**: WebSocket on per-VM `listen_port`, raw byte relay to TCP/Unix target
+- **Lifecycle API**: HTTP on 127.0.0.1:8090 — VM create/start/stop/destroy/snapshot via vm-core
+- **Terminal relay**: WebSocket with JSON control frames + typed TerminalEvent fan-out
 
 ## Roadmap
 
-### Phase 1: Hardening (current)
-- [ ] Add per-VM TLS/auth differentiation
-- [ ] Add target health-check (socket exists? port open?)
-- [ ] Add graceful shutdown for supervisor
-- [ ] Add per-VM config overrides
+### Phase 1: Hardening ✅ (complete)
+- [x] Per-VM auth token (`token` field in manifest.toml; query param or Bearer header)
+- [x] Target health-check (probes TCP/Unix socket before accepting websocket, returns 503 if down)
+- [x] Graceful shutdown for supervisor (SIGTERM/SIGINT → kill workers → exit)
+- [ ] Per-VM config overrides beyond manifest (env vars, CLI flags) — deferred, low priority
 
-### Phase 2: Shared Terminal
-- [ ] Terminal multiplexer integration (wezterm/zellij)
-- [ ] Shared terminal protocol over websocket
-- [ ] Terminal state sync across multiple clients
+### Phase 2: Shared Terminal ✅ (complete)
+- [x] Terminal event model in crabjar-terminal crate (inside the glass)
+- [x] Shared terminal protocol over websocket (control + event frames)
+- [x] Terminal state sync across multiple clients (broadcast fan-out)
+- [x] Live review bridge for herdr sessions
 
-### Phase 3: Display Protocol Support
-- [ ] Raw byte relay (dumb pipe)
-- [x] SPICE protocol decode (server-side)
-- [ ] VNC protocol decode (server-side)
-- [ ] Protocol selection via manifest
+### Phase 3: Display Protocol Support ✅ (complete as designed)
+- [x] Raw byte relay (dumb pipe) — browser-side client does protocol decode
+- [x] SPICE support (via spice-html5 over websocket relay)
+- [x] VNC support (via noVNC over websocket relay)
+- [x] Protocol selection via manifest (`protocol = "spice" | "vnc"`)
+
+> Note: This proxy is intentionally byte-transparent (ADR-005). No protocol
+> parsing happens server-side — the browser client handles all decoding.
 
 ### Phase 4: Screen Sharing
 - [ ] PipeWire integration for screen share sources
@@ -31,22 +51,24 @@ supervised by a parent process for isolation.
 - [ ] Audio capture (microphone + system audio)
 
 ### Phase 5: crabjar-host Integration
-- [ ] Add crabjar-host dependency (or be added as dependency)
+- [ ] Expose lifecycle API through crabjar-host service discovery
 - [ ] Provide screen sharing API for Teams plugin
 - [ ] Add shared terminal API for Teams plugin
 - [ ] Add display protocol routing for Teams preview window
 
 ## Dependencies
 
-- `axum` (websocket support)
+- `axum` (websocket + HTTP support)
 - `tokio` (async runtime)
 - `futures-util` (streaming)
-- `toml` (manifest parsing)
+- `serde` / `toml` (manifest parsing, JSON frames)
 - `anyhow` (error handling)
-- `tracing` (logging)
+- `tracing` / `tracing-subscriber` (logging)
+- `vm-core` (VM lifecycle management via Libvirt)
+- `crabjar-terminal` (TerminalEvent type for relay protocol)
 
 ## Not Planned
 
-- VM lifecycle management (by design - this is just the bridge)
-- SPICE/VNC protocol implementation (too much for a bridge)
-- Multi-user management (deferred to auth layer)
+- VM lifecycle management *inside the proxy* (handled by lifecycle API + vm-core)
+- SPICE/VNC protocol implementation server-side (browser clients do this)
+- Multi-user management (deferred to auth layer / Phase 1 hardening)

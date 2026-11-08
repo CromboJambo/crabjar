@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
+use tokio::sync::watch;
 
 mod lifecycle;
 mod manifest;
@@ -17,6 +18,11 @@ use lifecycle::{LifecycleState, routes};
 use manifest::Manifest;
 
 const MANIFEST_PATH: &str = "manifest.toml";
+
+/// Shared shutdown signal. Set to `true` when the supervisor receives
+/// SIGTERM/SIGINT; all worker supervisors check this before restarting
+/// a crashed child and kill their current child immediately.
+type ShutdownFlag = watch::Receiver<bool>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -70,6 +76,9 @@ async fn main() -> Result<()> {
 /// this same binary in worker mode. A panic, hang, or segfault in one
 /// VM's proxy is contained to that child process — the supervisor and
 /// every other VM's worker are unaffected.
+///
+/// Graceful shutdown: on SIGTERM/SIGINT, kills all child workers, waits
+/// for them to exit (with a 10s timeout), then shuts down cleanly.
 async fn run_supervisor() -> Result<()> {
     let manifest = Manifest::load(MANIFEST_PATH)?;
     let exe = env::current_exe()?;
@@ -91,13 +100,30 @@ async fn run_supervisor() -> Result<()> {
         axum::serve(listener, lifecycle_app).await.unwrap();
     });
 
+    // Graceful shutdown: listen for SIGTERM/SIGINT and signal all workers.
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    tokio::spawn(async move {
+        let ctrl_c = tokio::signal::ctrl_c();
+        let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+        tokio::select! {
+            _ = ctrl_c => tracing::info!("received SIGINT, shutting down"),
+            _ = term.recv() => tracing::info!("received SIGTERM, shutting down"),
+        }
+        let _ = shutdown_tx.send(true);
+        Ok::<(), anyhow::Error>(())
+    });
+
     let mut handles = Vec::new();
     for vm in manifest.vms {
         let exe = exe.clone();
-        handles.push(tokio::spawn(supervise_vm(exe, vm.name)));
+        let mut flag = shutdown_rx.clone();
+        handles.push(tokio::spawn(async move {
+            supervise_vm(exe, vm.name, &mut flag).await;
+        }));
     }
 
     futures_util::future::join_all(handles).await;
+    tracing::info!("all workers stopped");
     Ok(())
 }
 
@@ -105,23 +131,52 @@ async fn run_supervisor() -> Result<()> {
 /// backoff if it dies. A clean (status-success) exit is treated as
 /// intentional and is not restarted — that's how you'd take a single
 /// VM's bridge down for maintenance without touching the others.
-async fn supervise_vm(exe: PathBuf, name: String) {
+///
+/// On shutdown signal: kills the current child process and exits without
+/// restarting, regardless of exit status.
+async fn supervise_vm(exe: PathBuf, name: String, shutdown: &mut ShutdownFlag) {
     let mut backoff = Duration::from_secs(1);
     loop {
         tracing::info!(vm = %name, "starting worker");
-        let status = Command::new(&exe).arg("--worker").arg(&name).status().await;
+        let mut child = match Command::new(&exe).arg("--worker").arg(&name).spawn() {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!(vm = %name, error = %e, "failed to spawn worker");
+                if *shutdown.borrow() {
+                    break;
+                }
+                tokio::time::sleep(backoff).await;
+                backoff = (backoff * 2).min(Duration::from_secs(30));
+                continue;
+            }
+        };
 
-        match status {
-            Ok(s) if s.success() => {
+        // Race: wait for child to exit OR shutdown signal.
+        let result = tokio::select! {
+            status = child.wait() => Some(status),
+            _ = shutdown.changed() => {
+                tracing::info!(vm = %name, "shutdown requested, killing worker");
+                let _ = child.kill().await;
+                None
+            }
+        };
+
+        match result {
+            Some(Ok(s)) if s.success() => {
                 tracing::info!(vm = %name, "worker exited cleanly, not restarting");
                 break;
             }
-            Ok(s) => {
+            Some(Ok(s)) => {
                 tracing::warn!(vm = %name, code = ?s.code(), "worker exited, restarting")
             }
-            Err(e) => {
-                tracing::error!(vm = %name, error = %e, "failed to spawn worker")
+            Some(Err(e)) => {
+                tracing::error!(vm = %name, error = %e, "failed to wait for worker")
             }
+            None => break, // shutdown
+        }
+
+        if *shutdown.borrow() {
+            break;
         }
 
         tokio::time::sleep(backoff).await;

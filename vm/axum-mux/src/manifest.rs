@@ -24,6 +24,11 @@ pub struct Vm {
     /// Port this VM's worker binds its websocket listener to, on the
     /// tailscale interface.
     pub listen_port: u16,
+    /// Optional shared-secret token required for websocket connections.
+    /// If set, clients must pass `?token=<value>` as a query parameter
+    /// or `Authorization: Bearer <value>` header on upgrade.
+    #[serde(default)]
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -121,6 +126,29 @@ bind_addr = "100.0.0.1"
         let manifest: Manifest = toml::from_str(minimal).unwrap();
         assert_eq!(manifest.bind_addr, "100.0.0.1");
         assert!(manifest.vms.is_empty());
+    }
+
+    #[test]
+    fn parse_manifest_with_token() {
+        let with_token = r#"
+bind_addr = "100.0.0.1"
+
+[[vms]]
+name = "secure-vm"
+protocol = "spice"
+target = "127.0.0.1:5930"
+listen_port = 7001
+token = "s3cret-t0ken"
+"#;
+        let manifest: Manifest = toml::from_str(with_token).unwrap();
+        assert_eq!(manifest.vms[0].token, Some("s3cret-t0ken".to_string()));
+    }
+
+    #[test]
+    fn parse_manifest_without_token_defaults_none() {
+        let manifest: Manifest = toml::from_str(SAMPLE_MANIFEST).unwrap();
+        assert_eq!(manifest.vms[0].token, None);
+        assert_eq!(manifest.vms[1].token, None);
     }
 
     #[test]

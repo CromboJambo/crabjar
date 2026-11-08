@@ -1,13 +1,16 @@
 use anyhow::{Context, Result};
 use axum::{
     Router,
-    extract::State,
+    extract::{Query, State},
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
-    response::Response,
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use futures_util::{SinkExt, StreamExt};
+use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, UnixStream};
 
@@ -16,6 +19,60 @@ use crate::manifest::Vm;
 #[derive(Clone)]
 struct ProxyState {
     vm: Vm,
+}
+
+/// Health-check timeout for target connectivity probes.
+const HEALTH_CHECK_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Verifies the VM's display target is reachable before accepting a
+/// websocket connection. Returns an error response if the target is
+/// down, so the browser client gets immediate feedback instead of a
+/// silent dead relay.
+async fn check_target_health(vm: &Vm) -> Result<()> {
+    let probe = async {
+        if let Some(path) = vm.target.strip_prefix("unix:") {
+            UnixStream::connect(path).await?;
+        } else {
+            TcpStream::connect(&vm.target).await?;
+        }
+        Ok::<(), anyhow::Error>(())
+    };
+
+    tokio::time::timeout(HEALTH_CHECK_TIMEOUT, probe)
+        .await
+        .map_err(|_| anyhow::anyhow!("health check timed out"))?
+}
+
+/// Extracts the auth token from either a `?token=` query parameter or
+/// an `Authorization: Bearer <token>` header. Returns None if neither
+/// is present.
+fn extract_token(headers: &HeaderMap, query: &HashMap<String, String>) -> Option<String> {
+    // Query param takes precedence (simpler for browser clients).
+    if let Some(token) = query.get("token") {
+        return Some(token.clone());
+    }
+    // Bearer token in Authorization header.
+    headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|auth| auth.strip_prefix("Bearer "))
+        .map(|bearer| bearer.trim().to_string())
+}
+
+/// Verifies the request's token matches the VM's configured token.
+/// If no token is configured, any request is accepted (open access).
+fn check_auth(vm: &Vm, headers: &HeaderMap, query: &HashMap<String, String>) -> Result<(), Response> {
+    let required = match &vm.token {
+        None => return Ok(()), // no auth required
+        Some(t) => t,
+    };
+
+    let provided = extract_token(headers, query);
+    match provided {
+        Some(p) if p == *required => Ok(()),
+        Some(_) => Err((StatusCode::UNAUTHORIZED, "invalid token").into_response()),
+        None => Err((StatusCode::UNAUTHORIZED, "token required").into_response()),
+    }
 }
 
 /// Runs the worker for a single VM: binds a websocket listener and, for
@@ -40,8 +97,29 @@ pub async fn serve(vm: Vm, bind_addr: String) -> Result<()> {
     Ok(())
 }
 
-async fn ws_handler(ws: WebSocketUpgrade, State(state): State<ProxyState>) -> Response {
-    ws.on_upgrade(move |socket| handle_socket(socket, state.vm))
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<ProxyState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let vm = state.vm.clone();
+
+    // Auth check (if token configured for this VM).
+    if let Err(resp) = check_auth(&vm, &headers, &query) {
+        tracing::warn!(vm = %vm.name, "auth failed");
+        return resp;
+    }
+
+    // Health-check: reject the connection if the target is unreachable.
+    // This gives the browser client immediate feedback (503) instead of
+    // accepting a websocket that can't relay anything.
+    if let Err(e) = check_target_health(&vm).await {
+        tracing::warn!(vm = %vm.name, error = %e, "target health check failed");
+        return (StatusCode::SERVICE_UNAVAILABLE, e.to_string()).into_response();
+    }
+
+    ws.on_upgrade(move |socket| handle_socket(socket, vm))
 }
 
 async fn handle_socket(socket: WebSocket, vm: Vm) {
@@ -169,4 +247,85 @@ where
 
     let _ = tokio::join!(drain_target, drain_ws);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::{HeaderMap, HeaderValue};
+    use std::collections::HashMap;
+
+    fn vm_with_token(token: &str) -> Vm {
+        Vm {
+            name: "test".to_string(),
+            protocol: crate::manifest::Protocol::Spice,
+            target: "127.0.0.1:5930".to_string(),
+            listen_port: 7001,
+            token: Some(token.to_string()),
+        }
+    }
+
+    fn vm_open() -> Vm {
+        Vm {
+            name: "test".to_string(),
+            protocol: crate::manifest::Protocol::Spice,
+            target: "127.0.0.1:5930".to_string(),
+            listen_port: 7001,
+            token: None,
+        }
+    }
+
+    #[test]
+    fn auth_open_vm_accepts_anything() {
+        let vm = vm_open();
+        assert!(check_auth(&vm, &HeaderMap::new(), &HashMap::new()).is_ok());
+    }
+
+    #[test]
+    fn auth_missing_token_rejected() {
+        let vm = vm_with_token("secret");
+        let result = check_auth(&vm, &HeaderMap::new(), &HashMap::new());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn auth_wrong_token_rejected() {
+        let vm = vm_with_token("secret");
+        let mut query = HashMap::new();
+        query.insert("token".to_string(), "wrong".to_string());
+        let result = check_auth(&vm, &HeaderMap::new(), &query);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn auth_correct_query_token_accepted() {
+        let vm = vm_with_token("secret");
+        let mut query = HashMap::new();
+        query.insert("token".to_string(), "secret".to_string());
+        assert!(check_auth(&vm, &HeaderMap::new(), &query).is_ok());
+    }
+
+    #[test]
+    fn auth_correct_bearer_header_accepted() {
+        let vm = vm_with_token("secret");
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "authorization",
+            HeaderValue::from_str("Bearer secret").unwrap(),
+        );
+        assert!(check_auth(&vm, &headers, &HashMap::new()).is_ok());
+    }
+
+    #[test]
+    fn query_token_takes_precedence_over_header() {
+        let vm = vm_with_token("query-wins");
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "authorization",
+            HeaderValue::from_str("Bearer header-loses").unwrap(),
+        );
+        let mut query = HashMap::new();
+        query.insert("token".to_string(), "query-wins".to_string());
+        assert!(check_auth(&vm, &headers, &query).is_ok());
+    }
 }
