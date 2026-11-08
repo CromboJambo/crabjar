@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "name": "code-review-risk",
+  "description": "Assess risk of code changes based on structural patterns detected by pesti semantic analyzers",
+  "options": [
+    {
+      "id": "low",
+      "description": "Error handling improved or properly propagated using Result types and ? operator",
+      "conditions": "error_handling == Propagated || error_handling == Recovered"
+    },
+    {
+      "id": "medium", 
+      "description": "Code introduces mutability or uses unknown patterns requiring human review",
+      "conditions": "mutability == Mutable"
+    },
+    {
+      "id": "high",
+      "description": "Panic-prone error handling introduced (unwrap/expect) that could crash in production",
+      "conditions": "error_handling == Panicked"
+    }
+  ],
+  "threshold": 0.75,
+  "metadata": {
+    "created": "2026-11-07",
+    "owner": "crabjar-team",
+    "purpose": "Automated PR risk assessment using pesti structural analysis"
+  }
+}
