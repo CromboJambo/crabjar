@@ -58,7 +58,7 @@ crabjar-sandbox = { path = "../../sandbox" }
 universal-structure = { path = "../../universal-structure" }
 
 # Pesti semantic analyzers for code understanding
-pesti-structural-tokenizer = { git = "https://github.com/CromboJambo/pesti", package = "pesti-structural-tokenizer" }
+pesti-structural-tokenizer.workspace = true
 
 # Authentication
 jsonwebtoken = "10.3"

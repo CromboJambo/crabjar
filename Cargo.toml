@@ -199,6 +199,7 @@ crabjar_lib = { path = ".", package = "crabjar" }
 
 # Tokenization
 tiktoken-rs = "0.11.0"
+pesti-structural-tokenizer = { path = "../pesti/crates/pesti-structural-tokenizer" }
 
 # Model weights (dataset manifests; same crate pesti uses)
 safetensors = { version = "0.7.0", default-features = false, features = ["std"] }
