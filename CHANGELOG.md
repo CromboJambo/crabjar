@@ -2,6 +2,26 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 7, 2026 — v0.12.7: JEV Evolution System and pesti Integration
+
+### JEV Decision Evolution System
+- **Evolution module** (`crabjar-conductor/src/decision/evolution/`) — Adaptive threshold learning from user feedback
+- **EvolutionConfig** — Loaded from `.crabjar_config.toml` with evolution_enabled, evolution_threshold (default 0.85), feedback_window (default 100)
+- **DecisionOutcome tracking** — Records approval/rejection data per criteria file for accuracy computation
+- **Threshold adjustment algorithm** — <70% approval increases threshold (more conservative); >95% approval decreases threshold (more aggressive)
+- **State persistence** — Evolution state persisted to `.crabjar/jev-evolution.json` with sliding window approach
+- **Examples** — Three demonstration examples showing bidirectional threshold evolution with real feedback patterns
+
+### pesti + JEV Structural Analysis Integration
+- **Working integration** (`crabjar-conductor/examples/jev_pesti_integration.rs`) — pesti's semantic analyzers feed into JEV's evaluate_structural_conditions() for fast-path decisions without LLM backend
+- **Code review risk criteria** (`specs/criteria/code-review-risk.json`) — New JEV criteria file with three structural risk levels: LOW (Propagated/Recovered error handling), MEDIUM (Mutable patterns), HIGH (Panicked error handling)
+- **Security PR test** (`crabjar-conductor/examples/security_pr_test.rs`) — Validated detection of security issues in simulated PRs; correctly identified HIGH risk (error_handling == Panicked) with 100% confidence
+
+### Configuration Consolidation
+- **`.crabjar` directory** — All crabjar-specific configuration consolidated into single directory for cleaner repo root
+- **Moved files**: `topology.toml`, `deny.toml`, `.pre-commit-config.yaml` → `.crabjar/` subdirectory
+- **JEV decision config** — `.crabjar_config.toml` now includes `[decision]` section with evolution settings
+
 ## November 6, 2026 — v0.12.6: Dynamic Component Loading (Wasmtime Embedding)
 
 ### Wasm Plugin Infrastructure
