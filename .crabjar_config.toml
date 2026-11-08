@@ -4,6 +4,13 @@ description = "CrabJar agent workspace with cuda-oxide integration"
 tool_execution_enabled = true
 auto_register = true
 
+# JEV decision-making configuration
+[decision]
+enabled = true
+evolution_enabled = true
+evolution_threshold = 0.85
+feedback_window = 100
+
 [[tools]]
 path = "${CARGO_OXIDE_PATH:-$HOME/.cargo/bin/cargo-oxide}"
 commands = ["run", "build", "pipeline", "debug", "doctor"]
