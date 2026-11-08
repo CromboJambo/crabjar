@@ -1,0 +1,16 @@
+[package]
+name = "kdeconnect-mcp"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "kdeconnect-mcp"
+path = "src/main.rs"
+
+[dependencies]
+rmcp = { version = "3.5", features = ["server"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "0.8"
+anyhow = "1"

@@ -6,7 +6,6 @@ license.workspace = true
 description = "SSH bastion host using russh — transparent proxy for home-lab SSH access"
 
 [dependencies]
-crabjar-lab-topology = { path = "../lab-topology" }
 russh = { version = "0.65", features = ["des", "dsa", "rsa", "aws-lc-rs"], default-features = false }
 tokio.workspace = true
 serde.workspace = true
@@ -25,5 +24,12 @@ rand = "0.10"
 anyhow = "1.0"
 toml = "0.8"
 tempfile.workspace = true
+
+# Optional topology support — consumers provide their own LabTopology implementation
+home-lab-topology = { path = "/home/crombo/projects/active/home-lab/home-lab-topology", optional = true }
+
+[features]
+default = []
+topology = ["dep:home-lab-topology"]
 
 [dev-dependencies]

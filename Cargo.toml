@@ -82,6 +82,10 @@ members = [
     "crates/email-smtp", "crates/crabjar/crabjar-web-extract", "crates/crabjar/crabjar-browser", "crates/crabjar/crabjar-memory", "crates/crabjar/crabjar-delegation", "crates/crabjar/crabjar-cron", "crates/crabjar/crabjar-homeassistant", "crates/crabjar/crabjar-deploy",
     # Performance benchmarks for execution pipeline
     "crates/benchmarks", "crates/crabjar/hermes-wrapper", "crates/crabjar/deploy",
+    # KDE Connect MCP server for phone file access
+    "mcps/kdeconnect-mcp",
+    # SSH-based file access MCP for phone
+    "mcps/ssh-file-mcp",
 ]
 
 resolver = "2"
@@ -264,8 +268,7 @@ thiserror.workspace = true
 agent-context = { path = "crates/memory" }
 crabjar-guard = { path = "crates/guard" }
 crabjar-podman = { path = "crates/podman" }
-crabjar-ssh-bastion = { path = "crates/ssh-bastion" }
-crabjar-lab-topology = { path = "crates/lab-topology" }
+crabjar-ssh-bastion = { path = "crates/ssh-bastion", features = ["topology"] }
 crabjar-telemetry = { path = "crates/telemetry", features = ["otel"] }
 crabjar-tool-registry = { path = "crates/crabjar/tool_registry" }
 crabjar-terminal = { path = "crates/terminal" }

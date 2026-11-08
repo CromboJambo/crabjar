@@ -8,6 +8,7 @@
 pub mod cache;
 pub mod condition;
 pub mod evaluate;
+pub mod evolution;
 pub mod policy;
 pub mod postprocessor;
 pub mod registry;

@@ -11,7 +11,8 @@
 //! remains via russh but is only exercised when connecting to servers that
 //! exclusively support RSA host keys. Best practice: Ed25519 or ECDSA for all lab machines.
 
-use crabjar_lab_topology::LabTopology;
+#[cfg(feature = "topology")]
+use home_lab_topology::LabTopology;
 use std::env;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
@@ -25,6 +26,7 @@ pub struct RemoteOutput {
     pub stderr: String,
 }
 
+#[cfg(feature = "topology")]
 /// Load topology from file or environment variable.
 fn load_topology() -> Result<LabTopology, Box<dyn std::error::Error>> {
     // Check for explicit topology file path via environment
@@ -45,6 +47,7 @@ fn load_topology() -> Result<LabTopology, Box<dyn std::error::Error>> {
     )
 }
 
+#[cfg(feature = "topology")]
 /// Resolve target host IP from topology and environment overrides.
 fn resolve_target_host(
     topology: &LabTopology,
@@ -116,6 +119,7 @@ fn validate_ssh_key_permissions(key_path: &str) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+#[cfg(feature = "topology")]
 /// Execute a command on a remote machine via SSH.
 ///
 /// # Arguments
@@ -312,6 +316,7 @@ pub fn validate_credentials(user: &str, password: &str) -> anyhow::Result<bool> 
     anyhow::bail!("no credentials configured for user '{}'", user);
 }
 
+#[cfg(feature = "topology")]
 /// List all available targets from topology.
 pub fn list_targets() -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let topo = load_topology()?;

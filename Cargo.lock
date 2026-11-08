@@ -2087,7 +2087,6 @@ dependencies = [
  "crabjar-guard",
  "crabjar-host-agent",
  "crabjar-host-core",
- "crabjar-lab-topology",
  "crabjar-podman",
  "crabjar-skill-scanner",
  "crabjar-skills",
@@ -2616,16 +2615,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crabjar-lab-topology"
-version = "0.12.5"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "toml 0.8.23",
-]
-
-[[package]]
 name = "crabjar-mcp-tool-registry"
 version = "0.12.5"
 dependencies = [
@@ -2767,9 +2756,9 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "crabjar-lab-topology",
  "futures",
  "hex",
+ "home-lab-topology",
  "rand 0.10.3",
  "russh",
  "serde",
@@ -5351,6 +5340,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "home-lab-topology"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "host-graph"
 version = "0.12.5"
 dependencies = [
@@ -6090,6 +6089,18 @@ dependencies = [
  "hashbrown 0.17.1",
  "portable-atomic",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "kdeconnect-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rmcp",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -10411,6 +10422,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ssh-file-mcp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "libc",
+ "rmcp",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "ssh2",
+ "tokio",
+]
+
+[[package]]
 name = "ssh-key"
 version = "0.7.0-rc.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10435,6 +10460,18 @@ dependencies = [
  "ssh-cipher",
  "ssh-encoding",
  "zeroize",
+]
+
+[[package]]
+name = "ssh2"
+version = "0.9.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c85be00ec7fc67b19b590c6eb3cfb03c9ab663923fa8bdd18b7e1ba3a414a210"
+dependencies = [
+ "bitflags 2.13.2",
+ "libc",
+ "libssh2-sys",
+ "parking_lot",
 ]
 
 [[package]]

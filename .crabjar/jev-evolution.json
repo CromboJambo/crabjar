@@ -1,0 +1,514 @@
+{
+  "recent_outcomes": [
+    {
+      "decision_id": "test-1",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101300
+    },
+    {
+      "decision_id": "test-2",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.9,
+      "user_approved": true,
+      "timestamp": 1794101300
+    },
+    {
+      "decision_id": "test-3",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.6,
+      "user_approved": false,
+      "timestamp": 1794101300
+    },
+    {
+      "decision_id": "test-1",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-2",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-3",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-4",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": false,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-5",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": false,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-6",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": false,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-7",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": false,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-8",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": false,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-9",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": false,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-10",
+      "criteria_file": "code-review-risk.json",
+      "option": "low",
+      "confidence": 0.7,
+      "user_approved": false,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-11",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-12",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-13",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-14",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-15",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-16",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-17",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-18",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-19",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "test-20",
+      "criteria_file": "code-review-risk.json",
+      "option": "high",
+      "confidence": 0.95,
+      "user_approved": true,
+      "timestamp": 1794101341
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-0",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-1",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-2",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-3",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-4",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-5",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-6",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-7",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-8",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-9",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-10",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-11",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-12",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-13",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-14",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-15",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-16",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-17",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-18",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-low-approval-test.json-19",
+      "criteria_file": "low-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": false,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-0",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-1",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-2",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-3",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-4",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-5",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-6",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-7",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-8",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-9",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-10",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-11",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-12",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-13",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-14",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-15",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-16",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-17",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-18",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    },
+    {
+      "decision_id": "demo-high-approval-test.json-19",
+      "criteria_file": "high-approval-test.json",
+      "option": "test",
+      "confidence": 0.8,
+      "user_approved": true,
+      "timestamp": 1794101368
+    }
+  ],
+  "threshold_adjustments": {
+    "high-approval-test.json": 0.83,
+    "low-approval-test.json": 0.95,
+    "code-review-risk.json": 0.95
+  },
+  "decision_counts": {}
+}
