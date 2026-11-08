@@ -7,7 +7,7 @@
 //! Uses universal structural types from the multi-language topological analysis
 //! layer (universal-structure crate) for cross-language compatibility.
 
-use pesti_structural_tokenizer::semantic::{analyze_errors, analyze_mutability, analyze_ownership};
+use pesti_structural_tokenizer::semantic::annotate_all;
 use std::collections::HashMap;
 pub use universal_structure::{
     ErrorHandling, EvaluationTarget, Mutability, OwnershipMode, SpanKind,
@@ -15,9 +15,11 @@ pub use universal_structure::{
 
 /// Run pesti semantic analyzers on source text and populate typed fields.
 fn annotate_target(source: &str, target: &mut EvaluationTarget) {
+    // Run all semantic analyzers in one pass via projection API
+    let sem = annotate_all(source, 0);
+
     // Ownership analysis via pesti's analyzer (detects borrow patterns)
-    let ownership_anns = analyze_ownership(source);
-    for (_id, ann) in ownership_anns {
+    for (_id, ann) in &sem.ownership {
         match ann.mode {
             pesti_structural_tokenizer::semantic::OwnershipMode::Owned => {
                 if target.ownership_mode.is_none() {
@@ -50,8 +52,7 @@ fn annotate_target(source: &str, target: &mut EvaluationTarget) {
     }
 
     // Error handling analysis via pesti's analyzer
-    let error_anns = analyze_errors(source);
-    for (_id, ann) in error_anns {
+    for (_id, ann) in &sem.errors {
         match ann.handling {
             pesti_structural_tokenizer::semantic::ErrorHandling::Propagated => {
                 target.error_handling = Some(ErrorHandling::Propagated);
@@ -76,8 +77,7 @@ fn annotate_target(source: &str, target: &mut EvaluationTarget) {
     }
 
     // Mutability analysis via pesti's analyzer
-    let mutability_anns = analyze_mutability(source);
-    for (_id, ann) in mutability_anns {
+    for (_id, ann) in &sem.mutability {
         if ann.mutable {
             target.mutability = Some(Mutability::Mutable);
         } else if target.mutability.is_none() {
