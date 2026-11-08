@@ -140,7 +140,22 @@ impl LanguageAdapter for RustAdapter {
 
     fn tokenize_and_adapt(&self, source: &str) -> SpanTree {
         // Tokenize using pesti-structural-tokenizer
-        let tokens = self.tokenizer.tokenize(source).unwrap_or_default();
+        let tokens = match self.tokenizer.tokenize(source) {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                // Record tokenization failure in semantic tags so downstream
+                // consumers know structural data is incomplete
+                let mut error_tags = HashMap::new();
+                error_tags.insert("tokenization_failed".to_string(), "true".to_string());
+                error_tags.insert("tokenization_error".to_string(), format!("{e}"));
+                return SpanTree {
+                    spans: Vec::new(),
+                    source: source.to_string(),
+                    language: "rust".to_string(),
+                    semantic_tags: error_tags,
+                };
+            }
+        };
 
         // Convert to universal spans
         let mut spans = Vec::new();
@@ -267,6 +282,21 @@ mod tests {
             tree.semantic_tags.get("has_await"),
             Some(&"true".to_string())
         );
+    }
+
+    #[test]
+    fn test_tokenize_invalid_source_records_error() {
+        let adapter = RustAdapter::new();
+        // Source with unbalanced braces that will fail to tokenize
+        let tree = adapter.tokenize_and_adapt("fn foo() { let x = ");
+
+        assert_eq!(
+            tree.semantic_tags.get("tokenization_failed"),
+            Some(&"true".to_string())
+        );
+        assert!(tree.semantic_tags.contains_key("tokenization_error"));
+        // No spans should be produced from a failed tokenization
+        assert!(tree.spans.is_empty());
     }
 
     #[test]
