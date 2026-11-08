@@ -28,11 +28,20 @@ rsync -avz --delete \
 echo "==> Deploying dinit service config with pesti-url..."
 ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} "cat > /tmp/conductor-service << 'EOF'
 type     = process
-command  = /opt/crabjar/conductor/crabjar-conductor --port 8091 --pesti-url http://localhost:8081 --db-path /opt/crabjar/conductor/conductor-state.db
+command  = /opt/crabjar/conductor-start.sh
 logfile  = /var/log/dinit/crabjar-conductor.log
 depends-on: network.target
 EOF
 sudo cp /tmp/conductor-service /etc/dinit.d/crabjar-conductor"
+
+echo "==> Deploying conductor startup script with pesti-url and jev-url..."
+ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} "cat > /tmp/conductor-start.sh << 'EOF'
+#!/bin/bash
+cd /opt/crabjar
+export CRABJAR_JEV_API_URL=http://localhost:34159
+exec ./crabjar-conductor --port 8091 --pesti-url http://127.0.0.1:8081
+EOF"
+ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} "sudo mv /tmp/conductor-start.sh /opt/crabjar/conductor-start.sh && sudo chmod +x /opt/crabjar/conductor-start.sh"
 
 echo "==> Reloading and starting conductor service on ftw3 (dinit)..."
 ssh -i "$SSH_KEY" ${REMOTE_USER}@${REMOTE_HOST} \
