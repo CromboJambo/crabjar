@@ -19,6 +19,8 @@ chrono = { workspace = true }
 crabjar-terminal = { path = "../../crates/terminal" }
 # VM lifecycle management substrate
 vm-core = { path = "../vm-core" }
+# JPEG encoding for screen thumbnails (Phase 4)
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
 
 [[bin]]
 name = "vm-bridge"

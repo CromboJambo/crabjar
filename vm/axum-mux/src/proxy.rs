@@ -80,14 +80,25 @@ fn check_auth(vm: &Vm, headers: &HeaderMap, query: &HashMap<String, String>) -> 
 /// raw bytes in both directions. The browser-side SPICE/VNC client
 /// (spice-html5 / noVNC) does all the actual protocol decoding — this
 /// proxy is byte-transparent and performs no interpretation of the payload.
-pub async fn serve(vm: Vm, bind_addr: String) -> Result<()> {
+///
+/// When `screen_state` is provided, also mounts screen-sharing routes
+/// (thumbnails) for VNC targets.
+pub async fn serve_with_screen(
+    vm: Vm,
+    bind_addr: String,
+    screen_state: Option<crate::screen::ScreenState>,
+) -> Result<()> {
     let listen_port = vm.listen_port;
     let name = vm.name.clone();
     let state = ProxyState { vm };
 
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/ws", get(ws_handler))
-        .with_state(state);
+        .with_state(state.clone());
+
+    if let Some(screen) = screen_state {
+        app = app.merge(crate::screen::routes(screen));
+    }
 
     let ip: std::net::IpAddr = bind_addr.parse().context("bind_addr must be a valid IP")?;
     let addr: SocketAddr = (ip, listen_port).into();

@@ -45,9 +45,11 @@ modes for terminal relay and live review.
 > parsing happens server-side — the browser client handles all decoding.
 
 ### Phase 4: Screen Sharing
+- [x] VNC frame capture module (`src/screen/vnc_client.rs` — minimal RFB client, raw encoding)
+- [x] Preview thumbnail generation (`src/screen/thumbnail.rs` — JPEG encode from captured frames)
+- [x] Thumbnail HTTP endpoint (`GET /screen/thumbnail?max_dim=320&quality=75`, auth-gated)
 - [ ] PipeWire integration for screen share sources
 - [ ] X11/XDG-Portal integration for Wayland screen capture
-- [ ] Preview thumbnail generation
 - [ ] Audio capture (microphone + system audio)
 
 ### Phase 5: crabjar-host Integration
@@ -64,6 +66,7 @@ modes for terminal relay and live review.
 - `serde` / `toml` (manifest parsing, JSON frames)
 - `anyhow` (error handling)
 - `tracing` / `tracing-subscriber` (logging)
+- `image` (JPEG encoding for screen thumbnails)
 - `vm-core` (VM lifecycle management via Libvirt)
 - `crabjar-terminal` (TerminalEvent type for relay protocol)
 

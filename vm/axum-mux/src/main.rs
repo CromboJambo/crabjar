@@ -10,6 +10,7 @@ mod lifecycle;
 mod manifest;
 mod proxy;
 mod review;
+mod screen;
 mod terminal_relay;
 #[cfg(test)]
 mod terminal_relay_tests;
@@ -187,5 +188,12 @@ async fn supervise_vm(exe: PathBuf, name: String, shutdown: &mut ShutdownFlag) {
 async fn run_worker(name: &str) -> Result<()> {
     let manifest = Manifest::load(MANIFEST_PATH)?;
     let vm = manifest.find(name)?;
-    proxy::serve(vm, manifest.bind_addr).await
+    // Screen sharing is only available for VNC targets (we need to decode
+    // frames). SPICE targets get the byte-transparent proxy only.
+    let screen_state = if vm.protocol == crate::manifest::Protocol::Vnc {
+        Some(screen::ScreenState::new(vm.clone()))
+    } else {
+        None
+    };
+    proxy::serve_with_screen(vm, manifest.bind_addr, screen_state).await
 }
