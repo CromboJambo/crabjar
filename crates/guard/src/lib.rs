@@ -56,7 +56,10 @@ pub mod policy;
 pub mod policy_types;
 
 // Re-export types from split modules for backward compatibility
-pub use action::{ActionOutcome, ActionRequest, ActionStatus, OutcomeStatus};
+pub use action::{
+    ActionOutcome, ActionRequest, ActionStatus, Denied, Executed, GuardedAction, Interrupted,
+    OutcomeStatus, Pending, TrustApproved,
+};
 pub use command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
 pub use concierge::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
 pub use context_budget::ContextBudget;
