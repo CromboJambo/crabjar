@@ -22,6 +22,7 @@
 //! - **Every Abstraction Carries Doubt**: Outputs include uncertainty, assumptions, and staleness info
 
 pub mod action;
+pub mod arbiter;
 #[cfg(test)]
 pub mod authorization_order;
 pub mod command_risk;
