@@ -87,3 +87,7 @@ pub use trust_resolution::{
     EffectiveTrust, Policy, PolicyChain, PolicySource, RequestedTrust, TrustResolution,
     TrustResolver,
 };
+pub use arbiter::{
+    CommandRiskPass, ConfidencePass, HistoryPass, JevArbiter, ProvenancePass, TrustLayerPass,
+    ArbitrationResult,
+};

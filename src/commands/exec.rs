@@ -208,7 +208,87 @@ pub async fn handle_exec(
         Some(action_request_id.clone()),
     );
 
-    // Record guard decision via OTel telemetry
+    // JEV Arbiter: resolve Queued outcomes via belief-revision passes.
+    // Runs synchronously (all passes are local computation). If the arbiter
+    // reaches high confidence in either direction, it transitions the action
+    // state and we proceed accordingly. If it escalates, we fall through to
+    // the human-review path.
+    let outcome = match outcome {
+        crabjar_guard::ConciergeOutcome::Queued(pending_action, pending_entry) => {
+            let arbiter = crabjar_guard::JevArbiter::with_standard_passes();
+            let arbitration = arbiter.arbitrate(pending_action);
+
+            match arbitration {
+                crabjar_guard::ArbitrationResult::Approved(approved_action, confidence, _evidence) => {
+                    eprintln!(
+                        "DEBUG arbiter: approved action (confidence={:.2})",
+                        confidence
+                    );
+                    // Update telemetry with the final decision
+                    flight_recorder.record_guard_decision("exec-session", "exec", "approved", 3, confidence);
+                    crabjar_guard::ConciergeOutcome::Approved(approved_action)
+                }
+                crabjar_guard::ArbitrationResult::Denied(denied_action, confidence, evidence) => {
+                    let reasons: Vec<String> = evidence.iter().map(|e| e.rationale.clone()).collect();
+                    eprintln!(
+                        "DEBUG arbiter: denied action (confidence={:.2}) — {}",
+                        confidence,
+                        reasons.join("; ")
+                    );
+                    flight_recorder.record_guard_decision("exec-session", "exec", "denied", 3, confidence);
+                    let _ = denied_action; // Terminal state preserved in GuardDb
+                    return Ok(json!({
+                        "success": false,
+                        "exec": {
+                            "command": command,
+                            "args": args,
+                            "cwd": effective_cwd,
+                            "reason": reason,
+                            "gate_result": "denied",
+                            "arbiter_denied": true,
+                            "confidence": confidence,
+                            "evidence": evidence.iter().map(|e| json!({
+                                "pass": e.source,
+                                "delta": e.delta,
+                                "rationale": e.rationale,
+                            })).collect::<Vec<_>>(),
+                        },
+                    }));
+                }
+                crabjar_guard::ArbitrationResult::Escalated(excuse, evidence) => {
+                    let reasons: Vec<String> = evidence.iter().map(|e| e.rationale.clone()).collect();
+                    eprintln!(
+                        "DEBUG arbiter: escalated — {} — {}",
+                        excuse,
+                        reasons.join("; ")
+                    );
+                    // Update telemetry to reflect escalation
+                    flight_recorder.record_guard_decision("exec-session", "exec", "pending", 3, 0.5);
+                    return Ok(json!({
+                        "success": false,
+                        "exec": {
+                            "command": command,
+                            "args": args,
+                            "cwd": effective_cwd,
+                            "reason": reason,
+                            "gate_result": "pending",
+                            "requires_review": true,
+                            "arbiter_escalated": true,
+                            "excuse": excuse.to_string(),
+                            "evidence": evidence.iter().map(|e| json!({
+                                "pass": e.source,
+                                "delta": e.delta,
+                                "rationale": e.rationale,
+                            })).collect::<Vec<_>>(),
+                        },
+                    }));
+                }
+            }
+        }
+        other => other, // Approved or Denied — pass through unchanged
+    };
+
+    // Record guard decision via OTel telemetry (for non-arbiter paths)
     let decision_str = match &outcome {
         crabjar_guard::ConciergeOutcome::Approved(_) => "approved",
         crabjar_guard::ConciergeOutcome::Queued(_, _) => "pending",
