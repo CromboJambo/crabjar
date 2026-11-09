@@ -121,10 +121,7 @@ impl<'a> ExecutionGate<'a> {
     }
 
     /// Policy engine pre-check (if configured).
-    fn check_policy(
-        &self,
-        ctx: &GateContext<'_>,
-    ) -> Result<Option<GateResult>, GuardDbError> {
+    fn check_policy(&self, ctx: &GateContext<'_>) -> Result<Option<GateResult>, GuardDbError> {
         if let Some(gate_result) = policy::run_policy_check(self.policy_engine.as_deref(), ctx) {
             debug!(
                 action = %ctx.action_type,
@@ -151,10 +148,7 @@ impl<'a> ExecutionGate<'a> {
     }
 
     /// Provenance verification: source_event_id must exist in action_requests.
-    fn check_provenance(
-        &self,
-        ctx: &GateContext<'_>,
-    ) -> Result<Option<GateResult>, GuardDbError> {
+    fn check_provenance(&self, ctx: &GateContext<'_>) -> Result<Option<GateResult>, GuardDbError> {
         let provenance_exists = if let Some(id) = ctx.source_event_id {
             provenance::verify_provenance(&self.trust.conn(), id)?
         } else {
@@ -200,10 +194,7 @@ impl<'a> ExecutionGate<'a> {
     }
 
     /// Trust layer check.
-    fn check_trust_layer(
-        &self,
-        ctx: &GateContext<'_>,
-    ) -> Result<Option<GateResult>, GuardDbError> {
+    fn check_trust_layer(&self, ctx: &GateContext<'_>) -> Result<Option<GateResult>, GuardDbError> {
         let can_auto = self.trust.can_auto_execute(ctx.trust_layer)?;
         let needs_review = self.trust.requires_review(ctx.trust_layer)?;
 
@@ -227,58 +218,55 @@ impl<'a> ExecutionGate<'a> {
     }
 
     /// PID trust check (Option B: per-process trust layers).
-    fn check_pid_trust(
-        &self,
-        ctx: &GateContext<'_>,
-    ) -> Result<Option<GateResult>, GuardDbError> {
-        if let Some(pid) = ctx.pid {
-            if let Some(gate_result) = pid_trust::check_pid_trust(
+    fn check_pid_trust(&self, ctx: &GateContext<'_>) -> Result<Option<GateResult>, GuardDbError> {
+        if let Some(pid) = ctx.pid
+            && let Some(gate_result) = pid_trust::check_pid_trust(
                 &self.trust.conn(),
                 pid,
                 ctx.command,
                 &self.risk_config,
-            )? {
-                return Ok(Some(gate_result));
-            }
+            )?
+        {
+            return Ok(Some(gate_result));
         }
         Ok(None)
     }
 
     /// Scope isolation check.
     fn check_scope_isolation(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
-        if let (Some(actor_scope), Some(target_scope)) = (&ctx.scope, &ctx.target_scope) {
-            if !actor_scope.can_access(target_scope) {
-                // Check for valid CrossScopeAuth bypass
-                let cross_scope_allowed = ctx.cross_scope_auth.as_ref().is_some_and(|auth| {
-                    auth.is_valid(3600)
-                        && auth.actor_scope == *actor_scope
-                        && auth.target_scope == *target_scope
-                });
+        if let (Some(actor_scope), Some(target_scope)) = (&ctx.scope, &ctx.target_scope)
+            && !actor_scope.can_access(target_scope)
+        {
+            // Check for valid CrossScopeAuth bypass
+            let cross_scope_allowed = ctx.cross_scope_auth.as_ref().is_some_and(|auth| {
+                auth.is_valid(3600)
+                    && auth.actor_scope == *actor_scope
+                    && auth.target_scope == *target_scope
+            });
 
-                if !cross_scope_allowed {
-                    let reason = format!(
-                        "Scope isolation: {} cannot access {}",
-                        actor_scope.to_scope_string(),
-                        target_scope.to_scope_string()
-                    );
-                    warn!(
-                        action = %ctx.action_type,
-                        actor = %actor_scope,
-                        target = %target_scope,
-                        %reason,
-                        "Scope isolation blocked"
-                    );
-                    return Some(GateResult::Interrupted { reason });
-                }
-
-                debug!(
+            if !cross_scope_allowed {
+                let reason = format!(
+                    "Scope isolation: {} cannot access {}",
+                    actor_scope.to_scope_string(),
+                    target_scope.to_scope_string()
+                );
+                warn!(
                     action = %ctx.action_type,
                     actor = %actor_scope,
                     target = %target_scope,
-                    reason = ctx.cross_scope_auth.as_ref().map(|a| a.reason.as_str()).unwrap_or(""),
-                    "Cross-scope operation authorized via CrossScopeAuth"
+                    %reason,
+                    "Scope isolation blocked"
                 );
+                return Some(GateResult::Interrupted { reason });
             }
+
+            debug!(
+                action = %ctx.action_type,
+                actor = %actor_scope,
+                target = %target_scope,
+                reason = ctx.cross_scope_auth.as_ref().map(|a| a.reason.as_str()).unwrap_or(""),
+                "Cross-scope operation authorized via CrossScopeAuth"
+            );
         }
         None
     }
@@ -372,7 +360,9 @@ impl<'a> ExecutionGate<'a> {
             }
 
             // Reserve tokens for this action's context
-            if let Some(tokens) = fragment_tokens && !budget.can_fit(tokens) {
+            if let Some(tokens) = fragment_tokens
+                && !budget.can_fit(tokens)
+            {
                 return Some(GateResult::ContextExhausted {
                     used: budget.used(),
                     budget: budget.budget(),

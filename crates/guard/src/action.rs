@@ -255,9 +255,9 @@ pub struct GuardedAction<State> {
     _state: PhantomData<State>,
 }
 
-impl fmt::Debug for GuardedAction<Pending> {
+impl<State> fmt::Debug for GuardedAction<State> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("GuardedAction<Pending>")
+        f.debug_struct("GuardedAction")
             .field("inner", &self.inner)
             .finish()
     }

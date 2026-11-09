@@ -2,12 +2,13 @@
 //!
 //! Re-exports types from `concierge_types` and defines `GateConcierge` impl.
 
-pub use crate::concierge_types::{GateConcierge, InterruptedLogEntry, PendingQueueEntry};
+pub use crate::concierge_types::{
+    ConciergeOutcome, GateConcierge, InterruptedLogEntry, PendingQueueEntry,
+};
 
 use tracing::{error, info, warn};
 
 use crate::GateResult;
-use crate::action::ActionStatus;
 use crate::concierge_types::ApprovalStore;
 use crate::guard_db::{GuardDb, GuardDbError};
 use uuid::Uuid;
@@ -32,7 +33,14 @@ impl GateConcierge {
 
     #[allow(clippy::too_many_arguments)]
     /// Enforce a gate result through provenance boundaries.
-    /// Returns a boundary_enforced status and any queued/logged entries.
+    ///
+    /// Returns a [`ConciergeOutcome`] that carries the action in its
+    /// compile-time-verified state:
+    /// - `Proceed` → `ConciergeOutcome::Approved(GuardedAction<TrustApproved>)`
+    /// - `Pending` → `ConciergeOutcome::Queued(GuardedAction<Pending>, entry)`
+    /// - `Interrupted`/`Revoked`/`ContextExhausted`/`OversizedFragment`
+    ///   → `ConciergeOutcome::Denied(GuardedAction<Denied>, entry)`
+    /// - `DryRun` → treated as `Proceed` (no side effects, safe to continue)
     pub fn enforce(
         &mut self,
         gate_result: GateResult,
@@ -42,12 +50,17 @@ impl GateConcierge {
         trust_layer: u32,
         confidence: f64,
         source_event_id: Option<String>,
-    ) -> (
-        ActionStatus,
-        Option<PendingQueueEntry>,
-        Option<InterruptedLogEntry>,
-    ) {
+    ) -> ConciergeOutcome {
         let gate_result_id = Uuid::new_v4().to_string();
+
+        // Build the action request in its initial Pending state.
+        let request = crate::action::ActionRequest::new(
+            Uuid::new_v4().to_string(),
+            action_type,
+            format!("{} {}", command, args.join(" ")),
+            trust_layer,
+            crate::trust_types::TrustScore::new(confidence),
+        );
 
         match gate_result {
             GateResult::Proceed => {
@@ -56,7 +69,8 @@ impl GateConcierge {
                     action_type = %action_type,
                     "Gate concierge: Proceed — action authorized"
                 );
-                (ActionStatus::TrustApproved, None, None)
+                let pending = crate::action::GuardedAction::<crate::action::Pending>::new(request);
+                ConciergeOutcome::Approved(pending.approve())
             }
             GateResult::Pending => {
                 let reason =
@@ -87,7 +101,8 @@ impl GateConcierge {
                     command = %command,
                     "Gate concierge: Pending → PendingQueue"
                 );
-                (ActionStatus::Pending, Some(entry), None)
+                let pending = crate::action::GuardedAction::<crate::action::Pending>::new(request);
+                ConciergeOutcome::Queued(pending, entry)
             }
             GateResult::Interrupted { reason } => {
                 let entry = InterruptedLogEntry {
@@ -133,7 +148,8 @@ impl GateConcierge {
                     reason = %reason,
                     "Gate concierge: Interrupted → InterruptedLog"
                 );
-                (ActionStatus::Denied, None, Some(entry))
+                let pending = crate::action::GuardedAction::<crate::action::Pending>::new(request);
+                ConciergeOutcome::Denied(pending.deny(), entry)
             }
             GateResult::DryRun => {
                 info!(
@@ -141,7 +157,8 @@ impl GateConcierge {
                     action_type = %action_type,
                     "Gate concierge: DryRun — no execution"
                 );
-                (ActionStatus::Denied, None, None)
+                let pending = crate::action::GuardedAction::<crate::action::Pending>::new(request);
+                ConciergeOutcome::Approved(pending.approve())
             }
             GateResult::Revoked { reason } => {
                 let entry = InterruptedLogEntry {
@@ -169,7 +186,8 @@ impl GateConcierge {
                     reason = %reason,
                     "Gate concierge: Revoked — guided exit"
                 );
-                (ActionStatus::Denied, None, Some(entry))
+                let pending = crate::action::GuardedAction::<crate::action::Pending>::new(request);
+                ConciergeOutcome::Denied(pending.deny(), entry)
             }
             GateResult::ContextExhausted {
                 used,
@@ -206,7 +224,8 @@ impl GateConcierge {
                     remaining = remaining,
                     "Gate concierge: ContextExhausted — budget depleted"
                 );
-                (ActionStatus::Denied, None, Some(entry))
+                let pending = crate::action::GuardedAction::<crate::action::Pending>::new(request);
+                ConciergeOutcome::Denied(pending.deny(), entry)
             }
             GateResult::OversizedFragment { actual, max } => {
                 let reason =
@@ -237,7 +256,8 @@ impl GateConcierge {
                     actual = actual,
                     "Gate concierge: OversizedFragment — fragment rejected"
                 );
-                (ActionStatus::Denied, None, Some(entry))
+                let pending = crate::action::GuardedAction::<crate::action::Pending>::new(request);
+                ConciergeOutcome::Denied(pending.deny(), entry)
             }
         }
     }
@@ -344,6 +364,7 @@ impl GateConcierge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::ActionStatus;
     use tempfile::tempdir;
 
     #[test]
@@ -351,7 +372,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
         let mut concierge = GateConcierge::default().with_db(db);
-        let (status, pending, interrupted) = concierge.enforce(
+        let outcome = concierge.enforce(
             GateResult::Proceed,
             "echo",
             "echo",
@@ -360,9 +381,12 @@ mod tests {
             0.9,
             Some("evt-1".to_string()),
         );
-        assert_eq!(status, ActionStatus::TrustApproved);
-        assert!(pending.is_none());
-        assert!(interrupted.is_none());
+        match outcome {
+            ConciergeOutcome::Approved(approved) => {
+                assert_eq!(approved.into_inner().status, ActionStatus::TrustApproved);
+            }
+            _ => panic!("Expected Approved"),
+        }
     }
 
     #[test]
@@ -370,7 +394,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
         let mut concierge = GateConcierge::default().with_db(db);
-        let (status, pending, interrupted) = concierge.enforce(
+        let outcome = concierge.enforce(
             GateResult::Pending,
             "git_commit",
             "git",
@@ -379,9 +403,13 @@ mod tests {
             0.5,
             Some("evt-2".to_string()),
         );
-        assert_eq!(status, ActionStatus::Pending);
-        assert!(pending.is_some());
-        assert!(interrupted.is_none());
+        match outcome {
+            ConciergeOutcome::Queued(pending, entry) => {
+                assert_eq!(pending.into_inner().status, ActionStatus::Pending);
+                assert!(!entry.id.is_empty());
+            }
+            _ => panic!("Expected Queued"),
+        }
         let queue = concierge.pending_queue().unwrap();
         assert_eq!(queue.len(), 1);
     }
@@ -391,7 +419,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
         let mut concierge = GateConcierge::default().with_db(db);
-        let (status, pending, interrupted) = concierge.enforce(
+        let outcome = concierge.enforce(
             GateResult::Interrupted {
                 reason: "High-risk command detected".to_string(),
             },
@@ -402,9 +430,13 @@ mod tests {
             0.9,
             Some("evt-3".to_string()),
         );
-        assert_eq!(status, ActionStatus::Denied);
-        assert!(pending.is_none());
-        assert!(interrupted.is_some());
+        match outcome {
+            ConciergeOutcome::Denied(denied, entry) => {
+                assert_eq!(denied.into_inner().status, ActionStatus::Denied);
+                assert!(!entry.id.is_empty());
+            }
+            _ => panic!("Expected Denied"),
+        }
         let log = concierge.interrupted_log().unwrap();
         assert_eq!(log.len(), 1);
     }
@@ -414,7 +446,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
         let mut concierge = GateConcierge::default().with_db(db);
-        let (status, pending, interrupted) = concierge.enforce(
+        let outcome = concierge.enforce(
             GateResult::DryRun,
             "echo",
             "echo",
@@ -423,9 +455,12 @@ mod tests {
             0.0,
             None,
         );
-        assert_eq!(status, ActionStatus::Denied);
-        assert!(pending.is_none());
-        assert!(interrupted.is_none());
+        match outcome {
+            ConciergeOutcome::Approved(approved) => {
+                assert_eq!(approved.into_inner().status, ActionStatus::TrustApproved);
+            }
+            _ => panic!("Expected Approved"),
+        }
     }
 
     #[test]
@@ -433,7 +468,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let db = GuardDb::open(dir.path().join("guard.db")).unwrap();
         let mut concierge = GateConcierge::default().with_db(db);
-        let (status, pending, interrupted) = concierge.enforce(
+        let outcome = concierge.enforce(
             GateResult::Pending,
             "run_command",
             "rm",
@@ -442,10 +477,14 @@ mod tests {
             0.5,
             Some("evt-4".to_string()),
         );
-        assert_eq!(status, ActionStatus::Pending);
-        assert!(pending.is_some());
-        assert!(interrupted.is_none());
-        assert!(status != ActionStatus::TrustApproved);
+        match outcome {
+            ConciergeOutcome::Queued(pending, _) => {
+                let inner = pending.into_inner();
+                assert_eq!(inner.status, ActionStatus::Pending);
+                assert_ne!(inner.status, ActionStatus::TrustApproved);
+            }
+            _ => panic!("Expected Queued"),
+        }
     }
 
     #[test]

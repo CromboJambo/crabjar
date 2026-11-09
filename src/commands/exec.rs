@@ -198,7 +198,7 @@ pub async fn handle_exec(
 
     // Concierge layer: persist gate result to GuardDb
     let mut concierge = crabjar_guard::GateConcierge::default().with_db(guard_db.clone());
-    let (status, pending_entry, interrupted_entry) = concierge.enforce(
+    let outcome = concierge.enforce(
         gate_result,
         "exec",
         command,
@@ -209,31 +209,31 @@ pub async fn handle_exec(
     );
 
     // Record guard decision via OTel telemetry
-    let decision_str = match &status {
-        crabjar_guard::ActionStatus::Denied => "denied",
-        crabjar_guard::ActionStatus::Pending => "pending",
-        crabjar_guard::ActionStatus::TrustApproved => "approved",
-        crabjar_guard::ActionStatus::Executed | crabjar_guard::ActionStatus::Interrupted => {
-            "executed"
-        }
+    let decision_str = match &outcome {
+        crabjar_guard::ConciergeOutcome::Approved(_) => "approved",
+        crabjar_guard::ConciergeOutcome::Queued(_, _) => "pending",
+        crabjar_guard::ConciergeOutcome::Denied(_, _) => "denied",
     };
     flight_recorder.record_guard_decision("exec-session", "exec", decision_str, 3, 0.9);
 
-    match status {
-        crabjar_guard::ActionStatus::Denied => Ok(json!({
-            "success": false,
-            "exec": {
-                "command": command,
-                "args": args,
-                "cwd": effective_cwd,
-                "reason": reason,
-                "gate_result": "denied",
-                "interrupted_id": interrupted_entry.as_ref().map(|e| e.id.clone()),
-                "gate_reason": interrupted_entry.as_ref().map(|e| e.reason.clone()),
-            },
-        })),
-        crabjar_guard::ActionStatus::Pending => {
-            // Concierge already persisted the pending entry via with_db()
+    match outcome {
+        crabjar_guard::ConciergeOutcome::Denied(denied_action, interrupted_entry) => {
+            let _ = denied_action; // Terminal state preserved in GuardDb
+            Ok(json!({
+                "success": false,
+                "exec": {
+                    "command": command,
+                    "args": args,
+                    "cwd": effective_cwd,
+                    "reason": reason,
+                    "gate_result": "denied",
+                    "interrupted_id": interrupted_entry.id.clone(),
+                    "gate_reason": interrupted_entry.reason.clone(),
+                },
+            }))
+        }
+        crabjar_guard::ConciergeOutcome::Queued(pending_action, pending_entry) => {
+            let _ = pending_action; // Still in Pending state — can transition later
             Ok(json!({
                 "success": false,
                 "exec": {
@@ -243,11 +243,11 @@ pub async fn handle_exec(
                     "reason": reason,
                     "gate_result": "pending",
                     "requires_review": true,
-                    "pending_id": pending_entry.map(|e| e.id.clone()),
+                    "pending_id": pending_entry.id.clone(),
                 },
             }))
         }
-        crabjar_guard::ActionStatus::TrustApproved => {
+        crabjar_guard::ConciergeOutcome::Approved(_approved_action) => {
             // Tool registry: discover and validate tools before execution
             let tool_registry_path = workspace_dir.join("tool_registry/tool_registry.db");
             let tool_registry_conn: Option<rusqlite::Connection> =
@@ -377,18 +377,6 @@ pub async fn handle_exec(
                     } else {
                         Some(receipt)
                     },
-                },
-            }))
-        }
-        crabjar_guard::ActionStatus::Executed | crabjar_guard::ActionStatus::Interrupted => {
-            Ok(json!({
-                "success": false,
-                "exec": {
-                    "command": command,
-                    "args": args,
-                    "cwd": effective_cwd,
-                    "reason": reason,
-                    "gate_result": "unhandled",
                 },
             }))
         }

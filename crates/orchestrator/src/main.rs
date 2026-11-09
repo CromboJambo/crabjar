@@ -466,7 +466,7 @@ fn guard_tool_call(tool_name: &str, args: &[String], source_event_id: &str) -> R
         context_fragment_tokens: None,
     }) {
         Ok(result) => {
-            let (status, pending_entry, interrupted_entry) = concierge.enforce(
+            let outcome = concierge.enforce(
                 result,
                 "tool_call",
                 tool_name,
@@ -476,32 +476,20 @@ fn guard_tool_call(tool_name: &str, args: &[String], source_event_id: &str) -> R
                 Some(source_event_id.to_string()),
             );
 
-            match status {
-                ActionStatus::TrustApproved => {
+            match outcome {
+                crabjar_guard::ConciergeOutcome::Approved(_) => {
                     info!("Gate concierge: Proceed — {}", tool_name);
                     Ok(())
                 }
-                ActionStatus::Pending => Err(format!(
+                crabjar_guard::ConciergeOutcome::Queued(_, pending_entry) => Err(format!(
                     "Pending: queued for review (pending_id: {})",
-                    pending_entry
-                        .as_ref()
-                        .map(|e| e.id.clone())
-                        .unwrap_or_default()
+                    pending_entry.id
                 )),
-                ActionStatus::Denied => Err(format!(
+                crabjar_guard::ConciergeOutcome::Denied(_, interrupted_entry) => Err(format!(
                     "Interrupted: {} (interrupted_id: {})",
-                    interrupted_entry
-                        .as_ref()
-                        .map(|e| e.reason.clone())
-                        .unwrap_or_default(),
-                    interrupted_entry
-                        .as_ref()
-                        .map(|e| e.id.clone())
-                        .unwrap_or_default()
+                    interrupted_entry.reason,
+                    interrupted_entry.id
                 )),
-                ActionStatus::Executed | ActionStatus::Interrupted => {
-                    Err("Status not handled by concierge".to_string())
-                }
             }
         }
         Err(e) => {
