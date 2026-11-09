@@ -58,34 +58,103 @@ impl<'a> ExecutionGate<'a> {
 
     /// Run the full gate check before executing an action.
     ///
-    /// The gate enforces:
-    /// 1. Raw data reference: the event must reference raw data, not interpreted summaries
-    /// 2. Uncertainty exposure: if confidence is below threshold, surface it before executing
-    /// 3. Interruptibility: allow the gate to return Interrupted instead of executing
-    /// 4. Trust layer check: auto-execute only for trusted layers
+    /// The gate enforces a pipeline of checks. Each check returns `Some(result)`
+    /// to short-circuit with that result, or `None` to continue to the next check.
+    /// If all checks pass, execution proceeds.
     pub fn check(&self, ctx: GateContext<'_>) -> Result<GateResult, GuardDbError> {
-        // Policy engine pre-check (if configured).
-        if let Some(gate_result) = policy::run_policy_check(self.policy_engine.as_deref(), &ctx) {
+        // 1. Policy engine pre-check (if configured)
+        if let Some(result) = self.check_policy(&ctx)? {
+            return Ok(result);
+        }
+
+        // 2. Dry-run check
+        if let Some(result) = self.check_dry_run(&ctx) {
+            return Ok(result);
+        }
+
+        // 3. Provenance verification: source_event_id must exist in action_requests
+        if let Some(result) = self.check_provenance(&ctx)? {
+            return Ok(result);
+        }
+
+        // 4. Confidence threshold
+        if let Some(result) = self.check_confidence(&ctx) {
+            return Ok(result);
+        }
+
+        // 5. Interruptibility check
+        if let Some(result) = self.check_interruptibility(&ctx) {
+            return Ok(result);
+        }
+
+        // 6. Trust layer check
+        if let Some(result) = self.check_trust_layer(&ctx)? {
+            return Ok(result);
+        }
+
+        // 7. PID trust check (Option B: per-process trust layers)
+        if let Some(result) = self.check_pid_trust(&ctx)? {
+            return Ok(result);
+        }
+
+        // 8. Scope isolation check
+        if let Some(result) = self.check_scope_isolation(&ctx) {
+            return Ok(result);
+        }
+
+        // 9. Command risk assessment
+        if let Some(result) = self.check_command_risk(&ctx) {
+            return Ok(result);
+        }
+
+        // 10. Domain allowlist check (if domains are known)
+        if let Some(result) = self.check_domain_allowlist(&ctx)? {
+            return Ok(result);
+        }
+
+        // 11. Context budget check (Q12: wire in but leave pretty open)
+        if let Some(result) = self.check_context_budget(&ctx) {
+            return Ok(result);
+        }
+
+        Ok(GateResult::Proceed)
+    }
+
+    /// Policy engine pre-check (if configured).
+    fn check_policy(
+        &self,
+        ctx: &GateContext<'_>,
+    ) -> Result<Option<GateResult>, GuardDbError> {
+        if let Some(gate_result) = policy::run_policy_check(self.policy_engine.as_deref(), ctx) {
             debug!(
                 action = %ctx.action_type,
                 policy_source = self.policy_engine.as_ref().map(|e| e.source_description()),
                 "Policy engine pre-check returned: {:?}",
                 gate_result
             );
-            return Ok(gate_result);
+            return Ok(Some(gate_result));
         }
+        Ok(None)
+    }
 
-        // 1. Dry-run check
+    /// Dry-run check.
+    fn check_dry_run(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
         if self.dry_run {
             info!(
                 action = %ctx.action_type,
                 trust_layer = ctx.trust_layer,
                 "Dry-run: would execute action"
             );
-            return Ok(GateResult::DryRun);
+            return Some(GateResult::DryRun);
         }
+        None
+    }
 
-        // 2. Provenance verification: source_event_id must exist in action_requests
+    /// Provenance verification: source_event_id must exist in action_requests.
+    fn check_provenance(
+        &self,
+        ctx: &GateContext<'_>,
+    ) -> Result<Option<GateResult>, GuardDbError> {
         let provenance_exists = if let Some(id) = ctx.source_event_id {
             provenance::verify_provenance(&self.trust.conn(), id)?
         } else {
@@ -95,10 +164,13 @@ impl<'a> ExecutionGate<'a> {
         if !provenance_exists {
             let reason = "No provenance found in GuardDb; detection != authorization".to_string();
             warn!(action = %ctx.action_type, %reason, "Gate interrupted");
-            return Ok(GateResult::Interrupted { reason });
+            return Ok(Some(GateResult::Interrupted { reason }));
         }
+        Ok(None)
+    }
 
-        // 3. Confidence threshold
+    /// Confidence threshold check.
+    fn check_confidence(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
         if ctx.confidence.get() < self.risk_config.confidence_floor {
             let reason = format!(
                 "Confidence {:.3} below floor {:.3}; must surface before execution",
@@ -111,18 +183,27 @@ impl<'a> ExecutionGate<'a> {
                 %reason,
                 "Gate interrupted"
             );
-            return Ok(GateResult::Interrupted { reason });
+            return Some(GateResult::Interrupted { reason });
         }
+        None
+    }
 
-        // 4. Interruptibility check
+    /// Interruptibility check.
+    fn check_interruptibility(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
         if !ctx.can_interrupt {
             let reason =
                 "Action cannot be interrupted; gate safety requirement not met".to_string();
             warn!(action = %ctx.action_type, %reason, "Gate interrupted");
-            return Ok(GateResult::Interrupted { reason });
+            return Some(GateResult::Interrupted { reason });
         }
+        None
+    }
 
-        // 5. Trust layer check
+    /// Trust layer check.
+    fn check_trust_layer(
+        &self,
+        ctx: &GateContext<'_>,
+    ) -> Result<Option<GateResult>, GuardDbError> {
         let can_auto = self.trust.can_auto_execute(ctx.trust_layer)?;
         let needs_review = self.trust.requires_review(ctx.trust_layer)?;
 
@@ -132,7 +213,7 @@ impl<'a> ExecutionGate<'a> {
                 trust_layer = ctx.trust_layer,
                 "Action requires human review"
             );
-            return Ok(GateResult::Pending);
+            return Ok(Some(GateResult::Pending));
         }
 
         if !can_auto {
@@ -140,19 +221,31 @@ impl<'a> ExecutionGate<'a> {
                 "Trust layer {} does not allow auto-execute",
                 ctx.trust_layer
             );
-            return Ok(GateResult::Interrupted { reason });
+            return Ok(Some(GateResult::Interrupted { reason }));
         }
+        Ok(None)
+    }
 
-        // 6. PID trust check (Option B: per-process trust layers)
-        if let Some(pid) = ctx.pid
-            && let Some(gate_result) =
-                pid_trust::check_pid_trust(&self.trust.conn(), pid, ctx.command, &self.risk_config)?
-        {
-            return Ok(gate_result);
+    /// PID trust check (Option B: per-process trust layers).
+    fn check_pid_trust(
+        &self,
+        ctx: &GateContext<'_>,
+    ) -> Result<Option<GateResult>, GuardDbError> {
+        if let Some(pid) = ctx.pid {
+            if let Some(gate_result) = pid_trust::check_pid_trust(
+                &self.trust.conn(),
+                pid,
+                ctx.command,
+                &self.risk_config,
+            )? {
+                return Ok(Some(gate_result));
+            }
         }
+        Ok(None)
+    }
 
-        // 7. Scope isolation check
-        #[allow(clippy::collapsible_if)]
+    /// Scope isolation check.
+    fn check_scope_isolation(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
         if let (Some(actor_scope), Some(target_scope)) = (&ctx.scope, &ctx.target_scope) {
             if !actor_scope.can_access(target_scope) {
                 // Check for valid CrossScopeAuth bypass
@@ -175,7 +268,7 @@ impl<'a> ExecutionGate<'a> {
                         %reason,
                         "Scope isolation blocked"
                     );
-                    return Ok(GateResult::Interrupted { reason });
+                    return Some(GateResult::Interrupted { reason });
                 }
 
                 debug!(
@@ -187,34 +280,39 @@ impl<'a> ExecutionGate<'a> {
                 );
             }
         }
+        None
+    }
 
-        // 8. Command risk assessment
+    /// Command risk assessment.
+    fn check_command_risk(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
         let risk = command_risk::assess_command_risk(ctx.command, &ctx.args, &self.risk_config);
         match risk {
-            CommandRisk::High => {
-                return Ok(GateResult::Interrupted {
-                    reason: format!("High-risk command '{}' detected", ctx.command),
-                });
-            }
+            CommandRisk::High => Some(GateResult::Interrupted {
+                reason: format!("High-risk command '{}' detected", ctx.command),
+            }),
             CommandRisk::Medium => {
                 debug!(
                     action = %ctx.action_type,
                     command = %ctx.command,
                     "Medium-risk command requires review"
                 );
-                return Ok(GateResult::Pending);
+                Some(GateResult::Pending)
             }
             CommandRisk::Low => {
                 debug!(action = %ctx.action_type, "Low-risk command approved");
+                None
             }
-            CommandRisk::Unauthorized => {
-                return Ok(GateResult::Interrupted {
-                    reason: "Unauthorized action: detection != authorization".to_string(),
-                });
-            }
+            CommandRisk::Unauthorized => Some(GateResult::Interrupted {
+                reason: "Unauthorized action: detection != authorization".to_string(),
+            }),
         }
+    }
 
-        // 9. Domain allowlist check (if domains are known)
+    /// Domain allowlist check (if domains are known).
+    fn check_domain_allowlist(
+        &self,
+        ctx: &GateContext<'_>,
+    ) -> Result<Option<GateResult>, GuardDbError> {
         if !ctx.domains.is_empty() {
             for domain in &ctx.domains {
                 match self
@@ -240,20 +338,23 @@ impl<'a> ExecutionGate<'a> {
                             %reason,
                             "Domain allowlist blocked"
                         );
-                        return Ok(GateResult::Interrupted { reason });
+                        return Ok(Some(GateResult::Interrupted { reason }));
                     }
                 }
             }
         }
+        Ok(None)
+    }
 
-        // 10. Context budget check (Q12: wire in but leave pretty open)
+    /// Context budget check (Q12: wire in but leave pretty open).
+    fn check_context_budget(&self, ctx: &GateContext<'_>) -> Option<GateResult> {
         if let (Some(budget), fragment_tokens) = (&ctx.context_budget, ctx.context_fragment_tokens)
         {
             // Per-fragment hard cap (Codex spec: 10K tokens)
             if let Some(tokens) = fragment_tokens
                 && tokens > crate::context_budget::MAX_TOKENS_PER_FRAGMENT
             {
-                return Ok(GateResult::OversizedFragment {
+                return Some(GateResult::OversizedFragment {
                     actual: tokens,
                     max: crate::context_budget::MAX_TOKENS_PER_FRAGMENT,
                 });
@@ -271,18 +372,15 @@ impl<'a> ExecutionGate<'a> {
             }
 
             // Reserve tokens for this action's context
-            if let Some(tokens) = fragment_tokens
-                && !budget.can_fit(tokens)
-            {
-                return Ok(GateResult::ContextExhausted {
+            if let Some(tokens) = fragment_tokens && !budget.can_fit(tokens) {
+                return Some(GateResult::ContextExhausted {
                     used: budget.used(),
                     budget: budget.budget(),
                     remaining: budget.remaining(),
                 });
             }
         }
-
-        Ok(GateResult::Proceed)
+        None
     }
 
     /// Gate knowledge write based on source.
