@@ -71,15 +71,18 @@ impl EvolutionManager {
     /// Create a new evolution manager from .crabjar_config.toml
     pub fn new(project_root: &str) -> Result<Self> {
         let config_path = Path::new(project_root).join(".crabjar_config.toml");
-        
+
         let config = if config_path.exists() {
             let content = fs::read_to_string(&config_path)?;
             let parsed: toml::Value = toml::from_str(&content)?;
-            
+
             // Extract decision configuration
             if let Some(decision) = parsed.get("decision") {
                 EvolutionConfig {
-                    enabled: decision.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true),
+                    enabled: decision
+                        .get("enabled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(true),
                     evolution_threshold: decision
                         .get("evolution_threshold")
                         .and_then(|v| {
@@ -127,12 +130,10 @@ impl EvolutionManager {
     /// Record a decision outcome for learning
     pub fn record_outcome(&mut self, outcome: DecisionOutcome) -> Result<()> {
         self.state.recent_outcomes.push(outcome);
-        
+
         // Trim to feedback window size
         if self.state.recent_outcomes.len() > self.config.feedback_window {
-            self.state
-                .recent_outcomes
-                .remove(0);
+            self.state.recent_outcomes.remove(0);
         }
 
         self.save_state()?;
@@ -152,7 +153,7 @@ impl EvolutionManager {
     pub fn evolve(&mut self) -> Result<()> {
         // Group outcomes by criteria file
         let mut outcomes_by_criteria: HashMap<String, Vec<&DecisionOutcome>> = HashMap::new();
-        
+
         for outcome in &self.state.recent_outcomes {
             outcomes_by_criteria
                 .entry(outcome.criteria_file.clone())
@@ -166,10 +167,7 @@ impl EvolutionManager {
                 continue; // Need minimum sample size
             }
 
-            let approved = outcomes
-                .iter()
-                .filter(|o| o.user_approved)
-                .count();
+            let approved = outcomes.iter().filter(|o| o.user_approved).count();
             let approval_rate = approved as f64 / outcomes.len() as f64;
 
             // If approval rate is low, increase threshold (be more conservative)
@@ -207,10 +205,7 @@ impl EvolutionManager {
             return None;
         }
 
-        let approved = outcomes
-            .iter()
-            .filter(|o| o.user_approved)
-            .count();
+        let approved = outcomes.iter().filter(|o| o.user_approved).count();
 
         Some(DecisionStats {
             total: outcomes.len(),
@@ -226,12 +221,12 @@ impl EvolutionManager {
         let dir = Path::new(&self.state_path)
             .parent()
             .ok_or_else(|| anyhow!("Invalid state path"))?;
-        
+
         fs::create_dir_all(dir)?;
-        
+
         let content = serde_json::to_string_pretty(&self.state)?;
         fs::write(&self.state_path, content)?;
-        
+
         Ok(())
     }
 

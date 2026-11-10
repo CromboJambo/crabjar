@@ -7,13 +7,17 @@ use std::path::Path;
 
 // Submodules split by entity type (500 LoC rule)
 pub mod decisions;
+pub mod deployments;
 pub mod goals;
+pub mod supervisors;
 pub mod tasks;
 pub mod workers;
 
 // Re-export public types for backward compatibility
 pub use decisions::{DecisionFrequency, DecisionRecord, PromotedRule};
+pub use deployments::{DeploymentStatus, WorkerDeployment};
 pub use goals::{Goal, GoalStatus};
+pub use supervisors::SupervisorStatus;
 pub use tasks::{Task, TaskStatus};
 pub use workers::{Worker, WorkerStatus};
 
@@ -90,7 +94,31 @@ impl StateStore {
                 occurrence_count INTEGER NOT NULL,
                 promoted_at TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_decision_rules_criteria ON decision_rules(criteria_file);",
+            CREATE INDEX IF NOT EXISTS idx_decision_rules_criteria ON decision_rules(criteria_file);
+
+            -- Worker deployments (SUPERVISOR-DEPLOYMENT-READINESS Phase 1)
+            CREATE TABLE IF NOT EXISTS worker_deployments (
+                id              TEXT PRIMARY KEY,
+                supervisor_id   TEXT NOT NULL,
+                task_spec       JSON NOT NULL,
+                sandbox_id      TEXT,
+                status          TEXT NOT NULL DEFAULT 'pending',
+                outcome         JSON,
+                created_at      TEXT NOT NULL,
+                completed_at    TEXT,
+                error           TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_deployments_supervisor ON worker_deployments(supervisor_id);
+            CREATE INDEX IF NOT EXISTS idx_deployments_status ON worker_deployments(status);
+
+            -- Supervisor readiness status (SUPERVISOR-DEPLOYMENT-READINESS Phase 2)
+            CREATE TABLE IF NOT EXISTS supervisor_status (
+                id              TEXT PRIMARY KEY,
+                ready           BOOLEAN NOT NULL DEFAULT false,
+                health          JSON,
+                last_heartbeat  TEXT,
+                active_deployments INTEGER NOT NULL DEFAULT 0
+            );",
         )?;
 
         Ok(Self { db })

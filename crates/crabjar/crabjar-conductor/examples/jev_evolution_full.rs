@@ -29,7 +29,9 @@ fn main() {
                 .as_secs(),
         };
 
-        evolver.record_outcome(outcome).expect("Failed to record outcome");
+        evolver
+            .record_outcome(outcome)
+            .expect("Failed to record outcome");
     }
 
     let stats_before = evolver.get_stats("code-review-risk.json").unwrap();
@@ -62,7 +64,9 @@ fn main() {
                 .as_secs(),
         };
 
-        evolver.record_outcome(outcome).expect("Failed to record outcome");
+        evolver
+            .record_outcome(outcome)
+            .expect("Failed to record outcome");
     }
 
     let stats_before2 = evolver.get_stats("code-review-risk.json").unwrap();

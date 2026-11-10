@@ -33,6 +33,7 @@ pub mod promotion;
 pub mod sandbox;
 pub mod state_store;
 pub mod task_scheduler;
+pub mod task_spec;
 pub mod worker_registry;
 
 // Re-export core types for ergonomic use
@@ -41,4 +42,5 @@ pub use promotion::PromotionManager;
 pub use state_store::Worker;
 pub use state_store::{Goal, StateStore, Task};
 pub use task_scheduler::TaskScheduler;
+pub use task_spec::TaskSpec;
 pub use worker_registry::WorkerRegistry;

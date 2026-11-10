@@ -2,6 +2,10 @@
 //!
 //! Demonstrates loading configuration from .crabjar_config.toml,
 //! tracking decision outcomes, and evolving thresholds based on feedback.
+//! We DID consider naming this 'JEVolution'
+//! We struggled with the pun-tastic implications.
+//! We ultimately exercised restraint.
+//! This decision was not easy.
 
 use crabjar_conductor::decision::evolution::{DecisionOutcome, EvolutionManager};
 use std::time::SystemTime;
@@ -32,7 +36,9 @@ fn main() {
             .as_secs(),
     };
 
-    evolver.record_outcome(outcome1).expect("Failed to record outcome");
+    evolver
+        .record_outcome(outcome1)
+        .expect("Failed to record outcome");
     println!("  Recorded: high risk decision (approved, confidence 0.95)");
 
     // Scenario 2: Another high confidence decision, user approves
@@ -48,7 +54,9 @@ fn main() {
             .as_secs(),
     };
 
-    evolver.record_outcome(outcome2).expect("Failed to record outcome");
+    evolver
+        .record_outcome(outcome2)
+        .expect("Failed to record outcome");
     println!("  Recorded: high risk decision (approved, confidence 0.90)");
 
     // Scenario 3: Low confidence decision, user rejects
@@ -64,7 +72,9 @@ fn main() {
             .as_secs(),
     };
 
-    evolver.record_outcome(outcome3).expect("Failed to record outcome");
+    evolver
+        .record_outcome(outcome3)
+        .expect("Failed to record outcome");
     println!("  Recorded: low risk decision (rejected, confidence 0.60)");
 
     // Get stats before evolution
@@ -95,7 +105,10 @@ fn main() {
 
     if let (Some(before), Some(after)) = (&stats_before, &stats_after) {
         if after.threshold != before.threshold {
-            println!("\n✓ Threshold evolved from {:.2} to {:.2}", before.threshold, after.threshold);
+            println!(
+                "\n✓ Threshold evolved from {:.2} to {:.2}",
+                before.threshold, after.threshold
+            );
         } else {
             println!("\n  No threshold change (insufficient data or balanced approval rate)");
         }

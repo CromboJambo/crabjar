@@ -143,6 +143,12 @@ pub fn routes(conductor: ConductorState) -> Router {
         .route("/workers/login", post(workers::worker_login_handler))
         .route("/workers/poll", post(workers::worker_poll_handler))
         .route("/workers/heartbeat", post(workers::worker_heartbeat_public))
+        // Supervisor deployment endpoints (Phase 1)
+        .route("/workers/deploy", post(workers::deploy_worker))
+        .route(
+            "/workers/heartbeat/supervisor",
+            post(workers::supervisor_heartbeat),
+        )
         // Seed container environment reporting
         .route("/api/report", post(seed_reports::seed_report_handler))
         .route("/api/reports", get(seed_reports::list_seed_reports_handler))
@@ -283,6 +289,14 @@ pub fn routes(conductor: ConductorState) -> Router {
             get(workers::tasks_for_worker),
         )
         .route("/tasks/{id}/result", post(tasks::report_task_result))
+        // Deployment tracking endpoints (Phase 1)
+        .route("/deployments", get(workers::list_deployments))
+        .route("/deployments/{id}", get(workers::get_deployment))
+        // Supervisor status endpoint (Phase 2, table created in Phase 1)
+        .route(
+            "/supervisors/status",
+            get(workers::list_supervisor_statuses),
+        )
         .route("/review", post(review::submit_review))
         .layer(middleware::from_fn(jwt_auth_middleware))
         .with_state(Arc::clone(&conductor));

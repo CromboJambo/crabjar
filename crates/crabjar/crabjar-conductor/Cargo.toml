@@ -61,7 +61,7 @@ universal-structure = { path = "../../universal-structure" }
 pesti-structural-tokenizer.workspace = true
 
 # Authentication
-jsonwebtoken = "10.3"
+jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
 
 # Caching (SHA-256 for decision cache keys)
 sha2 = { workspace = true }
