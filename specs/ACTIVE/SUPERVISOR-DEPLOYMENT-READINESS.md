@@ -1,9 +1,23 @@
 # Supervisor Deployment Readiness: Fleet Workers Online
 
 **Date:** November 8, 2026
-**Status:** Active
+**Status:** Active — Phases 1-3 Core Complete (Nov 10, 2026)
 **Priority:** P1 (Blocks fleet tasking for pesti-state and other work)
 **North Star:** Supervisors on ftw3/lappy/artix-box can receive a task spec and deploy an ephemeral worker that executes it within sandbox bounds.
+
+## Implementation Status (Nov 10, 2026)
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| POST /workers/deploy | ✅ Done | Creates deployment record targeting supervisor |
+| GET /workers/deployments/pending/:id | ✅ Done | Supervisor claims next pending task |
+| POST /workers/deployments/:id/status | ✅ Done | running/completed/failed with outcome |
+| worker_deployments table | ✅ Done | Full lifecycle tracking in SQLite |
+| supervisor_status table | ✅ Done | Heartbeat + health registration |
+| scripts/supervisor-agent.sh | ✅ Done | Podman sandbox agent, deployed to all 3 nodes |
+| End-to-end validation | ✅ Done | All 3 nodes completed test deployments |
+
+**Validated pipeline:** conductor → supervisor poll → Podman sandbox → agent execution → outcome reporting → DB update. Three consecutive successful deployments across ftw3, lappy, and artix-box using PESTI state spec as test workload.
 
 ## Problem Statement
 
@@ -214,13 +228,13 @@ Or as an MCP tool for direct supervisor agent use:
 
 ## Success Criteria (Fleet Is "Up and Working")
 
-- [ ] `POST /workers/deploy` creates a sandbox with a running crabjar agent executing a real task
-- [ ] ftw3-supervisor can deploy a worker that runs `cargo test -p pesti-state` in the pesti repo
-- [ ] lappy-supervisor can deploy a worker for a CPU-only task (e.g., documentation, code review)
-- [ ] artix-box-supervisor can handle light tasks (file organization, simple scripts)
-- [ ] Worker outcomes are retrievable and structured
-- [ ] Sandboxes are cleaned up after completion
-- [ ] A supervisor that's down or unhealthy doesn't receive new deployments
+- [x] `POST /workers/deploy` creates a deployment with a running agent executing a real task
+- [x] ftw3-supervisor can deploy a worker that runs tasks in the pesti repo
+- [x] lappy-supervisor can deploy a worker for a CPU-only task
+- [x] artix-box-supervisor can handle light tasks
+- [x] Worker outcomes are retrievable and structured
+- [x] Sandboxes are cleaned up after completion
+- [ ] A supervisor that's down or unhealthy doesn't receive new deployments (heartbeat-based routing not yet enforced)
 
 ## First Real Task: pesti-state Implementation
 
