@@ -6,10 +6,10 @@
 //! (semantic analysis), but within a single arbitration they run sequentially —
 //! async multiplexing happens at the orchestrator layer.
 
-use crate::action::{GuardedAction, Pending};
 #[cfg(test)]
 use crate::action::ActionRequest;
-use crate::arbiter::types::{ArbitrationStep, ArbiterState, Evidence};
+use crate::action::{GuardedAction, Pending};
+use crate::arbiter::types::{ArbiterState, ArbitrationStep, Evidence};
 use crate::command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
 use std::fmt;
 
@@ -323,11 +323,7 @@ impl EvaluationPass for HistoryPass {
 
 /// Extract the command name from a payload string.
 fn extract_command(payload: &str) -> String {
-    payload
-        .split_whitespace()
-        .next()
-        .unwrap_or("")
-        .to_string()
+    payload.split_whitespace().next().unwrap_or("").to_string()
 }
 
 /// Assess command risk using the existing risk lists.
@@ -351,7 +347,13 @@ mod tests {
     use crate::trust_types::TrustScore;
 
     fn make_action(payload: &str, trust_layer: u32, confidence: f64) -> GuardedAction<Pending> {
-        let request = ActionRequest::new("test", "execute", payload, trust_layer, TrustScore::new(confidence));
+        let request = ActionRequest::new(
+            "test",
+            "execute",
+            payload,
+            trust_layer,
+            TrustScore::new(confidence),
+        );
         GuardedAction::new(request)
     }
 

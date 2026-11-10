@@ -30,7 +30,12 @@ pub struct Evidence {
 }
 
 impl Evidence {
-    pub fn new(source: impl Into<String>, pass_number: u32, delta: f64, rationale: impl Into<String>) -> Self {
+    pub fn new(
+        source: impl Into<String>,
+        pass_number: u32,
+        delta: f64,
+        rationale: impl Into<String>,
+    ) -> Self {
         Self {
             source: source.into(),
             pass_number,
@@ -90,15 +95,9 @@ pub enum ArbitrationExcuse {
         con: Vec<Evidence>,
     },
     /// Required context is missing for a confident decision.
-    MissingContext {
-        required: String,
-        available: String,
-    },
+    MissingContext { required: String, available: String },
     /// The action's scope doesn't match what the arbiter can evaluate.
-    ScopeViolation {
-        expected: String,
-        found: String,
-    },
+    ScopeViolation { expected: String, found: String },
     /// All passes completed but confidence never crossed a threshold.
     MaxPassesExceeded {
         final_confidence: f64,
@@ -115,13 +114,19 @@ impl fmt::Display for ArbitrationExcuse {
                 pro.len(),
                 con.len()
             ),
-            Self::MissingContext { required, available } => {
+            Self::MissingContext {
+                required,
+                available,
+            } => {
                 write!(f, "Missing context: need '{required}', have '{available}'")
             }
             Self::ScopeViolation { expected, found } => {
                 write!(f, "Scope violation: expected '{expected}', found '{found}'")
             }
-            Self::MaxPassesExceeded { final_confidence, passes_completed } => write!(
+            Self::MaxPassesExceeded {
+                final_confidence,
+                passes_completed,
+            } => write!(
                 f,
                 "Confidence {final_confidence:.3} after {passes_completed} passes — threshold not reached"
             ),
@@ -213,9 +218,12 @@ impl ArbitrationResult {
     pub fn confidence(&self) -> Option<f64> {
         match self {
             Self::Approved(_, c, _) | Self::Denied(_, c, _) => Some(*c),
-            Self::Escalated(ArbitrationExcuse::MaxPassesExceeded { final_confidence, .. }, _) => {
-                Some(*final_confidence)
-            }
+            Self::Escalated(
+                ArbitrationExcuse::MaxPassesExceeded {
+                    final_confidence, ..
+                },
+                _,
+            ) => Some(*final_confidence),
             _ => None,
         }
     }

@@ -19,7 +19,11 @@ pub mod types;
 
 // Re-exports for ergonomic use
 pub use arbiter::JevArbiter;
-pub use pass::{CommandRiskPass, ConfidencePass, EvaluationPass, HistoryPass, PassError, ProvenancePass, TrustLayerPass};
+pub use pass::{
+    CommandRiskPass, ConfidencePass, EvaluationPass, HistoryPass, PassError, ProvenancePass,
+    TrustLayerPass,
+};
 pub use types::{
-    ArbiterState, ArbitrationExcuse, ArbitrationRecord, ArbitrationResult, ArbitrationStep, Evidence,
+    ArbiterState, ArbitrationExcuse, ArbitrationRecord, ArbitrationResult, ArbitrationStep,
+    Evidence,
 };

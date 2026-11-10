@@ -17,7 +17,8 @@
 use crate::action::{GuardedAction, Pending};
 use crate::arbiter::pass::EvaluationPass;
 use crate::arbiter::types::{
-    ArbitrationExcuse, ArbitrationRecord, ArbitrationResult, ArbitrationStep, ArbiterState, Evidence,
+    ArbiterState, ArbitrationExcuse, ArbitrationRecord, ArbitrationResult, ArbitrationStep,
+    Evidence,
 };
 use std::sync::Arc;
 
@@ -109,9 +110,16 @@ impl JevArbiter {
 
     /// Create an arbiter with the standard built-in passes registered.
     pub fn with_standard_passes() -> Self {
-        use crate::arbiter::pass::{CommandRiskPass, ConfidencePass, HistoryPass, ProvenancePass, TrustLayerPass};
+        use crate::arbiter::pass::{
+            CommandRiskPass, ConfidencePass, HistoryPass, ProvenancePass, TrustLayerPass,
+        };
 
-        Self::new().register_pass(Arc::new(CommandRiskPass)).register_pass(Arc::new(TrustLayerPass)).register_pass(Arc::new(ConfidencePass)).register_pass(Arc::new(ProvenancePass)).register_pass(Arc::new(HistoryPass::default()))
+        Self::new()
+            .register_pass(Arc::new(CommandRiskPass))
+            .register_pass(Arc::new(TrustLayerPass))
+            .register_pass(Arc::new(ConfidencePass))
+            .register_pass(Arc::new(ProvenancePass))
+            .register_pass(Arc::new(HistoryPass::default()))
     }
 
     /// Run the arbitration loop on a queued action.
@@ -149,12 +157,15 @@ impl JevArbiter {
                 Err(e) => {
                     // Pass failed unexpectedly — record it and continue with other passes
                     tracing::warn!("Arbiter pass '{}' failed: {}", pass.name(), e);
-                    state.record_pass(0.0, vec![Evidence::new(
-                        pass.name(),
-                        pass_num as u32,
+                    state.record_pass(
                         0.0,
-                        format!("Pass failed: {e}"),
-                    )]);
+                        vec![Evidence::new(
+                            pass.name(),
+                            pass_num as u32,
+                            0.0,
+                            format!("Pass failed: {e}"),
+                        )],
+                    );
                     continue;
                 }
             };
@@ -262,9 +273,12 @@ impl JevArbiter {
             ArbitrationResult::Approved(_, _, ev) | ArbitrationResult::Denied(_, _, ev) => {
                 ev.iter().map(|e| e.pass_number).max().unwrap_or(0)
             }
-            ArbitrationResult::Escalated(ArbitrationExcuse::MaxPassesExceeded { passes_completed, .. }, _) => {
-                *passes_completed
-            }
+            ArbitrationResult::Escalated(
+                ArbitrationExcuse::MaxPassesExceeded {
+                    passes_completed, ..
+                },
+                _,
+            ) => *passes_completed,
             _ => 0,
         };
         record
@@ -281,7 +295,13 @@ mod tests {
     use crate::trust_types::TrustScore;
 
     fn make_action(payload: &str, trust_layer: u32, confidence: f64) -> GuardedAction<Pending> {
-        let request = ActionRequest::new("test", "execute", payload, trust_layer, TrustScore::new(confidence));
+        let request = ActionRequest::new(
+            "test",
+            "execute",
+            payload,
+            trust_layer,
+            TrustScore::new(confidence),
+        );
         GuardedAction::new(request)
     }
 
@@ -346,7 +366,10 @@ mod tests {
 
         match arbiter.arbitrate(action) {
             ArbitrationResult::Escalated(excuse, _) => {
-                assert!(matches!(excuse, ArbitrationExcuse::MaxPassesExceeded { .. }));
+                assert!(matches!(
+                    excuse,
+                    ArbitrationExcuse::MaxPassesExceeded { .. }
+                ));
             }
             other => panic!("Expected Escalated, got {:?}", other),
         }

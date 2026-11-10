@@ -220,12 +220,8 @@ impl<'a> ExecutionGate<'a> {
     /// PID trust check (Option B: per-process trust layers).
     fn check_pid_trust(&self, ctx: &GateContext<'_>) -> Result<Option<GateResult>, GuardDbError> {
         if let Some(pid) = ctx.pid
-            && let Some(gate_result) = pid_trust::check_pid_trust(
-                &self.trust.conn(),
-                pid,
-                ctx.command,
-                &self.risk_config,
-            )?
+            && let Some(gate_result) =
+                pid_trust::check_pid_trust(&self.trust.conn(), pid, ctx.command, &self.risk_config)?
         {
             return Ok(Some(gate_result));
         }
