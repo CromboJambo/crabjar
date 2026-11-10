@@ -149,6 +149,14 @@ pub fn routes(conductor: ConductorState) -> Router {
             "/workers/heartbeat/supervisor",
             post(workers::supervisor_heartbeat),
         )
+        .route(
+            "/workers/deployments/pending/{supervisor_id}",
+            get(workers::pending_deployments),
+        )
+        .route(
+            "/workers/deployments/{id}/status",
+            post(workers::update_deployment_status),
+        )
         // Seed container environment reporting
         .route("/api/report", post(seed_reports::seed_report_handler))
         .route("/api/reports", get(seed_reports::list_seed_reports_handler))

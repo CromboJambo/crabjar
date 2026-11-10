@@ -403,6 +403,112 @@ pub async fn supervisor_heartbeat(
     }
 }
 
+/// GET /workers/deployments/pending/{supervisor_id} - Return pending deployments for a supervisor (public).
+pub async fn pending_deployments(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    Path(supervisor_id): Path<String>,
+) -> Json<serde_json::Value> {
+    if supervisor_id.is_empty() {
+        return Json(json!({
+            "status": "error",
+            "message": "supervisor_id is required"
+        }));
+    }
+
+    let sid = supervisor_id.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        use crate::state_store::deployments::DeploymentStatus;
+        c.store().list_deployments(Some(&sid), Some(&DeploymentStatus::Pending))
+    })
+    .await;
+
+    match result {
+        Ok(Ok(deployments)) => Json(json!({
+            "status": "ok",
+            "supervisor_id": supervisor_id,
+            "pending": deployments.iter().map(|d| json!({
+                "id": d.id,
+                "task_spec": d.task_spec,
+                "created_at": d.created_at
+            })).collect::<Vec<_>>()
+        })),
+        Ok(Err(e)) => Json(json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+        Err(_) => Json(json!({
+            "status": "error",
+            "message": "internal error"
+        })),
+    }
+}
+
+/// POST /workers/deployments/{id}/status - Update deployment status (public).
+pub async fn update_deployment_status(
+    axum::extract::State(conductor): axum::extract::State<ConductorState>,
+    id: Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let deployment_id = id.0;
+    let status_str = body["status"].as_str().unwrap_or("").to_string();
+    let sandbox_id = body["sandbox_id"].as_str().map(|s| s.to_string());
+    let outcome = body.get("outcome").cloned();
+    let error = body["error"].as_str().map(|s| s.to_string());
+
+    if status_str.is_empty() {
+        return Json(json!({
+            "status": "error",
+            "message": "status field is required"
+        }));
+    }
+
+    use crate::state_store::deployments::DeploymentStatus;
+    let status = match status_str.as_str() {
+        "pending" => DeploymentStatus::Pending,
+        "running" => DeploymentStatus::Running,
+        "completed" => DeploymentStatus::Completed,
+        "failed" => DeploymentStatus::Failed,
+        "cancelled" => DeploymentStatus::Cancelled,
+        "timeout" => DeploymentStatus::Timeout,
+        _ => {
+            return Json(json!({
+                "status": "error",
+                "message": format!("unknown status: {}", status_str)
+            }));
+        }
+    };
+
+    let did = deployment_id.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let c = conductor.blocking_lock();
+        c.store().update_deployment(
+            &did,
+            &status,
+            sandbox_id.as_deref(),
+            outcome.as_ref(),
+            error.as_deref(),
+        )
+    })
+    .await;
+
+    match result {
+        Ok(Ok(())) => Json(json!({
+            "status": "ok",
+            "deployment_id": deployment_id,
+            "new_status": status_str
+        })),
+        Ok(Err(e)) => Json(json!({
+            "status": "error",
+            "message": e.to_string()
+        })),
+        Err(_) => Json(json!({
+            "status": "error",
+            "message": "internal error"
+        })),
+    }
+}
+
 /// GET /supervisors/status - List all supervisor statuses (protected).
 pub async fn list_supervisor_statuses(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
