@@ -1,6 +1,6 @@
 # project_map.md
 
-> Generated: November 05 2026 — Fresh structural audit (78 workspace members)
+> Generated: November 09 2026 — Guard persistence alignment + conductor supervisor deployment updates
 > Source: Cargo.toml, filesystem scan, README.md, AGENTS.md, agent_config.md
 > Purpose: Structural alignment reference for agent navigation
 
@@ -55,7 +55,7 @@ crabjar/
 │   └── ... (39 more crates)
 │
 │  Supporting crates (crates/)
-├── crates/guard/            # Trust layers, annealing, execution gate (30 files)
+├── crates/guard/            # Trust layers, annealing, execution gate (45 files)
 ├── crates/memory/           # agent-context crate, SQLite-backed storage (21 files)
 ├── crates/orchestrator/     # Axum SSE server + unified LM client (16 files)
 ├── crates/sandbox/          # Agent isolation (6 files)
@@ -563,7 +563,7 @@ Prior audit entries preserved below for historical reference.
 
 ### Known Items
 
-- `crates/guard/src/schema.sql` — GuardDb schema definition
+- `crates/guard/src/schema.sql` — GuardDb schema definition (includes handoffs + action_transitions tables)
 - `crates/guard/src/concierge.rs` — sole gate enforcement layer (~466 LoC)
 - `crates/guard/src/scope.rs` — scope isolation model (identity, project, tenant, thread dimensions) + 16 tests
 - `crates/guard/src/trust_resolution.rs` — requested-vs-effective trust resolution (~431 LoC)
@@ -573,9 +573,12 @@ Prior audit entries preserved below for historical reference.
 - `crates/guard/src/context_budget.rs` — ContextBudget + MAX_TOKENS_PER_FRAGMENT (6 tests)
 - `crates/guard/src/command_risk.rs` — CommandRisk, HIGH/MEDIUM_RISK_COMMANDS (6 tests)
 - `crates/guard/src/authorization_order.rs` — monotonic authorization-order invariant tests (10; CodeWhale-informed)
-- `crates/guard/src/guard_db_impl.rs` — 368 LoC (anneal + concierge + PID trust) — split from monolithic impl
-- `crates/guard/src/guard_db_queries.rs` — 352 LoC (action requests + trust resolution) — split from monolithic impl
-- `crates/guard/src/guard_db_types.rs` — 16 LoC (TrustResolutionEntry) — split from monolithic impl
+- `crates/guard/src/guard_db_impl.rs` — 426 LoC (anneal + concierge + PID trust) — split from monolithic impl
+- `crates/guard/src/guard_db_queries.rs` — query helpers + validated rehydration reads
+- `crates/guard/src/guard_db_handoffs.rs` — handoff envelope persistence + transition logging (399 LoC)
+- `crates/guard/src/guard_db_types.rs` — ActionTransition, TransitionError, validate_transition
+- `crates/guard/src/handoff.rs` — HandoffEnvelope contract types (Phase 2)
+- `crates/guard/src/arbiter/` — JEV Arbiter belief-revision decision engine (mod + passes + tests)
 - `crates/memory/src/state_docs/extract.rs` — markdown parsing (~400 LoC)
 - `crates/memory/src/state_docs/insert.rs` — SQLite writes (~144 LoC)
 - `crates/memory/src/context/mod.rs` — ContextFragmentBuilder with token budget (24 tests)

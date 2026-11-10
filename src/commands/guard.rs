@@ -26,8 +26,12 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
             }))
         }
         GuardCommand::Approve { action_id } => {
-            guard_db
-                .update_action_status(&action_id, crabjar_guard::ActionStatus::TrustApproved)?;
+            guard_db.update_action_status(
+                &action_id,
+                crabjar_guard::ActionStatus::TrustApproved,
+                "user:cli",
+                Some("approved via CLI"),
+            )?;
             Ok(json!({
                 "success": true,
                 "guard": {
@@ -39,7 +43,12 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
             }))
         }
         GuardCommand::Reject { action_id, reason } => {
-            guard_db.update_action_status(&action_id, crabjar_guard::ActionStatus::Denied)?;
+            guard_db.update_action_status(
+                &action_id,
+                crabjar_guard::ActionStatus::Denied,
+                "user:cli",
+                Some(&reason),
+            )?;
             Ok(json!({
                 "success": true,
                 "guard": {

@@ -39,9 +39,11 @@ pub mod gate_result;
 #[cfg(test)]
 pub mod gate_tests;
 pub mod guard_db;
+pub mod guard_db_handoffs;
 pub mod guard_db_impl;
 pub mod guard_db_queries;
 pub mod guard_db_types;
+pub mod handoff;
 pub mod inference;
 pub mod memory;
 pub mod memory_types;
@@ -61,6 +63,10 @@ pub use action::{
     ActionOutcome, ActionRequest, ActionStatus, Denied, Executed, GuardedAction, Interrupted,
     OutcomeStatus, Pending, TrustApproved,
 };
+pub use arbiter::{
+    ArbitrationResult, CommandRiskPass, ConfidencePass, HistoryPass, JevArbiter, ProvenancePass,
+    TrustLayerPass,
+};
 pub use command_risk::{CommandRisk, HIGH_RISK_COMMANDS, MEDIUM_RISK_COMMANDS};
 pub use concierge::{ConciergeOutcome, GateConcierge, InterruptedLogEntry, PendingQueueEntry};
 pub use context_budget::ContextBudget;
@@ -71,7 +77,13 @@ pub use gate::ExecutionGate;
 pub use gate_context::GateContext;
 pub use gate_result::GateResult;
 pub use guard_db::{GuardDb, GuardDbError};
-pub use guard_db_types::TrustResolutionEntry;
+pub use guard_db_types::{
+    ActionTransition, TransitionError, TrustResolutionEntry, parse_status, validate_transition,
+};
+pub use handoff::{
+    ActionOrigin, HandoffContext, HandoffEnvelope, HandoffPayload, ReasoningStep, ReasoningTrace,
+    SenderIdentity, TransitionIntent,
+};
 pub use inference::{ModelInferenceKind, ModelInferenceOutcome, ModelInferenceRequest};
 pub use memory::MemoryGraph;
 pub use memory_types::{EdgeRelation, MemoryEdge, MemoryNode, NodeKind};
@@ -86,8 +98,4 @@ pub use trust::{
 pub use trust_resolution::{
     EffectiveTrust, Policy, PolicyChain, PolicySource, RequestedTrust, TrustResolution,
     TrustResolver,
-};
-pub use arbiter::{
-    CommandRiskPass, ConfidencePass, HistoryPass, JevArbiter, ProvenancePass, TrustLayerPass,
-    ArbitrationResult,
 };

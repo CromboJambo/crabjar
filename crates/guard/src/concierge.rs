@@ -6,11 +6,14 @@ pub use crate::concierge_types::{
     ConciergeOutcome, GateConcierge, InterruptedLogEntry, PendingQueueEntry,
 };
 
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::GateResult;
 use crate::concierge_types::ApprovalStore;
 use crate::guard_db::{GuardDb, GuardDbError};
+use crate::handoff::{
+    ActionOrigin, HandoffContext, HandoffEnvelope, HandoffPayload, SenderIdentity, TransitionIntent,
+};
 use uuid::Uuid;
 
 impl GateConcierge {
@@ -29,6 +32,106 @@ impl GateConcierge {
     pub fn with_approval_store(mut self, store: ApprovalStore) -> Self {
         self.approval_store = store;
         self
+    }
+
+    /// Construct a [`HandoffEnvelope`] for the given gate decision.
+    ///
+    /// Phase 2: additive only — this builds the envelope and logs it,
+    /// demonstrating what context would be preserved across process boundaries.
+    /// Persistence wiring comes in Phase 3.
+    #[allow(clippy::too_many_arguments)]
+    fn build_handoff_envelope(
+        &self,
+        gate_result: &GateResult,
+        action_type: &str,
+        command: &str,
+        args: &[String],
+        trust_layer: u32,
+        confidence: f64,
+        source_event_id: Option<&str>,
+    ) -> HandoffEnvelope {
+        let full_command = format!("{} {}", command, args.join(" "));
+
+        // Determine origin from source_event_id (best-effort; in Phase 3 this
+        // will come from explicit caller identity)
+        let origin = match source_event_id {
+            Some(event_id) => ActionOrigin::AgentDecision {
+                agent_id: event_id.to_string(),
+                observation_ids: vec![],
+                rationale: format!("Gate decision for {}", action_type),
+            },
+            None => ActionOrigin::UserRequest {
+                session_id: "cli".to_string(),
+                reason: format!("Direct request to run {}", command),
+            },
+        };
+
+        // Determine the intended transition from the gate result
+        let (intended_transition, previous_state) = match gate_result {
+            GateResult::Proceed | GateResult::DryRun => (
+                TransitionIntent::ToApproved,
+                crate::action::ActionStatus::Pending,
+            ),
+            GateResult::Pending => (
+                TransitionIntent::ToPending,
+                crate::action::ActionStatus::Pending,
+            ),
+            GateResult::Interrupted { reason } => (
+                TransitionIntent::ToInterrupted {
+                    reason: reason.clone(),
+                },
+                crate::action::ActionStatus::Pending,
+            ),
+            GateResult::Revoked { reason } => (
+                TransitionIntent::ToDenied {
+                    reason: reason.clone(),
+                },
+                crate::action::ActionStatus::Pending,
+            ),
+            GateResult::ContextExhausted { .. } => (
+                TransitionIntent::ToDenied {
+                    reason: "context budget exhausted".to_string(),
+                },
+                crate::action::ActionStatus::Pending,
+            ),
+            GateResult::OversizedFragment { actual, max } => (
+                TransitionIntent::ToDenied {
+                    reason: format!("fragment {actual} exceeds max {max}"),
+                },
+                crate::action::ActionStatus::Pending,
+            ),
+        };
+
+        let envelope = HandoffEnvelope {
+            context: HandoffContext {
+                origin,
+                reasoning: None, // Phase 3: wire up ReasoningTrace from gate evaluation
+                sender: SenderIdentity::Guard {
+                    component: "concierge".to_string(),
+                },
+                previous_state,
+                intended_transition,
+                idempotency_key: Uuid::new_v4().to_string(),
+                schema_version: 1,
+            },
+            payload: HandoffPayload::ActionRequest {
+                action: serde_json::json!({
+                    "action_type": action_type,
+                    "command": full_command,
+                    "trust_layer": trust_layer,
+                    "confidence": confidence,
+                }),
+            },
+        };
+
+        // Phase 3: log the envelope — now persisted alongside DB writes where applicable.
+        debug!(
+            idempotency_key = %envelope.context.idempotency_key,
+            action_type = %action_type,
+            "HandoffEnvelope constructed and will be persisted"
+        );
+
+        envelope
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -52,6 +155,19 @@ impl GateConcierge {
         source_event_id: Option<String>,
     ) -> ConciergeOutcome {
         let gate_result_id = Uuid::new_v4().to_string();
+
+        // Phase 3: construct the handoff envelope — now persisted alongside DB writes.
+        // This captures what was previously lost across process boundaries:
+        // origin, reasoning, authority, and idempotency.
+        let envelope = self.build_handoff_envelope(
+            &gate_result,
+            action_type,
+            command,
+            args,
+            trust_layer,
+            confidence,
+            source_event_id.as_deref(),
+        );
 
         // Build the action request in its initial Pending state.
         let request = crate::action::ActionRequest::new(
@@ -87,13 +203,30 @@ impl GateConcierge {
                     queued_at: chrono::Utc::now().timestamp(),
                     reason,
                 };
-                if let Some(db) = &self.db
-                    && let Err(e) = db.persist_pending_queue_entry(&entry)
-                {
-                    error!(
-                        gate_result_id = %gate_result_id,
-                        "Failed to persist pending queue entry: {}", e
-                    );
+                if let Some(db) = &self.db {
+                    if let Err(e) = db.persist_pending_queue_entry(&entry) {
+                        error!(
+                            gate_result_id = %gate_result_id,
+                            "Failed to persist pending queue entry: {}", e
+                        );
+                    }
+                    // Phase 3: also persist an action request so approval can transition it
+                    if let Err(e) = db.persist_action_request_with_scope(
+                        &entry.id,
+                        Some(&entry.gate_result_id),
+                        None,
+                        &entry.action_type,
+                        &entry.command,
+                        entry.trust_layer,
+                        confidence,
+                        None,
+                        None,
+                    ) {
+                        error!(
+                            gate_result_id = %gate_result_id,
+                            "Failed to persist action request for pending entry: {}", e
+                        );
+                    }
                 }
                 warn!(
                     gate_result_id = %gate_result_id,
@@ -138,6 +271,13 @@ impl GateConcierge {
                         error!(
                             gate_result_id = %gate_result_id,
                             "Failed to persist action request for interrupted entry: {}", e
+                        );
+                    }
+                    // Phase 3: persist the handoff envelope alongside the action request
+                    if let Err(e) = db.persist_handoff(&entry.id, &envelope) {
+                        error!(
+                            gate_result_id = %gate_result_id,
+                            "Failed to persist handoff envelope: {}", e
                         );
                     }
                 }

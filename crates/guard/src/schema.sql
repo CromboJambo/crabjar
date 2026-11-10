@@ -104,6 +104,46 @@ CREATE INDEX IF NOT EXISTS idx_actions_status ON action_requests(status);
 CREATE INDEX IF NOT EXISTS idx_actions_trust ON action_requests(trust_layer);
 CREATE INDEX IF NOT EXISTS idx_actions_time ON action_requests(requested_at DESC);
 
+-- Action state transitions (audit trail + rehydration validation)
+CREATE TABLE IF NOT EXISTS action_transitions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_id TEXT NOT NULL REFERENCES action_requests(id),
+    from_status TEXT NOT NULL,
+    to_status TEXT NOT NULL,
+    authority TEXT NOT NULL,
+    reason TEXT,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_transitions_action_id ON action_transitions(action_id);
+
+-- ============================================================================
+-- Handoffs: full context envelopes for interprocess state transfer
+-- Stores the complete HandoffEnvelope as JSON — origin, reasoning, authority,
+-- idempotency key. This is what's needed to rehydrate an action with full
+-- context after a process restart or crash.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS handoffs (
+    id TEXT PRIMARY KEY,
+    action_id TEXT NOT NULL REFERENCES action_requests(id) ON DELETE CASCADE,
+    envelope_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
+CREATE INDEX IF NOT EXISTS idx_handoffs_action ON handoffs(action_id);
+CREATE INDEX IF NOT EXISTS idx_handoffs_time ON handoffs(created_at DESC);
+
+-- Schema version tracking
+CREATE TABLE IF NOT EXISTS schema_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('version', '3');
+
+-- Migration: v2 → v3 (additive — handoffs table created above)
+UPDATE schema_meta SET value = '3' WHERE key = 'version' AND value = '2';
+
 CREATE TABLE IF NOT EXISTS action_outcomes (
     id TEXT PRIMARY KEY,
     action_id TEXT NOT NULL UNIQUE,
