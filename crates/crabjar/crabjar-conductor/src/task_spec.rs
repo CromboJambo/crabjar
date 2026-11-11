@@ -94,6 +94,12 @@ pub struct TaskSpec {
     /// Timeout in seconds (default: 3600).
     #[serde(default = "default_timeout")]
     pub timeout_seconds: u32,
+    /// Container image to use for the sandbox (e.g., "rust:slim", "alpine:3.20").
+    #[serde(default)]
+    pub image: Option<String>,
+    /// Shell command to execute inside the container. If empty, runs default validation.
+    #[serde(default)]
+    pub command: Option<String>,
 }
 
 fn default_timeout() -> u32 {
@@ -163,6 +169,8 @@ mod tests {
                 network: true,
             },
             timeout_seconds: 7200,
+            image: Some("rust:slim".to_string()),
+            command: Some("cargo test -p pesti-inference".to_string()),
         }
     }
 
@@ -231,5 +239,21 @@ mod tests {
         assert_eq!(parsed.id, spec.id);
         assert_eq!(parsed.repo, spec.repo);
         assert_eq!(parsed.resources.cpu, spec.resources.cpu);
+        assert_eq!(parsed.image, spec.image);
+        assert_eq!(parsed.command, spec.command);
+    }
+
+    #[test]
+    fn image_and_command_are_optional() {
+        let json = r#"{
+            "id": "task-003",
+            "title": "No image or command",
+            "repo": "crabjar",
+            "context": {"description": "Test optional fields"},
+            "outcome": {"definition_of_done": "Fields default to None"}
+        }"#;
+        let spec: TaskSpec = serde_json::from_str(json).unwrap();
+        assert!(spec.image.is_none());
+        assert!(spec.command.is_none());
     }
 }

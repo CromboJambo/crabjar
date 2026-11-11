@@ -71,82 +71,93 @@ run_deployment() {
     echo "$task_spec_json" > "$workspace_dir/task-spec.json"
 
     # Extract fields from task spec for environment
-    local task_cpu task_memory timeout_s
+    local task_cpu task_memory timeout_s task_image task_command
     task_cpu=$(echo "$task_spec_json" | jq -r '.resources.cpu // 2' 2>/dev/null || echo "2")
     task_memory=$(echo "$task_spec_json" | jq -r '.resources.memory_mb // 4096' 2>/dev/null || echo "4096")
     timeout_s=$(echo "$task_spec_json" | jq -r '.timeout_seconds // 3600' 2>/dev/null || echo "3600")
+    task_image=$(echo "$task_spec_json" | jq -r '.image // "alpine:3.20"' 2>/dev/null || echo "alpine:3.20")
+    task_command=$(echo "$task_spec_json" | jq -r '.command // ""' 2>/dev/null || echo "")
 
-    # Link the target repo into the workspace
+    # Mount the target repo directly into the container (not via symlink)
     local repo_name
     repo_name=$(echo "$task_spec_json" | jq -r '.repo')
     local repo_path="/home/crombo/projects/active/$repo_name"
-    if [ -d "$repo_path" ]; then
-        ln -sfn "$repo_path" "$workspace_dir/workspace/$repo_name"
+    local repo_mount_arg=""
+    if [ -d "$repo_path" ] && [ "$(ls -A "$repo_path" 2>/dev/null)" ]; then
+        repo_mount_arg="--mount type=bind,src=$repo_path,dst=/workspace/$repo_name,ro"
     fi
 
-    log "Task: cpu=$task_cpu memory=${task_memory}MB timeout=${timeout_s}s repo=$repo_name"
+    log "Task: cpu=$task_cpu memory=${task_memory}MB timeout=${timeout_s}s repo=$repo_name image=$task_image"
 
     # Report running status
     report_status "$deployment_id" "running" "$container_name" || return 1
 
-    # Run the task in a Podman container with a basic agent script
+    # Run the task in a Podman container
     local exit_code=0
-    podman run --rm \
-        --name "$container_name" \
-        --network host \
-        --memory "${task_memory}m" \
-        --cpus "$task_cpu" \
-        -v "$workspace_dir/workspace:/workspace" \
-        -v "$workspace_dir/config:/config" \
-        -v "$workspace_dir/task-spec.json:/task-spec.json:ro" \
-        -e "CRABJAR_TASK_SPEC=/task-spec.json" \
-        -e "CRABJAR_DEPLOYMENT_ID=$deployment_id" \
-        -w /workspace \
-        alpine:3.20 \
-        sh -c '
-            # Basic agent: read task spec, validate repo exists, write outcome
-            set -e
-            apk add --no-cache git jq > /dev/null 2>&1 || true
-            
-            TASK_ID=$(cat /task-spec.json | jq -r ".id")
-            REPO=$(cat /task-spec.json | jq -r ".repo")
-            TITLE=$(cat /task-spec.json | jq -r ".title")
-            BRANCH=$(cat /task-spec.json | jq -r ".context.branch // \"main\"")
-            
-            echo "=== Agent starting ==="
-            echo "Task: $TASK_ID - $TITLE"
-            echo "Repo: $REPO (branch: $BRANCH)"
-            
-            # Clone the target repo if it exists on the host
-            REPO_MAP="pesti=/home/crombo/projects/active/pesti crabjar=/home/crombo/projects/active/crabjar mirror-lab=/home/crombo/projects/active/mirror-lab"
-            for pair in $REPO_MAP; do
-                name=${pair%%=*}
-                path=${pair#*=}
-                if [ "$name" = "$REPO" ]; then
-                    echo "Working with repo: $path"
-                    # Verify the repo exists on the host (mounted via workspace)
-                    if [ -d "/workspace/$name" ]; then
-                        cd "/workspace/$name"
-                        git status --short | head -5
-                        echo "Repo verified: $(git rev-parse --short HEAD)"
-                    fi
-                    break
+    if [ -n "$task_command" ]; then
+        # Execute the specified command
+        log "Executing custom command for $deployment_id"
+        podman run --rm \
+            --name "$container_name" \
+            --network host \
+            --memory "${task_memory}m" \
+            --cpus "$task_cpu" \
+            -v "$workspace_dir/workspace:/workspace" \
+            $repo_mount_arg \
+            -v "$workspace_dir/config:/config" \
+            -v "$workspace_dir/task-spec.json:/task-spec.json:ro" \
+            -e "CRABJAR_TASK_SPEC=/task-spec.json" \
+            -e "CRABJAR_DEPLOYMENT_ID=$deployment_id" \
+            -w /workspace \
+            "$task_image" \
+            sh -c "$task_command" 2>&1 | tee "$workspace_dir/agent.log" || exit_code=$?
+    else
+        # Default: basic repo validation (backward compatible)
+        log "Running default validation for $deployment_id"
+        podman run --rm \
+            --name "$container_name" \
+            --network host \
+            --memory "${task_memory}m" \
+            --cpus "$task_cpu" \
+            -v "$workspace_dir/workspace:/workspace" \
+            $repo_mount_arg \
+            -v "$workspace_dir/config:/config" \
+            -v "$workspace_dir/task-spec.json:/task-spec.json:ro" \
+            -e "CRABJAR_TASK_SPEC=/task-spec.json" \
+            -e "CRABJAR_DEPLOYMENT_ID=$deployment_id" \
+            -w /workspace \
+            "$task_image" \
+            sh -c '
+                set -e
+                apk add --no-cache git jq > /dev/null 2>&1 || true
+                
+                TASK_ID=$(cat /task-spec.json | jq -r ".id")
+                REPO=$(cat /task-spec.json | jq -r ".repo")
+                TITLE=$(cat /task-spec.json | jq -r ".title")
+                
+                echo "=== Agent starting ==="
+                echo "Task: $TASK_ID - $TITLE"
+                echo "Repo: $REPO"
+                
+                if [ -d "/workspace/$REPO" ]; then
+                    cd "/workspace/$REPO"
+                    git status --short | head -5
+                    echo "Repo verified: $(git rev-parse --short HEAD)"
                 fi
-            done
-            
-            # Write outcome
-            cat > /workspace/outcome.json << EOF
-            {
-                "task_id": "$TASK_ID",
-                "status": "completed",
-                "repo": "$REPO",
-                "message": "Sandbox execution verified. Pipeline working end-to-end.",
-                "timestamp": "$(date -Iseconds)"
-            }
-            EOF
-            
-            echo "=== Agent completed ==="
-        ' 2>&1 | tee "$workspace_dir/agent.log" || exit_code=$?
+                
+                cat > /workspace/outcome.json << EOF
+                {
+                    "task_id": "$TASK_ID",
+                    "status": "completed",
+                    "repo": "$REPO",
+                    "message": "Sandbox execution verified.",
+                    "timestamp": "$(date -Iseconds)"
+                }
+                EOF
+                
+                echo "=== Agent completed ==="
+            ' 2>&1 | tee "$workspace_dir/agent.log" || exit_code=$?
+    fi
 
     local outcome_json="null"
     if [ $exit_code -eq 0 ]; then
