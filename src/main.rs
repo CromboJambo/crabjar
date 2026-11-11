@@ -1,6 +1,7 @@
 use clap::Parser;
 use commands::attempts::handle as handle_attempts_command;
 use commands::backend::handle_backend_command;
+use commands::cell::handle_cell_command;
 use commands::dotfile::handle as handle_dotfile_command;
 use commands::exec::handle_exec;
 use commands::fleet::handle_fleet_submit_kanban_task;
@@ -30,7 +31,7 @@ mod tool_registry_cli;
 use bitwarden::commands::handle_bitwarden_command;
 mod commands;
 use crabjar_lib::{
-    ApprovalCommand, BitwardenCommand, Cli, CliCommand, DoctorCommand, KnowledgeCommand,
+    ApprovalCommand, BitwardenCommand, CellCommand, Cli, CliCommand, DoctorCommand, KnowledgeCommand,
     WorkspaceCommand,
 };
 use doctor::handle_doctor_command;
@@ -302,6 +303,7 @@ async fn main() {
         Some(CliCommand::Approval { command }) => {
             commands::approval::handle_approval_command(command)
         }
+        Some(CliCommand::Cell { command }) => handle_cell_command(command),
         None => {
             print_json(&error_response("missing command", true));
             std::process::exit(1);

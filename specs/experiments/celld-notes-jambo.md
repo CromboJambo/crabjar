@@ -128,8 +128,45 @@ await opencode.session.wait({ sessionID: session.id });  // blocks until done
 8. [x] **Authority failure test** — recovery does NOT implicitly authorize pending actions ✅ (`specs/experiments/celld_auth_failure_test.rs`)
 9. [x] **GuardDb ↔ celld consistency boundary** — design spec + `SessionMirror` trait + HTTP implementation ✅
 10. [ ] Test ensemble failover (kill node, verify cell migration) — needs fleet mode (MinIO)
-11. [ ] Run real agent workloads through cells
+11. [x] Run real agent workloads through cells — session-store worker + `crabjar cell` CLI + checkpointed workload demo ✅
 12. [ ] **MinIO for fleet mode** — PARKED. Circle back when we need multi-node failover testing.
+
+### Item #11: Real Agent Workloads Through Cells (2026-11-11) ✅ IMPLEMENTED
+
+**What was built:**
+
+1. **`session-store` worker** (`~/.local/share/celld-test/session-store/`, port 8789):
+   - Per-session KV store with metadata index
+   - API: `POST ?key=***` (create, 409 if exists), `GET ?key=***` (fetch, 404 if missing), `PUT ?key=***` (update), `?list=1` (enumerate)
+   - One celld cell per agent session — state in built-in SQLite survives restarts
+
+2. **Rust integration** (`src/celld_session.rs`, 219 lines):
+   - `SessionClient` — HTTP client for the session-store worker, configured via `CELLD_SESSION_URL` (default `http://127.0.0.1:8789`)
+   - `CheckpointedWorkload` + `WorkloadStep` + `StepStatus` — serializable workload model with checkpoint/resume semantics
+   - Public API: `put()`, `get()`, `list()`, `delete()`
+
+3. **CLI subcommand** (`crabjar cell ...`):
+   - `cell put <session> <key> '<json>' [--type <t>]` — store value
+   - `cell get <session> <key>` — retrieve value
+   - `cell list <session>` — enumerate entries
+   - `cell delete <session> <key>` — remove entry
+   - `cell workload create <session> <name> <step1> [step2] ...` — create checkpointed workload
+   - `cell workload status <session> <name>` — show progress
+   - `cell workload step <session> <name> [--result <str>]` — execute next step (checkpoint after each)
+   - `cell workload resume <session> <name>` — resume from last checkpoint
+
+**Demo verified:**
+```
+create 4-step workload → complete 2 steps → (process dies) → resume → completes remaining 2 steps from checkpoint
+```
+
+**Key finding:** Agent lifecycle is now decoupled from machine lifecycle. The celld worker holds the state; the crabjar process is disposable. If the agent crashes or the machine reboots, a new process can `cell workload resume` and continue exactly where it left off.
+
+**Celld early-user findings (item #11):**
+- `storage.get()` returns `undefined` for missing keys, not `null` — must use nullish checks (`== null`) in worker code
+- No `list({prefix})` on storage API — maintain an explicit index key for enumeration
+- Dev mode SQLite persists across SIGTERM restarts (confirmed: data survived worker restart during testing)
+- Worker runs fine as a simple background process; dinit service file written but dinit doesn't hot-reload service definitions in this environment
 
 ### Authority Failure Test (2026-11-10) ✅ PASSED
 

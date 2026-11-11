@@ -14,6 +14,7 @@ pub mod state;
 
 // Command handler modules (extracted from main.rs)
 pub mod backend;
+pub mod cell;
 pub mod dinitctl;
 pub mod dotfile;
 pub mod exec;

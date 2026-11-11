@@ -212,6 +212,12 @@ pub enum CliCommand {
         #[command(subcommand)]
         command: ApprovalCommand,
     },
+
+    /// Durable session state via celld cells (agent lifecycle > machine lifecycle)
+    Cell {
+        #[command(subcommand)]
+        command: CellCommand,
+    },
 }
 
 #[derive(Debug, Subcommand, Clone)]
@@ -287,6 +293,70 @@ pub enum ApprovalCommand {
 }
 
 #[derive(Debug, Subcommand, Clone)]
+pub enum CellCommand {
+    /// Store a value in the session cell
+    Put {
+        /// Session identifier (maps to a celld cell)
+        session: String,
+        /// Key within the session
+        key: String,
+        /// JSON value to store
+        value: String,
+        /// Entry type for metadata (default: data)
+        #[arg(long, default_value = "data")]
+        r#type: String,
+    },
+    /// Retrieve a value from the session cell
+    Get {
+        session: String,
+        key: String,
+    },
+    /// List all entries in a session cell
+    List {
+        session: String,
+    },
+    /// Delete an entry from the session cell
+    Delete {
+        session: String,
+        key: String,
+    },
+    /// Run a checkpointed workload with resume capability
+    Workload {
+        #[command(subcommand)]
+        command: CellWorkloadCommand,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum CellWorkloadCommand {
+    /// Create a new checkpointed workload
+    Create {
+        session: String,
+        name: String,
+        /// Step descriptions (space-separated or multiple args)
+        steps: Vec<String>,
+    },
+    /// Show workload status and progress
+    Status {
+        session: String,
+        name: String,
+    },
+    /// Execute the next pending step (simulated for demo)
+    Step {
+        session: String,
+        name: String,
+        /// Simulated result for this step
+        #[arg(long, default_value = "ok")]
+        result: String,
+    },
+    /// Resume a workload from its last checkpoint
+    Resume {
+        session: String,
+        name: String,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
 pub enum CheckpointCommand {
     /// Create a checkpoint for a task
     Create {
@@ -343,6 +413,7 @@ pub enum SessionCommand {
 }
 
 pub mod autonomy;
+pub mod celld_session;
 pub mod cli_commands;
 pub mod cli_habitat_commands;
 pub mod cli_tool_commands;
