@@ -127,9 +127,61 @@ await opencode.session.wait({ sessionID: session.id });  // blocks until done
    - Session-lifecycle contract validated: crabjar needs only HTTP + JSON
 8. [x] **Authority failure test** — recovery does NOT implicitly authorize pending actions ✅ (`specs/experiments/celld_auth_failure_test.rs`)
 9. [x] **GuardDb ↔ celld consistency boundary** — design spec + `SessionMirror` trait + HTTP implementation ✅
-10. [ ] Test ensemble failover (kill node, verify cell migration) — needs fleet mode (MinIO)
+10. [ ] Test ensemble failover (kill node, verify cell migration) — needs fleet mode (RustFS) ✅ storage ready on jambo
 11. [x] Run real agent workloads through cells — session-store worker + `crabjar cell` CLI + checkpointed workload demo ✅
-12. [ ] **MinIO for fleet mode** — PARKED. Circle back when we need multi-node failover testing.
+12. [x] **RustFS for fleet mode** — MinIO archived Feb 2026; using RustFS instead. jambo node running, bucket created, counter deployed ✅ (ftw3 pending)
+
+### Item #12: RustFS for Fleet Mode (2026-11-11) ✅ jambo COMPLETE, ftw3 PENDING
+
+**MinIO is archived.** As of Feb 2026, `dl.min.io` returns 410 Gone — the open-source project has been sunset. We're using **RustFS** instead:
+- Rust-based (matches our stack), Apache 2.0
+- Designed as a drop-in MinIO replacement with identical S3 API
+- Single static binary (musl), no dependencies
+- Version 1.0.5 GA
+
+**Installation on jambo:**
+```bash
+# Download from GitHub releases (not dl.min.io — that's dead)
+curl -sSL https://github.com/rustfs/rustfs/releases/download/1.0.5/rustfs-linux-x86_64-musl-v1.0.5.zip -o /tmp/rustfs.zip
+python3 -c "import zipfile; zipfile.ZipFile('/tmp/rustfs.zip').extractall('/tmp')"
+sudo mv /tmp/rustfs /usr/local/bin/rustfs
+
+# Data dir + credentials
+mkdir -p ~/.local/share/rustfs/celld-fleet ~/.config/rustfs
+printf 'RUSTFS_ACCESS_KEY=celld-fleet\nRUSTFS_SECRET_KEY=<generated>\n' > ~/.config/rustfs/env
+
+# Start (needs env vars for auth!)
+source ~/.config/rustfs/env && rustfs server --address ":9000" ~/.local/share/rustfs/celld-fleet
+
+# Create bucket (boto3 works fine)
+python3 -c "import boto3; s3=boto3.client('s3', endpoint_url='http://127.0.0.1:9000', aws_access_key_id='celld-fleet', aws_secret_access_key='<key>'); s3.create_bucket(Bucket='celld-fleet')"
+```
+
+**Gotchas:**
+- `source` in a terminal session does NOT carry env vars to background processes started via Hermes' `background=true`. Must export inline: `RUSTFS_ACCESS_KEY=... RUSTFS_SECRET_KEY=... rustfs server ...`
+- Without auth configured, S3 requests get `InvalidAccessKeyId` — the binary doesn't fail loudly at startup, just rejects operations
+
+**Fleet-mode celld on jambo:**
+```bash
+# Start script: ~/.local/bin/start-celld-fleet.sh
+AWS_ACCESS_KEY_ID=celld-fleet AWS_SECRET_ACCESS_KEY=<key> \
+CELLD_DURABILITY=bucket RUST_LOG=info \
+celld --bucket s3://celld-fleet \
+  --endpoint http://127.0.0.1:9000 \
+  --listen 0.0.0.0:8790 \
+  --internal-listen 0.0.0.0:8791 \
+  --advertise 100.100.52.109:8791   # Tailscale IP for cross-node reachability
+```
+
+**Key findings:**
+- `--advertise` is REQUIRED when `--internal-listen` uses `0.0.0.0` — no default, explicit error message (good UX)
+- Fleet mode requires a deployment before serving: `celld deploy <project> --bucket s3://celld-fleet --endpoint http://127.0.0.1:9000`
+- Deployed workers are picked up automatically via bucket pointer polling — no restart needed
+- Counter worker deployed as version `bf5806589892a6cc`, responding on :8790
+- `CELLD_DURABILITY=bucket` for single-node (every write waits for S3 ack); use `fleet` (default) with 2+ nodes for faster acks
+- File limit warning: "caps this node near 512 resident cells" — production needs `ulimit -n 8000`
+
+**Next:** Install RustFS on ftw3 (or point ftw3's celld at jambo's over Tailscale), start second fleet node, test failover (#10).
 
 ### Item #11: Real Agent Workloads Through Cells (2026-11-11) ✅ IMPLEMENTED
 
