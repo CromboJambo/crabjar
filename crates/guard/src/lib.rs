@@ -47,6 +47,7 @@ pub mod handoff;
 pub mod inference;
 pub mod memory;
 pub mod memory_types;
+pub mod mirror;
 pub mod pid_trust_impl;
 pub mod risk_config;
 pub mod scope;

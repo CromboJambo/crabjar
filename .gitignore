@@ -63,3 +63,4 @@ historical/
 
 # Database files (runtime state)
 *.db
+assets/celld-*
