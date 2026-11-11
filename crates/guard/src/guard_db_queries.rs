@@ -16,7 +16,7 @@ type RawActionRow = (
     String,         // action_type
     String,         // payload
     u32,            // trust_layer
-    String,         // confidence (stored as string in DB)
+    f64,            // confidence (stored as REAL in DB)
     String,         // status (raw string — parsed outside closure)
     Option<String>, // gate_result
     i64,            // requested_at
@@ -34,20 +34,12 @@ fn raw_to_action_request(raw: RawActionRow) -> Result<ActionRequest, GuardDbErro
         action_type,
         payload,
         trust_layer,
-        confidence_str,
+        confidence,
         status_str,
         gate_result,
         requested_at,
         resolved_at,
     ) = raw;
-
-    // Parse confidence — fail loudly on corruption
-    let confidence: f64 = confidence_str.parse().map_err(|e| {
-        GuardDbError::SchemaError(format!(
-            "Corrupted confidence value '{}' for action {}: {}",
-            confidence_str, id, e
-        ))
-    })?;
 
     // Parse status — fail loudly on unknown values instead of silent Pending fallback
     let status = parse_status(&status_str).map_err(|e| match e {
@@ -282,7 +274,7 @@ impl GuardDb {
             String,   // action_type
             String,   // payload
             u32,      // trust_layer
-            String,   // confidence
+            f64,      // confidence (REAL in DB)
             String,   // status
             String,   // gate_result
             i64,      // requested_at
@@ -323,20 +315,12 @@ impl GuardDb {
             action_type,
             payload,
             trust_layer,
-            confidence_str,
+            confidence_val,
             status_str,
             gate_result_str,
             requested_at,
             resolved_at,
         ) = row_data;
-
-        // Parse confidence — fail loudly on corruption instead of silent fallback
-        let confidence_val: f64 = confidence_str.parse().map_err(|e| {
-            GuardDbError::SchemaError(format!(
-                "Corrupted confidence value '{}' for action {}: {}",
-                confidence_str, action_id, e
-            ))
-        })?;
 
         // Parse status — fail loudly on unknown values instead of silent Pending fallback
         let status = parse_status(&status_str).map_err(|e| {
@@ -457,7 +441,7 @@ impl GuardDb {
                 action_type,
                 payload,
                 trust_layer,
-                confidence.to_string(),
+                confidence,
                 scope_actor,
                 scope_target,
             ],

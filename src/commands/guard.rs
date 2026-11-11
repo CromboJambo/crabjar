@@ -149,5 +149,116 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
                 },
             }))
         }
+        GuardCommand::Reconcile { url, queue } => {
+            let base_url = url
+                .or_else(|| std::env::var("CELLD_MIRROR_URL").ok())
+                .unwrap_or_else(|| "http://127.0.0.1:8788".to_string());
+
+            // Get all pending actions from local GuardDb
+            let pending = guard_db.read_action_requests(Some(&"pending".to_string()), 50)?;
+            let mut reconciled = Vec::new();
+            let mut errors = Vec::new();
+
+            for action in &pending {
+                let action_id = &action.id;
+                let check_url = format!(
+                    "{}/?queue={}&action={}",
+                    base_url, queue, action_id
+                );
+                match std::process::Command::new("curl")
+                    .args(["-s", "--max-time", "3", &check_url])
+                    .output()
+                {
+                    Ok(output) if output.status.success() => {
+                        let body = String::from_utf8_lossy(&output.stdout);
+                        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&body) {
+                            if let Some(status) = json_val
+                                .get("action")
+                                .and_then(|a| a.get("status"))
+                                .and_then(|s| s.as_str())
+                            {
+                                match status {
+                                    "approved" => {
+                                        let decided_by = json_val
+                                            .get("action")
+                                            .and_then(|a| a.get("decided_by"))
+                                            .and_then(|d| d.as_str())
+                                            .unwrap_or("celld-remote");
+                                        match guard_db.update_action_status(
+                                            action_id,
+                                            crabjar_guard::ActionStatus::TrustApproved,
+                                            decided_by,
+                                            Some(&format!("reconciled from celld ({})", queue)),
+                                        ) {
+                                            Ok(_) => reconciled.push(json!({
+                                                "action_id": action_id,
+                                                "decision": "approved",
+                                                "decided_by": decided_by,
+                                            })),
+                                            Err(e) => errors.push(json!({
+                                                "action_id": action_id,
+                                                "error": format!("local update failed: {}", e),
+                                            })),
+                                        }
+                                    }
+                                    "rejected" => {
+                                        let decided_by = json_val
+                                            .get("action")
+                                            .and_then(|a| a.get("decided_by"))
+                                            .and_then(|d| d.as_str())
+                                            .unwrap_or("celld-remote");
+                                        match guard_db.update_action_status(
+                                            action_id,
+                                            crabjar_guard::ActionStatus::Denied,
+                                            decided_by,
+                                            Some(&format!("reconciled from celld ({})", queue)),
+                                        ) {
+                                            Ok(_) => reconciled.push(json!({
+                                                "action_id": action_id,
+                                                "decision": "rejected",
+                                                "decided_by": decided_by,
+                                            })),
+                                            Err(e) => errors.push(json!({
+                                                "action_id": action_id,
+                                                "error": format!("local update failed: {}", e),
+                                            })),
+                                        }
+                                    }
+                                    _ => {} // still pending or unknown — skip
+                                }
+                            }
+                        }
+                    }
+                    Ok(output) => {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        errors.push(json!({
+                            "action_id": action_id,
+                            "error": format!("curl failed: {}", stderr.trim()),
+                        }));
+                    }
+                    Err(e) => {
+                        errors.push(json!({
+                            "action_id": action_id,
+                            "error": format!("curl error: {}", e),
+                        }));
+                    }
+                }
+            }
+
+            Ok(json!({
+                "success": true,
+                "guard": {
+                    "reconcile": {
+                        "url": base_url,
+                        "queue": queue,
+                        "checked": pending.len(),
+                        "reconciled": reconciled.len(),
+                        "errors": errors.len(),
+                        "actions": reconciled,
+                        "error_details": errors,
+                    },
+                },
+            }))
+        }
     }
 }
