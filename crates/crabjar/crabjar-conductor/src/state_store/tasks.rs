@@ -1,5 +1,6 @@
 //! Task types and operations.
 
+use crate::task_spec::TaskResources;
 use rusqlite::{OptionalExtension, Row, params};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -20,6 +21,8 @@ pub struct Task {
     pub required_capabilities: Vec<String>,
     /// Phase 2: minimum trust level required to execute this task
     pub trust_level_required: u8,
+    /// Resource requirements for this task (riod-aware scheduling)
+    pub resources: TaskResources,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -57,6 +60,7 @@ fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
     let deps_str: String = row.get(4)?;
     let required_caps_str: String = row.get(7).unwrap_or_else(|_| "[]".to_string());
     let trust_required: u8 = row.get(8).unwrap_or(0);
+    let resources_json: String = row.get(9).unwrap_or_else(|_| "{}".to_string());
 
     Ok(Task {
         id: row.get(0)?,
@@ -70,6 +74,7 @@ fn row_to_task(row: &Row<'_>) -> rusqlite::Result<Task> {
         required_capabilities: serde_json::from_str(&required_caps_str)
             .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?,
         trust_level_required: trust_required,
+        resources: serde_json::from_str(&resources_json).unwrap_or_default(),
     })
 }
 
@@ -87,19 +92,28 @@ impl StateStore {
             result: None,
             required_capabilities: vec![],
             trust_level_required: 0,
+            resources: TaskResources::default(),
         };
 
         let deps_json = serde_json::to_string(&task.dependencies)
             .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
+        let caps_json = serde_json::to_string(&task.required_capabilities)
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
+        let resources_json = serde_json::to_string(&task.resources)
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
+
         self.db.execute(
-            "INSERT INTO tasks (id, goal_id, worker_id, command, dependencies, status) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO tasks (id, goal_id, worker_id, command, dependencies, status, required_capabilities, trust_level_required, resources_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 task.id,
                 task.goal_id,
                 task.worker_id,
                 task.command,
                 deps_json,
-                task.status.as_str()
+                task.status.as_str(),
+                caps_json,
+                task.trust_level_required,
+                resources_json
             ],
         )?;
 
@@ -109,7 +123,7 @@ impl StateStore {
     pub fn get_task(&self, id: &str) -> Result<Option<Task>, rusqlite::Error> {
         self.db
             .query_row(
-                "SELECT id, goal_id, worker_id, command, dependencies, status, result, required_capabilities, trust_level_required FROM tasks WHERE id = ?",
+                "SELECT id, goal_id, worker_id, command, dependencies, status, result, required_capabilities, trust_level_required, resources_json FROM tasks WHERE id = ?",
                 params![id],
                 row_to_task,
             )
@@ -118,7 +132,7 @@ impl StateStore {
 
     pub fn list_tasks_for_goal(&self, goal_id: &str) -> Result<Vec<Task>, rusqlite::Error> {
         let mut stmt = self.db.prepare(
-            "SELECT id, goal_id, worker_id, command, dependencies, status, result, required_capabilities, trust_level_required FROM tasks WHERE goal_id = ?",
+            "SELECT id, goal_id, worker_id, command, dependencies, status, result, required_capabilities, trust_level_required, resources_json FROM tasks WHERE goal_id = ?",
         )?;
         let rows = stmt.query_map(params![goal_id], row_to_task)?;
         rows.collect()
@@ -192,6 +206,30 @@ impl StateStore {
         Ok(())
     }
 
+    /// Set resource requirements for a task (riod-aware scheduling).
+    pub fn set_task_resources(
+        &self,
+        task_id: &str,
+        resources: &TaskResources,
+    ) -> Result<(), rusqlite::Error> {
+        let json = serde_json::to_string(resources).unwrap_or_else(|_| "{}".to_string());
+        self.db.execute(
+            "UPDATE tasks SET resources_json = ? WHERE id = ?",
+            params![json, task_id],
+        )?;
+        Ok(())
+    }
+
+    /// Get a task's resource requirements.
+    pub fn get_task_resources(&self, task_id: &str) -> Result<TaskResources, rusqlite::Error> {
+        let json: String = self.db.query_row(
+            "SELECT resources_json FROM tasks WHERE id = ?",
+            params![task_id],
+            |row| row.get(0),
+        )?;
+        Ok(serde_json::from_str(&json).unwrap_or_default())
+    }
+
     /// Set the capabilities required for a task.
     pub fn set_task_capabilities(
         &self,
@@ -211,7 +249,7 @@ impl StateStore {
     pub fn get_ready_tasks(&self) -> Result<Vec<Task>, rusqlite::Error> {
         let sql = r"
             SELECT t.id, t.goal_id, t.worker_id, t.command, t.dependencies, t.status, t.result,
-                   t.required_capabilities, t.trust_level_required
+                   t.required_capabilities, t.trust_level_required, t.resources_json
             FROM tasks t
             WHERE t.status = 'pending'
               AND (

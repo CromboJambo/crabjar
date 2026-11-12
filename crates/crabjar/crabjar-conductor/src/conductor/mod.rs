@@ -1,6 +1,7 @@
 //! Core orchestration logic — goal decomposition and task lifecycle management.
 
 use crate::audit::{AuditContext, AuditEventType, ConductorAuditLogger};
+use crate::conductor::riod::RiodResourceChecker;
 use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
 use crate::fleet_status::FleetStatusTracker;
 use crate::promotion::PromotionManager;
@@ -14,6 +15,7 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
 pub mod decisions;
+pub mod riod;
 pub mod workers;
 
 #[cfg(test)]
@@ -49,6 +51,7 @@ pub struct Conductor {
     fleet_status: FleetStatusTracker,
     sandbox_manager: SandboxManager,
     audit_logger: Option<Arc<Mutex<ConductorAuditLogger>>>,
+    riod_checker: RiodResourceChecker,
 }
 
 impl Conductor {
@@ -57,6 +60,7 @@ impl Conductor {
         let store = StateStore::open(":memory:")?;
         let db_conn = Connection::open(":memory:")?;
         let promotion_manager = PromotionManager::new(db_conn)?;
+        let riod_checker = RiodResourceChecker::default(); // No riod in tests
         Ok(Self {
             store,
             config,
@@ -66,6 +70,7 @@ impl Conductor {
             fleet_status: FleetStatusTracker::default(),
             sandbox_manager: SandboxManager::default(),
             audit_logger: None,
+            riod_checker,
         })
     }
 
@@ -84,6 +89,9 @@ impl Conductor {
             }
         };
 
+        // Initialize riod resource checker (fail-open if unavailable)
+        let riod_checker = RiodResourceChecker::new("/run/riod.sock");
+
         Ok(Self {
             store,
             config,
@@ -93,6 +101,7 @@ impl Conductor {
             fleet_status: FleetStatusTracker::default(),
             sandbox_manager: SandboxManager::default(),
             audit_logger,
+            riod_checker,
         })
     }
 
@@ -390,5 +399,10 @@ impl Conductor {
     /// Get the fleet status tracker.
     pub fn fleet_status(&self) -> &FleetStatusTracker {
         &self.fleet_status
+    }
+
+    /// Get the riod resource checker (for resource-aware task assignment).
+    pub fn riod_checker(&self) -> &RiodResourceChecker {
+        &self.riod_checker
     }
 }

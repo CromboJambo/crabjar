@@ -2314,6 +2314,7 @@ dependencies = [
  "mirror-log",
  "pesti-structural-tokenizer",
  "reqwest 0.12.28",
+ "riod-client",
  "rusqlite",
  "serde",
  "serde_json",
@@ -9336,6 +9337,17 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "riod-client"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
 ]
 
 [[package]]

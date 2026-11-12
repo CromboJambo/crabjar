@@ -54,7 +54,8 @@ impl StateStore {
                 status TEXT NOT NULL DEFAULT 'pending',
                 result TEXT,
                 required_capabilities TEXT NOT NULL DEFAULT '[]',
-                trust_level_required INTEGER NOT NULL DEFAULT 0
+                trust_level_required INTEGER NOT NULL DEFAULT 0,
+                resources_json TEXT NOT NULL DEFAULT '{}'
             );
 
             CREATE TABLE IF NOT EXISTS workers (
@@ -120,6 +121,12 @@ impl StateStore {
                 active_deployments INTEGER NOT NULL DEFAULT 0
             );",
         )?;
+
+        // Migration: add resources_json column to existing tasks tables (idempotent)
+        let _ = db.execute(
+            "ALTER TABLE tasks ADD COLUMN resources_json TEXT NOT NULL DEFAULT '{}'",
+            [],
+        );
 
         Ok(Self { db })
     }

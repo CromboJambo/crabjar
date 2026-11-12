@@ -130,6 +130,20 @@ impl Conductor {
                 continue;
             }
 
+            // Resource-aware scheduling: verify the worker has enough resources.
+            // Fail-open: if riod is unavailable, assignment proceeds as before.
+            if !self.riod_checker().can_satisfy(&task.resources) {
+                debug!(
+                    task_id = %task.id,
+                    worker_id = %worker_id,
+                    cpu = task.resources.cpu,
+                    memory_mb = task.resources.memory_mb,
+                    gpu = task.resources.gpu,
+                    "Worker resources insufficient (riod check)"
+                );
+                continue;
+            }
+
             // Worker qualifies — assign the task
             self.store.assign_task(&task.id, worker_id)?;
             let updated = self.store.get_task(&task.id)?.unwrap();

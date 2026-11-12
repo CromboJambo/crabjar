@@ -419,7 +419,8 @@ pub async fn pending_deployments(
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
         use crate::state_store::deployments::DeploymentStatus;
-        c.store().list_deployments(Some(&sid), Some(&DeploymentStatus::Pending))
+        c.store()
+            .list_deployments(Some(&sid), Some(&DeploymentStatus::Pending))
     })
     .await;
 
