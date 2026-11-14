@@ -181,7 +181,13 @@ async fn send_heartbeat(
 ) {
     let url = format!("{conductor_url}/workers/heartbeat");
 
-    let body = serde_json::json!({ "worker_id": worker_id });
+    // Collect local resource snapshot to include in heartbeat
+    let resources = collect_resources();
+
+    let mut body = serde_json::json!({ "worker_id": worker_id });
+    if let Some(res) = resources {
+        body["resources"] = res;
+    }
 
     let resp = client
         .post(&url)
@@ -201,6 +207,79 @@ async fn send_heartbeat(
             warn!(worker_id, error = %e, "Heartbeat request failed");
         }
     }
+}
+
+/// Collect local system resources for the conductor to use in scheduling.
+/// Returns None if resource detection fails entirely (fail-open).
+fn collect_resources() -> Option<serde_json::Value> {
+    let max_ram_mb = read_total_ram_mb()?;
+    let available_ram_mb = read_available_ram_mb().unwrap_or(0);
+
+    // GPU detection via nvidia-smi (best-effort)
+    let (gpu_count, gpus_available) = detect_gpus();
+
+    Some(serde_json::json!({
+        "max_ram_mb": max_ram_mb,
+        "available_ram_mb": available_ram_mb,
+        "gpu_count": gpu_count,
+        "gpus_available": gpus_available,
+        "reported_at": chrono::Utc::now().to_rfc3339(),
+    }))
+}
+
+/// Read total RAM in MB from /proc/meminfo (Linux).
+fn read_total_ram_mb() -> Option<u64> {
+    let content = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("MemTotal:") {
+            let kb: u64 = rest.trim().split_whitespace().next()?.parse().ok()?;
+            return Some(kb / 1024);
+        }
+    }
+    None
+}
+
+/// Read available RAM in MB from /proc/meminfo (Linux).
+fn read_available_ram_mb() -> Option<u64> {
+    let content = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("MemAvailable:") {
+            let kb: u64 = rest.trim().split_whitespace().next()?.parse().ok()?;
+            return Some(kb / 1024);
+        }
+    }
+    None
+}
+
+/// Detect NVIDIA GPUs via nvidia-smi. Returns (total_count, available_count).
+/// Available = GPUs with < 90% memory used (rough heuristic for "in use").
+fn detect_gpus() -> (u32, u32) {
+    let output = match std::process::Command::new("nvidia-smi")
+        .args(["--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"])
+        .output()
+    {
+        Ok(o) if o.status.success() => o,
+        _ => return (0, 0), // No nvidia-smi or failed — no GPUs detected
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut count = 0u32;
+    let mut available = 0u32;
+
+    for line in stdout.lines() {
+        let fields: Vec<&str> = line.split(',').map(str::trim).collect();
+        if fields.len() >= 2 {
+            if let (Ok(used), Ok(total)) = (fields[0].parse::<u64>(), fields[1].parse::<u64>()) {
+                count += 1;
+                // GPU is "available" if using less than 90% of memory
+                if total > 0 && used * 10 < total * 9 {
+                    available += 1;
+                }
+            }
+        }
+    }
+
+    (count, available)
 }
 
 async fn poll_for_tasks(
@@ -309,5 +388,56 @@ mod tests {
     fn config_defaults() {
         let config = WorkerConfig::default();
         assert!(!config.name.is_empty());
+    }
+
+    #[test]
+    fn read_total_ram_mb_returns_sane_value() {
+        let mb = read_total_ram_mb().expect("should read /proc/meminfo on Linux");
+        // Any real machine has at least 128MB
+        assert!(mb >= 128, "Expected at least 128MB RAM, got {mb}MB");
+    }
+
+    #[test]
+    fn available_ram_leq_total_ram() {
+        let total = read_total_ram_mb().expect("should read total RAM");
+        let available = read_available_ram_mb();
+        if let Some(available) = available {
+            assert!(
+                available <= total,
+                "Available ({available}MB) should be <= total ({total}MB)"
+            );
+        }
+    }
+
+    #[test]
+    fn detect_gpus_returns_non_negative() {
+        let (count, available) = detect_gpus();
+        assert!(available <= count, "Available GPUs should not exceed total");
+    }
+
+    #[test]
+    fn collect_resources_produces_valid_json() {
+        let res = collect_resources();
+        if let Some(json) = res {
+            // Verify all required fields are present and have correct types
+            assert!(json["max_ram_mb"].is_u64());
+            assert!(json["available_ram_mb"].is_u64());
+            assert!(json["gpu_count"].is_u64());
+            assert!(json["gpus_available"].is_u64());
+            assert!(json["reported_at"].is_string());
+
+            // Verify it can be deserialized into the conductor's WorkerResources shape
+            #[derive(serde::Deserialize)]
+            #[allow(dead_code)]
+            struct Expected {
+                max_ram_mb: u64,
+                available_ram_mb: u64,
+                gpu_count: u32,
+                gpus_available: u32,
+                reported_at: String,
+            }
+            let parsed: Expected = serde_json::from_value(json).expect("valid WorkerResources JSON");
+            assert!(parsed.max_ram_mb > 0);
+        }
     }
 }
