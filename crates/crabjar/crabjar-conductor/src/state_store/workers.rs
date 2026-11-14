@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth;
+use crate::task_spec::WorkerResources;
 
 use super::StateStore;
 
@@ -23,6 +24,9 @@ pub struct Worker {
     pub successful_tasks: i32,
     /// Count of failed tasks.
     pub failed_tasks: i32,
+    /// Last reported resource snapshot (from heartbeat).
+    #[serde(default)]
+    pub resources: Option<WorkerResources>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -52,6 +56,11 @@ impl WorkerStatus {
 
 fn row_to_worker(row: &Row<'_>) -> rusqlite::Result<Worker> {
     let caps_str: String = row.get(3)?;
+    let resources_json: String = row.get(8).unwrap_or_else(|_| "{}".to_string());
+    let resources = serde_json::from_str::<WorkerResources>(&resources_json)
+        .ok()
+        .filter(|r| r.max_ram_mb > 0); // treat empty/invalid as None
+
     Ok(Worker {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -62,6 +71,7 @@ fn row_to_worker(row: &Row<'_>) -> rusqlite::Result<Worker> {
         trust_level: row.get(5).unwrap_or(0u8),
         successful_tasks: row.get(6).unwrap_or(0i32),
         failed_tasks: row.get(7).unwrap_or(0i32),
+        resources,
     })
 }
 
@@ -83,6 +93,7 @@ impl StateStore {
             trust_level: 0,
             successful_tasks: 0,
             failed_tasks: 0,
+            resources: None,
         };
 
         // Generate auth token for the worker
@@ -97,7 +108,7 @@ impl StateStore {
         let caps_json = serde_json::to_string(&worker.capabilities)
             .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
         self.db.execute(
-            "INSERT OR REPLACE INTO workers (id, name, ssh_key, capabilities, status, auth_token) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO workers (id, name, ssh_key, capabilities, status, auth_token, resources_json) VALUES (?, ?, ?, ?, ?, ?, '{}')",
             params![
                 worker.id,
                 worker.name,
@@ -114,7 +125,7 @@ impl StateStore {
     pub fn get_worker(&self, id: &str) -> Result<Option<Worker>, rusqlite::Error> {
         self.db
             .query_row(
-                "SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks FROM workers WHERE id = ?",
+                "SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks, resources_json FROM workers WHERE id = ?",
                 params![id],
                 row_to_worker,
             )
@@ -124,7 +135,7 @@ impl StateStore {
     pub fn get_worker_by_name(&self, name: &str) -> Result<Option<Worker>, rusqlite::Error> {
         self.db
             .query_row(
-                "SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks FROM workers WHERE name = ?",
+                "SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks, resources_json FROM workers WHERE name = ?",
                 params![name],
                 row_to_worker,
             )
@@ -134,7 +145,7 @@ impl StateStore {
     pub fn list_workers(&self) -> Result<Vec<Worker>, rusqlite::Error> {
         let mut stmt = self
             .db
-            .prepare("SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks FROM workers")?;
+            .prepare("SELECT id, name, ssh_key, capabilities, status, trust_level, successful_tasks, failed_tasks, resources_json FROM workers")?;
         let rows = stmt.query_map(params![], row_to_worker)?;
         rows.collect()
     }
@@ -170,6 +181,51 @@ impl StateStore {
         self.db.execute(
             "UPDATE workers SET status = 'online', last_heartbeat = ? WHERE id = ?",
             params![now, worker_id],
+        )?;
+        Ok(())
+    }
+
+    /// Heartbeat with resource reporting. Updates status, timestamp, and resource snapshot.
+    pub fn heartbeat_with_resources(
+        &self,
+        worker_id: &str,
+        resources: Option<&WorkerResources>,
+    ) -> Result<(), rusqlite::Error> {
+        let now = Utc::now().to_rfc3339();
+
+        // Check for idle decay first
+        self.apply_idle_decay(worker_id)?;
+
+        match resources {
+            Some(res) => {
+                let res_json = serde_json::to_string(res)
+                    .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
+                self.db.execute(
+                    "UPDATE workers SET status = 'online', last_heartbeat = ?, resources_json = ? WHERE id = ?",
+                    params![now, res_json, worker_id],
+                )?;
+            }
+            None => {
+                self.db.execute(
+                    "UPDATE workers SET status = 'online', last_heartbeat = ? WHERE id = ?",
+                    params![now, worker_id],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Update a worker's resource snapshot directly (for testing or riod sync).
+    pub fn update_worker_resources(
+        &self,
+        worker_id: &str,
+        resources: &WorkerResources,
+    ) -> Result<(), rusqlite::Error> {
+        let res_json = serde_json::to_string(resources)
+            .map_err(|_e| rusqlite::Error::ExecuteReturnedResults)?;
+        self.db.execute(
+            "UPDATE workers SET resources_json = ? WHERE id = ?",
+            params![res_json, worker_id],
         )?;
         Ok(())
     }
@@ -386,5 +442,110 @@ mod tests {
         store.record_task_success(&worker.id).unwrap();
         let w = store.get_worker(&worker.id).unwrap().unwrap();
         assert_eq!(w.trust_level, 1);
+    }
+
+    #[test]
+    fn heartbeat_with_resources_persists() {
+        let (store, _dir) = test_store();
+        unsafe { std::env::set_var("CRABJAR_AUTH_SECRET", "test-secret") };
+        let (worker, _token) = store
+            .register_worker(
+                "res-worker".to_string(),
+                vec!["gpu:nvidia:3090".to_string()],
+                None,
+            )
+            .unwrap();
+
+        // Initially no resources reported
+        let w = store.get_worker(&worker.id).unwrap().unwrap();
+        assert!(w.resources.is_none());
+
+        // Heartbeat with resources
+        let res = WorkerResources {
+            max_ram_mb: 65536,
+            available_ram_mb: 49152,
+            gpu_count: 1,
+            gpus_available: 1,
+            reported_at: chrono::Utc::now().to_rfc3339(),
+        };
+        store
+            .heartbeat_with_resources(&worker.id, Some(&res))
+            .unwrap();
+
+        // Verify persisted
+        let w = store.get_worker(&worker.id).unwrap().unwrap();
+        assert!(w.resources.is_some());
+        let stored = w.resources.unwrap();
+        assert_eq!(stored.max_ram_mb, 65536);
+        assert_eq!(stored.available_ram_mb, 49152);
+        assert_eq!(stored.gpu_count, 1);
+        assert_eq!(stored.gpus_available, 1);
+
+        // Heartbeat without resources — should not clear existing snapshot
+        store.heartbeat_with_resources(&worker.id, None).unwrap();
+        let w = store.get_worker(&worker.id).unwrap().unwrap();
+        assert!(w.resources.is_some());
+        assert_eq!(w.resources.unwrap().max_ram_mb, 65536);
+
+        // Update resources with new values
+        let updated_res = WorkerResources {
+            available_ram_mb: 32768,
+            gpus_available: 0,
+            ..res.clone()
+        };
+        store
+            .update_worker_resources(&worker.id, &updated_res)
+            .unwrap();
+        let w = store.get_worker(&worker.id).unwrap().unwrap();
+        assert_eq!(w.resources.as_ref().unwrap().available_ram_mb, 32768);
+        assert_eq!(w.resources.as_ref().unwrap().gpus_available, 0);
+    }
+
+    #[test]
+    fn worker_resources_can_satisfy_integration() {
+        let (store, _dir) = test_store();
+        unsafe { std::env::set_var("CRABJAR_AUTH_SECRET", "test-secret") };
+        let (worker, _token) = store
+            .register_worker("sched-worker".to_string(), vec![], None)
+            .unwrap();
+
+        // Worker reports limited resources
+        let res = WorkerResources {
+            max_ram_mb: 8192,
+            available_ram_mb: 4096,
+            gpu_count: 0,
+            gpus_available: 0,
+            reported_at: chrono::Utc::now().to_rfc3339(),
+        };
+        store
+            .heartbeat_with_resources(&worker.id, Some(&res))
+            .unwrap();
+
+        let w = store.get_worker(&worker.id).unwrap().unwrap();
+        let stored_res = w.resources.unwrap();
+
+        // Small task fits
+        let small_task = crate::task_spec::TaskResources {
+            memory_mb: 2048,
+            gpu: false,
+            ..Default::default()
+        };
+        assert!(stored_res.can_satisfy(&small_task));
+
+        // Large task doesn't fit (needs more RAM than available)
+        let big_task = crate::task_spec::TaskResources {
+            memory_mb: 8192,
+            gpu: false,
+            ..Default::default()
+        };
+        assert!(!stored_res.can_satisfy(&big_task));
+
+        // GPU task doesn't fit (no GPUs)
+        let gpu_task = crate::task_spec::TaskResources {
+            memory_mb: 1024,
+            gpu: true,
+            ..Default::default()
+        };
+        assert!(!stored_res.can_satisfy(&gpu_task));
     }
 }

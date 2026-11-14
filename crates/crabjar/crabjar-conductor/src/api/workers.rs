@@ -180,16 +180,24 @@ pub async fn tasks_for_worker(
     }
 }
 
-/// POST /workers/heartbeat - Worker heartbeat (public).
+/// POST /workers/heartbeat - Worker heartbeat with optional resource snapshot (public).
 pub async fn worker_heartbeat_public(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     let worker_id = body["worker_id"].as_str().unwrap_or("").to_string();
 
+    // Parse optional resource snapshot
+    let resources: Option<crate::task_spec::WorkerResources> =
+        if let Some(res_val) = body.get("resources") {
+            serde_json::from_value(res_val.clone()).ok()
+        } else {
+            None
+        };
+
     let result = tokio::task::spawn_blocking(move || {
         let c = conductor.blocking_lock();
-        c.worker_heartbeat(&worker_id)
+        c.worker_heartbeat_with_resources(&worker_id, resources.as_ref())
     })
     .await;
 

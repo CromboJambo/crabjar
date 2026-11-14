@@ -28,6 +28,9 @@ pub struct ConductorConfig {
     pub pesti_server_url: String,
     /// Optional path to mirror-log database for attention-based decision filtering.
     pub mirror_log_db_path: Option<String>,
+    /// Path to riod Unix socket for resource-aware scheduling.
+    /// If None or the socket doesn't exist, resource checks are disabled (fail-open).
+    pub riod_socket_path: Option<String>,
 }
 
 impl Default for ConductorConfig {
@@ -37,6 +40,7 @@ impl Default for ConductorConfig {
             listen_port: 8091,
             pesti_server_url: "http://localhost:8000".to_string(),
             mirror_log_db_path: None,
+            riod_socket_path: None,
         }
     }
 }
@@ -90,7 +94,10 @@ impl Conductor {
         };
 
         // Initialize riod resource checker (fail-open if unavailable)
-        let riod_checker = RiodResourceChecker::new("/run/riod.sock");
+        let riod_checker = match &config.riod_socket_path {
+            Some(path) => RiodResourceChecker::new(path),
+            None => RiodResourceChecker::default(), // No riod configured, fail-open
+        };
 
         Ok(Self {
             store,

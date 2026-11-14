@@ -76,6 +76,7 @@ mod tests {
             trust_level: 0,
             successful_tasks: 0,
             failed_tasks: 0,
+            resources: None,
         };
         assert!(!trust_sufficient_for_auto_assign(&unknown));
 
@@ -88,6 +89,7 @@ mod tests {
             trust_level: 1,
             successful_tasks: 5,
             failed_tasks: 0,
+            resources: None,
         };
         assert!(trust_sufficient_for_auto_assign(&proven));
     }

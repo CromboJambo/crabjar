@@ -131,15 +131,38 @@ impl Conductor {
             }
 
             // Resource-aware scheduling: verify the worker has enough resources.
-            // Fail-open: if riod is unavailable, assignment proceeds as before.
-            if !self.riod_checker().can_satisfy(&task.resources) {
+            // Uses worker-reported resource snapshots (from heartbeats) when available,
+            // falls back to local riod check for workers without reports.
+            // Fail-open: if neither is available, assignment proceeds as before.
+            let resource_ok = match &worker.resources {
+                Some(res) => {
+                    if !res.is_fresh(300) {
+                        // Stale snapshot (>5 min) — treat as unknown, fall through to riod
+                        debug!(
+                            task_id = %task.id,
+                            worker_id = %worker_id,
+                            reported_at = %res.reported_at,
+                            "Worker resource snapshot stale, falling back to local riod"
+                        );
+                        self.riod_checker().can_satisfy(&task.resources)
+                    } else {
+                        res.can_satisfy(&task.resources)
+                    }
+                }
+                None => {
+                    // No reported resources — use local riod as fallback
+                    self.riod_checker().can_satisfy(&task.resources)
+                }
+            };
+
+            if !resource_ok {
                 debug!(
                     task_id = %task.id,
                     worker_id = %worker_id,
                     cpu = task.resources.cpu,
                     memory_mb = task.resources.memory_mb,
                     gpu = task.resources.gpu,
-                    "Worker resources insufficient (riod check)"
+                    "Worker resources insufficient"
                 );
                 continue;
             }
@@ -357,6 +380,16 @@ impl Conductor {
     /// Update worker status via heartbeat.
     pub fn worker_heartbeat(&self, worker_id: &str) -> Result<()> {
         self.store.heartbeat(worker_id)?;
+        Ok(())
+    }
+
+    /// Update worker status and resource snapshot via heartbeat.
+    pub fn worker_heartbeat_with_resources(
+        &self,
+        worker_id: &str,
+        resources: Option<&crate::task_spec::WorkerResources>,
+    ) -> Result<()> {
+        self.store.heartbeat_with_resources(worker_id, resources)?;
         Ok(())
     }
 }

@@ -31,6 +31,7 @@ impl WorkerRegistry {
             trust_level: 0,
             successful_tasks: 0,
             failed_tasks: 0,
+            resources: None,
         };
         self.workers.insert(worker.id.clone(), worker.clone());
         worker

@@ -128,6 +128,12 @@ impl StateStore {
             [],
         );
 
+        // Migration: add resources_json column to existing workers tables (idempotent)
+        let _ = db.execute(
+            "ALTER TABLE workers ADD COLUMN resources_json TEXT NOT NULL DEFAULT '{}'",
+            [],
+        );
+
         Ok(Self { db })
     }
 }

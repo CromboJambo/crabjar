@@ -54,6 +54,51 @@ pub struct TaskResources {
     pub network: bool,
 }
 
+/// Live resource snapshot reported by a worker via heartbeat.
+///
+/// Workers include this in their heartbeat payload so the conductor can
+/// make resource-aware scheduling decisions without querying remote riod
+/// instances directly.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkerResources {
+    /// Total RAM on the machine (MB).
+    pub max_ram_mb: u64,
+    /// Currently available RAM (MB).
+    pub available_ram_mb: u64,
+    /// Total GPU count.
+    pub gpu_count: u32,
+    /// Currently idle/available GPUs.
+    pub gpus_available: u32,
+    /// RFC3339 timestamp when this snapshot was taken.
+    pub reported_at: String,
+}
+
+impl WorkerResources {
+    /// Check if this worker can satisfy the given task requirements.
+    pub fn can_satisfy(&self, req: &TaskResources) -> bool {
+        // RAM check
+        if u64::from(req.memory_mb) > self.available_ram_mb {
+            return false;
+        }
+        // GPU check
+        if req.gpu && self.gpus_available == 0 {
+            return false;
+        }
+        true
+    }
+
+    /// Check if this snapshot is still fresh (less than `max_age_secs` old).
+    pub fn is_fresh(&self, max_age_secs: u64) -> bool {
+        match chrono::DateTime::parse_from_rfc3339(&self.reported_at) {
+            Ok(t) => {
+                let age = chrono::Utc::now().signed_duration_since(t.with_timezone(&chrono::Utc));
+                age.num_seconds().unsigned_abs() < max_age_secs
+            }
+            Err(_) => false,
+        }
+    }
+}
+
 fn default_cpu() -> u32 {
     2
 }
@@ -255,5 +300,96 @@ mod tests {
         let spec: TaskSpec = serde_json::from_str(json).unwrap();
         assert!(spec.image.is_none());
         assert!(spec.command.is_none());
+    }
+
+    // --- WorkerResources tests ---
+
+    fn fresh_worker_resources() -> WorkerResources {
+        WorkerResources {
+            max_ram_mb: 32768,
+            available_ram_mb: 16384,
+            gpu_count: 1,
+            gpus_available: 1,
+            reported_at: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+
+    #[test]
+    fn worker_resources_can_satisfy_ram() {
+        let res = fresh_worker_resources();
+        // Task needs 8GB — worker has 16GB available
+        let req = TaskResources {
+            memory_mb: 8192,
+            ..Default::default()
+        };
+        assert!(res.can_satisfy(&req));
+
+        // Task needs 32GB — worker only has 16GB available
+        let big_req = TaskResources {
+            memory_mb: 32768,
+            ..Default::default()
+        };
+        assert!(!res.can_satisfy(&big_req));
+    }
+
+    #[test]
+    fn worker_resources_gpu_check() {
+        // Worker with GPU available
+        let res = fresh_worker_resources();
+        let gpu_req = TaskResources {
+            gpu: true,
+            ..Default::default()
+        };
+        assert!(res.can_satisfy(&gpu_req));
+
+        // Worker with no GPUs available
+        let no_gpu_res = WorkerResources {
+            gpus_available: 0,
+            ..fresh_worker_resources()
+        };
+        assert!(!no_gpu_res.can_satisfy(&gpu_req));
+
+        // Non-GPU task passes regardless
+        let cpu_req = TaskResources::default();
+        assert!(no_gpu_res.can_satisfy(&cpu_req));
+    }
+
+    #[test]
+    fn worker_resources_freshness() {
+        let fresh = fresh_worker_resources();
+        assert!(fresh.is_fresh(300)); // 5 min window
+
+        // Stale snapshot (1 hour old)
+        let stale_time = chrono::Utc::now() - chrono::Duration::hours(1);
+        let stale = WorkerResources {
+            reported_at: stale_time.to_rfc3339(),
+            ..fresh_worker_resources()
+        };
+        assert!(!stale.is_fresh(300));
+
+        // Invalid timestamp
+        let invalid = WorkerResources {
+            reported_at: "not-a-timestamp".to_string(),
+            ..fresh_worker_resources()
+        };
+        assert!(!invalid.is_fresh(300));
+    }
+
+    #[test]
+    fn worker_resources_json_roundtrip() {
+        let res = fresh_worker_resources();
+        let json = serde_json::to_string(&res).unwrap();
+        let parsed: WorkerResources = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.max_ram_mb, res.max_ram_mb);
+        assert_eq!(parsed.available_ram_mb, res.available_ram_mb);
+        assert_eq!(parsed.gpu_count, res.gpu_count);
+        assert_eq!(parsed.gpus_available, res.gpus_available);
+    }
+
+    #[test]
+    fn worker_resources_empty_json_is_none() {
+        // Empty JSON object should fail to parse as WorkerResources (missing required fields)
+        let result: Result<WorkerResources, _> = serde_json::from_str("{}");
+        assert!(result.is_err());
     }
 }

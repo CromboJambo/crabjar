@@ -38,6 +38,10 @@ struct Args {
     /// JEV embedding backend URL (overrides `CRABJAR_JEV_API_URL` if set)
     #[arg(long)]
     jev_url: Option<String>,
+
+    /// Path to riod Unix socket for resource-aware scheduling
+    #[arg(long, env = "CRABJAR_RIOD_SOCKET")]
+    riod_socket: Option<String>,
 }
 
 #[tokio::main]
@@ -56,6 +60,7 @@ async fn main() -> Result<()> {
         listen_port: args.port,
         pesti_server_url: args.pesti_url,
         mirror_log_db_path: std::env::var("CRABJAR_MIRROR_LOG_DB").ok(),
+        riod_socket_path: args.riod_socket,
     };
 
     tracing::info!("Starting crabjar-conductor");

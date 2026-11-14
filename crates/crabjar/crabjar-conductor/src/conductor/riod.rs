@@ -148,9 +148,13 @@ mod tests {
             total_gpus: 1,
             allocated_gpus: 0,
             total_ram_mb: 16384,
-            allocated_ram_mb: 12288,
+            system_used_ram_mb: 12288,
+            riod_allocated_ram_mb: 0,
             available_ram_mb: 4096,
             active_allocations: 1,
+            data_fresh: true,
+            gpu_details: vec![],
+            thresholds: None,
         };
 
         // Task needs 8GB but only 4GB available
@@ -179,9 +183,13 @@ mod tests {
             total_gpus: 1,
             allocated_gpus: 1,
             total_ram_mb: 16384,
-            allocated_ram_mb: 0,
+            system_used_ram_mb: 0,
+            riod_allocated_ram_mb: 0,
             available_ram_mb: 16384,
             active_allocations: 1,
+            data_fresh: true,
+            gpu_details: vec![],
+            thresholds: None,
         };
 
         let gpu_task = TaskResources {
