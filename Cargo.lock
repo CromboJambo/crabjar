@@ -1701,6 +1701,7 @@ dependencies = [
  "analyze-common",
  "async-trait",
  "chrono",
+ "pesti-structural",
  "pesti-structural-tokenizer",
  "regex",
  "reqwest 0.12.28",
@@ -8128,6 +8129,16 @@ checksum = "9ac6154fd4418b8f0b82532c59c26f303f9ca59a64c883e8ce3971fd82733439"
 dependencies = [
  "psm",
  "stacker",
+]
+
+[[package]]
+name = "pesti-structural"
+version = "0.1.4"
+dependencies = [
+ "ahash",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
