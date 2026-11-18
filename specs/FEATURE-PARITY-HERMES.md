@@ -26,7 +26,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | `write_file` | ✅ Full overwrite with syntax check | ✅ `orchestrator/src/tools/write_file.rs` | ✅ | P1 GAP CLOSED — full overwrite with parent dir creation; matches Hermes API contract |
 | `patch` | ✅ Fuzzy find-and-replace, 9 strategies | ✅ `orchestrator/src/tools/patch.rs` (9 fuzzy strategies) | ✅ | P1 GAP CLOSED — 9 matching strategies: exact, whitespace-normalized, trailing-ws-ignored, trimmed-lines, case-insensitive, case-insensitive-trimmed, line-by-line-fuzzy, context-tolerance, single-line-fallback |
 | `search_files` | ✅ Ripgrep-backed content + filename search | ✅ `orchestrator/src/tools/search_files.rs` (ripgrep-backed) | ✅ | P1 GAP CLOSED — first-class tool with structured results for both content and filename search |
-| `execute_code` | ✅ Python kernel with hermes_tools API | ✅ `crabjar-exec` (Rhai VM, Rust-first) | ✅ | P1 GAP CLOSED — Rhai-based execution engine with tool bindings, no Python dependency |
+| `execute_code` | ✅ Python kernel with hermes_tools API | ✅ `crabjar-exec` (Rhai VM, Rust-first) + `orchestrator/src/tools/execute_code.rs` | ✅ | P1 GAP CLOSED — Rhai-based execution engine exposed as first-class tool; 300s timeout, 50 tool call limit; no Python dependency |
 
 ## Web & Browser Tools
 
@@ -49,16 +49,16 @@ The baseline is the tool surface available in a standard Hermes session.
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
 | `memory` | ✅ Persistent MEMORY.md + USER.md, atomic ops | ✅ `crabjar-memory` (MemoryStore, MirrorLog) | ⚠️ | crabjar has richer storage but different API shape |
-| `skill_view` | ✅ Load SKILL.md + linked files | ✅ `crabjar-skills` (loader, context) | ⚠️ | Needs parity on linked file resolution |
-| `skills_list` | ✅ List with category filters | ✅ `crabjar-skills` | ✅ | Basic listing works |
-| `skill_manage` | ✅ Create/patch/write_file/remove_file/delete | ⚠️ Partial in `crabjar-skills` | ⚠️ | Needs full CRUD parity with atomic operations |
+| `skill_view` | ✅ Load SKILL.md + linked files | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — full manifest + linked file resolution via crabjar-skills loader |
+| `skills_list` | ✅ List with category filters | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — discover all skills from filesystem, optional category filter |
+| `skill_manage` | ✅ Create/patch/write_file/remove_file/delete | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — create/patch/delete with atomic operations array |
 | `session_search` | ✅ Search conversation history | ✅ `orchestrator/src/session_search.rs` | ⚠️ | P1-6 complete; needs verification of search quality |
 
 ## Process & System Tools
 
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
-| `terminal` | ✅ Shell with background jobs, PTY, notifications | ✅ `run_command` tool + process management | ⚠️ | P1-7 complete; needs parity on background job tracking |
+| `terminal` | ✅ Shell with background jobs, PTY, notifications | ✅ `orchestrator/src/tools/terminal.rs` (first-class) + process management | ✅ | P1 GAP CLOSED — foreground/background execution with timeout, workdir, exit codes; 8 tests |
 | `process_manage` | ✅ List/kill/restart background processes | ✅ `orchestrator/src/process_management.rs` | ⚠️ | Basic registry exists; needs full lifecycle parity |
 | `cronjob_manage` | ✅ Schedule recurring tasks | ✅ `crabjar-cron` (scheduler, store) | ⚠️ | P1-8 complete; needs verification of tool surface parity |
 
@@ -115,7 +115,7 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
 | **P2 (Enhancement)** | 3 | 3 | 0 | 0 | **100%** |
 | **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
-| **Total** | 25 | 17 | 5 | 3 | **68%** |
+| **Total** | 25 | 20 | 3 | 2 | **80%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -185,6 +185,7 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **execute_code, terminal, and skill tools upgraded to first-class.** `execute_code` (Rhai VM via crabjar-exec), `terminal` (foreground/background with timeout/workdir), `skills_list`/`skill_view`/`skill_manage` (full CRUD). 12 new tests. Parity: 68% → **80%** |
 | 2026-11-18 | **4 first-class file tools implemented.** `read_file` (line-numbered, pagination), `write_file` (overwrite + parent dirs), `patch` (9 fuzzy strategies), `search_files` (ripgrep-backed). All 4 upgraded from ⚠️ partial to ✅ full API parity with Hermes. 22 new unit tests. |
 | 2026-11-18 | **All P2 gaps closed.** `manage_catalog` (wraps tool registry), `react_to_message` (headless ack), `video_analyze` (ffmpeg + vision). Total parity: 60% → **68%** |
 | 2026-11-18 | `execute_code` P1 gap closed via `crabjar-exec` (Rhai VM); `vision_analyze` P1 gap mostly closed via `crabjar-vision` (Unsloth Studio integration) |

@@ -7910,6 +7910,7 @@ dependencies = [
  "crabjar-browser",
  "crabjar-browser-vault",
  "crabjar-delegation",
+ "crabjar-exec",
  "crabjar-guard",
  "crabjar-homeassistant",
  "crabjar-memory",

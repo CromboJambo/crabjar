@@ -72,6 +72,9 @@ crabjar-vision = { path = "../crabjar/crabjar-vision" }
 # Skill management (P2 — skills_list, skill_view, skill_manage)
 crabjar-skills = { path = "../crabjar/crabjar-skills" }
 
+# Code execution (P1 — execute_code via Rhai VM)
+crabjar-exec = { path = "../crabjar/crabjar-exec" }
+
 # Directory detection for memory tool
 dirs.workspace = true
 

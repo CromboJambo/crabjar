@@ -11,6 +11,7 @@ pub mod browser_vault;
 pub mod by_source;
 pub mod clarify;
 pub mod delegate_task;
+pub mod execute_code;
 pub mod homeassistant;
 pub mod manage_catalog;
 pub mod memory;
@@ -49,6 +50,7 @@ pub async fn execute(
         "web_search" => web_search::handle(args).await,
         "memory" => memory::handle(args, ctx).await,
         "delegate_task" => delegate_task::handle(args, ctx).await,
+        "execute_code" => execute_code::handle(args).await,
         "clarify" => clarify::handle(args, ctx).await,
         "session_search" => session_search::handle(args, ctx).await,
         "process_manage" => process_manage::handle(args, ctx).await,
