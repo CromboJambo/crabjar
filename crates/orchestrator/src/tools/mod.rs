@@ -14,14 +14,18 @@ pub mod delegate_task;
 pub mod homeassistant;
 pub mod manage_catalog;
 pub mod memory;
+pub mod patch;
 pub mod process_manage;
 pub mod react_to_message;
+pub mod read_file;
 pub mod recent_events;
 pub mod run_command;
+pub mod search_files;
 pub mod search_logs;
 pub mod session_search;
 pub mod video_analyze;
 pub mod web_search;
+pub mod write_file;
 
 /// Context passed to tool handlers.
 pub struct ToolContext {
@@ -52,6 +56,10 @@ pub async fn execute(
         "manage_catalog" => manage_catalog::handle(args).await,
         "react_to_message" => react_to_message::handle(args).await,
         "video_analyze" => video_analyze::handle(args).await,
+        "read_file" => read_file::handle(args).await,
+        "write_file" => write_file::handle(args).await,
+        "patch" => patch::handle(args).await,
+        "search_files" => search_files::handle(args).await,
         name if name.starts_with("ha_") => homeassistant::handle(name, args, ctx).await,
         _ => Err(format!("Unknown tool: {}", function_name)),
     }

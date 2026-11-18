@@ -22,10 +22,10 @@ The baseline is the tool surface available in a standard Hermes session.
 
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
-| `read_file` | ✅ Line-numbered reads, pagination, doc extraction | ✅ `crabjar-memory` + core file ops | ✅ | crabjar has structured storage; needs direct file read parity |
-| `write_file` | ✅ Full overwrite with syntax check | ✅ Core file ops | ✅ | Syntax checking may differ |
-| `patch` | ✅ Fuzzy find-and-replace, 9 strategies | ⚠️ Basic patching in core | ⚠️ | Hermes has sophisticated fuzzy matching (9 strategies); crabjar needs parity |
-| `search_files` | ✅ Ripgrep-backed content + filename search | ⚠️ Via `run_command` (grep/rg) | 🔧 | Works but not a first-class tool with structured results |
+| `read_file` | ✅ Line-numbered reads, pagination, doc extraction | ✅ `orchestrator/src/tools/read_file.rs` | ✅ | P1 GAP CLOSED — first-class tool with line numbers, offset/limit pagination; matches Hermes API contract |
+| `write_file` | ✅ Full overwrite with syntax check | ✅ `orchestrator/src/tools/write_file.rs` | ✅ | P1 GAP CLOSED — full overwrite with parent dir creation; matches Hermes API contract |
+| `patch` | ✅ Fuzzy find-and-replace, 9 strategies | ✅ `orchestrator/src/tools/patch.rs` (9 fuzzy strategies) | ✅ | P1 GAP CLOSED — 9 matching strategies: exact, whitespace-normalized, trailing-ws-ignored, trimmed-lines, case-insensitive, case-insensitive-trimmed, line-by-line-fuzzy, context-tolerance, single-line-fallback |
+| `search_files` | ✅ Ripgrep-backed content + filename search | ✅ `orchestrator/src/tools/search_files.rs` (ripgrep-backed) | ✅ | P1 GAP CLOSED — first-class tool with structured results for both content and filename search |
 | `execute_code` | ✅ Python kernel with hermes_tools API | ✅ `crabjar-exec` (Rhai VM, Rust-first) | ✅ | P1 GAP CLOSED — Rhai-based execution engine with tool bindings, no Python dependency |
 
 ## Web & Browser Tools
@@ -185,6 +185,7 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **4 first-class file tools implemented.** `read_file` (line-numbered, pagination), `write_file` (overwrite + parent dirs), `patch` (9 fuzzy strategies), `search_files` (ripgrep-backed). All 4 upgraded from ⚠️ partial to ✅ full API parity with Hermes. 22 new unit tests. |
 | 2026-11-18 | **All P2 gaps closed.** `manage_catalog` (wraps tool registry), `react_to_message` (headless ack), `video_analyze` (ffmpeg + vision). Total parity: 60% → **68%** |
 | 2026-11-18 | `execute_code` P1 gap closed via `crabjar-exec` (Rhai VM); `vision_analyze` P1 gap mostly closed via `crabjar-vision` (Unsloth Studio integration) |
 | 2026-11-18 | `browser_vault` P1 gap mostly closed via `crabjar-browser-vault` (Bitwarden CLI, Vaultwarden support) — all three P1 blockers now addressed |
