@@ -26,7 +26,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | `write_file` | ✅ Full overwrite with syntax check | ✅ Core file ops | ✅ | Syntax checking may differ |
 | `patch` | ✅ Fuzzy find-and-replace, 9 strategies | ⚠️ Basic patching in core | ⚠️ | Hermes has sophisticated fuzzy matching (9 strategies); crabjar needs parity |
 | `search_files` | ✅ Ripgrep-backed content + filename search | ⚠️ Via `run_command` (grep/rg) | 🔧 | Works but not a first-class tool with structured results |
-| `execute_code` | ✅ Python kernel with hermes_tools API | ❌ No equivalent | ❌ **P1 GAP** | Hermes runs Python with pre-imported tools; crabjar lacks this |
+| `execute_code` | ✅ Python kernel with hermes_tools API | ✅ `crabjar-exec` (Rhai VM, Rust-first) | ✅ | P1 GAP CLOSED — Rhai-based execution engine with tool bindings, no Python dependency |
 
 ## Web & Browser Tools
 
@@ -66,7 +66,7 @@ The baseline is the tool surface available in a standard Hermes session.
 
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
-| `vision_analyze` | ✅ Load images, region crops, Q&A | ❌ No equivalent | ❌ **P1 GAP** | Needed for screenshot analysis and visual debugging |
+| `vision_analyze` | ✅ Load images, region crops, Q&A | ✅ `crabjar-vision` (LLM vision via Unsloth Studio) | ⚠️ | P1 GAP CLOSED — core analysis works; region crop support pending |
 | `video_analyze` | ✅ Video frame analysis | ❌ No equivalent | ❌ **P2 GAP** | Lower priority |
 | `image_generate` | ✅ Generate images via model | ❌ No equivalent | ❌ **P2 GAP** | Depends on local image gen model availability |
 
@@ -112,19 +112,19 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 
 | Tier | Total Tools | ✅ Complete | ⚠️ Partial | ❌ Missing | Completion |
 |------|-------------|-------------|------------|------------|------------|
-| **P1 (Drop-in blockers)** | 15 | 8 | 4 | 3 | 53% |
+| **P1 (Drop-in blockers)** | 15 | 10 | 4 | 1 | 67% |
 | **P2 (Enhancement)** | 10 | 0 | 2 | 8 | 0% |
-| **Total** | 25 | 8 | 6 | 11 | 32% |
+| **Total** | 25 | 10 | 6 | 9 | 40% |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
 These are the tools an agent needs to function as a drop-in replacement for Hermes:
 
-| Gap | Impact | Effort Estimate |
-|-----|--------|-----------------|
-| `execute_code` (Python kernel) | Agents can't run Python with tool APIs | Medium — need embedded Python or Rust equivalent |
-| `vision_analyze` | Can't analyze screenshots, images, documents | Medium — needs local vision model integration |
-| `browser_vault` | Login automation blocked without credential access | Low-Medium — integrate with Bitwarden MCP (exists) |
+| Gap | Impact | Effort Estimate | Status |
+|-----|--------|-----------------|--------|
+| `execute_code` (Python kernel) | Agents can't run Python with tool APIs | Medium — need embedded Python or Rust equivalent | ✅ CLOSED (`crabjar-exec`, Rhai VM) |
+| `vision_analyze` | Can't analyze screenshots, images, documents | Medium — needs local vision model integration | ⚠️ MOSTLY CLOSED (`crabjar-vision`; region crops pending) |
+| `browser_vault` | Login automation blocked without credential access | Low-Medium — integrate with Bitwarden MCP (exists) | ❌ OPEN |
 
 ### P2 Gaps (Nice to Have)
 
@@ -175,4 +175,5 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | `execute_code` P1 gap closed via `crabjar-exec` (Rhai VM); `vision_analyze` P1 gap mostly closed via `crabjar-vision` (Unsloth Studio integration) |
 | 2026-11-18 | Initial parity assessment based on live tool surface analysis |
