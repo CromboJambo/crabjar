@@ -7914,6 +7914,7 @@ dependencies = [
  "crabjar-homeassistant",
  "crabjar-memory",
  "crabjar-sandbox",
+ "crabjar-skills",
  "crabjar-telemetry",
  "crabjar-tool-registry",
  "crabjar-vision",

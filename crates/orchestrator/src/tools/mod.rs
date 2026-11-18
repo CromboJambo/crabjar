@@ -23,6 +23,8 @@ pub mod run_command;
 pub mod search_files;
 pub mod search_logs;
 pub mod session_search;
+pub mod skills;
+pub mod terminal;
 pub mod video_analyze;
 pub mod web_search;
 pub mod write_file;
@@ -60,6 +62,10 @@ pub async fn execute(
         "write_file" => write_file::handle(args).await,
         "patch" => patch::handle(args).await,
         "search_files" => search_files::handle(args).await,
+        "terminal" => terminal::handle(args).await,
+        "skills_list" => skills::handle_skills_list(args).await,
+        "skill_view" => skills::handle_skill_view(args).await,
+        "skill_manage" => skills::handle_skill_manage(args).await,
         name if name.starts_with("ha_") => homeassistant::handle(name, args, ctx).await,
         _ => Err(format!("Unknown tool: {}", function_name)),
     }

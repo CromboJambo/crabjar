@@ -69,6 +69,9 @@ crabjar-homeassistant = { path = "../crabjar/crabjar-homeassistant" }
 # Vision analysis (P2 — video_analyze)
 crabjar-vision = { path = "../crabjar/crabjar-vision" }
 
+# Skill management (P2 — skills_list, skill_view, skill_manage)
+crabjar-skills = { path = "../crabjar/crabjar-skills" }
+
 # Directory detection for memory tool
 dirs.workspace = true
 
