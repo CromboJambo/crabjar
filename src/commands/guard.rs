@@ -26,36 +26,46 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
             }))
         }
         GuardCommand::Approve { action_id } => {
-            guard_db.update_action_status(
+            let found = match guard_db.update_action_status(
                 &action_id,
                 crabjar_guard::ActionStatus::TrustApproved,
                 "user:cli",
                 Some("approved via CLI"),
-            )?;
+            ) {
+                Ok(found) => found,
+                Err(e) if e.to_string().contains("Action not found") => false,
+                Err(e) => return Err(Box::new(e)),
+            };
             Ok(json!({
                 "success": true,
                 "guard": {
                     "approve": {
                         "action_id": action_id,
-                        "status": "trust-approved",
+                        "status": if found { "trust-approved" } else { "not-found" },
+                        "found": found,
                     },
                 },
             }))
         }
         GuardCommand::Reject { action_id, reason } => {
-            guard_db.update_action_status(
+            let found = match guard_db.update_action_status(
                 &action_id,
                 crabjar_guard::ActionStatus::Denied,
                 "user:cli",
                 Some(&reason),
-            )?;
+            ) {
+                Ok(found) => found,
+                Err(e) if e.to_string().contains("Action not found") => false,
+                Err(e) => return Err(Box::new(e)),
+            };
             Ok(json!({
                 "success": true,
                 "guard": {
                     "reject": {
                         "action_id": action_id,
                         "reason": reason,
-                        "status": "denied",
+                        "status": if found { "denied" } else { "not-found" },
+                        "found": found,
                     },
                 },
             }))
