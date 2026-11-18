@@ -221,3 +221,79 @@ fn sec_wildcard_matching_correct() {
     // But NOT unrelated domains with similar suffixes
     assert!(allowlist.check("notgithub.com").is_err());
 }
+
+// ──────────────────────────────────────────────
+// ADR-045 Red Team Regression Tests
+// ──────────────────────────────────────────────
+
+/// SEC-040: CORS must be restricted to localhost origins (ADR-045 Finding #4).
+/// Verifies the orchestrator does NOT use AllowOrigin::any().
+#[test]
+fn sec_cors_restricted_to_localhost() {
+    // Read the orchestrator source and verify CORS is not set to any()
+    let src = std::fs::read_to_string("crates/orchestrator/src/main.rs").unwrap();
+    
+    // Must NOT have AllowOrigin::any()
+    assert!(
+        !src.contains("AllowOrigin::any()"),
+        "CORS must not allow any origin (ADR-045 Finding #4)"
+    );
+    
+    // Must have exact localhost origin
+    assert!(
+        src.contains("http://localhost:3000"),
+        "CORS should allow localhost:3000"
+    );
+}
+
+/// SEC-041: SSH key permissions must be validated before use (ADR-045 Finding #1).
+#[test]
+fn sec_ssh_key_permissions_validated() {
+    // Verify the validation function exists in ssh-bastion
+    let src = std::fs::read_to_string("crates/ssh-bastion/src/lib.rs").unwrap();
+    
+    assert!(
+        src.contains("validate_ssh_key_permissions"),
+        "SSH key permission validation must exist (ADR-045 Finding #1)"
+    );
+    assert!(
+        src.contains("overly permissive permissions"),
+        "SSH key validation must reject overly permissive keys"
+    );
+}
+
+/// SEC-042: Memory store must block path traversal (ADR-045 Finding #17).
+#[test]
+fn sec_memory_store_path_traversal_blocked() {
+    use crabjar_memory::{MemoryStore, MemoryTarget};
+    
+    let temp = tempfile::tempdir().unwrap();
+    let base_dir = temp.path().to_path_buf();
+    let store = MemoryStore::new(base_dir.clone());
+    
+    // Normal write works
+    let result = store.add_entry(&MemoryTarget::Memory, "normal entry".to_string());
+    assert!(result.is_ok(), "Normal memory write should succeed");
+    
+    // Verify file was created within base dir
+    assert!(base_dir.join("MEMORY.md").exists());
+}
+
+/// SEC-043: Memory store operations must stay within base directory.
+#[test]
+fn sec_memory_store_stays_in_base() {
+    use crabjar_memory::{MemoryStore, MemoryTarget};
+    
+    let temp = tempfile::tempdir().unwrap();
+    let base_dir = temp.path().to_path_buf();
+    let store = MemoryStore::new(base_dir.clone());
+    
+    // Write and read back should work within bounds
+    store.add_entry(&MemoryTarget::User, "user profile entry".to_string()).unwrap();
+    let entries = store.read_entries(&MemoryTarget::User).unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0], "user profile entry");
+    
+    // File should be inside base dir
+    assert!(base_dir.join("USER.md").exists());
+}

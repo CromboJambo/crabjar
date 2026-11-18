@@ -20,7 +20,7 @@ pub mod tool;
 
 pub use capacity::MemoryCapacity;
 pub use error::{MemoryError, MemoryResult};
-pub use store::MemoryStore;
+pub use store::{MemoryStore, MemoryTarget};
 pub use tool::{MemoryAction, MemoryTool, MemoryToolInput};
 
 /// Character limit for MEMORY.md (agent notes)

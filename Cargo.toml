@@ -310,6 +310,7 @@ clap_mangen = { workspace = true }
 tempfile.workspace = true
 crabjar-host-core = { path = "host/host-core" }
 crabjar-host-agent = { path = "host/host-agent" }
+crabjar-memory = { path = "crates/crabjar/crabjar-memory" }
 universal-structure = { path = "crates/universal-structure" }
 serial_test.workspace = true
 
