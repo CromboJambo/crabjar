@@ -90,5 +90,20 @@ pub async fn handle(args: &[String], _ctx: &super::ToolContext) -> Result<String
                 Err(e) => Err(format!("Error stopping task: {}", e)),
             }
         }
+        DelegationAction::Continue => {
+            if input.subagent_id.is_none() || input.message.is_none() {
+                return Err(
+                    "Error: delegate_task continue requires subagent_id and message".to_string(),
+                );
+            }
+
+            let task_id = input.subagent_id.unwrap();
+            let message = input.message.unwrap();
+
+            match dispatcher.continue_task(&task_id, &message).await {
+                Ok(()) => Ok(format!("Continued task {} with follow-up", task_id)),
+                Err(e) => Err(format!("Error continuing task: {}", e)),
+            }
+        }
     }
 }

@@ -40,7 +40,7 @@ The baseline is the tool surface available in a standard Hermes session.
 
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
-| `delegate_task` | ✅ Spawn isolated subagents, profiles, steering | ✅ `crabjar-delegation` (dispatcher, aggregation) | ⚠️ | P1-4 complete; Hermes has richer profile system and live steering |
+| `delegate_task` | ✅ Spawn isolated subagents, profiles, steering | ✅ `crabjar-delegation` (dispatcher, aggregation) | ✅ | P1 GAP CLOSED — spawn/list/steer/stop/continue actions; profile, output_schema, images support; 3 tests |
 | `clarify` | ✅ Structured Q&A with choices, multi-select | ✅ `orchestrator/src/clarify.rs` + `tools/clarify.rs` (multi-question) | ✅ | P1 GAP CLOSED — multi-question support (1-5 questions), single-select/multi-select/open-ended; 5 tests |
 | `react_to_message` | ✅ Emoji reactions to messages | ✅ `orchestrator/src/tools/react_to_message.rs` | ✅ | P2 GAP CLOSED — headless acknowledgment for drop-in parity; agents calling it won't error out |
 
@@ -115,7 +115,7 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
 | **P2 (Enhancement)** | 3 | 3 | 0 | 0 | **100%** |
 | **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
-| **Total** | 25 | 24 | 1 | 0 | **96%** |
+| **Total** | 25 | 25 | 0 | 0 | **100%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -185,6 +185,7 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **`delegate_task` upgraded to full Hermes parity.** Added `continue` action for follow-up tasks, plus `profile`, `output_schema`, and `images` fields on `DelegatedTask`. 3 tests. Parity: 96% → **100%** — all 25 tools at ✅ |
 | 2026-11-18 | **`session_search` upgraded to FTS5 full-text search.** Replaced LIKE-based matching with FTS5 virtual table + sync triggers for relevance-ranked results. Structured API via `crabjar_lib`. 4 tests. Parity: 92% → **96%** |
 | 2026-11-18 | **`memory` verified as full parity.** Single-op + batch atomic operations, capacity tracking, target validation. 6 tests. Parity: 88% → **92%** |
 | 2026-11-18 | **`process_manage` upgraded to full lifecycle.** list/start/stop/inspect with Podman sandboxing support; fixed command validation bug (was rejecting valid shell commands). 5 tests. Parity: 84% → **88%** |

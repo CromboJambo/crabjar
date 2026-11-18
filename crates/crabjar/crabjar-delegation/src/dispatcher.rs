@@ -116,6 +116,13 @@ impl TaskDispatcher {
         Ok(())
     }
 
+    /// Continue a finished task with a follow-up message.
+    #[allow(clippy::unused_async)] // Stub awaiting conductor endpoint
+    pub async fn continue_task(&self, _task_id: &str, _message: &str) -> Result<(), DelegationError> {
+        // TODO: Implement when conductor adds goal continuation
+        Ok(())
+    }
+
     /// Submit a goal to the conductor API.
     async fn submit_goal(&self, description: &str) -> Result<String, DelegationError> {
         let body = serde_json::json!({

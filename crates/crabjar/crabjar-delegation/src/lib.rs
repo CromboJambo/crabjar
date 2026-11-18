@@ -40,6 +40,7 @@ pub enum DelegationAction {
     List,
     Steer,
     Stop,
+    Continue,
 }
 
 /// Input structure for the `delegate_task` tool (Hermes-compatible schema).
@@ -74,6 +75,15 @@ pub struct DelegatedTask {
     /// Optional model override for this specific task.
     #[serde(default)]
     pub model: Option<String>,
+    /// Optional profile to run as (Hermes-compatible).
+    #[serde(default)]
+    pub profile: Option<String>,
+    /// Optional JSON Schema the child's final answer must validate against.
+    #[serde(default)]
+    pub output_schema: Option<serde_json::Value>,
+    /// Images this child must see (max 8): local file paths or http(s) URLs.
+    #[serde(default)]
+    pub images: Vec<String>,
 }
 
 /// Request to delegate work to subagents.
@@ -153,6 +163,9 @@ impl DelegationRequest {
                 goal,
                 context: self.context,
                 model: self.model,
+                profile: None,
+                output_schema: None,
+                images: Vec::new(),
             }]
         } else {
             Vec::new()
@@ -220,11 +233,17 @@ mod tests {
                     goal: "Task 1".to_string(),
                     context: None,
                     model: None,
+                    profile: None,
+                    output_schema: None,
+                    images: Vec::new(),
                 },
                 DelegatedTask {
                     goal: "Task 2".to_string(),
                     context: None,
                     model: None,
+                    profile: None,
+                    output_schema: None,
+                    images: Vec::new(),
                 },
             ]),
             background: false,
