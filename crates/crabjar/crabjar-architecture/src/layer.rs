@@ -30,6 +30,7 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     map.insert("agent-context", 1); // memory
     map.insert("analyze-common", 1);
     map.insert("crabjar-architecture", 1);
+    map.insert("crabjar-artifact", 1);
     map.insert("crabjar-browser", 1);
     map.insert("crabjar-compress", 1);
     map.insert("crabjar-cron", 1);
@@ -64,6 +65,7 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     map.insert("analyze-har", 2);
     map.insert("analyze-js", 2);
     map.insert("analyze-native", 2);
+    map.insert("code-audit", 2);
     map.insert("crabjar-benchmarks", 2);
     map.insert("crabjar-clawhub-client", 2);
     map.insert("crabjar-commit", 2);
@@ -80,13 +82,16 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     // Layer 3: runtime — execution runtime
     map.insert("analyze-mcp-server", 3);
     map.insert("crabjar-analyze", 3);
+    map.insert("crabjar-code-audit-mcp", 3);
     map.insert("crabjar-herdr-mcp", 3);
     map.insert("crabjar-mcp-tool-registry", 3);
     map.insert("crabjar-plugin", 3);
     map.insert("crabjar-terminal", 3); // crates/terminal — typed terminal stream (ADR-005)
     map.insert("crabjar-unsloth-mcp", 3);
     map.insert("crabjar-worker", 3);
+    map.insert("kdeconnect-mcp", 3);
     map.insert("orchestrator", 3);
+    map.insert("ssh-file-mcp", 3);
     map.insert("vm-bridge", 3); // axum-mux
 
     // Layer 4: host — host runtime crates
@@ -108,9 +113,11 @@ pub fn crate_to_layer() -> HashMap<&'static str, usize> {
     map.insert("crabjar-email-smtp", 5);
     map.insert("crabjar-host", 5); // host-binary
     map.insert("crabjar-structured-aux", 5);
+    map.insert("deploy", 5);
     map.insert("terrarium", 5);
 
     // Layer 6: bridge — external protocol bridges
+    map.insert("hermes-wrapper", 6);
     map.insert("zed-acp-bridge", 6);
     map.insert("zed-acp-server", 6);
 

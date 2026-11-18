@@ -47,7 +47,11 @@ mod tests {
     #[test]
     fn test_crate_to_layer_exact_membership() {
         // Discover actual workspace members and assert exact membership
+        // CARGO_MANIFEST_DIR = crates/crabjar/crabjar-architecture
+        // Need 3 parents to reach workspace root: -> crates/crabjar -> crates -> .
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
             .parent()
             .unwrap()
             .parent()
@@ -341,7 +345,11 @@ mod tests {
     // Integration test: check the actual workspace
     #[test]
     fn test_workspace_boundaries_are_valid() {
+        // CARGO_MANIFEST_DIR = crates/crabjar/crabjar-architecture
+        // Need 3 parents to reach workspace root: -> crates/crabjar -> crates -> .
         let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
             .parent()
             .unwrap()
             .parent()
