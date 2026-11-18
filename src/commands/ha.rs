@@ -1,13 +1,6 @@
 use crabjar_lib::HaCommand;
 use serde_json::json;
 
-fn error_response(message: &str) -> serde_json::Value {
-    json!({
-        "success": false,
-        "error": message,
-    })
-}
-
 /// Handle Home Assistant commands (P2-2 Hermes compatibility layer)
 pub fn handle_ha_command(command: HaCommand) -> serde_json::Value {
     // Placeholder implementation — actual Home Assistant API integration would go here

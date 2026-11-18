@@ -20,11 +20,8 @@ mod bitwarden;
 mod crabjar_config;
 mod doctor;
 mod dotfile_manager;
-mod hermes_memory;
-mod homeassistant;
 mod knowledge_store;
 mod mcp_client_cli;
-mod metrics;
 mod project_loader;
 mod tool_registry_cli;
 

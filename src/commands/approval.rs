@@ -10,23 +10,6 @@ mod impact_assessment {
     // Re-export from src/commands/impact_assessment.rs
 }
 
-fn success_response(data: Value) -> Value {
-    json!({ "success": true, "data": data })
-}
-
-fn error_response(message: &str, show_usage: bool) -> Value {
-    let mut response = json!({ "success": false, "error": message });
-    if show_usage {
-        response["usage"] = json!([
-            "crabjar approval list",
-            "crabjar approval approve <id>",
-            "crabjar approval reject <id> --reason <r>",
-            "crabjar approval history [id]"
-        ]);
-    }
-    response
-}
-
 pub fn handle_approval_command(command: ApprovalCommand) -> Value {
     match command {
         ApprovalCommand::List {

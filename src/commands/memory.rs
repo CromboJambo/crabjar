@@ -1,13 +1,6 @@
 use crabjar_lib::MemoryCommand;
 use serde_json::json;
 
-fn error_response(message: &str) -> serde_json::Value {
-    json!({
-        "success": false,
-        "error": message,
-    })
-}
-
 /// Handle memory commands (P2-1 Hermes compatibility layer)
 pub fn handle_memory_command(command: MemoryCommand) -> serde_json::Value {
     // Placeholder implementation — actual MemoryStore integration would go here
