@@ -7907,6 +7907,7 @@ dependencies = [
  "axum 0.7.9",
  "axum-server",
  "chrono",
+ "crabjar",
  "crabjar-browser",
  "crabjar-browser-vault",
  "crabjar-delegation",

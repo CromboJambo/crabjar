@@ -37,17 +37,35 @@ pub async fn execute_session_search(
 ) -> anyhow::Result<SessionSearchResponse> {
     let query = request.query.unwrap_or_default();
 
-    // TODO: Integrate with actual conversation history storage
-    // For now, return a structured response indicating the search parameters
-    // In production, this would query SQLite or the memory crate for historical messages
+    // Use the library's SessionSearchIndex for FTS5-based search
+    let mut index = crabjar_lib::session_search::SessionSearchIndex::new();
+    let raw_results = index.search(&query, 20).map_err(|e| anyhow::anyhow!(e))?;
 
-    let results = Vec::new();
-    let total_matches = 0;
+    let results: Vec<SearchResult> = raw_results
+        .iter()
+        .enumerate()
+        .map(|(i, r)| {
+            let content_preview = r["outcome"]
+                .as_str()
+                .or_else(|| r["query"].as_str())
+                .unwrap_or("")
+                .chars()
+                .take(200)
+                .collect::<String>();
+            SearchResult {
+                session_id: r["session_id"].as_str().unwrap_or("unknown").to_string(),
+                timestamp: r["timestamp"].as_str().unwrap_or("").to_string(),
+                sender: "system".to_string(),
+                content_preview,
+                relevance_score: 1.0 / (i as f64 + 1.0),
+            }
+        })
+        .collect();
 
     Ok(SessionSearchResponse {
-        results,
-        total_matches,
+        total_matches: results.len(),
         query: if query.is_empty() { None } else { Some(query) },
         session_id: request.session_id,
+        results,
     })
 }

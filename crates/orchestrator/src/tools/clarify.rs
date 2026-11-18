@@ -163,7 +163,10 @@ mod tests {
 
     fn make_ctx() -> crate::tools::ToolContext {
         use agent_context::{Source};
-        let path = format!("/tmp/crabjar-test-clarify-{}.db", std::process::id());
+        // Use a unique path per test to avoid concurrent test conflicts
+        static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let path = format!("/tmp/crabjar-test-clarify-{}-{}.db", std::process::id(), counter);
         // Remove any existing test DB
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{}-wal", path));

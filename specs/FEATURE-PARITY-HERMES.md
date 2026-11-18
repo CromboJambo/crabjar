@@ -52,7 +52,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | `skill_view` | ✅ Load SKILL.md + linked files | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — full manifest + linked file resolution via crabjar-skills loader |
 | `skills_list` | ✅ List with category filters | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — discover all skills from filesystem, optional category filter |
 | `skill_manage` | ✅ Create/patch/write_file/remove_file/delete | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — create/patch/delete with atomic operations array |
-| `session_search` | ✅ Search conversation history | ✅ `orchestrator/src/session_search.rs` | ⚠️ | P1-6 complete; needs verification of search quality |
+| `session_search` | ✅ Search conversation history | ✅ `src/session_search.rs` (FTS5) + `orchestrator/src/session_search.rs` | ✅ | P1 GAP CLOSED — FTS5 full-text search with relevance ranking, sync triggers, structured API; 4 tests |
 
 ## Process & System Tools
 
@@ -115,7 +115,7 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
 | **P2 (Enhancement)** | 3 | 3 | 0 | 0 | **100%** |
 | **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
-| **Total** | 25 | 23 | 2 | 0 | **92%** |
+| **Total** | 25 | 24 | 1 | 0 | **96%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -185,6 +185,7 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **`session_search` upgraded to FTS5 full-text search.** Replaced LIKE-based matching with FTS5 virtual table + sync triggers for relevance-ranked results. Structured API via `crabjar_lib`. 4 tests. Parity: 92% → **96%** |
 | 2026-11-18 | **`memory` verified as full parity.** Single-op + batch atomic operations, capacity tracking, target validation. 6 tests. Parity: 88% → **92%** |
 | 2026-11-18 | **`process_manage` upgraded to full lifecycle.** list/start/stop/inspect with Podman sandboxing support; fixed command validation bug (was rejecting valid shell commands). 5 tests. Parity: 84% → **88%** |
 | 2026-11-18 | **`clarify` upgraded to multi-question.** Supports 1-5 questions per call with single-select, multi-select, and open-ended responses — matches Hermes API exactly. 5 tests. Parity: 80% → **84%** |
