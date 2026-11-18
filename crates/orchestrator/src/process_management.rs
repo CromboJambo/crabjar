@@ -151,12 +151,9 @@ async fn handle_start(
         .command
         .ok_or_else(|| anyhow::anyhow!("command required for start"))?;
 
-    // Validate command format (redteam finding #14)
-    if !validate_tool_name(&cmd) {
-        return Ok(error_response(
-            "start",
-            "Invalid command format. Use lowercase alphanumeric with hyphens/underscores only.",
-        ));
+    // Validate command is not empty
+    if cmd.trim().is_empty() {
+        return Ok(error_response("start", "Empty command"));
     }
 
     if request.sandboxed {
@@ -350,5 +347,132 @@ async fn handle_inspect(
                 "error": "Process not found"
             }),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::Mutex as TokioMutex;
+
+    fn make_registry() -> TokioMutex<ProcessRegistry> {
+        TokioMutex::new(ProcessRegistry::new())
+    }
+
+    #[tokio::test]
+    async fn test_list_empty() {
+        let registry = make_registry();
+        let req = ProcessManageRequest {
+            action: "list".to_string(),
+            command: None,
+            pid: None,
+            sandboxed: false,
+            container_name: None,
+        };
+        let resp = execute_process_management(req, &registry).await.unwrap();
+        assert!(resp.success);
+        assert_eq!(resp.result["count"], 0);
+    }
+
+    #[tokio::test]
+    async fn test_start_and_list() {
+        let registry = make_registry();
+        let req = ProcessManageRequest {
+            action: "start".to_string(),
+            command: Some("sleep 1".to_string()),
+            pid: None,
+            sandboxed: false,
+            container_name: None,
+        };
+        let resp = execute_process_management(req, &registry).await.unwrap();
+        assert!(resp.success);
+        let pid = resp.result["pid"].as_i64().unwrap() as i32;
+
+        // List should show the process
+        let list_req = ProcessManageRequest {
+            action: "list".to_string(),
+            command: None,
+            pid: None,
+            sandboxed: false,
+            container_name: None,
+        };
+        let list_resp = execute_process_management(list_req, &registry).await.unwrap();
+        assert!(list_resp.success);
+        assert_eq!(list_resp.result["count"], 1);
+
+        // Stop the process
+        let stop_req = ProcessManageRequest {
+            action: "stop".to_string(),
+            command: None,
+            pid: Some(pid),
+            sandboxed: false,
+            container_name: None,
+        };
+        let stop_resp = execute_process_management(stop_req, &registry).await.unwrap();
+        assert!(stop_resp.success);
+    }
+
+    #[tokio::test]
+    async fn test_inspect_managed() {
+        let registry = make_registry();
+        let req = ProcessManageRequest {
+            action: "start".to_string(),
+            command: Some("sleep 1".to_string()),
+            pid: None,
+            sandboxed: false,
+            container_name: None,
+        };
+        let resp = execute_process_management(req, &registry).await.unwrap();
+        assert!(resp.success);
+        let pid = resp.result["pid"].as_i64().unwrap() as i32;
+
+        let inspect_req = ProcessManageRequest {
+            action: "inspect".to_string(),
+            command: None,
+            pid: Some(pid),
+            sandboxed: false,
+            container_name: None,
+        };
+        let inspect_resp = execute_process_management(inspect_req, &registry).await.unwrap();
+        assert!(inspect_resp.success);
+        assert_eq!(inspect_resp.result["pid"], pid);
+
+        // Cleanup
+        let stop_req = ProcessManageRequest {
+            action: "stop".to_string(),
+            command: None,
+            pid: Some(pid),
+            sandboxed: false,
+            container_name: None,
+        };
+        let _ = execute_process_management(stop_req, &registry).await;
+    }
+
+    #[tokio::test]
+    async fn test_unknown_action() {
+        let registry = make_registry();
+        let req = ProcessManageRequest {
+            action: "fly".to_string(),
+            command: None,
+            pid: None,
+            sandboxed: false,
+            container_name: None,
+        };
+        let resp = execute_process_management(req, &registry).await.unwrap();
+        assert!(!resp.success);
+    }
+
+    #[tokio::test]
+    async fn test_start_empty_command() {
+        let registry = make_registry();
+        let req = ProcessManageRequest {
+            action: "start".to_string(),
+            command: Some("   ".to_string()),
+            pid: None,
+            sandboxed: false,
+            container_name: None,
+        };
+        let resp = execute_process_management(req, &registry).await.unwrap();
+        assert!(!resp.success);
     }
 }

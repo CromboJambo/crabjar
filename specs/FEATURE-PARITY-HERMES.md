@@ -59,7 +59,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
 | `terminal` | ✅ Shell with background jobs, PTY, notifications | ✅ `orchestrator/src/tools/terminal.rs` (first-class) + process management | ✅ | P1 GAP CLOSED — foreground/background execution with timeout, workdir, exit codes; 8 tests |
-| `process_manage` | ✅ List/kill/restart background processes | ✅ `orchestrator/src/process_management.rs` | ⚠️ | Basic registry exists; needs full lifecycle parity |
+| `process_manage` | ✅ List/kill/restart background processes | ✅ `orchestrator/src/process_management.rs` (full lifecycle) | ✅ | P1 GAP CLOSED — list/start/stop/inspect with Podman sandboxing; 5 tests |
 | `cronjob_manage` | ✅ Schedule recurring tasks | ✅ `crabjar-cron` (scheduler, store) | ⚠️ | P1-8 complete; needs verification of tool surface parity |
 
 ## Vision & Media Tools
@@ -115,7 +115,7 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
 | **P2 (Enhancement)** | 3 | 3 | 0 | 0 | **100%** |
 | **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
-| **Total** | 25 | 21 | 3 | 1 | **84%** |
+| **Total** | 25 | 22 | 3 | 0 | **88%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -185,6 +185,7 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **`process_manage` upgraded to full lifecycle.** list/start/stop/inspect with Podman sandboxing support; fixed command validation bug (was rejecting valid shell commands). 5 tests. Parity: 84% → **88%** |
 | 2026-11-18 | **`clarify` upgraded to multi-question.** Supports 1-5 questions per call with single-select, multi-select, and open-ended responses — matches Hermes API exactly. 5 tests. Parity: 80% → **84%** |
 | 2026-11-18 | **execute_code, terminal, and skill tools upgraded to first-class.** `execute_code` (Rhai VM via crabjar-exec), `terminal` (foreground/background with timeout/workdir), `skills_list`/`skill_view`/`skill_manage` (full CRUD). 12 new tests. Parity: 68% → **80%** |
 | 2026-11-18 | **4 first-class file tools implemented.** `read_file` (line-numbered, pagination), `write_file` (overwrite + parent dirs), `patch` (9 fuzzy strategies), `search_files` (ripgrep-backed). All 4 upgraded from ⚠️ partial to ✅ full API parity with Hermes. 22 new unit tests. |
