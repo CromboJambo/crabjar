@@ -57,11 +57,10 @@ pub struct CrateInfo {
 /// Handles workspace = true inherited deps and `package` field aliases.
 fn resolve_dep_package_name(dep_val: &toml::Value) -> Option<String> {
     // Check for explicit package override (alias)
-    if let Some(pkg_field) = dep_val.get("package") {
-        if let Some(pkg_name) = pkg_field.as_str() {
+    if let Some(pkg_field) = dep_val.get("package")
+        && let Some(pkg_name) = pkg_field.as_str() {
             return Some(pkg_name.to_string());
         }
-    }
 
     // For workspace = true, we'd need to resolve through the workspace manifest.
     // This is complex — for now, skip these (they're version-inherited, not structural).
@@ -94,54 +93,45 @@ fn parse_crate_info(manifest_path: &Path) -> Option<CrateInfo> {
 
     // Check [dependencies], [dev-dependencies], [build-dependencies]
     for section in &["dependencies", "dev-dependencies", "build-dependencies"] {
-        if let Some(deps) = parsed.get(section) {
-            if let Some(table) = deps.as_table() {
+        if let Some(deps) = parsed.get(section)
+            && let Some(table) = deps.as_table() {
                 for (dep_key, dep_val) in table {
                     // Resolve package name (handle aliases)
                     let pkg_name = resolve_dep_package_name(dep_val);
-                    match pkg_name {
-                        Some(name) => direct_deps.push(name),
-                        None => {
-                            // Key is the package name (or workspace-inherited, which we skip)
-                            if dep_val.get("workspace").and_then(toml::Value::as_bool) == Some(true)
-                            {
-                                continue;
-                            }
-                            direct_deps.push(dep_key.clone());
+                    if let Some(name) = pkg_name { direct_deps.push(name) } else {
+                        // Key is the package name (or workspace-inherited, which we skip)
+                        if dep_val.get("workspace").and_then(toml::Value::as_bool) == Some(true)
+                        {
+                            continue;
                         }
+                        direct_deps.push(dep_key.clone());
                     }
                 }
             }
-        }
     }
 
     // Check target-specific dependency tables
-    if let Some(target_table) = parsed.get("target") {
-        if let Some(targets) = target_table.as_table() {
+    if let Some(target_table) = parsed.get("target")
+        && let Some(targets) = target_table.as_table() {
             for (_target_name, target_val) in targets {
                 for section in &["dependencies", "dev-dependencies", "build-dependencies"] {
-                    if let Some(deps) = target_val.get(section) {
-                        if let Some(table) = deps.as_table() {
+                    if let Some(deps) = target_val.get(section)
+                        && let Some(table) = deps.as_table() {
                             for (dep_key, dep_val) in table {
                                 let pkg_name = resolve_dep_package_name(dep_val);
-                                match pkg_name {
-                                    Some(name) => direct_deps.push(name),
-                                    None => {
-                                        if dep_val.get("workspace").and_then(toml::Value::as_bool)
-                                            == Some(true)
-                                        {
-                                            continue;
-                                        }
-                                        direct_deps.push(dep_key.clone());
+                                if let Some(name) = pkg_name { direct_deps.push(name) } else {
+                                    if dep_val.get("workspace").and_then(toml::Value::as_bool)
+                                        == Some(true)
+                                    {
+                                        continue;
                                     }
+                                    direct_deps.push(dep_key.clone());
                                 }
                             }
                         }
-                    }
                 }
             }
         }
-    }
 
     Some(CrateInfo {
         name,
@@ -170,11 +160,10 @@ pub fn discover_workspace_members(workspace_root: &Path) -> Result<Vec<CrateInfo
         let member_path = member.as_str().ok_or("Invalid member entry")?;
         let manifest_path = workspace_root.join(member_path).join("Cargo.toml");
 
-        if manifest_path.exists() {
-            if let Some(info) = parse_crate_info(&manifest_path) {
+        if manifest_path.exists()
+            && let Some(info) = parse_crate_info(&manifest_path) {
                 crates.push(info);
             }
-        }
     }
 
     Ok(crates)

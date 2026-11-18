@@ -19,7 +19,7 @@ fn annotate_target(source: &str, target: &mut EvaluationTarget) {
     let sem = annotate_all(source, 0);
 
     // Ownership analysis via pesti's analyzer (detects borrow patterns)
-    for (_id, ann) in &sem.ownership {
+    for ann in sem.ownership.values() {
         match ann.mode {
             pesti_structural_tokenizer::semantic::OwnershipMode::Owned => {
                 if target.ownership_mode.is_none() {
@@ -52,7 +52,7 @@ fn annotate_target(source: &str, target: &mut EvaluationTarget) {
     }
 
     // Error handling analysis via pesti's analyzer
-    for (_id, ann) in &sem.errors {
+    for ann in sem.errors.values() {
         match ann.handling {
             pesti_structural_tokenizer::semantic::ErrorHandling::Propagated => {
                 target.error_handling = Some(ErrorHandling::Propagated);
@@ -77,7 +77,7 @@ fn annotate_target(source: &str, target: &mut EvaluationTarget) {
     }
 
     // Mutability analysis via pesti's analyzer
-    for (_id, ann) in &sem.mutability {
+    for ann in sem.mutability.values() {
         if ann.mutable {
             target.mutability = Some(Mutability::Mutable);
         } else if target.mutability.is_none() {

@@ -136,7 +136,9 @@ impl Conductor {
             // Fail-open: if neither is available, assignment proceeds as before.
             let resource_ok = match &worker.resources {
                 Some(res) => {
-                    if !res.is_fresh(300) {
+                    if res.is_fresh(300) {
+                        res.can_satisfy(&task.resources)
+                    } else {
                         // Stale snapshot (>5 min) — treat as unknown, fall through to riod
                         debug!(
                             task_id = %task.id,
@@ -145,8 +147,6 @@ impl Conductor {
                             "Worker resource snapshot stale, falling back to local riod"
                         );
                         self.riod_checker().can_satisfy(&task.resources)
-                    } else {
-                        res.can_satisfy(&task.resources)
                     }
                 }
                 None => {

@@ -122,7 +122,7 @@ impl russh::server::Handler for Bastion {
         &mut self,
         channel: russh::Channel<russh::server::Msg>,
         reply: russh::server::ChannelOpenHandle,
-        session: &mut russh::server::Session,
+        _session: &mut russh::server::Session,
     ) -> Result<(), Self::Error> {
         let client_id = self.id;
 

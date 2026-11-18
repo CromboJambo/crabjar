@@ -7,8 +7,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::evaluate::evaluate_structural_conditions;
-use super::structural::build_target;
 
 pub(crate) mod cargo;
 pub(crate) mod dependency_graph;

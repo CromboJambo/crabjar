@@ -17,7 +17,7 @@ pub fn verify_artifact(artifact_path: &Path) -> Result<bool, ArtifactError> {
     let metadata = inspect_artifact(artifact_path)?;
 
     // The .ca file should be alongside a .tar.zst with the same base name
-    let stem = artifact_path
+    let _stem = artifact_path
         .file_stem()
         .ok_or(ArtifactError::InvalidFormat("No file stem".to_string()))?;
     let tarball_path = artifact_path.with_extension("tar.gz");
@@ -44,7 +44,7 @@ pub fn rebuild_check(
     project_dir: &Path,
     target_triple: Option<&str>,
 ) -> Result<bool, ArtifactError> {
-    let target = target_triple.unwrap_or("x86_64-unknown-linux-musl");
+    let _target = target_triple.unwrap_or("x86_64-unknown-linux-musl");
 
     // Read package name to find existing artifact
     use crate::build::read_package_name;
@@ -106,7 +106,7 @@ pub fn install_artifact(artifact_path: &Path, store_root: &Path) -> Result<PathB
     fs::create_dir_all(&store_path)?;
 
     // Extract tarball to store path
-    let stem = artifact_path
+    let _stem = artifact_path
         .file_stem()
         .ok_or(ArtifactError::InvalidFormat("No file stem".to_string()))?;
     let tarball_path = artifact_path.with_extension("tar.gz");

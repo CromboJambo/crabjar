@@ -4,7 +4,6 @@
 //! Integrates with the TUI's existing approval/question mechanism via SSE events.
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot;
 
 /// A single question option for the user to select from.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -107,7 +107,7 @@ impl FileWatcher {
 
         // Step 3: Dedup check
         let result = self.dedup_engine.process_file(
-            &path.to_string_lossy(),
+            path.to_string_lossy(),
             &cleaned,
             Some(secrets_found.keys().cloned().collect()),
         )?;

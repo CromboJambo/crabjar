@@ -10,7 +10,7 @@ use std::path::Path;
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 
-/// Evolution configuration loaded from .crabjar_config.toml
+/// Evolution configuration loaded from .`crabjar_config.toml`
 #[derive(Debug, Clone, Deserialize)]
 pub struct EvolutionConfig {
     pub enabled: bool,
@@ -41,6 +41,7 @@ pub struct DecisionOutcome {
 
 /// Evolution state persisted to disk
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct EvolutionState {
     /// Recent decision outcomes for learning
     pub recent_outcomes: Vec<DecisionOutcome>,
@@ -50,15 +51,6 @@ pub struct EvolutionState {
     pub decision_counts: HashMap<String, usize>,
 }
 
-impl Default for EvolutionState {
-    fn default() -> Self {
-        Self {
-            recent_outcomes: Vec::new(),
-            threshold_adjustments: HashMap::new(),
-            decision_counts: HashMap::new(),
-        }
-    }
-}
 
 /// JEV Evolution Manager
 pub struct EvolutionManager {
@@ -68,7 +60,7 @@ pub struct EvolutionManager {
 }
 
 impl EvolutionManager {
-    /// Create a new evolution manager from .crabjar_config.toml
+    /// Create a new evolution manager from .`crabjar_config.toml`
     pub fn new(project_root: &str) -> Result<Self> {
         let config_path = Path::new(project_root).join(".crabjar_config.toml");
 
@@ -81,23 +73,18 @@ impl EvolutionManager {
                 EvolutionConfig {
                     enabled: decision
                         .get("enabled")
-                        .and_then(|v| v.as_bool())
+                        .and_then(toml::Value::as_bool)
                         .unwrap_or(true),
                     evolution_threshold: decision
                         .get("evolution_threshold")
                         .and_then(|v| {
-                            if let Ok(f) = v.to_string().parse::<f64>() {
-                                Some(f)
-                            } else {
-                                None
-                            }
+                            v.to_string().parse::<f64>().ok()
                         })
                         .unwrap_or(0.85),
                     feedback_window: decision
                         .get("feedback_window")
-                        .and_then(|v| v.as_integer())
-                        .map(|v| v as usize)
-                        .unwrap_or(100),
+                        .and_then(toml::Value::as_integer)
+                        .map_or(100, |v| v as usize),
                 }
             } else {
                 EvolutionConfig::default()
@@ -141,6 +128,7 @@ impl EvolutionManager {
     }
 
     /// Get the evolved threshold for a criteria file
+    #[must_use]
     pub fn get_threshold(&self, criteria_file: &str) -> f64 {
         if let Some(adjustment) = self.state.threshold_adjustments.get(criteria_file) {
             *adjustment
@@ -193,6 +181,7 @@ impl EvolutionManager {
     }
 
     /// Get decision statistics for a criteria file
+    #[must_use]
     pub fn get_stats(&self, criteria_file: &str) -> Option<DecisionStats> {
         let outcomes: Vec<&DecisionOutcome> = self
             .state

@@ -1,6 +1,6 @@
 //! Jev decision-making: feedback, metrics, promotion, and learnings subcommands.
 
-use crate::commands::decide_db::{DecisionRecord, EvidenceStore};
+use crate::commands::decide_db::EvidenceStore;
 use serde_json::json;
 use std::time::SystemTime;
 

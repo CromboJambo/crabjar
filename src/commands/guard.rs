@@ -165,7 +165,7 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
                 .unwrap_or_else(|| "http://127.0.0.1:8788".to_string());
 
             // Get all pending actions from local GuardDb
-            let pending = guard_db.read_action_requests(Some(&"pending".to_string()), 50)?;
+            let pending = guard_db.read_action_requests(Some("pending"), 50)?;
             let mut reconciled = Vec::new();
             let mut errors = Vec::new();
 
@@ -181,8 +181,8 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
                 {
                     Ok(output) if output.status.success() => {
                         let body = String::from_utf8_lossy(&output.stdout);
-                        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&body) {
-                            if let Some(status) = json_val
+                        if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&body)
+                            && let Some(status) = json_val
                                 .get("action")
                                 .and_then(|a| a.get("status"))
                                 .and_then(|s| s.as_str())
@@ -237,7 +237,6 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
                                     _ => {} // still pending or unknown — skip
                                 }
                             }
-                        }
                     }
                     Ok(output) => {
                         let stderr = String::from_utf8_lossy(&output.stderr);

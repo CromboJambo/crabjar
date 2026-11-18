@@ -411,7 +411,7 @@ pub async fn supervisor_heartbeat(
     }
 }
 
-/// GET /workers/deployments/pending/{supervisor_id} - Return pending deployments for a supervisor (public).
+/// GET /`workers/deployments/pending/{supervisor_id`} - Return pending deployments for a supervisor (public).
 pub async fn pending_deployments(
     axum::extract::State(conductor): axum::extract::State<ConductorState>,
     Path(supervisor_id): Path<String>,
@@ -461,9 +461,9 @@ pub async fn update_deployment_status(
 ) -> Json<serde_json::Value> {
     let deployment_id = id.0;
     let status_str = body["status"].as_str().unwrap_or("").to_string();
-    let sandbox_id = body["sandbox_id"].as_str().map(|s| s.to_string());
+    let sandbox_id = body["sandbox_id"].as_str().map(std::string::ToString::to_string);
     let outcome = body.get("outcome").cloned();
-    let error = body["error"].as_str().map(|s| s.to_string());
+    let error = body["error"].as_str().map(std::string::ToString::to_string);
 
     if status_str.is_empty() {
         return Json(json!({

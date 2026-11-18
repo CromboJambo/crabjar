@@ -36,7 +36,7 @@ impl PromotionManager {
         Ok(manager)
     }
 
-    /// Initialize SQLite schema for promotion tracking.
+    /// Initialize `SQLite` schema for promotion tracking.
     fn init_schema(&self) -> Result<(), rusqlite::Error> {
         self.db.execute_batch(
             "CREATE TABLE IF NOT EXISTS worker_competence_evidence (\n\

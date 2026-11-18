@@ -1,7 +1,7 @@
 //! Cargo.toml parsing and crate discovery.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::types::CrateInfo;
 

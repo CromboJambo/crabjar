@@ -28,7 +28,7 @@ mod tool_registry_cli;
 use bitwarden::commands::handle_bitwarden_command;
 mod commands;
 use crabjar_lib::{
-    ApprovalCommand, BitwardenCommand, CellCommand, Cli, CliCommand, DoctorCommand, KnowledgeCommand,
+    ApprovalCommand, BitwardenCommand, Cli, CliCommand, DoctorCommand, KnowledgeCommand,
     WorkspaceCommand,
 };
 use doctor::handle_doctor_command;

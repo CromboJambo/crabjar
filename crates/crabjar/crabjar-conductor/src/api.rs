@@ -31,7 +31,7 @@ use crate::auth::{AuthError, validate_token};
 use crate::conductor::Conductor;
 use axum::{
     Json, Router,
-    extract::{Request, State},
+    extract::Request,
     http::StatusCode,
     middleware::{self, Next},
     response::IntoResponse,

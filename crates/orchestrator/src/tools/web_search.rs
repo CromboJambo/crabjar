@@ -19,16 +19,14 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
             for (i, result) in response.results.iter().enumerate() {
                 output.push_str(&format!("{}. {}\n", i + 1, result.title));
                 output.push_str(&format!("   URL: {}\n", result.url));
-                if let Some(desc) = &result.description {
-                    if !desc.is_empty() {
+                if let Some(desc) = &result.description
+                    && !desc.is_empty() {
                         output.push_str(&format!("   Description: {}\n", desc));
                     }
-                }
-                if let Some(snippet) = &result.snippet {
-                    if !snippet.is_empty() {
+                if let Some(snippet) = &result.snippet
+                    && !snippet.is_empty() {
                         output.push_str(&format!("   Snippet: {}\n", snippet));
                     }
-                }
                 output.push('\n');
             }
 

@@ -33,11 +33,11 @@ impl AgentConfig {
         Self {
             user,
             home: home.clone(),
-            inbox: format!("{}/inbox", home),
-            outbox: format!("{}/outbox", home),
-            log_dir: format!("{}/log", home),
-            workspace: format!("{}/workspace", home),
-            config: format!("{}/config", home),
+            inbox: format!("{home}/inbox"),
+            outbox: format!("{home}/outbox"),
+            log_dir: format!("{home}/log"),
+            workspace: format!("{home}/workspace"),
+            config: format!("{home}/config"),
         }
     }
 
@@ -64,11 +64,10 @@ impl ExecutionResult {
         let ts = self
             .timestamp
             .duration_since(SystemTime::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+            .map_or(0, |d| d.as_secs());
 
         let exit_code = match &self.exit_code {
-            Some(code) => format!("\"{}\"", code),
+            Some(code) => format!("\"{code}\""),
             None => "null".to_string(),
         };
 
@@ -101,7 +100,7 @@ fn escape_json_string(s: &str) -> String {
 
 fn ensure_dir(path: &str) -> Result<(), String> {
     if let Err(e) = fs::create_dir_all(path) {
-        return Err(format!("Failed to create directory {}: {}", path, e));
+        return Err(format!("Failed to create directory {path}: {e}"));
     }
     Ok(())
 }
@@ -113,12 +112,12 @@ fn append_telemetry(config: &AgentConfig, result: &ExecutionResult) -> Result<()
         Ok(file) => {
             let mut writer = BufWriter::new(file);
             let json = result.to_json();
-            match writer.write_all(format!("{}\n", json).as_bytes()) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(format!("Failed to write telemetry: {}", e)),
+            match writer.write_all(format!("{json}\n").as_bytes()) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(format!("Failed to write telemetry: {e}")),
             }
         }
-        Err(e) => Err(format!("Failed to open telemetry file {}: {}", path, e)),
+        Err(e) => Err(format!("Failed to open telemetry file {path}: {e}")),
     }
 }
 
@@ -126,8 +125,8 @@ fn write_status(config: &AgentConfig, result: &ExecutionResult) -> Result<(), St
     let path = config.status_path();
     let json = result.to_json();
 
-    fs::write(&path, format!("{}\n", json))
-        .map_err(|e| format!("Failed to write status file {}: {}", path, e))
+    fs::write(&path, format!("{json}\n"))
+        .map_err(|e| format!("Failed to write status file {path}: {e}"))
 }
 
 fn print_environment(config: &AgentConfig) {
@@ -160,7 +159,7 @@ fn main() {
         let result = ExecutionResult {
             success: false,
             exit_code: None,
-            error_message: Some(format!("Directory setup failed: {}", e)),
+            error_message: Some(format!("Directory setup failed: {e}")),
             timestamp: SystemTime::now(),
             hermes_args: hermes_args.clone(),
         };
@@ -200,10 +199,10 @@ fn main() {
                 ExecutionResult {
                     success,
                     exit_code,
-                    error_message: if !success {
-                        Some(format!("hermes exited with code {:?}", exit_code))
-                    } else {
+                    error_message: if success {
                         None
+                    } else {
+                        Some(format!("hermes exited with code {exit_code:?}"))
                     },
                     timestamp: SystemTime::now(),
                     hermes_args: hermes_args.clone(),
@@ -212,7 +211,7 @@ fn main() {
             Err(e) => ExecutionResult {
                 success: false,
                 exit_code: None,
-                error_message: Some(format!("Failed to wait for hermes: {}", e)),
+                error_message: Some(format!("Failed to wait for hermes: {e}")),
                 timestamp: SystemTime::now(),
                 hermes_args: hermes_args.clone(),
             },
@@ -220,7 +219,7 @@ fn main() {
         Err(e) => ExecutionResult {
             success: false,
             exit_code: None,
-            error_message: Some(format!("Failed to spawn hermes: {}", e)),
+            error_message: Some(format!("Failed to spawn hermes: {e}")),
             timestamp: SystemTime::now(),
             hermes_args: hermes_args.clone(),
         },
@@ -228,11 +227,11 @@ fn main() {
 
     // Write telemetry and status
     if let Err(e) = append_telemetry(&config, &result) {
-        eprintln!("Warning: {}", e);
+        eprintln!("Warning: {e}");
     }
 
     if let Err(e) = write_status(&config, &result) {
-        eprintln!("Warning: {}", e);
+        eprintln!("Warning: {e}");
     }
 
     // Report result
@@ -240,7 +239,7 @@ fn main() {
         println!("SUCCESS: hermes completed successfully");
     } else {
         match &result.error_message {
-            Some(msg) => eprintln!("ERROR: {}", msg),
+            Some(msg) => eprintln!("ERROR: {msg}"),
             None => eprintln!("ERROR: hermes failed (no error message available)"),
         }
     }

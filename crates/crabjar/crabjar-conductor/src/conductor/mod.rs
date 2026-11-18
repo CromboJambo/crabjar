@@ -2,7 +2,7 @@
 
 use crate::audit::{AuditContext, AuditEventType, ConductorAuditLogger};
 use crate::conductor::riod::RiodResourceChecker;
-use crate::decision::{BackendConfig, CacheStats, DecisionGate, DecisionPolicy};
+use crate::decision::DecisionGate;
 use crate::fleet_status::FleetStatusTracker;
 use crate::promotion::PromotionManager;
 use crate::sandbox::SandboxManager;
@@ -12,7 +12,7 @@ use rusqlite::Connection;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 pub mod decisions;
 pub mod riod;
@@ -223,7 +223,7 @@ impl Conductor {
                 // Fallback: create a single task with the goal description as the command
                 let task = self
                     .store
-                    .create_task(&goal_id, format!("[{}] {}", description, description))?;
+                    .create_task(&goal_id, format!("[{description}] {description}"))?;
                 Ok(vec![task])
             }
         }
@@ -361,7 +361,7 @@ impl Conductor {
             debug!(goal_id = %goal_id, command = %command, "Creating task from LLM spec");
             let task = self
                 .store
-                .create_task(goal_id, format!("[{}] {}", description, command))?;
+                .create_task(goal_id, format!("[{description}] {command}"))?;
             tasks.push(task);
         }
 

@@ -75,6 +75,7 @@ pub struct WorkerResources {
 
 impl WorkerResources {
     /// Check if this worker can satisfy the given task requirements.
+    #[must_use]
     pub fn can_satisfy(&self, req: &TaskResources) -> bool {
         // RAM check
         if u64::from(req.memory_mb) > self.available_ram_mb {
@@ -88,6 +89,7 @@ impl WorkerResources {
     }
 
     /// Check if this snapshot is still fresh (less than `max_age_secs` old).
+    #[must_use]
     pub fn is_fresh(&self, max_age_secs: u64) -> bool {
         match chrono::DateTime::parse_from_rfc3339(&self.reported_at) {
             Ok(t) => {

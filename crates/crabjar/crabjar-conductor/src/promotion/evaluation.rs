@@ -4,7 +4,7 @@ use chrono::Utc;
 use rusqlite::{Connection, params};
 use uuid::Uuid;
 
-use super::evidence::{aggregate_evidence, record_task_completion};
+use super::evidence::aggregate_evidence;
 use super::types::{PromotionEvaluation, PromotionThresholdConfig, ThresholdCheck};
 
 /// Get threshold configuration for a target rank.

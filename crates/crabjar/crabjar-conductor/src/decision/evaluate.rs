@@ -217,14 +217,13 @@ impl JevEvaluator {
     async fn load_criteria(&self, path: &str) -> Result<DecisionCriteria> {
         // Validate and canonicalize path to prevent injection
         let resolved = std::fs::canonicalize(path)
-            .map_err(|e| anyhow!("Failed to resolve path '{}': {}", path, e))?;
+            .map_err(|e| anyhow!("Failed to resolve path '{path}': {e}"))?;
 
         // Ensure the resolved path is within an expected base directory
         // (no traversal outside the project root)
         if !resolved.starts_with("/") {
             return Err(anyhow!(
-                "Path not absolute after canonicalization: {}",
-                path
+                "Path not absolute after canonicalization: {path}"
             ));
         }
 

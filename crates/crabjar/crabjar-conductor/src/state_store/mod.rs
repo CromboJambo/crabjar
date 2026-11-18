@@ -1,6 +1,6 @@
 //! SQLite-backed state store for conductor persistence.
 //!
-//! Provides durable storage for goals, tasks, workers, and decisions using embedded SQLite.
+//! Provides durable storage for goals, tasks, workers, and decisions using embedded `SQLite`.
 //! Schema migrations are handled automatically on open.
 
 use std::path::Path;

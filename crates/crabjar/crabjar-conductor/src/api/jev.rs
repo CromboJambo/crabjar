@@ -1,7 +1,6 @@
 //! JEV (Just-in-Time Evaluation) routes: structural evaluation, post-processing, and feedback.
 
 use crate::api::ConductorState;
-use crate::decision::evaluate::validate_path;
 use axum::{Json, extract::State};
 use serde_json::json;
 

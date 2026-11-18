@@ -1,7 +1,6 @@
 //! Crate evaluation using structural conditions.
 
 use std::fs;
-use std::path::Path;
 
 use super::super::evaluate::evaluate_structural_conditions;
 use super::super::structural::build_target;

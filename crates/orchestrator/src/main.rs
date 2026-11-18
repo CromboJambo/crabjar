@@ -9,7 +9,7 @@ use axum::{
 use std::env;
 
 
-use crabjar_guard::{ActionStatus, ExecutionGate, GateConcierge, GateContext};
+use crabjar_guard::{ExecutionGate, GateConcierge, GateContext};
 
 use futures_util::stream;
 use serde::{Deserialize, Serialize};

@@ -214,7 +214,7 @@ pub async fn handle_exec(
     // state and we proceed accordingly. If it escalates, we fall through to
     // the human-review path.
     let outcome = match outcome {
-        crabjar_guard::ConciergeOutcome::Queued(pending_action, pending_entry) => {
+        crabjar_guard::ConciergeOutcome::Queued(pending_action, _pending_entry) => {
             let arbiter = crabjar_guard::JevArbiter::with_standard_passes();
             let arbitration = arbiter.arbitrate(pending_action);
 

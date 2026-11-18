@@ -232,7 +232,7 @@ fn read_total_ram_mb() -> Option<u64> {
     let content = std::fs::read_to_string("/proc/meminfo").ok()?;
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix("MemTotal:") {
-            let kb: u64 = rest.trim().split_whitespace().next()?.parse().ok()?;
+            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
             return Some(kb / 1024);
         }
     }
@@ -244,14 +244,14 @@ fn read_available_ram_mb() -> Option<u64> {
     let content = std::fs::read_to_string("/proc/meminfo").ok()?;
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix("MemAvailable:") {
-            let kb: u64 = rest.trim().split_whitespace().next()?.parse().ok()?;
+            let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
             return Some(kb / 1024);
         }
     }
     None
 }
 
-/// Detect NVIDIA GPUs via nvidia-smi. Returns (total_count, available_count).
+/// Detect NVIDIA GPUs via nvidia-smi. Returns (`total_count`, `available_count`).
 /// Available = GPUs with < 90% memory used (rough heuristic for "in use").
 fn detect_gpus() -> (u32, u32) {
     let output = match std::process::Command::new("nvidia-smi")
@@ -268,15 +268,14 @@ fn detect_gpus() -> (u32, u32) {
 
     for line in stdout.lines() {
         let fields: Vec<&str> = line.split(',').map(str::trim).collect();
-        if fields.len() >= 2 {
-            if let (Ok(used), Ok(total)) = (fields[0].parse::<u64>(), fields[1].parse::<u64>()) {
+        if fields.len() >= 2
+            && let (Ok(used), Ok(total)) = (fields[0].parse::<u64>(), fields[1].parse::<u64>()) {
                 count += 1;
                 // GPU is "available" if using less than 90% of memory
                 if total > 0 && used * 10 < total * 9 {
                     available += 1;
                 }
             }
-        }
     }
 
     (count, available)

@@ -30,7 +30,7 @@ impl TargetConfig {
     fn resolve(target: &str) -> Result<Self, String> {
         let home = match env::var("HOME") {
             Ok(h) => PathBuf::from(h),
-            Err(e) => return Err(format!("Failed to get HOME directory: {}", e)),
+            Err(e) => return Err(format!("Failed to get HOME directory: {e}")),
         };
 
         match target {
@@ -64,7 +64,7 @@ impl TargetConfig {
                 ssh_key: None,
                 port: None,
             }),
-            other => Err(format!("Unknown target: {}", other)),
+            other => Err(format!("Unknown target: {other}")),
         }
     }
 }
@@ -108,19 +108,14 @@ impl DeployConfig {
         };
 
         // Determine version from git or environment
-        let version = match env::var("CRABJAR_VERSION") {
-            Ok(v) => v,
-            Err(_) => {
-                let output = Command::new("git")
-                    .args(["describe", "--tags", "--always"])
-                    .output()
-                    .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-                    .unwrap_or_else(|_| "dev".to_string());
-                if output.is_empty() {
-                    "dev".to_string()
-                } else {
-                    output
-                }
+        let version = if let Ok(v) = env::var("CRABJAR_VERSION") { v } else {
+            let output = Command::new("git")
+                .args(["describe", "--tags", "--always"])
+                .output().map_or_else(|_| "dev".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+            if output.is_empty() {
+                "dev".to_string()
+            } else {
+                output
             }
         };
 
@@ -141,7 +136,7 @@ impl DeployConfig {
 
 /// Log a deployment step.
 fn log_step(message: &str) {
-    println!("[deploy] {}", message);
+    println!("[deploy] {message}");
 }
 
 /// Run a command and return its output.
@@ -149,7 +144,7 @@ fn run_command(program: &str, args: &[&str]) -> Result<String, String> {
     let output = Command::new(program)
         .args(args)
         .output()
-        .map_err(|e| format!("Failed to run {}: {}", program, e))?;
+        .map_err(|e| format!("Failed to run {program}: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -161,28 +156,27 @@ fn run_command(program: &str, args: &[&str]) -> Result<String, String> {
 
 /// Build the release binary for a specific package.
 fn build_release(package: &str) -> Result<PathBuf, String> {
-    log_step(&format!("Building {} release binary...", package));
+    log_step(&format!("Building {package} release binary..."));
 
     let output = Command::new("cargo")
         .args(["build", "--release", "-p", package])
         .output()
-        .map_err(|e| format!("Failed to run cargo build: {}", e))?;
+        .map_err(|e| format!("Failed to run cargo build: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("cargo build failed:\n{}", stderr));
+        return Err(format!("cargo build failed:\n{stderr}"));
     }
 
     log_step("Build complete");
-    Ok(PathBuf::from(format!("target/release/{}", package)))
+    Ok(PathBuf::from(format!("target/release/{package}")))
 }
 
 /// Generate machine-specific configuration.
 fn generate_config(machine_id: &str, version: &str, data_dir: &PathBuf) -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_secs());
 
     format!(
         "# Crabjar configuration for {}\n\
@@ -223,7 +217,7 @@ fn ssh_exec(config: &DeployConfig, command: &str) -> Result<String, String> {
 
     let output = ssh_cmd
         .output()
-        .map_err(|e| format!("Failed to run ssh: {}", e))?;
+        .map_err(|e| format!("Failed to run ssh: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(
@@ -247,11 +241,11 @@ fn scp_copy(config: &DeployConfig, local_path: &PathBuf, remote_path: &str) -> R
     }
     scp_cmd
         .arg(local_path)
-        .arg(&format!("{}:{}", host, remote_path));
+        .arg(format!("{host}:{remote_path}"));
 
     let output = scp_cmd
         .output()
-        .map_err(|e| format!("Failed to run scp: {}", e))?;
+        .map_err(|e| format!("Failed to run scp: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(
@@ -288,9 +282,9 @@ fn deploy_remote(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Str
 
     // Restart dinit service if specified
     if let Some(service) = &config.service {
-        log_step(&format!("Restarting dinit service: {}", service));
-        ssh_exec(config, &format!("sudo dinitctl stop {} || true", service))?;
-        ssh_exec(config, &format!("sudo dinitctl start {}", service))?;
+        log_step(&format!("Restarting dinit service: {service}"));
+        ssh_exec(config, &format!("sudo dinitctl stop {service} || true"))?;
+        ssh_exec(config, &format!("sudo dinitctl start {service}"))?;
     }
 
     // Generate and deploy machine-specific configuration for main crabjar package
@@ -302,7 +296,7 @@ fn deploy_remote(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Str
         // Write config to temp file and copy to remote
         let tmp_config = "/tmp/crabjar_deploy_config.toml";
         fs::write(tmp_config, &config_content)
-            .map_err(|e| format!("Failed to write temp config: {}", e))?;
+            .map_err(|e| format!("Failed to write temp config: {e}"))?;
 
         let tmp_path = PathBuf::from(tmp_config);
         scp_copy(
@@ -329,18 +323,18 @@ fn deploy_local(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Stri
 
     // Create directories
     fs::create_dir_all(&config.install_dir)
-        .map_err(|e| format!("Failed to create install dir: {}", e))?;
+        .map_err(|e| format!("Failed to create install dir: {e}"))?;
     fs::create_dir_all(&config.data_dir)
-        .map_err(|e| format!("Failed to create data dir: {}", e))?;
+        .map_err(|e| format!("Failed to create data dir: {e}"))?;
 
     // Copy binary
     log_step("Copying binary...");
     let dest = config.install_dir.join(&config.binary_name);
-    fs::copy(binary_path, &dest).map_err(|e| format!("Failed to copy binary: {}", e))?;
+    fs::copy(binary_path, &dest).map_err(|e| format!("Failed to copy binary: {e}"))?;
 
     // Make executable
     let perms = std::fs::Permissions::from_mode(0o755);
-    fs::set_permissions(&dest, perms).map_err(|e| format!("Failed to set permissions: {}", e))?;
+    fs::set_permissions(&dest, perms).map_err(|e| format!("Failed to set permissions: {e}"))?;
 
     // Generate config for main crabjar package
     if config.package == "crabjar" {
@@ -352,7 +346,7 @@ fn deploy_local(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Stri
             config.install_dir.join(".crabjar_config.toml"),
             &config_content,
         )
-        .map_err(|e| format!("Failed to write config: {}", e))?;
+        .map_err(|e| format!("Failed to write config: {e}"))?;
     }
 
     log_step("Local deployment complete");
@@ -374,11 +368,11 @@ fn main() {
     let extra_args = &args[2..];
 
     match run_deployment(target_name, extra_args) {
-        Ok(_) => {
+        Ok(()) => {
             println!("[deploy] Done!");
         }
         Err(e) => {
-            eprintln!("[deploy] Error: {}", e);
+            eprintln!("[deploy] Error: {e}");
             std::process::exit(1);
         }
     }

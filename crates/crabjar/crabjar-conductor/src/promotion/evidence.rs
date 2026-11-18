@@ -1,6 +1,6 @@
 //! Evidence collection and aggregation for worker promotion.
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, Utc};
 use rusqlite::{Connection, params};
 use uuid::Uuid;
 

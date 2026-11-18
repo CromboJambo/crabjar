@@ -1,10 +1,10 @@
 //! Deployment artifact management.
 //!
 //! Captures, stores, and retrieves output artifacts from completed deployments
-//! (logs, results, generated files). Supports both SQLite BLOB storage for small
+//! (logs, results, generated files). Supports both `SQLite` BLOB storage for small
 //! artifacts (< 1MB) and filesystem paths for large files.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use rusqlite::{OptionalExtension, Row, params};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use super::StateStore;
 
-/// Maximum size for SQLite BLOB storage (1MB). Larger artifacts are stored on disk.
+/// Maximum size for `SQLite` BLOB storage (1MB). Larger artifacts are stored on disk.
 pub const MAX_BLOB_SIZE: usize = 1_048_576;
 
 /// Artifact type classification.
@@ -35,6 +35,7 @@ impl ArtifactType {
         }
     }
 
+    #[must_use]
     pub fn from_str(s: &str) -> Self {
         match s {
             "result" => ArtifactType::Result,
@@ -48,7 +49,7 @@ impl ArtifactType {
 /// Storage location for an artifact.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ArtifactStorage {
-    /// Stored as BLOB in SQLite (small artifacts).
+    /// Stored as BLOB in `SQLite` (small artifacts).
     Blob(Vec<u8>),
     /// Stored on filesystem (large artifacts).
     Path(PathBuf),
@@ -143,7 +144,7 @@ impl StateStore {
                 rusqlite::Error::FromSqlConversionFailure(
                     0,
                     rusqlite::types::Type::Text,
-                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)),
+                    Box::new(std::io::Error::other(e)),
                 )
             })?;
             let file_path = artifacts_dir.join(format!("{id}.artifact"));
@@ -152,7 +153,7 @@ impl StateStore {
                 rusqlite::Error::FromSqlConversionFailure(
                     0,
                     rusqlite::types::Type::Text,
-                    Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)),
+                    Box::new(std::io::Error::other(e)),
                 )
             })?;
 
@@ -206,11 +207,10 @@ impl StateStore {
     /// Delete an artifact.
     pub fn delete_artifact(&self, id: &str) -> Result<(), rusqlite::Error> {
         // If it's a filesystem artifact, delete the file too
-        if let Some(artifact) = self.get_artifact(id)? {
-            if let ArtifactStorage::Path(path) = &artifact.storage {
+        if let Some(artifact) = self.get_artifact(id)?
+            && let ArtifactStorage::Path(path) = &artifact.storage {
                 let _ = std::fs::remove_file(path);
             }
-        }
 
         self.db.execute("DELETE FROM deployment_artifacts WHERE id = ?", params![id])?;
         Ok(())
@@ -234,7 +234,7 @@ impl StateStore {
 
     /// Clean up artifacts older than the given retention period (in days).
     pub fn cleanup_old_artifacts(&self, retention_days: u32) -> Result<i64, rusqlite::Error> {
-        let cutoff = Utc::now() - chrono::Duration::days(retention_days as i64);
+        let cutoff = Utc::now() - chrono::Duration::days(i64::from(retention_days));
         let cutoff_str = cutoff.to_rfc3339();
 
         // Find completed deployments older than cutoff
@@ -259,9 +259,7 @@ impl StateStore {
         // Use the same directory as the database file
         let parent = self
             .db
-            .path()
-            .map(|p| std::path::Path::new(p).parent().unwrap_or_else(|| std::path::Path::new(".")))
-            .unwrap_or_else(|| std::path::Path::new("."));
+            .path().map_or_else(|| std::path::Path::new("."), |p| std::path::Path::new(p).parent().unwrap_or_else(|| std::path::Path::new(".")));
         parent.join("artifacts")
     }
 }

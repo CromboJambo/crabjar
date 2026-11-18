@@ -23,7 +23,7 @@ fn load_benchmarks(benchmark_dir: &str) -> Vec<BenchmarkPR> {
         let entry = entry.expect("Failed to read entry");
         let file_path = entry.path();
 
-        if !file_path.extension().is_some_and(|ext| ext == "json") {
+        if file_path.extension().is_none_or(|ext| ext != "json") {
             continue;
         }
 
@@ -34,8 +34,7 @@ fn load_benchmarks(benchmark_dir: &str) -> Vec<BenchmarkPR> {
         let pr = BenchmarkPR {
             name: data["name"].as_str().unwrap_or("unknown").to_string(),
             findings: data["findings"]
-                .as_array()
-                .map(|arr| arr.clone())
+                .as_array().cloned()
                 .unwrap_or_default(),
             expected_rule_ids: data["expected_rule_ids"]
                 .as_array()

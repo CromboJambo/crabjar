@@ -1,4 +1,4 @@
-//! C++ LanguageAdapter implementation: converts source to universal SpanTree.
+//! C++ `LanguageAdapter` implementation: converts source to universal `SpanTree`.
 
 use crate::{LanguageAdapter, Span, SpanKind, SpanTree};
 use std::collections::HashMap;
