@@ -113,6 +113,17 @@ jobs:
     - name: Review snapshots (fail on pending)
       run: cargo insta test --review --test snapshot_tests
 
+  security-audit:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Install cargo-audit
+      run: cargo install cargo-audit --quiet
+    - name: Check for known vulnerabilities
+      run: cargo audit
+
   e2e-smoke:
     runs-on: ubuntu-24.04
     steps:
