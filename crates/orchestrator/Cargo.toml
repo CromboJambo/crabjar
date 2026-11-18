@@ -66,11 +66,17 @@ crabjar-browser = { path = "../crabjar/crabjar-browser" }
 crabjar-browser-vault = { path = "../crabjar/crabjar-browser-vault" }
 crabjar-homeassistant = { path = "../crabjar/crabjar-homeassistant" }
 
+# Vision analysis (P2 — video_analyze)
+crabjar-vision = { path = "../crabjar/crabjar-vision" }
+
 # Directory detection for memory tool
 dirs.workspace = true
 
 # Time handling for clarify tool timeouts
 chrono.workspace = true
+
+# Temp directories for video analysis and catalog
+tempfile.workspace = true
 
 # Local LLM inference (placeholder — llm-runner moved to PESTI portable execution substrate)
 # The native runner was removed; inference now delegates to external LLM servers.

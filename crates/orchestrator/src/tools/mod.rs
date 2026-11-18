@@ -12,12 +12,15 @@ pub mod by_source;
 pub mod clarify;
 pub mod delegate_task;
 pub mod homeassistant;
+pub mod manage_catalog;
 pub mod memory;
 pub mod process_manage;
+pub mod react_to_message;
 pub mod recent_events;
 pub mod run_command;
 pub mod search_logs;
 pub mod session_search;
+pub mod video_analyze;
 pub mod web_search;
 
 /// Context passed to tool handlers.
@@ -46,6 +49,9 @@ pub async fn execute(
         "browser_exec" => browser_exec::handle(args, ctx).await,
         "browser_login" => browser_login::handle(args).await,
         "browser_vault" => browser_vault::handle(args).await,
+        "manage_catalog" => manage_catalog::handle(args).await,
+        "react_to_message" => react_to_message::handle(args).await,
+        "video_analyze" => video_analyze::handle(args).await,
         name if name.starts_with("ha_") => homeassistant::handle(name, args, ctx).await,
         _ => Err(format!("Unknown tool: {}", function_name)),
     }

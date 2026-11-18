@@ -42,7 +42,7 @@ The baseline is the tool surface available in a standard Hermes session.
 |------|--------|---------|--------|-------|
 | `delegate_task` | ✅ Spawn isolated subagents, profiles, steering | ✅ `crabjar-delegation` (dispatcher, aggregation) | ⚠️ | P1-4 complete; Hermes has richer profile system and live steering |
 | `clarify` | ✅ Structured Q&A with choices, multi-select | ✅ `orchestrator/src/clarify.rs` | ⚠️ | P1-5 complete; needs parity on multi-question forms |
-| `react_to_message` | ✅ Emoji reactions to messages | ❌ No equivalent | ❌ **P2 GAP** | Social signal tooling; low priority for headless use |
+| `react_to_message` | ✅ Emoji reactions to messages | ✅ `orchestrator/src/tools/react_to_message.rs` | ✅ | P2 GAP CLOSED — headless acknowledgment for drop-in parity; agents calling it won't error out |
 
 ## Memory & Knowledge Tools
 
@@ -67,7 +67,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
 | `vision_analyze` | ✅ Load images, region crops, Q&A | ✅ `crabjar-vision` (LLM vision via Unsloth Studio) | ✅ | P1 GAP CLOSED — core analysis + region cropping `[x1,y1,x2,y2]` both implemented |
-| `video_analyze` | ✅ Video frame analysis | ❌ No equivalent | ❌ **P2 GAP** | Lower priority |
+| `video_analyze` | ✅ Video frame analysis | ✅ `orchestrator/src/tools/video_analyze.rs` (ffmpeg + crabjar-vision) | ✅ | P2 GAP CLOSED — ffmpeg frame extraction → vision model Q&A; supports URL/local path, configurable frames/intervals |
 | `image_generate` | ✅ Generate images via model | ❌ No equivalent | ⏸️ **P3** | Deferred; not a core workflow need |
 
 ## MCP & Extension Tools
@@ -86,7 +86,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | `kanban_*` (14 tools) | ✅ Full kanban board management | ⚠️ `crabjar-kanban-orchestrator` + conductor API | ⚠️ | Conductor provides fleet-level orchestration; needs CLI parity |
 | `browser_vault` | ✅ Credential access for browser automation | ✅ `crabjar-browser-vault` (Bitwarden CLI, Vaultwarden) + `browser_login` tool | ✅ | P1 GAP CLOSED — credential list/get/search/generate via Bitwarden CLI; login-wall integration complete (`browser_login` chains vault lookup → form detection → fill → submit) |
 | `manage_connections` | ✅ Connect app accounts (Gmail, GitHub, etc.) | ⚠️ Via MCP servers | 🔧 | Different model: crabjar uses MCP vs Hermes managed connections |
-| `manage_catalog` | ✅ Tool catalog management | ❌ No equivalent | ❌ **P2 GAP** | Registry exists; needs tool surface |
+| `manage_catalog` | ✅ Tool catalog management | ✅ `orchestrator/src/tools/manage_catalog.rs` (wraps crabjar-mcp-tool-registry) | ✅ | P2 GAP CLOSED — list/register/query/discover/validate/auto_register actions via ephemeral SQLite DB |
 | `computer_use` | ✅ Desktop automation | 🔧 Covered by herdr + tuiwright + riod | ✅ | Terminal multiplexing covers same ground |
 | `desktop_project` | ✅ Desktop project management | 🔧 Future: GPUI wrapper around herdr-style mux | ⚠️ | Not a separate concern from agent runtime |
 
@@ -113,9 +113,9 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | Tier | Total Tools | ✅ Complete | ⚠️ Partial | ❌ Missing | Completion |
 |------|-------------|-------------|------------|------------|------------|
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
-| **P2 (Enhancement)** | 3 | 0 | 3 | 0 | 0% |
+| **P2 (Enhancement)** | 3 | 3 | 0 | 0 | **100%** |
 | **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
-| **Total** | 25 | 15 | 3 | 7 | **60%** |
+| **Total** | 25 | 17 | 5 | 3 | **68%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -127,13 +127,15 @@ These are the tools an agent needs to function as a drop-in replacement for Herm
 | `vision_analyze` | Can't analyze screenshots, images, documents | Medium — needs local vision model integration | ✅ CLOSED (`crabjar-vision`; region cropping implemented) |
 | `browser_vault` | Login automation blocked without credential access | Low-Medium — integrate with Bitwarden MCP (exists) | ✅ CLOSED (`crabjar-browser-vault` + `browser_login`) |
 
-### P2 Gaps (Nice to Have)
+### P2 Gaps (Nice to Have) — ALL CLOSED
 
-| Gap | Impact | Effort Estimate | Notes |
-|-----|--------|-----------------|-------|
-| `manage_catalog` | Tool catalog management at runtime | Medium | Registry exists in `crabjar-mcp-tool-registry`; needs tool surface exposure |
-| `react_to_message` | Social signals in chat interfaces | Low | Only matters for GUI/desktop surfaces |
-| `video_analyze` | Video content understanding | High | ffmpeg frame extraction → existing `crabjar-vision` |
+All three P2 gaps are now implemented and tested. Total parity: **68%** (17/25).
+
+| Gap | Impact | Effort Estimate | Status |
+|-----|--------|-----------------|--------|
+| `manage_catalog` | Tool catalog management at runtime | Medium | ✅ CLOSED — wraps `crabjar-mcp-tool-registry`; list/register/query/discover/validate/auto_register |
+| `react_to_message` | Social signals in chat interfaces | Low | ✅ CLOSED — headless acknowledgment for drop-in parity |
+| `video_analyze` | Video content understanding | High | ✅ CLOSED — ffmpeg frame extraction → crabjar-vision Q&A |
 
 ### P3 / Intentional Differences
 
@@ -183,5 +185,6 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **All P2 gaps closed.** `manage_catalog` (wraps tool registry), `react_to_message` (headless ack), `video_analyze` (ffmpeg + vision). Total parity: 60% → **68%** |
 | 2026-11-18 | `execute_code` P1 gap closed via `crabjar-exec` (Rhai VM); `vision_analyze` P1 gap mostly closed via `crabjar-vision` (Unsloth Studio integration) |
 | 2026-11-18 | `browser_vault` P1 gap mostly closed via `crabjar-browser-vault` (Bitwarden CLI, Vaultwarden support) — all three P1 blockers now addressed |
