@@ -8,7 +8,6 @@ use axum::{
 };
 use std::env;
 
-
 use crabjar_guard::{ExecutionGate, GateConcierge, GateContext};
 
 use futures_util::stream;
@@ -487,8 +486,7 @@ fn guard_tool_call(tool_name: &str, args: &[String], source_event_id: &str) -> R
                 )),
                 crabjar_guard::ConciergeOutcome::Denied(_, interrupted_entry) => Err(format!(
                     "Interrupted: {} (interrupted_id: {})",
-                    interrupted_entry.reason,
-                    interrupted_entry.id
+                    interrupted_entry.reason, interrupted_entry.id
                 )),
             }
         }

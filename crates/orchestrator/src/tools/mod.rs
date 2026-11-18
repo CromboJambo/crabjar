@@ -1,22 +1,22 @@
 //! Tool execution framework for the orchestrator.
 //! Each tool is implemented as a separate module with a consistent interface.
 
+use agent_context::Store;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use agent_context::Store;
 
+pub mod browser_exec;
+pub mod by_source;
+pub mod clarify;
+pub mod delegate_task;
+pub mod homeassistant;
+pub mod memory;
+pub mod process_manage;
+pub mod recent_events;
 pub mod run_command;
 pub mod search_logs;
-pub mod recent_events;
-pub mod by_source;
-pub mod web_search;
-pub mod memory;
-pub mod delegate_task;
-pub mod clarify;
 pub mod session_search;
-pub mod process_manage;
-pub mod browser_exec;
-pub mod homeassistant;
+pub mod web_search;
 
 /// Context passed to tool handlers.
 pub struct ToolContext {

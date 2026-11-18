@@ -108,10 +108,16 @@ impl DeployConfig {
         };
 
         // Determine version from git or environment
-        let version = if let Ok(v) = env::var("CRABJAR_VERSION") { v } else {
+        let version = if let Ok(v) = env::var("CRABJAR_VERSION") {
+            v
+        } else {
             let output = Command::new("git")
                 .args(["describe", "--tags", "--always"])
-                .output().map_or_else(|_| "dev".to_string(), |o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+                .output()
+                .map_or_else(
+                    |_| "dev".to_string(),
+                    |o| String::from_utf8_lossy(&o.stdout).trim().to_string(),
+                );
             if output.is_empty() {
                 "dev".to_string()
             } else {
@@ -239,9 +245,7 @@ fn scp_copy(config: &DeployConfig, local_path: &PathBuf, remote_path: &str) -> R
     if let Some(p) = config.target.port {
         scp_cmd.arg("-P").arg(p.to_string());
     }
-    scp_cmd
-        .arg(local_path)
-        .arg(format!("{host}:{remote_path}"));
+    scp_cmd.arg(local_path).arg(format!("{host}:{remote_path}"));
 
     let output = scp_cmd
         .output()
@@ -324,8 +328,7 @@ fn deploy_local(config: &DeployConfig, binary_path: &PathBuf) -> Result<(), Stri
     // Create directories
     fs::create_dir_all(&config.install_dir)
         .map_err(|e| format!("Failed to create install dir: {e}"))?;
-    fs::create_dir_all(&config.data_dir)
-        .map_err(|e| format!("Failed to create data dir: {e}"))?;
+    fs::create_dir_all(&config.data_dir).map_err(|e| format!("Failed to create data dir: {e}"))?;
 
     // Copy binary
     log_step("Copying binary...");

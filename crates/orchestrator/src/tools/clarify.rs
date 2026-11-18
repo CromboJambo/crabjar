@@ -40,7 +40,10 @@ pub async fn handle(args: &[String], ctx: &super::ToolContext) -> Result<String,
         source_observations: vec![],
     };
 
-    let store_lock = ctx.store.lock().map_err(|e| format!("Failed to lock store: {}", e))?;
+    let store_lock = ctx
+        .store
+        .lock()
+        .map_err(|e| format!("Failed to lock store: {}", e))?;
     match store_lock.insert(entry) {
         Ok(id) => {
             info!("Clarify question stored: id={}, db_row={}", question_id, id);

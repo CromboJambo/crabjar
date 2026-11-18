@@ -135,4 +135,3 @@ impl GithubClient {
         Ok(results)
     }
 }
-

@@ -255,7 +255,10 @@ fn read_available_ram_mb() -> Option<u64> {
 /// Available = GPUs with < 90% memory used (rough heuristic for "in use").
 fn detect_gpus() -> (u32, u32) {
     let output = match std::process::Command::new("nvidia-smi")
-        .args(["--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"])
+        .args([
+            "--query-gpu=memory.used,memory.total",
+            "--format=csv,noheader,nounits",
+        ])
         .output()
     {
         Ok(o) if o.status.success() => o,
@@ -269,13 +272,14 @@ fn detect_gpus() -> (u32, u32) {
     for line in stdout.lines() {
         let fields: Vec<&str> = line.split(',').map(str::trim).collect();
         if fields.len() >= 2
-            && let (Ok(used), Ok(total)) = (fields[0].parse::<u64>(), fields[1].parse::<u64>()) {
-                count += 1;
-                // GPU is "available" if using less than 90% of memory
-                if total > 0 && used * 10 < total * 9 {
-                    available += 1;
-                }
+            && let (Ok(used), Ok(total)) = (fields[0].parse::<u64>(), fields[1].parse::<u64>())
+        {
+            count += 1;
+            // GPU is "available" if using less than 90% of memory
+            if total > 0 && used * 10 < total * 9 {
+                available += 1;
             }
+        }
     }
 
     (count, available)
@@ -435,7 +439,8 @@ mod tests {
                 gpus_available: u32,
                 reported_at: String,
             }
-            let parsed: Expected = serde_json::from_value(json).expect("valid WorkerResources JSON");
+            let parsed: Expected =
+                serde_json::from_value(json).expect("valid WorkerResources JSON");
             assert!(parsed.max_ram_mb > 0);
         }
     }

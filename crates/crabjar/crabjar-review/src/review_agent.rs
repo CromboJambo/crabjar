@@ -41,9 +41,7 @@ impl ReviewAgent {
     /// Create a new review agent with default configuration.
     #[must_use]
     pub fn new(config: ReviewConfig) -> Self {
-        Self {
-            config,
-        }
+        Self { config }
     }
 
     /// Run the full review pipeline on a git diff.

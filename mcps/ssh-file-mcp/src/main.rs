@@ -71,7 +71,9 @@ impl SshFileServer {
 
 #[tool_router(server_handler)]
 impl SshFileServer {
-    #[tool(description = "List files in a directory on the phone. Path is relative to phone home (~).")]
+    #[tool(
+        description = "List files in a directory on the phone. Path is relative to phone home (~)."
+    )]
     fn list_files(&self, params: Parameters<ListRequest>) -> String {
         let request = &params.0;
         let path = if request.path.starts_with("~/") || request.path == "~" {
@@ -86,7 +88,9 @@ impl SshFileServer {
         }
     }
 
-    #[tool(description = "Read a file from the phone. Path is relative to phone home (~). Returns file content as text.")]
+    #[tool(
+        description = "Read a file from the phone. Path is relative to phone home (~). Returns file content as text."
+    )]
     fn read_file(&self, params: Parameters<FileRequest>) -> String {
         let request = &params.0;
         let path = if request.path.starts_with("~/") || request.path == "~" {
@@ -101,7 +105,9 @@ impl SshFileServer {
         }
     }
 
-    #[tool(description = "Write content to a file on the phone. Path is relative to phone home (~).")]
+    #[tool(
+        description = "Write content to a file on the phone. Path is relative to phone home (~)."
+    )]
     fn write_file(&self, params: Parameters<WriteRequest>) -> String {
         let request = &params.0;
         // Write to temp file locally, then SCP to phone
@@ -129,7 +135,9 @@ impl SshFileServer {
         }
     }
 
-    #[tool(description = "Download a file from the phone to this machine. Source is on phone (~ relative), destination is local absolute path.")]
+    #[tool(
+        description = "Download a file from the phone to this machine. Source is on phone (~ relative), destination is local absolute path."
+    )]
     fn download_file(&self, params: Parameters<TransferRequest>) -> String {
         let request = &params.0;
         let src_path = if request.source.starts_with("~/") || request.source == "~" {
@@ -144,11 +152,16 @@ impl SshFileServer {
         }
     }
 
-    #[tool(description = "Upload a file from this machine to the phone. Source is local absolute path, destination is on phone (~ relative).")]
+    #[tool(
+        description = "Upload a file from this machine to the phone. Source is local absolute path, destination is on phone (~ relative)."
+    )]
     fn upload_file(&self, params: Parameters<TransferRequest>) -> String {
         let request = &params.0;
         let dest_path = if request.destination.starts_with("~/") || request.destination == "~" {
-            format!("/data/data/com.termux/files/home{}", &request.destination[1..])
+            format!(
+                "/data/data/com.termux/files/home{}",
+                &request.destination[1..]
+            )
         } else {
             request.destination.clone()
         };

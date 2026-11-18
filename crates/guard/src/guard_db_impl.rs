@@ -396,7 +396,8 @@ mod tests {
         assert_eq!(status, "pending");
 
         // Approve the pending entry
-        db.resolve_pending_queue_entry("phase3-test-1", true).unwrap();
+        db.resolve_pending_queue_entry("phase3-test-1", true)
+            .unwrap();
 
         // Verify action_request is now TrustApproved
         let status = {

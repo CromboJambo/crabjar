@@ -1,6 +1,6 @@
 //! Cell subcommand handlers — durable session state via celld cells.
 
-use crabjar_lib::{celld_session, CellCommand, CellWorkloadCommand};
+use crabjar_lib::{CellCommand, CellWorkloadCommand, celld_session};
 use serde_json::json;
 
 pub fn handle_cell_command(command: CellCommand) -> serde_json::Value {
@@ -18,12 +18,7 @@ pub fn handle_cell_command(command: CellCommand) -> serde_json::Value {
     }
 }
 
-fn handle_put(
-    session: &str,
-    key: &str,
-    value_str: &str,
-    entry_type: &str,
-) -> serde_json::Value {
+fn handle_put(session: &str, key: &str, value_str: &str, entry_type: &str) -> serde_json::Value {
     let value: serde_json::Value = match serde_json::from_str(value_str) {
         Ok(v) => v,
         Err(e) => {
@@ -110,7 +105,11 @@ fn handle_delete(session: &str, key: &str) -> serde_json::Value {
 
 fn handle_workload_command(command: CellWorkloadCommand) -> serde_json::Value {
     match command {
-        CellWorkloadCommand::Create { session, name, steps } => {
+        CellWorkloadCommand::Create {
+            session,
+            name,
+            steps,
+        } => {
             if steps.is_empty() {
                 return json!({
                     "success": false,
@@ -145,13 +144,14 @@ fn handle_workload_command(command: CellWorkloadCommand) -> serde_json::Value {
 
             match client.get(&key) {
                 Ok(Some(value)) => {
-                    let workload: celld_session::CheckpointedWorkload =
-                        match serde_json::from_value(value) {
-                            Ok(w) => w,
-                            Err(e) => {
-                                return json!({ "success": false, "error": format!("invalid workload data: {}", e) })
-                            }
-                        };
+                    let workload: celld_session::CheckpointedWorkload = match serde_json::from_value(
+                        value,
+                    ) {
+                        Ok(w) => w,
+                        Err(e) => {
+                            return json!({ "success": false, "error": format!("invalid workload data: {}", e) });
+                        }
+                    };
                     json!({
                         "success": true,
                         "session": session,
@@ -176,27 +176,30 @@ fn handle_workload_command(command: CellWorkloadCommand) -> serde_json::Value {
             }
         }
 
-        CellWorkloadCommand::Step { session, name, result } => {
+        CellWorkloadCommand::Step {
+            session,
+            name,
+            result,
+        } => {
             let client = celld_session::SessionClient::new(&session);
             let key = format!("workload:{}", name);
 
             let value = match client.get(&key) {
                 Ok(Some(v)) => v,
                 Ok(None) => {
-                    return json!({ "success": false, "error": "workload not found", "session": session, "name": name })
+                    return json!({ "success": false, "error": "workload not found", "session": session, "name": name });
                 }
-                Err(e) => {
-                    return json!({ "success": false, "error": e })
-                }
+                Err(e) => return json!({ "success": false, "error": e }),
             };
 
-            let mut workload: celld_session::CheckpointedWorkload =
-                match serde_json::from_value(value) {
-                    Ok(w) => w,
-                    Err(e) => {
-                        return json!({ "success": false, "error": format!("invalid workload data: {}", e) })
-                    }
-                };
+            let mut workload: celld_session::CheckpointedWorkload = match serde_json::from_value(
+                value,
+            ) {
+                Ok(w) => w,
+                Err(e) => {
+                    return json!({ "success": false, "error": format!("invalid workload data: {}", e) });
+                }
+            };
 
             let next_idx = match workload.next_pending() {
                 Some(i) => i,
@@ -207,7 +210,7 @@ fn handle_workload_command(command: CellWorkloadCommand) -> serde_json::Value {
                         "name": name,
                         "complete": true,
                         "message": "all steps already complete"
-                    })
+                    });
                 }
             };
 
@@ -247,20 +250,18 @@ fn handle_workload_command(command: CellWorkloadCommand) -> serde_json::Value {
             let value = match client.get(&key) {
                 Ok(Some(v)) => v,
                 Ok(None) => {
-                    return json!({ "success": false, "error": "workload not found", "session": session, "name": name })
+                    return json!({ "success": false, "error": "workload not found", "session": session, "name": name });
                 }
-                Err(e) => {
-                    return json!({ "success": false, "error": e })
-                }
+                Err(e) => return json!({ "success": false, "error": e }),
             };
 
-            let workload: celld_session::CheckpointedWorkload =
-                match serde_json::from_value(value) {
-                    Ok(w) => w,
-                    Err(e) => {
-                        return json!({ "success": false, "error": format!("invalid workload data: {}", e) })
-                    }
-                };
+            let workload: celld_session::CheckpointedWorkload = match serde_json::from_value(value)
+            {
+                Ok(w) => w,
+                Err(e) => {
+                    return json!({ "success": false, "error": format!("invalid workload data: {}", e) });
+                }
+            };
 
             if workload.is_complete() {
                 return json!({
@@ -288,7 +289,9 @@ fn handle_workload_command(command: CellWorkloadCommand) -> serde_json::Value {
                 completed_steps.push(current.steps[idx].id.clone());
 
                 // Checkpoint after each step (this is the key: state survives interruption)
-                if let Err(e) = client.put(&key, &serde_json::to_value(&current).unwrap(), "workload") {
+                if let Err(e) =
+                    client.put(&key, &serde_json::to_value(&current).unwrap(), "workload")
+                {
                     return json!({
                         "success": false,
                         "error": format!("checkpoint failed at {}: {}", current.steps[idx].id, e),

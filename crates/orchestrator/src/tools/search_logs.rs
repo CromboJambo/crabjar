@@ -20,13 +20,17 @@ pub async fn handle(args: &[String], ctx: &super::ToolContext) -> Result<String,
             }
         };
 
-    let store_lock = ctx.store.lock().map_err(|e| format!("Failed to lock store: {}", e))?;
-    let events = match store_lock.search_content(&search_req.term, search_req.limit.map(|l| l as usize)) {
-        Ok(events) => events,
-        Err(e) => {
-            return Err(format!("Error searching events: {:?}", e));
-        }
-    };
+    let store_lock = ctx
+        .store
+        .lock()
+        .map_err(|e| format!("Failed to lock store: {}", e))?;
+    let events =
+        match store_lock.search_content(&search_req.term, search_req.limit.map(|l| l as usize)) {
+            Ok(events) => events,
+            Err(e) => {
+                return Err(format!("Error searching events: {:?}", e));
+            }
+        };
 
     let mut output = String::new();
     output.push_str(&format!(

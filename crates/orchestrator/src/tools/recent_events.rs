@@ -15,7 +15,10 @@ pub async fn handle(args: &[String], ctx: &super::ToolContext) -> Result<String,
             }
         };
 
-    let store_lock = ctx.store.lock().map_err(|e| format!("Failed to lock store: {}", e))?;
+    let store_lock = ctx
+        .store
+        .lock()
+        .map_err(|e| format!("Failed to lock store: {}", e))?;
     let events = match store_lock.events(recent_req.limit as usize) {
         Ok(events) => events,
         Err(e) => {

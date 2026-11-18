@@ -5,6 +5,8 @@
 use std::env;
 use std::path::PathBuf;
 
+use serial_test::serial;
+
 /// Helper: set env var, run closure, restore original value
 fn with_env_var(name: &str, value: Option<&str>, f: impl FnOnce()) {
     let original = env::var(name).ok();
@@ -19,6 +21,7 @@ fn with_env_var(name: &str, value: Option<&str>, f: impl FnOnce()) {
     }
 }
 
+#[serial]
 #[test]
 fn test_crabjar_state_dir_env() {
     // Test that CRABJAR_STATE_DIR is respected
@@ -42,6 +45,7 @@ fn test_crabjar_state_dir_env() {
     });
 }
 
+#[serial]
 #[test]
 fn test_structured_aux_criteria_path_env() {
     // Test that STRUCTURED_AUX_CRITERIA_PATH is respected
@@ -64,6 +68,7 @@ fn test_structured_aux_criteria_path_env() {
     });
 }
 
+#[serial]
 #[test]
 fn test_training_data_dir_env() {
     // Test that CRABJAR_TRAINING_DATA_DIR is respected
@@ -86,6 +91,7 @@ fn test_training_data_dir_env() {
     });
 }
 
+#[serial]
 #[test]
 fn test_unsloth_outputs_dir_env() {
     // Test that UNSLOTH_OUTPUTS_DIR is respected
@@ -104,6 +110,7 @@ fn test_unsloth_outputs_dir_env() {
     });
 }
 
+#[serial]
 #[test]
 fn test_bastion_key_path_env() {
     // Test that CRABJAR_BASTION_KEY_PATH is respected
@@ -126,6 +133,7 @@ fn test_bastion_key_path_env() {
     });
 }
 
+#[serial]
 #[test]
 fn test_ssh_key_path_env() {
     // Test that CRABJAR_SSH_KEY_PATH is respected
@@ -144,6 +152,7 @@ fn test_ssh_key_path_env() {
     });
 }
 
+#[serial]
 #[test]
 fn test_all_env_vars_can_be_set_simultaneously() {
     // Test that all env vars can be set at once without conflicts
@@ -202,6 +211,7 @@ fn test_all_env_vars_can_be_set_simultaneously() {
     });
 }
 
+#[serial]
 #[test]
 fn test_env_vars_do_not_affect_each_other() {
     // Test that setting one env var doesn't affect others

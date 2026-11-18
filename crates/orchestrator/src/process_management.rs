@@ -121,14 +121,15 @@ pub async fn execute_process_management(
         "start" => handle_start(request, registry).await,
         "stop" => handle_stop(request, registry).await,
         "inspect" => handle_inspect(request, registry).await,
-        other => Ok(error_response("unknown", &format!("Unknown action: {}", other))),
+        other => Ok(error_response(
+            "unknown",
+            &format!("Unknown action: {}", other),
+        )),
     }
 }
 
 /// List all managed processes.
-async fn handle_list(
-    registry: &Mutex<ProcessRegistry>,
-) -> anyhow::Result<ProcessManageResponse> {
+async fn handle_list(registry: &Mutex<ProcessRegistry>) -> anyhow::Result<ProcessManageResponse> {
     let reg = registry.lock().await;
     let processes = reg.list().await;
     Ok(ProcessManageResponse {
@@ -195,7 +196,7 @@ async fn start_sandboxed(
             return Ok(error_response(
                 "start",
                 &format!("Failed to create sandbox container: {}", e),
-            ))
+            ));
         }
     };
 

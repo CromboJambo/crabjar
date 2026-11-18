@@ -8,11 +8,11 @@ pub mod thumbnail;
 pub mod vnc_client;
 
 use anyhow::{Context, Result};
+use axum::Router;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::get;
-use axum::Router;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -55,9 +55,7 @@ impl ScreenState {
         let cap = guard.as_mut().context("no VNC connection")?;
 
         match cap.capture_frame().await {
-            Ok(frame) => {
-                thumbnail::generate_thumbnail(&frame, max_dim, quality)
-            }
+            Ok(frame) => thumbnail::generate_thumbnail(&frame, max_dim, quality),
             Err(e) => {
                 // Connection likely died — drop it so next call reconnects.
                 tracing::warn!(vm = %self.vm.name, error = %e, "VNC capture failed, will reconnect");
@@ -113,12 +111,7 @@ async fn thumbnail_handler(
         .clamp(1, 100);
 
     match state.capture_thumbnail(max_dim, quality).await {
-        Ok(jpeg) => (
-            StatusCode::OK,
-            [("Content-Type", "image/jpeg")],
-            jpeg,
-        )
-            .into_response(),
+        Ok(jpeg) => (StatusCode::OK, [("Content-Type", "image/jpeg")], jpeg).into_response(),
         Err(e) => {
             tracing::error!(vm = %state.vm.name, error = %e, "thumbnail capture failed");
             (StatusCode::SERVICE_UNAVAILABLE, e.to_string()).into_response()

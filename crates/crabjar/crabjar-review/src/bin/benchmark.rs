@@ -33,9 +33,7 @@ fn load_benchmarks(benchmark_dir: &str) -> Vec<BenchmarkPR> {
 
         let pr = BenchmarkPR {
             name: data["name"].as_str().unwrap_or("unknown").to_string(),
-            findings: data["findings"]
-                .as_array().cloned()
-                .unwrap_or_default(),
+            findings: data["findings"].as_array().cloned().unwrap_or_default(),
             expected_rule_ids: data["expected_rule_ids"]
                 .as_array()
                 .map(|arr| {

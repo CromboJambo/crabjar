@@ -60,4 +60,3 @@ pub struct ClarifyResponse {
     pub selection: Option<usize>,
     pub text_response: Option<String>,
 }
-

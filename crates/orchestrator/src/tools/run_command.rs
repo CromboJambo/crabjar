@@ -2,9 +2,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 
 pub async fn handle(args: &[String]) -> Result<String, String> {
     if args.len() < 2 {
-        return Err(
-            "Error: run_command requires at least 2 arguments (tool and args)".to_string(),
-        );
+        return Err("Error: run_command requires at least 2 arguments (tool and args)".to_string());
     }
     let tool = &args[0];
     let command_args = &args[1..];

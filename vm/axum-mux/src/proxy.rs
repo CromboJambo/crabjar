@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use axum::{
     Router,
-    extract::{Query, State},
     extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
@@ -61,7 +61,11 @@ fn extract_token(headers: &HeaderMap, query: &HashMap<String, String>) -> Option
 
 /// Verifies the request's token matches the VM's configured token.
 /// If no token is configured, any request is accepted (open access).
-fn check_auth(vm: &Vm, headers: &HeaderMap, query: &HashMap<String, String>) -> Result<(), Response> {
+fn check_auth(
+    vm: &Vm,
+    headers: &HeaderMap,
+    query: &HashMap<String, String>,
+) -> Result<(), Response> {
     let required = match &vm.token {
         None => return Ok(()), // no auth required
         Some(t) => t,

@@ -51,4 +51,3 @@ pub async fn execute_session_search(
         session_id: request.session_id,
     })
 }
-

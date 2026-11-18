@@ -307,19 +307,11 @@ pub enum CellCommand {
         r#type: String,
     },
     /// Retrieve a value from the session cell
-    Get {
-        session: String,
-        key: String,
-    },
+    Get { session: String, key: String },
     /// List all entries in a session cell
-    List {
-        session: String,
-    },
+    List { session: String },
     /// Delete an entry from the session cell
-    Delete {
-        session: String,
-        key: String,
-    },
+    Delete { session: String, key: String },
     /// Run a checkpointed workload with resume capability
     Workload {
         #[command(subcommand)]
@@ -337,10 +329,7 @@ pub enum CellWorkloadCommand {
         steps: Vec<String>,
     },
     /// Show workload status and progress
-    Status {
-        session: String,
-        name: String,
-    },
+    Status { session: String, name: String },
     /// Execute the next pending step (simulated for demo)
     Step {
         session: String,
@@ -350,10 +339,7 @@ pub enum CellWorkloadCommand {
         result: String,
     },
     /// Resume a workload from its last checkpoint
-    Resume {
-        session: String,
-        name: String,
-    },
+    Resume { session: String, name: String },
 }
 
 #[derive(Debug, Subcommand, Clone)]

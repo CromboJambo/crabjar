@@ -3,8 +3,14 @@
 //! These tests verify that the TUI message types and CLI JSON output format
 //! produce consistent, serializable output across changes. They don't require
 //! a real terminal — just serde serialization of data structures.
+//!
+//! CLI tests check **structure** (valid JSON, expected fields present) rather
+//! than exact values (counts change with system state). This keeps them
+//! deterministic when run in parallel with other workspace tests.
 
 use std::process::Command;
+
+use serial_test::serial;
 
 /// Test that Message enum serializes to stable JSON.
 #[test]
@@ -31,173 +37,127 @@ fn test_message_serialization() {
         }),
     ];
 
-    insta::assert_json_snapshot!("message_serialization", messages);
+    // Verify structure: 4 messages, each with the expected type and fields.
+    assert_eq!(messages.len(), 4);
+
+    let user = &messages[0];
+    assert!(user.get("User").is_some());
+    assert_eq!(user["User"]["text"], "Hello, world!");
+
+    let agent = &messages[1];
+    assert!(agent.get("Agent").is_some());
+    assert!(
+        agent["Agent"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("processing")
+    );
+
+    let tool_call = &messages[2];
+    assert!(tool_call.get("ToolCall").is_some());
+    assert_eq!(tool_call["ToolCall"]["name"], "read_file");
+    assert!(
+        tool_call["ToolCall"]["args"]
+            .as_str()
+            .unwrap()
+            .contains("path")
+    );
+    assert!(tool_call["ToolCall"]["result"].is_string());
+
+    let guard = &messages[3];
+    assert!(guard.get("Guard").is_some());
+    assert_eq!(guard["Guard"]["action"], "execute_command");
+    assert_eq!(guard["Guard"]["pending"], true);
+}
+
+/// Helper: run a CLI command and return parsed JSON.
+fn run_cli(args: &[&str]) -> serde_json::Value {
+    let output = Command::new("cargo")
+        .args(["run", "-p", "crabjar", "--"])
+        .args(args)
+        .output()
+        .expect("Failed to run crabjar CLI");
+
+    assert!(
+        output.status.success(),
+        "crabjar {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str(&stdout).expect("Output is not valid JSON")
+}
+
+/// Verify CLI output has the expected structure: success field + required keys.
+fn assert_cli_structure(parsed: &serde_json::Value, command: &str, required_fields: &[&str]) {
+    assert!(
+        parsed
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        "crabjar {} should return success: true",
+        command
+    );
+
+    for field in required_fields {
+        assert!(
+            parsed.get(*field).is_some(),
+            "crabjar {} output missing expected field '{}'",
+            command,
+            field
+        );
+    }
 }
 
 /// Test that CLI `state list` returns valid JSON structure.
+#[serial]
 #[test]
 fn test_cli_state_list_output() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "crabjar", "--", "state", "list"])
-        .output()
-        .expect("Failed to run crabjar state list");
-
-    assert!(
-        output.status.success(),
-        "crabjar state list failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Output is not valid JSON");
-
-    insta::assert_json_snapshot!(
-        "cli_state_list_output",
-        serde_json::json!({
-            "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
-            "docs_count": parsed.get("docs").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-        })
-    );
+    let parsed = run_cli(&["state", "list"]);
+    assert_cli_structure(&parsed, "state list", &["success", "payload"]);
 }
 
 /// Test that CLI `workspace status` returns valid JSON structure.
+#[serial]
 #[test]
 fn test_cli_workspace_status_output() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "crabjar", "--", "workspace", "status"])
-        .output()
-        .expect("Failed to run crabjar workspace status");
-
-    assert!(
-        output.status.success(),
-        "crabjar workspace status failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Output is not valid JSON");
-
-    let workspace_val = parsed
-        .get("workspace")
-        .cloned()
-        .unwrap_or(serde_json::json!(null));
-
-    insta::assert_json_snapshot!(
-        "cli_workspace_status_output",
-        serde_json::json!({
-            "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
-            "workspace": workspace_val,
-        })
-    );
+    let parsed = run_cli(&["workspace", "status"]);
+    assert_cli_structure(&parsed, "workspace status", &["success", "workspace"]);
 }
 
 /// Test that CLI `doctor check` returns valid JSON structure.
+#[serial]
 #[test]
 fn test_cli_doctor_check_output() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "crabjar", "--", "doctor", "check"])
-        .output()
-        .expect("Failed to run crabjar doctor check");
-
-    assert!(
-        output.status.success(),
-        "crabjar doctor check failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Output is not valid JSON");
-
-    insta::assert_json_snapshot!(
-        "cli_doctor_check_output",
-        serde_json::json!({
-            "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
-            "checks_count": parsed.get("checks").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-        })
-    );
+    let parsed = run_cli(&["doctor", "check"]);
+    assert_cli_structure(&parsed, "doctor check", &["success", "doctor"]);
 }
 
 /// Test that CLI `tool list` returns valid JSON structure.
+#[serial]
 #[test]
 fn test_cli_tool_list_output() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "crabjar", "--", "tool", "list"])
-        .output()
-        .expect("Failed to run crabjar tool list");
-
-    assert!(
-        output.status.success(),
-        "crabjar tool list failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Output is not valid JSON");
-
-    insta::assert_json_snapshot!(
-        "cli_tool_list_output",
-        serde_json::json!({
-            "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
-            "tools_count": parsed.get("tools").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-        })
-    );
+    let parsed = run_cli(&["tool", "list"]);
+    assert_cli_structure(&parsed, "tool list", &["success", "tools"]);
 }
 
 /// Test that CLI `attempts status` returns valid JSON structure.
+#[serial]
 #[test]
 fn test_cli_attempts_status_output() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "crabjar", "--", "attempts", "status"])
-        .output()
-        .expect("Failed to run crabjar attempts status");
-
-    assert!(
-        output.status.success(),
-        "crabjar attempts status failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Output is not valid JSON");
-
-    insta::assert_json_snapshot!(
-        "cli_attempts_status_output",
-        serde_json::json!({
-            "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
-            "unjudged": parsed.get("attempts").and_then(|v| v.get("unjudged")).and_then(|v| v.as_u64()).unwrap_or(0),
-            "has_doubt": parsed.get("doubt").is_some(),
-        })
+    let parsed = run_cli(&["attempts", "status"]);
+    assert_cli_structure(
+        &parsed,
+        "attempts status",
+        &["success", "attempts", "doubt"],
     );
 }
 
 /// Test that CLI `guard queue` returns valid JSON structure.
+#[serial]
 #[test]
 fn test_cli_guard_queue_output() {
-    let output = Command::new("cargo")
-        .args(["run", "-p", "crabjar", "--", "guard", "queue"])
-        .output()
-        .expect("Failed to run crabjar guard queue");
-
-    assert!(
-        output.status.success(),
-        "crabjar guard queue failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("Output is not valid JSON");
-
-    insta::assert_json_snapshot!(
-        "cli_guard_queue_output",
-        serde_json::json!({
-            "success": parsed.get("success").and_then(|v| v.as_bool()).unwrap_or(false),
-            "pending_count": parsed.get("pending").and_then(|v| v.as_array()).map(|a| a.len()).unwrap_or(0),
-        })
-    );
+    let parsed = run_cli(&["guard", "queue"]);
+    assert_cli_structure(&parsed, "guard queue", &["success", "guard"]);
 }

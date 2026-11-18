@@ -40,8 +40,7 @@ pub struct DecisionOutcome {
 }
 
 /// Evolution state persisted to disk
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct EvolutionState {
     /// Recent decision outcomes for learning
     pub recent_outcomes: Vec<DecisionOutcome>,
@@ -50,7 +49,6 @@ pub struct EvolutionState {
     /// Decision counts per criteria file
     pub decision_counts: HashMap<String, usize>,
 }
-
 
 /// JEV Evolution Manager
 pub struct EvolutionManager {
@@ -77,9 +75,7 @@ impl EvolutionManager {
                         .unwrap_or(true),
                     evolution_threshold: decision
                         .get("evolution_threshold")
-                        .and_then(|v| {
-                            v.to_string().parse::<f64>().ok()
-                        })
+                        .and_then(|v| v.to_string().parse::<f64>().ok())
                         .unwrap_or(0.85),
                     feedback_window: decision
                         .get("feedback_window")

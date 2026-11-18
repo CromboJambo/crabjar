@@ -171,10 +171,7 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
 
             for action in &pending {
                 let action_id = &action.id;
-                let check_url = format!(
-                    "{}/?queue={}&action={}",
-                    base_url, queue, action_id
-                );
+                let check_url = format!("{}/?queue={}&action={}", base_url, queue, action_id);
                 match std::process::Command::new("curl")
                     .args(["-s", "--max-time", "3", &check_url])
                     .output()
@@ -186,57 +183,57 @@ pub fn handle(command: GuardCommand) -> Result<serde_json::Value, Box<dyn std::e
                                 .get("action")
                                 .and_then(|a| a.get("status"))
                                 .and_then(|s| s.as_str())
-                            {
-                                match status {
-                                    "approved" => {
-                                        let decided_by = json_val
-                                            .get("action")
-                                            .and_then(|a| a.get("decided_by"))
-                                            .and_then(|d| d.as_str())
-                                            .unwrap_or("celld-remote");
-                                        match guard_db.update_action_status(
-                                            action_id,
-                                            crabjar_guard::ActionStatus::TrustApproved,
-                                            decided_by,
-                                            Some(&format!("reconciled from celld ({})", queue)),
-                                        ) {
-                                            Ok(_) => reconciled.push(json!({
-                                                "action_id": action_id,
-                                                "decision": "approved",
-                                                "decided_by": decided_by,
-                                            })),
-                                            Err(e) => errors.push(json!({
-                                                "action_id": action_id,
-                                                "error": format!("local update failed: {}", e),
-                                            })),
-                                        }
+                        {
+                            match status {
+                                "approved" => {
+                                    let decided_by = json_val
+                                        .get("action")
+                                        .and_then(|a| a.get("decided_by"))
+                                        .and_then(|d| d.as_str())
+                                        .unwrap_or("celld-remote");
+                                    match guard_db.update_action_status(
+                                        action_id,
+                                        crabjar_guard::ActionStatus::TrustApproved,
+                                        decided_by,
+                                        Some(&format!("reconciled from celld ({})", queue)),
+                                    ) {
+                                        Ok(_) => reconciled.push(json!({
+                                            "action_id": action_id,
+                                            "decision": "approved",
+                                            "decided_by": decided_by,
+                                        })),
+                                        Err(e) => errors.push(json!({
+                                            "action_id": action_id,
+                                            "error": format!("local update failed: {}", e),
+                                        })),
                                     }
-                                    "rejected" => {
-                                        let decided_by = json_val
-                                            .get("action")
-                                            .and_then(|a| a.get("decided_by"))
-                                            .and_then(|d| d.as_str())
-                                            .unwrap_or("celld-remote");
-                                        match guard_db.update_action_status(
-                                            action_id,
-                                            crabjar_guard::ActionStatus::Denied,
-                                            decided_by,
-                                            Some(&format!("reconciled from celld ({})", queue)),
-                                        ) {
-                                            Ok(_) => reconciled.push(json!({
-                                                "action_id": action_id,
-                                                "decision": "rejected",
-                                                "decided_by": decided_by,
-                                            })),
-                                            Err(e) => errors.push(json!({
-                                                "action_id": action_id,
-                                                "error": format!("local update failed: {}", e),
-                                            })),
-                                        }
-                                    }
-                                    _ => {} // still pending or unknown — skip
                                 }
+                                "rejected" => {
+                                    let decided_by = json_val
+                                        .get("action")
+                                        .and_then(|a| a.get("decided_by"))
+                                        .and_then(|d| d.as_str())
+                                        .unwrap_or("celld-remote");
+                                    match guard_db.update_action_status(
+                                        action_id,
+                                        crabjar_guard::ActionStatus::Denied,
+                                        decided_by,
+                                        Some(&format!("reconciled from celld ({})", queue)),
+                                    ) {
+                                        Ok(_) => reconciled.push(json!({
+                                            "action_id": action_id,
+                                            "decision": "rejected",
+                                            "decided_by": decided_by,
+                                        })),
+                                        Err(e) => errors.push(json!({
+                                            "action_id": action_id,
+                                            "error": format!("local update failed: {}", e),
+                                        })),
+                                    }
+                                }
+                                _ => {} // still pending or unknown — skip
                             }
+                        }
                     }
                     Ok(output) => {
                         let stderr = String::from_utf8_lossy(&output.stderr);

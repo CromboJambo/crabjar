@@ -208,11 +208,13 @@ impl StateStore {
     pub fn delete_artifact(&self, id: &str) -> Result<(), rusqlite::Error> {
         // If it's a filesystem artifact, delete the file too
         if let Some(artifact) = self.get_artifact(id)?
-            && let ArtifactStorage::Path(path) = &artifact.storage {
-                let _ = std::fs::remove_file(path);
-            }
+            && let ArtifactStorage::Path(path) = &artifact.storage
+        {
+            let _ = std::fs::remove_file(path);
+        }
 
-        self.db.execute("DELETE FROM deployment_artifacts WHERE id = ?", params![id])?;
+        self.db
+            .execute("DELETE FROM deployment_artifacts WHERE id = ?", params![id])?;
         Ok(())
     }
 
@@ -225,7 +227,10 @@ impl StateStore {
             if let ArtifactStorage::Path(path) = &artifact.storage {
                 let _ = std::fs::remove_file(path);
             }
-            let rows = self.db.execute("DELETE FROM deployment_artifacts WHERE id = ?", params![artifact.id])?;
+            let rows = self.db.execute(
+                "DELETE FROM deployment_artifacts WHERE id = ?",
+                params![artifact.id],
+            )?;
             deleted += rows as i64;
         }
 
@@ -239,7 +244,7 @@ impl StateStore {
 
         // Find completed deployments older than cutoff
         let mut stmt = self.db.prepare(
-            "SELECT id FROM worker_deployments WHERE completed_at IS NOT NULL AND completed_at < ?"
+            "SELECT id FROM worker_deployments WHERE completed_at IS NOT NULL AND completed_at < ?",
         )?;
 
         let rows = stmt.query_map(params![cutoff_str], |row| row.get::<_, String>(0))?;
@@ -257,9 +262,14 @@ impl StateStore {
     /// Get the artifacts directory path.
     fn artifacts_dir(&self) -> PathBuf {
         // Use the same directory as the database file
-        let parent = self
-            .db
-            .path().map_or_else(|| std::path::Path::new("."), |p| std::path::Path::new(p).parent().unwrap_or_else(|| std::path::Path::new(".")));
+        let parent = self.db.path().map_or_else(
+            || std::path::Path::new("."),
+            |p| {
+                std::path::Path::new(p)
+                    .parent()
+                    .unwrap_or_else(|| std::path::Path::new("."))
+            },
+        );
         parent.join("artifacts")
     }
 }
@@ -283,7 +293,9 @@ mod tests {
 
         // Create a deployment first
         let task_spec = serde_json::json!({"id": "test-task"});
-        store.create_deployment("test-supervisor".to_string(), task_spec).unwrap();
+        store
+            .create_deployment("test-supervisor".to_string(), task_spec)
+            .unwrap();
 
         // Store a small artifact as BLOB
         let data = b"test log output\nline 2\n";
@@ -318,7 +330,9 @@ mod tests {
         let dep_id = "dep-test-002";
 
         let task_spec = serde_json::json!({"id": "test-task"});
-        store.create_deployment("test-supervisor".to_string(), task_spec).unwrap();
+        store
+            .create_deployment("test-supervisor".to_string(), task_spec)
+            .unwrap();
 
         // Create a large artifact (> 1MB) that should be stored on disk
         let large_data = vec![0u8; MAX_BLOB_SIZE + 1024];
@@ -337,7 +351,11 @@ mod tests {
         // Should be stored on filesystem
         match &artifact.storage {
             ArtifactStorage::Path(path) => {
-                assert!(path.exists(), "filesystem artifact should exist at {:?}", path);
+                assert!(
+                    path.exists(),
+                    "filesystem artifact should exist at {:?}",
+                    path
+                );
                 let contents = std::fs::read(path).unwrap();
                 assert_eq!(contents, large_data);
             }
@@ -354,7 +372,9 @@ mod tests {
         let dep_id = "dep-test-003";
 
         let task_spec = serde_json::json!({"id": "test-task"});
-        store.create_deployment("test-supervisor".to_string(), task_spec).unwrap();
+        store
+            .create_deployment("test-supervisor".to_string(), task_spec)
+            .unwrap();
 
         // Store multiple artifacts
         store
@@ -400,7 +420,9 @@ mod tests {
         let dep_id = "dep-test-004";
 
         let task_spec = serde_json::json!({"id": "test-task"});
-        store.create_deployment("test-supervisor".to_string(), task_spec).unwrap();
+        store
+            .create_deployment("test-supervisor".to_string(), task_spec)
+            .unwrap();
 
         let artifact = store
             .store_artifact(
@@ -429,24 +451,46 @@ mod tests {
         // Create a deployment that completed 10 days ago
         let old_dep_id = "dep-old";
         let task_spec = serde_json::json!({"id": "old-task"});
-        let old_dep = store.create_deployment("test-supervisor".to_string(), task_spec).unwrap();
+        let old_dep = store
+            .create_deployment("test-supervisor".to_string(), task_spec)
+            .unwrap();
 
         // Manually set completed_at to 10 days ago
         let ten_days_ago = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
-        store.db.execute(
-            "UPDATE worker_deployments SET status = 'completed', completed_at = ? WHERE id = ?",
-            params![ten_days_ago, old_dep.id],
-        ).unwrap();
+        store
+            .db
+            .execute(
+                "UPDATE worker_deployments SET status = 'completed', completed_at = ? WHERE id = ?",
+                params![ten_days_ago, old_dep.id],
+            )
+            .unwrap();
 
         // Store an artifact for the old deployment
         store
-            .store_artifact(&old_dep.id, "old.log".to_string(), ArtifactType::Log, None, b"old".to_vec())
+            .store_artifact(
+                &old_dep.id,
+                "old.log".to_string(),
+                ArtifactType::Log,
+                None,
+                b"old".to_vec(),
+            )
             .unwrap();
 
         // Create a recent deployment with artifacts
-        let new_dep = store.create_deployment("test-supervisor".to_string(), serde_json::json!({"id": "new-task"})).unwrap();
+        let new_dep = store
+            .create_deployment(
+                "test-supervisor".to_string(),
+                serde_json::json!({"id": "new-task"}),
+            )
+            .unwrap();
         store
-            .store_artifact(&new_dep.id, "new.log".to_string(), ArtifactType::Log, None, b"new".to_vec())
+            .store_artifact(
+                &new_dep.id,
+                "new.log".to_string(),
+                ArtifactType::Log,
+                None,
+                b"new".to_vec(),
+            )
             .unwrap();
 
         // Clean up artifacts older than 7 days
@@ -454,7 +498,15 @@ mod tests {
         assert_eq!(deleted, 1); // Only the old one should be deleted
 
         // Verify old is gone, new remains
-        assert!(store.list_deployment_artifacts(&old_dep.id).unwrap().is_empty());
-        assert_eq!(store.list_deployment_artifacts(&new_dep.id).unwrap().len(), 1);
+        assert!(
+            store
+                .list_deployment_artifacts(&old_dep.id)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            store.list_deployment_artifacts(&new_dep.id).unwrap().len(),
+            1
+        );
     }
 }

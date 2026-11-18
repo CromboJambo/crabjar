@@ -39,11 +39,7 @@ impl StructuredAuxPlugin {
         // Determine criteria path from environment, then relative paths.
         let criteria_path = env::var("STRUCTURED_AUX_CRITERIA_PATH")
             .or_else(|_| {
-                env::current_dir().map(|p| {
-                    p.join("specs/criteria")
-                        .to_string_lossy()
-                        .to_string()
-                })
+                env::current_dir().map(|p| p.join("specs/criteria").to_string_lossy().to_string())
             })
             .expect("STRUCTURED_AUX_CRITERIA_PATH must be set or run from repo root");
 

@@ -4,7 +4,7 @@
 //! that capture origin, reasoning, authority, and idempotency for interprocess
 //! state transfer.
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use uuid::Uuid;
 
 use crate::action::ActionStatus;

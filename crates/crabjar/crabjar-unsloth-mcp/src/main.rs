@@ -6,7 +6,6 @@
 use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
 use std::process::Command;
 
-
 fn get_training_data_dir() -> String {
     std::env::var("CRABJAR_TRAINING_DATA_DIR")
         .expect("CRABJAR_TRAINING_DATA_DIR environment variable must be set")

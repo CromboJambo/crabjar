@@ -59,9 +59,10 @@ fn collect_files(dir: &Path) -> Result<Vec<PathBuf>, ArtifactError> {
         } else if path.is_dir() {
             // Skip target/ and .git/ directories
             if let Some(name) = path.file_name()
-                && (name == "target" || name == ".git") {
-                    continue;
-                }
+                && (name == "target" || name == ".git")
+            {
+                continue;
+            }
             files.extend(collect_files(&path)?);
         }
     }

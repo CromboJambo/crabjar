@@ -311,5 +311,5 @@ tempfile.workspace = true
 crabjar-host-core = { path = "host/host-core" }
 crabjar-host-agent = { path = "host/host-agent" }
 universal-structure = { path = "crates/universal-structure" }
-insta = { version = "1.43", features = ["json"] }
+serial_test.workspace = true
 

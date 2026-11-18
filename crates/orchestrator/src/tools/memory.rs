@@ -14,10 +14,8 @@ pub async fn handle(args: &[String], _ctx: &super::ToolContext) -> Result<String
     // Create the tool and execute
     let tool = crabjar_memory::MemoryTool::new(&memories_dir);
     match tool.execute(input) {
-        Ok(response) => {
-            serde_json::to_string_pretty(&response)
-                .map_err(|e| format!("Error serializing memory response: {}", e))
-        }
+        Ok(response) => serde_json::to_string_pretty(&response)
+            .map_err(|e| format!("Error serializing memory response: {}", e)),
         Err(e) => Err(format!("Memory tool error: {}", e)),
     }
 }

@@ -7,7 +7,6 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-
 pub(crate) mod cargo;
 pub(crate) mod dependency_graph;
 pub(crate) mod evaluate;

@@ -289,7 +289,10 @@ pub enum GuardCommand {
     },
     /// Reconcile local pending actions with celld decisions (remote approval sync)
     Reconcile {
-        #[arg(long, help = "celld mirror URL (default: $CELLD_MIRROR_URL or http://127.0.0.1:8788)")]
+        #[arg(
+            long,
+            help = "celld mirror URL (default: $CELLD_MIRROR_URL or http://127.0.0.1:8788)"
+        )]
         url: Option<String>,
         #[arg(long, default_value = "crabjar-guard", help = "celld queue name")]
         queue: String,

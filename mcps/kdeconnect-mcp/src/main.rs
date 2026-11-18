@@ -13,7 +13,10 @@ pub struct KdeconnectServer;
 fn run_kdeconnect(args: &[&str]) -> anyhow::Result<String> {
     // Get D-Bus session address from environment or default socket path
     let dbus_addr = std::env::var("DBUS_SESSION_BUS_ADDRESS").unwrap_or_else(|_| {
-        format!("unix:path=/run/user/{}/bus", std::env::var("UID").unwrap_or("1000".to_string()))
+        format!(
+            "unix:path=/run/user/{}/bus",
+            std::env::var("UID").unwrap_or("1000".to_string())
+        )
     });
 
     let output = Command::new("kdeconnect-cli")
@@ -39,7 +42,9 @@ impl KdeconnectServer {
         }
     }
 
-    #[tool(description = "Share a file or URL to a KDE Connect device. Path is absolute path on this machine.")]
+    #[tool(
+        description = "Share a file or URL to a KDE Connect device. Path is absolute path on this machine."
+    )]
     fn share_file(&self, params: Parameters<ShareRequest>) -> String {
         let request = &params.0;
         match run_kdeconnect(&["-d", &request.device_id, "--share", &request.path]) {

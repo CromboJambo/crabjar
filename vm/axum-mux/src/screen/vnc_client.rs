@@ -171,13 +171,17 @@ impl VncCapture {
         // FramebufferUpdateRequest: incremental=0 (full), x, y, w, h.
         self.stream
             .write_all(&[
-                3u8,       // msg type
-                0,         // padding
-                0,         // incremental = false
-                0, 0,      // x
-                0, 0,      // y
-                (self.width >> 8) as u8, self.width as u8,
-                (self.height >> 8) as u8, self.height as u8,
+                3u8, // msg type
+                0,   // padding
+                0,   // incremental = false
+                0,
+                0, // x
+                0,
+                0, // y
+                (self.width >> 8) as u8,
+                self.width as u8,
+                (self.height >> 8) as u8,
+                self.height as u8,
             ])
             .await?;
 
@@ -205,11 +209,7 @@ impl VncCapture {
             match encoding {
                 0 => {
                     // Raw encoding.
-                    let bytes_per_pixel = if self.pixel_format.depth >= 24 {
-                        4
-                    } else {
-                        2
-                    };
+                    let bytes_per_pixel = if self.pixel_format.depth >= 24 { 4 } else { 2 };
                     let data_len = (w * h * bytes_per_pixel as u32) as usize;
                     let mut data = vec![0u8; data_len];
                     self.stream.read_exact(&mut data).await?;
@@ -290,15 +290,7 @@ async fn read_pseudo_encoding_data(stream: &mut TcpStream, encoding: i32) -> Res
 }
 
 /// Decode raw-encoded pixels into the RGBA8 frame buffer.
-fn decode_raw(
-    data: &[u8],
-    pf: &PixelFormat,
-    x: u32,
-    y: u32,
-    w: u32,
-    h: u32,
-    frame: &mut Frame,
-) {
+fn decode_raw(data: &[u8], pf: &PixelFormat, x: u32, y: u32, w: u32, h: u32, frame: &mut Frame) {
     if !pf.true_color {
         // Pseudo-color (palette) not supported — fill with black.
         return;

@@ -1,4 +1,8 @@
-pub async fn handle(function_name: &str, args: &[String], _ctx: &super::ToolContext) -> Result<String, String> {
+pub async fn handle(
+    function_name: &str,
+    args: &[String],
+    _ctx: &super::ToolContext,
+) -> Result<String, String> {
     if args.is_empty() {
         return Err(format!("Error: {} requires JSON arguments", function_name));
     }

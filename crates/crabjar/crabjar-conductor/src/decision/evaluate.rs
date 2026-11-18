@@ -222,9 +222,7 @@ impl JevEvaluator {
         // Ensure the resolved path is within an expected base directory
         // (no traversal outside the project root)
         if !resolved.starts_with("/") {
-            return Err(anyhow!(
-                "Path not absolute after canonicalization: {path}"
-            ));
+            return Err(anyhow!("Path not absolute after canonicalization: {path}"));
         }
 
         // Simple cache check (not thread-safe, but sufficient for single-threaded use)

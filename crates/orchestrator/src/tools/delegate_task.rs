@@ -20,7 +20,10 @@ pub async fn handle(args: &[String], _ctx: &super::ToolContext) -> Result<String
 
             let mut results = Vec::new();
             for task in &input.tasks {
-                match dispatcher.execute_task(task.goal.clone(), task.context.clone()).await {
+                match dispatcher
+                    .execute_task(task.goal.clone(), task.context.clone())
+                    .await
+                {
                     Ok(task_id) => {
                         results.push(serde_json::json!({
                             "status": "spawned",
@@ -62,7 +65,9 @@ pub async fn handle(args: &[String], _ctx: &super::ToolContext) -> Result<String
         },
         DelegationAction::Steer => {
             if input.subagent_id.is_none() || input.message.is_none() {
-                return Err("Error: delegate_task steer requires subagent_id and message".to_string());
+                return Err(
+                    "Error: delegate_task steer requires subagent_id and message".to_string(),
+                );
             }
 
             let task_id = input.subagent_id.unwrap();

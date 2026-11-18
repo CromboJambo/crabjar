@@ -203,17 +203,29 @@ impl CheckpointedWorkload {
     }
 
     pub fn next_pending(&self) -> Option<usize> {
-        self.steps.iter().position(|s| s.status == StepStatus::Pending)
+        self.steps
+            .iter()
+            .position(|s| s.status == StepStatus::Pending)
     }
 
     pub fn is_complete(&self) -> bool {
-        self.steps.iter().all(|s| matches!(s.status, StepStatus::Completed | StepStatus::Failed))
+        self.steps
+            .iter()
+            .all(|s| matches!(s.status, StepStatus::Completed | StepStatus::Failed))
     }
 
     pub fn progress_summary(&self) -> String {
         let total = self.steps.len();
-        let done = self.steps.iter().filter(|s| s.status == StepStatus::Completed).count();
-        let failed = self.steps.iter().filter(|s| s.status == StepStatus::Failed).count();
+        let done = self
+            .steps
+            .iter()
+            .filter(|s| s.status == StepStatus::Completed)
+            .count();
+        let failed = self
+            .steps
+            .iter()
+            .filter(|s| s.status == StepStatus::Failed)
+            .count();
         format!("{}/{} complete, {} failed", done, total, failed)
     }
 }
