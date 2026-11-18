@@ -1,0 +1,36 @@
+[package]
+name = "crabjar-exec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+description = "Structured code execution engine for crabjar agents — Rust-first alternative to Python execute_code"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+# Scripting engine
+rhai = { version = "1.21", features = ["sync"] }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+
+# Tool dependencies (for binding tools to the script engine)
+crabjar-web-search = { path = "../crabjar-web-search" }
+crabjar-web-extract = { path = "../crabjar-web-extract" }
+crabjar-memory = { path = "../crabjar-memory" }
+
+# File operations
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
