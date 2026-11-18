@@ -20,6 +20,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 scraper = "0.22"
 urlencoding = "2.1"
+pdf-extract = { version = "0.10", default-features = false }
 
 [lints]
 workspace = true

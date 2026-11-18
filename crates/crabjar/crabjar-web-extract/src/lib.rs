@@ -11,10 +11,12 @@
 mod error;
 mod html_extractor;
 mod models;
+mod pdf_extractor;
 
 pub use error::WebExtractError;
 pub use html_extractor::HtmlExtractor;
 pub use models::{ExtractResponse, ExtractResult};
+pub use pdf_extractor::PdfExtractor;
 
 /// Extract readable content from web URLs.
 ///
@@ -32,17 +34,24 @@ pub async fn extract(
     let mut results = Vec::new();
 
     let html_extractor = HtmlExtractor::new();
+    let pdf_extractor = PdfExtractor::new();
 
     for url in urls.iter().take(5) {
         // PDF detection by extension (future: content-type sniffing)
         if url.to_lowercase().ends_with(".pdf") {
-            tracing::info!(url, "Using PDF extractor (placeholder)");
-            results.push(ExtractResult {
-                url: url.clone(),
-                title: String::new(),
-                content: String::new(),
-                error: Some("PDF extraction not yet implemented".to_string()),
-            });
+            tracing::info!(url, "Using PDF extractor");
+            match pdf_extractor.extract(url, char_limit).await {
+                Ok(result) => results.push(result),
+                Err(e) => {
+                    tracing::warn!(url, error = %e, "PDF extraction failed");
+                    results.push(ExtractResult {
+                        url: url.clone(),
+                        title: String::new(),
+                        content: String::new(),
+                        error: Some(format!("{e}")),
+                    });
+                }
+            }
         } else {
             tracing::debug!(url, "Using HTML extractor");
             match html_extractor.extract(url, char_limit).await {

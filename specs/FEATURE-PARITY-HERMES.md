@@ -33,7 +33,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
 | `web_search` | ✅ 5 results default, backend-agnostic | ✅ `crabjar-web-search` (SearXNG/Brave/DDG) | ✅ | P1-1 complete; self-hosted SearXNG primary |
-| `web_extract` | ✅ Markdown extraction, PDF support, truncation | ✅ `crabjar-web-extract` (HTML parsing) | ⚠️ | P1-2 complete but PDF extraction deferred |
+| `web_extract` | ✅ Markdown extraction, PDF support, truncation | ✅ `crabjar-web-extract` (HTML + PDF via pdf-extract) | ✅ | P1-2 CLOSED — PDF text extraction implemented |
 | `browser_exec` | ✅ Full browser automation (Browser Use CLI), JS eval, forms | ✅ `crabjar-browser` (Playwright subprocess) | ⚠️ | P1-3 complete; Hermes uses Browser Use CLI with richer API |
 
 ## Agent & Delegation Tools
@@ -112,9 +112,9 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 
 | Tier | Total Tools | ✅ Complete | ⚠️ Partial | ❌ Missing | Completion |
 |------|-------------|-------------|------------|------------|------------|
-| **P1 (Drop-in blockers)** | 15 | 14 | 1 | 0 | **93%** |
+| **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
 | **P2 (Enhancement)** | 10 | 0 | 2 | 8 | 0% |
-| **Total** | 25 | 14 | 4 | 7 | **56%** |
+| **Total** | 25 | 15 | 3 | 7 | **60%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
