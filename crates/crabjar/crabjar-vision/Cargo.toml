@@ -1,0 +1,39 @@
+[package]
+name = "crabjar-vision"
+description = "Vision analysis tool for crabjar agents — image understanding via LLM vision models."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+# HTTP client for downloading images and calling LLM endpoints
+reqwest = { workspace = true, features = ["json", "stream"] }
+
+# Base64 encoding for image data URIs
+base64 = { version = "0.22", features = ["alloc"] }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging and tracing
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
