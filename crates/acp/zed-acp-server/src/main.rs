@@ -7,12 +7,9 @@ use zed_acp_server::{AcpAgentServer, AcpRequest, AcpResponse};
 
 #[derive(Debug, Deserialize)]
 struct JsonRpcMessage {
-    jsonrpc: Option<String>,
     id: Option<serde_json::Value>,
     method: Option<String>,
     params: Option<serde_json::Value>,
-    result: Option<serde_json::Value>,
-    error: Option<serde_json::Value>,
 }
 
 fn parse_message(line: &str) -> Result<JsonRpcMessage, anyhow::Error> {

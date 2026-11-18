@@ -136,19 +136,3 @@ impl GithubClient {
     }
 }
 
-fn build_api_url(owner: &str, repo: &str, path: &str) -> String {
-    format!("https://api.github.com/repos/{owner}/{repo}{path}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_build_api_url() {
-        assert_eq!(
-            build_api_url("owner", "repo", "/pulls/42/comments"),
-            "https://api.github.com/repos/owner/repo/pulls/42/comments"
-        );
-    }
-}

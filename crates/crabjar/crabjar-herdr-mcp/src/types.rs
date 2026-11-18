@@ -193,11 +193,7 @@ pub struct PaneCloseRequest {
 // ─── Session Template Tools ──────────────────────────────────────
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
-pub struct TemplateListRequest {
-    /// If true, include raw command output for debugging.
-    #[serde(default)]
-    pub verbose: bool,
-}
+pub struct TemplateListRequest {}
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct TemplateCreateSessionRequest {
@@ -209,24 +205,15 @@ pub struct TemplateCreateSessionRequest {
     /// Working directory for the session (optional).
     #[serde(default)]
     pub cwd: Option<String>,
-    /// If true, include raw command output for debugging.
-    #[serde(default)]
-    pub verbose: bool,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct TemplateSaveRequest {
     /// Name to save the template as.
     pub template_name: String,
-    /// Current session name to capture layout from (optional).
-    #[serde(default)]
-    pub session: Option<String>,
     /// Description of the template (optional).
     #[serde(default)]
     pub description: Option<String>,
-    /// If true, include raw command output for debugging.
-    #[serde(default)]
-    pub verbose: bool,
 }
 
 pub fn default_lines() -> u32 {

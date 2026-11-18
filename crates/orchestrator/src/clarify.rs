@@ -62,36 +62,3 @@ pub struct ClarifyResponse {
     pub text_response: Option<String>,
 }
 
-/// Execute the clarify tool by sending an SSE event and waiting for response.
-pub async fn execute_clarify(
-    input: ClarifyInput,
-    event_tx: &tokio::sync::broadcast::Sender<String>,
-) -> Result<ClarifyResult, String> {
-    let question_id = uuid::Uuid::new_v4().to_string();
-
-    // Send SSE event to TUI with the question
-    let event = ClarifyEvent {
-        event_type: "clarify_question".to_string(),
-        id: question_id.clone(),
-        question: input.question,
-        options: input.options,
-    };
-
-    let event_json = serde_json::to_string(&event)
-        .map_err(|e| format!("Failed to serialize clarify event: {}", e))?;
-    if event_tx.send(event_json).is_err() {
-        return Err("No TUI subscribers for clarify question".to_string());
-    }
-
-    // Wait for user response via channel
-    let (_tx, rx) = oneshot::channel();
-
-    // Store the sender so handler can respond to it
-    // In a real implementation, this would be stored in shared state keyed by question_id
-    // For simplicity, we'll use a blocking wait here — production would use an async map of pending questions
-
-    tokio::time::timeout(tokio::time::Duration::from_secs(input.timeout_secs), rx)
-        .await
-        .map_err(|_| "Clarify question timed out".to_string())?
-        .map_err(|_| "Clarify channel closed without response".to_string())
-}

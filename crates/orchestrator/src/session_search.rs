@@ -58,12 +58,3 @@ pub async fn execute_session_search(
     })
 }
 
-/// Generate a unique session ID.
-pub fn generate_session_id() -> String {
-    Uuid::new_v4().to_string()
-}
-
-/// Get the current UTC timestamp in ISO 8601 format.
-pub fn now_iso() -> String {
-    Utc::now().to_rfc3339()
-}

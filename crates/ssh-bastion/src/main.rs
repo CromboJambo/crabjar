@@ -45,8 +45,6 @@ struct TargetConfig {
 
 /// Per-client state: tracks outbound SSH connection to target machine
 struct ClientState {
-    channel_id: russh::ChannelId,
-    server_handle: russh::server::Handle,
     user: String,
 }
 
@@ -140,8 +138,6 @@ impl russh::server::Handler for Bastion {
             clients_lock.insert(
                 client_id,
                 ClientState {
-                    channel_id: channel.id(),
-                    server_handle: session.handle(),
                     user: String::new(), // Will be set on shell/exec
                 },
             );

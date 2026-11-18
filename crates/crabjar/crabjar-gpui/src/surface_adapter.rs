@@ -93,41 +93,15 @@ impl CrabjarAgent {
     }
 }
 
-/// Goal state from crabjar-conductor API.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CrabjarGoal {
-    pub id: String,
-    pub description: String,
-    pub status: String,
-    pub created_at: String,
-}
-
-impl CrabjarGoal {
-    pub fn from_conductor_response(value: &serde_json::Value) -> Self {
-        CrabjarGoal {
-            id: value["goal_id"].as_str().unwrap_or("unknown").to_string(),
-            description: value["description"].as_str().unwrap_or("").to_string(),
-            status: value["status"].as_str().unwrap_or("unknown").to_string(),
-            created_at: value["created_at"].as_str().unwrap_or("").to_string(),
-        }
-    }
-}
-
 /// The CrabjarSurfaceAdapter translates conductor API state into herdr protocol
 /// surface patches for GPUI rendering.
 pub struct CrabjarSurfaceAdapter {
-    boot_id: String,
-    projection_revision: u64,
-    surface_revision: u64,
     agents: HashMap<String, CrabjarAgent>,
 }
 
 impl CrabjarSurfaceAdapter {
-    pub fn new(boot_id: &str) -> Self {
+    pub fn new(_boot_id: &str) -> Self {
         CrabjarSurfaceAdapter {
-            boot_id: boot_id.to_string(),
-            projection_revision: 0,
-            surface_revision: 0,
             agents: HashMap::new(),
         }
     }
@@ -138,43 +112,10 @@ impl CrabjarSurfaceAdapter {
             let agent = CrabjarAgent::from_conductor_response(worker);
             self.agents.insert(agent.id.clone(), agent);
         }
-        self.projection_revision += 1;
-        self.surface_revision += 1;
     }
 
     /// Get all agents for rendering.
     pub fn agents(&self) -> &HashMap<String, CrabjarAgent> {
         &self.agents
-    }
-
-    /// Generate a surface patch describing the current agent state.
-    /// This would be serialized and sent to the GPUI renderer.
-    pub fn generate_patch(&mut self) -> serde_json::Value {
-        let agents_vec: Vec<serde_json::Value> = self
-            .agents
-            .values()
-            .map(|a| {
-                serde_json::json!({
-                    "id": a.id,
-                    "name": a.name,
-                    "status": match a.status {
-                        AgentStatus::Idle => "idle",
-                        AgentStatus::Working => "working",
-                        AgentStatus::Blocked => "blocked",
-                        AgentStatus::Done => "done",
-                        AgentStatus::Unknown => "unknown",
-                    },
-                    "capabilities": a.capabilities,
-                    "trust_level": a.trust_level,
-                })
-            })
-            .collect();
-
-        serde_json::json!({
-            "boot_id": self.boot_id,
-            "projection_revision": self.projection_revision,
-            "surface_revision": self.surface_revision,
-            "agents": agents_vec,
-        })
     }
 }

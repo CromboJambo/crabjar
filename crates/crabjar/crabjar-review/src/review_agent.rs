@@ -15,7 +15,6 @@ use anyhow::Result;
 use std::path::Path;
 
 use crate::bundling::create_bundles;
-use crate::context_retrieval::ToolCallTracker;
 use crate::file_selection::parse_diff;
 use crate::prompts::generate_review_prompt;
 use crate::rules::load_rules_from_str;
@@ -36,7 +35,6 @@ pub struct ReviewFinding {
 /// The review agent that orchestrates the full pipeline.
 pub struct ReviewAgent {
     config: ReviewConfig,
-    tool_tracker: ToolCallTracker,
 }
 
 impl ReviewAgent {
@@ -44,7 +42,6 @@ impl ReviewAgent {
     #[must_use]
     pub fn new(config: ReviewConfig) -> Self {
         Self {
-            tool_tracker: ToolCallTracker::new(config.context_retrieval_limit),
             config,
         }
     }

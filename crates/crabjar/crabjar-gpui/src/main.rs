@@ -74,7 +74,6 @@ impl DashboardState {
 
 /// Multi-agent dashboard view
 struct DashboardView {
-    state: DashboardState,
     agents: Vec<CrabjarAgent>,
     status: String,
 }
@@ -84,7 +83,6 @@ impl DashboardView {
         let state = DashboardState::new();
         let agents = state.generate_mock_agents();
         DashboardView {
-            state,
             agents,
             status: "Mock Data".to_string(),
         }
