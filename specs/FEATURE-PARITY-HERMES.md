@@ -48,7 +48,7 @@ The baseline is the tool surface available in a standard Hermes session.
 
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
-| `memory` | ✅ Persistent MEMORY.md + USER.md, atomic ops | ✅ `crabjar-memory` (MemoryStore, MirrorLog) | ⚠️ | crabjar has richer storage but different API shape |
+| `memory` | ✅ Persistent MEMORY.md + USER.md, atomic ops | ✅ `crabjar-memory` (MemoryStore, MirrorLog) | ✅ | P1 GAP CLOSED — single-op + batch atomic operations, capacity tracking; 6 tests |
 | `skill_view` | ✅ Load SKILL.md + linked files | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — full manifest + linked file resolution via crabjar-skills loader |
 | `skills_list` | ✅ List with category filters | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — discover all skills from filesystem, optional category filter |
 | `skill_manage` | ✅ Create/patch/write_file/remove_file/delete | ✅ `orchestrator/src/tools/skills.rs` (first-class) | ✅ | P2 GAP CLOSED — create/patch/delete with atomic operations array |
@@ -115,7 +115,7 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
 | **P2 (Enhancement)** | 3 | 3 | 0 | 0 | **100%** |
 | **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
-| **Total** | 25 | 22 | 3 | 0 | **88%** |
+| **Total** | 25 | 23 | 2 | 0 | **92%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -185,6 +185,7 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **`memory` verified as full parity.** Single-op + batch atomic operations, capacity tracking, target validation. 6 tests. Parity: 88% → **92%** |
 | 2026-11-18 | **`process_manage` upgraded to full lifecycle.** list/start/stop/inspect with Podman sandboxing support; fixed command validation bug (was rejecting valid shell commands). 5 tests. Parity: 84% → **88%** |
 | 2026-11-18 | **`clarify` upgraded to multi-question.** Supports 1-5 questions per call with single-select, multi-select, and open-ended responses — matches Hermes API exactly. 5 tests. Parity: 80% → **84%** |
 | 2026-11-18 | **execute_code, terminal, and skill tools upgraded to first-class.** `execute_code` (Rhai VM via crabjar-exec), `terminal` (foreground/background with timeout/workdir), `skills_list`/`skill_view`/`skill_manage` (full CRUD). 12 new tests. Parity: 68% → **80%** |

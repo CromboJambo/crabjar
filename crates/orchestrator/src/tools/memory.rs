@@ -19,3 +19,103 @@ pub async fn handle(args: &[String], _ctx: &super::ToolContext) -> Result<String
         Err(e) => Err(format!("Memory tool error: {}", e)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crabjar_memory::{MemoryTool, MemoryToolInput};
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_memory_add_single() {
+        let dir = tempdir().unwrap();
+        let tool = MemoryTool::new(dir.path());
+        let input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "memory", "action": "add", "content": "Test fact"}"#,
+        )
+        .unwrap();
+        let resp = tool.execute(input).unwrap();
+        assert!(resp.success);
+        assert_eq!(resp.entries_count, 1);
+    }
+
+    #[test]
+    fn test_memory_batch_operations() {
+        let dir = tempdir().unwrap();
+        let tool = MemoryTool::new(dir.path());
+        let input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "memory", "operations": [
+                {"action": "add", "content": "Entry one"},
+                {"action": "add", "content": "Entry two"}
+            ]}"#,
+        )
+        .unwrap();
+        let resp = tool.execute(input).unwrap();
+        assert!(resp.success);
+        assert_eq!(resp.entries_count, 2);
+    }
+
+    #[test]
+    fn test_memory_patch() {
+        let dir = tempdir().unwrap();
+        let tool = MemoryTool::new(dir.path());
+        // Add first
+        let add_input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "memory", "action": "add", "content": "Old text here"}"#,
+        )
+        .unwrap();
+        tool.execute(add_input).unwrap();
+        // Patch
+        let patch_input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "memory", "action": "patch", "old_text": "Old", "content": "New"}"#,
+        )
+        .unwrap();
+        let resp = tool.execute(patch_input).unwrap();
+        assert!(resp.success);
+        assert_eq!(resp.entries_count, 1);
+    }
+
+    #[test]
+    fn test_memory_remove() {
+        let dir = tempdir().unwrap();
+        let tool = MemoryTool::new(dir.path());
+        // Add first
+        let add_input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "memory", "action": "add", "content": "To be removed"}"#,
+        )
+        .unwrap();
+        tool.execute(add_input).unwrap();
+        // Remove
+        let remove_input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "memory", "action": "remove", "old_text": "removed"}"#,
+        )
+        .unwrap();
+        let resp = tool.execute(remove_input).unwrap();
+        assert!(resp.success);
+        assert_eq!(resp.entries_count, 0);
+    }
+
+    #[test]
+    fn test_memory_user_target() {
+        let dir = tempdir().unwrap();
+        let tool = MemoryTool::new(dir.path());
+        let input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "user", "action": "add", "content": "User preference"}"#,
+        )
+        .unwrap();
+        let resp = tool.execute(input).unwrap();
+        assert!(resp.success);
+    }
+
+    #[test]
+    fn test_memory_invalid_target() {
+        let dir = tempdir().unwrap();
+        let tool = MemoryTool::new(dir.path());
+        let input: MemoryToolInput = serde_json::from_str(
+            r#"{"target": "invalid", "action": "add", "content": "Test"}"#,
+        )
+        .unwrap();
+        let result = tool.execute(input);
+        assert!(result.is_err());
+    }
+}
