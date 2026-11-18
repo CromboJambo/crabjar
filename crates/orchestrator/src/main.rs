@@ -1005,8 +1005,7 @@ async fn clarify_pending(
             match serde_json::from_str::<clarify::ClarifyInput>(&entry.content) {
                 Ok(input) => Some(serde_json::json!({
                     "question_id": entry.metadata.get("question_id").and_then(|v| v.as_str()),
-                    "question": input.question,
-                    "options": input.options,
+                    "questions": input.questions,
                     "timeout_secs": input.timeout_secs,
                     "created_at": entry.metadata.get("created_at").and_then(|v| v.as_str())
                 })),

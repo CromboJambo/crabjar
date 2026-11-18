@@ -41,7 +41,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
 | `delegate_task` | ✅ Spawn isolated subagents, profiles, steering | ✅ `crabjar-delegation` (dispatcher, aggregation) | ⚠️ | P1-4 complete; Hermes has richer profile system and live steering |
-| `clarify` | ✅ Structured Q&A with choices, multi-select | ✅ `orchestrator/src/clarify.rs` | ⚠️ | P1-5 complete; needs parity on multi-question forms |
+| `clarify` | ✅ Structured Q&A with choices, multi-select | ✅ `orchestrator/src/clarify.rs` + `tools/clarify.rs` (multi-question) | ✅ | P1 GAP CLOSED — multi-question support (1-5 questions), single-select/multi-select/open-ended; 5 tests |
 | `react_to_message` | ✅ Emoji reactions to messages | ✅ `orchestrator/src/tools/react_to_message.rs` | ✅ | P2 GAP CLOSED — headless acknowledgment for drop-in parity; agents calling it won't error out |
 
 ## Memory & Knowledge Tools
@@ -115,7 +115,7 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
 | **P2 (Enhancement)** | 3 | 3 | 0 | 0 | **100%** |
 | **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
-| **Total** | 25 | 20 | 3 | 2 | **80%** |
+| **Total** | 25 | 21 | 3 | 1 | **84%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -185,6 +185,7 @@ For each tool reaching ✅ status:
 
 | Date | Change |
 |------|--------|
+| 2026-11-18 | **`clarify` upgraded to multi-question.** Supports 1-5 questions per call with single-select, multi-select, and open-ended responses — matches Hermes API exactly. 5 tests. Parity: 80% → **84%** |
 | 2026-11-18 | **execute_code, terminal, and skill tools upgraded to first-class.** `execute_code` (Rhai VM via crabjar-exec), `terminal` (foreground/background with timeout/workdir), `skills_list`/`skill_view`/`skill_manage` (full CRUD). 12 new tests. Parity: 68% → **80%** |
 | 2026-11-18 | **4 first-class file tools implemented.** `read_file` (line-numbered, pagination), `write_file` (overwrite + parent dirs), `patch` (9 fuzzy strategies), `search_files` (ripgrep-backed). All 4 upgraded from ⚠️ partial to ✅ full API parity with Hermes. 22 new unit tests. |
 | 2026-11-18 | **All P2 gaps closed.** `manage_catalog` (wraps tool registry), `react_to_message` (headless ack), `video_analyze` (ffmpeg + vision). Total parity: 60% → **68%** |
