@@ -6,6 +6,7 @@
 use std::path::Path;
 
 // Submodules split by entity type (500 LoC rule)
+pub mod artifacts;
 pub mod decisions;
 pub mod deployments;
 pub mod goals;
@@ -14,6 +15,7 @@ pub mod tasks;
 pub mod workers;
 
 // Re-export public types for backward compatibility
+pub use artifacts::{ArtifactStorage, ArtifactType, DeploymentArtifact};
 pub use decisions::{DecisionFrequency, DecisionRecord, PromotedRule};
 pub use deployments::{DeploymentStatus, WorkerDeployment};
 pub use goals::{Goal, GoalStatus};
