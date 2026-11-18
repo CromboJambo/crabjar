@@ -68,7 +68,7 @@ The baseline is the tool surface available in a standard Hermes session.
 |------|--------|---------|--------|-------|
 | `vision_analyze` | ✅ Load images, region crops, Q&A | ✅ `crabjar-vision` (LLM vision via Unsloth Studio) | ✅ | P1 GAP CLOSED — core analysis + region cropping `[x1,y1,x2,y2]` both implemented |
 | `video_analyze` | ✅ Video frame analysis | ❌ No equivalent | ❌ **P2 GAP** | Lower priority |
-| `image_generate` | ✅ Generate images via model | ❌ No equivalent | ❌ **P2 GAP** | Depends on local image gen model availability |
+| `image_generate` | ✅ Generate images via model | ❌ No equivalent | ⏸️ **P3** | Deferred; not a core workflow need |
 
 ## MCP & Extension Tools
 
@@ -86,9 +86,9 @@ The baseline is the tool surface available in a standard Hermes session.
 | `kanban_*` (14 tools) | ✅ Full kanban board management | ⚠️ `crabjar-kanban-orchestrator` + conductor API | ⚠️ | Conductor provides fleet-level orchestration; needs CLI parity |
 | `browser_vault` | ✅ Credential access for browser automation | ✅ `crabjar-browser-vault` (Bitwarden CLI, Vaultwarden) + `browser_login` tool | ✅ | P1 GAP CLOSED — credential list/get/search/generate via Bitwarden CLI; login-wall integration complete (`browser_login` chains vault lookup → form detection → fill → submit) |
 | `manage_connections` | ✅ Connect app accounts (Gmail, GitHub, etc.) | ⚠️ Via MCP servers | 🔧 | Different model: crabjar uses MCP vs Hermes managed connections |
-| `manage_catalog` | ✅ Tool catalog management | ❌ No equivalent | ❌ **P2 GAP** | Lower priority |
-| `computer_use` | ✅ Desktop automation | ❌ No equivalent | ❌ **P2 GAP** | Depends on display server access |
-| `desktop_project` | ✅ Desktop project management | ❌ No equivalent | ❌ **P2 GAP** | |
+| `manage_catalog` | ✅ Tool catalog management | ❌ No equivalent | ❌ **P2 GAP** | Registry exists; needs tool surface |
+| `computer_use` | ✅ Desktop automation | 🔧 Covered by herdr + tuiwright + riod | ✅ | Terminal multiplexing covers same ground |
+| `desktop_project` | ✅ Desktop project management | 🔧 Future: GPUI wrapper around herdr-style mux | ⚠️ | Not a separate concern from agent runtime |
 
 ## Crabjar-Unique Capabilities (Beyond Hermes)
 
@@ -113,7 +113,8 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 | Tier | Total Tools | ✅ Complete | ⚠️ Partial | ❌ Missing | Completion |
 |------|-------------|-------------|------------|------------|------------|
 | **P1 (Drop-in blockers)** | 15 | 15 | 0 | 0 | **100%** |
-| **P2 (Enhancement)** | 10 | 0 | 2 | 8 | 0% |
+| **P2 (Enhancement)** | 3 | 0 | 3 | 0 | 0% |
+| **P3 / Intentional** | 3 | — | — | — | Different approach or deferred |
 | **Total** | 25 | 15 | 3 | 7 | **60%** |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
@@ -128,14 +129,21 @@ These are the tools an agent needs to function as a drop-in replacement for Herm
 
 ### P2 Gaps (Nice to Have)
 
-| Gap | Impact | Effort Estimate |
-|-----|--------|-----------------|
-| `react_to_message` | Social signals in chat interfaces | Low |
-| `video_analyze` | Video content understanding | High |
-| `image_generate` | Image creation | High (needs model) |
-| `computer_use` | Full desktop automation | Very High |
-| `manage_catalog` | Tool catalog management | Medium |
-| `desktop_project` | Desktop project workflows | Medium |
+| Gap | Impact | Effort Estimate | Notes |
+|-----|--------|-----------------|-------|
+| `manage_catalog` | Tool catalog management at runtime | Medium | Registry exists in `crabjar-mcp-tool-registry`; needs tool surface exposure |
+| `react_to_message` | Social signals in chat interfaces | Low | Only matters for GUI/desktop surfaces |
+| `video_analyze` | Video content understanding | High | ffmpeg frame extraction → existing `crabjar-vision` |
+
+### P3 / Intentional Differences
+
+These are not gaps — crabjar covers the same ground differently or defers them:
+
+| Gap | Hermes Approach | Crabjar Approach |
+|-----|-----------------|------------------|
+| `image_generate` | Built-in image gen model | Deferred to P3; not a core workflow need |
+| `computer_use` | Full desktop automation (mouse/keyboard) | Covered by existing stack: **herdr** (terminal multiplexing) + **tuiwright** (TUI automation) + **roid** (resource supervision). No GUI needed — everything is a terminal pane away. |
+| `desktop_project` | Desktop project workflows | If built: GPUI-based Rust framework wrapping herdr-style multiplexing. Bare minimum like hermes desktop — new window/tab/pane for any prompt, TUI or CLI. Not a separate concern from the agent runtime. |
 
 ---
 
