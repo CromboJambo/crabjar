@@ -18,6 +18,9 @@ reqwest = { workspace = true, features = ["json", "stream"] }
 # Base64 encoding for image data URIs
 base64 = { version = "0.22", features = ["alloc"] }
 
+# Image processing for region cropping
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+
 # Async runtime
 tokio = { workspace = true, features = ["full"] }
 

@@ -37,4 +37,12 @@ pub enum VisionError {
     /// Invalid configuration.
     #[error("Configuration error: {0}")]
     ConfigError(String),
+
+    /// Invalid crop region coordinates.
+    #[error("Region error: {0}")]
+    RegionError(String),
+
+    /// Failed to decode or crop the image.
+    #[error("Image processing error: {0}")]
+    ImageProcessingError(String),
 }

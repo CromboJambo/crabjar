@@ -147,7 +147,100 @@ impl VisionClient {
         Ok(analysis)
     }
 
-    /// Load an image from a local path or URL and encode as base64 data URI.
+    /// Analyze a specific region of an image.
+    ///
+    /// Crops the image to `[x1, y1, x2, y2]` pixel coordinates before sending
+    /// to the vision model. The crop keeps full resolution — no downscaling.
+    ///
+    /// # Arguments
+    /// * `source` - Local file path or URL of the original image
+    /// * `question` - What to ask about the region
+    /// * `region` - Crop rectangle as `[x1, y1, x2, y2]` in original-image pixels
+    pub async fn analyze_with_region(
+        &self,
+        source: &str,
+        question: &str,
+        region: &[u32; 4],
+    ) -> VisionResult<VisionAnalysis> {
+        let [x1, y1, x2, y2] = *region;
+
+        if x1 >= x2 || y1 >= y2 {
+            return Err(VisionError::RegionError(
+                "Invalid region: x1 must be < x2 and y1 must be < y2".to_string(),
+            ));
+        }
+
+        info!(source = %source, region = ?region, "Starting region-cropped vision analysis");
+
+        // Load raw image bytes
+        let (bytes, mime_type) = self.load_image_bytes(source).await?;
+
+        // Crop the region
+        let cropped_bytes = crop_image_region(&bytes, x1, y1, x2, y2)?;
+
+        // Encode as base64 data URI
+        let encoded = BASE64.encode(&cropped_bytes);
+        let data_uri = format!("data:image/png;base64,{}", encoded);
+
+        // Build and send request with region context
+        let region_context = format!(
+            "This is a cropped region [x1={}, y1={}, x2={}, y2={}] from the original image. {}",
+            x1, y1, x2, y2, question
+        );
+
+        let request = self.build_vision_request(&data_uri, &mime_type, &region_context)?;
+        let response = self.send_request(&request).await?;
+        let analysis = self.parse_response(&response, source)?;
+
+        info!(tokens_used = ?analysis.tokens_used, "Region-cropped vision analysis complete");
+        Ok(analysis)
+    }
+
+    /// Load an image from a local path or URL as raw bytes (without encoding).
+    async fn load_image_bytes(&self, source: &str) -> VisionResult<(Vec<u8>, String)> {
+        if source.starts_with("http://") || source.starts_with("https://") {
+            info!(url = %source, "Downloading image from URL");
+            let response = self
+                .http_client
+                .get(source)
+                .send()
+                .await
+                .map_err(|e| VisionError::ImageLoadError {
+                    image_source: source.to_string(),
+                    reason: format!("Failed to download: {}", e),
+                })?;
+
+            if !response.status().is_success() {
+                return Err(VisionError::ImageLoadError {
+                    image_source: source.to_string(),
+                    reason: format!("HTTP error: {}", response.status()),
+                });
+            }
+
+            let content_type = response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.split(';').next().unwrap_or(s).trim().to_string())
+                .filter(|s| s.starts_with("image/"))
+                .unwrap_or_else(|| detect_mime_from_extension(source));
+
+            let bytes = response.bytes().await.map_err(|e| VisionError::ImageLoadError {
+                image_source: source.to_string(),
+                reason: format!("Failed to read response body: {}", e),
+            })?;
+
+            Ok((bytes.to_vec(), content_type))
+        } else {
+            info!(path = %source, "Reading image from local file");
+            let bytes = tokio::fs::read(source).await.map_err(|e| VisionError::ImageLoadError {
+                image_source: source.to_string(),
+                reason: format!("Failed to read file: {}", e),
+            })?;
+
+            Ok((bytes, detect_mime_from_extension(source)))
+        }
+    }
     async fn load_image(&self, source: &str) -> VisionResult<(String, String)> {
         let (bytes, mime_type) = if source.starts_with("http://") || source.starts_with("https://") {
             // Download from URL
@@ -343,9 +436,74 @@ fn detect_mime_from_extension(path: &str) -> String {
     }
 }
 
+/// Crop an image to the specified region and re-encode as PNG.
+///
+/// # Arguments
+/// * `bytes` - Raw image bytes (PNG or JPEG)
+/// * `x1, y1` - Top-left corner of the crop rectangle
+/// * `x2, y2` - Bottom-right corner of the crop rectangle
+fn crop_image_region(bytes: &[u8], x1: u32, y1: u32, x2: u32, y2: u32) -> VisionResult<Vec<u8>> {
+    use image::{GenericImageView, ImageEncoder, RgbaImage};
+
+    // Decode the source image
+    let img = image::load_from_memory(bytes).map_err(|e| {
+        VisionError::ImageProcessingError(format!("Failed to decode image: {}", e))
+    })?;
+
+    let (width, height) = img.dimensions();
+
+    // Validate region bounds and clamp if needed
+    let x1 = x1.min(width);
+    let y1 = y1.min(height);
+    let x2 = x2.min(width).max(x1);
+    let y2 = y2.min(height).max(y1);
+
+    let crop_width = x2 - x1;
+    let crop_height = y2 - y1;
+
+    if crop_width == 0 || crop_height == 0 {
+        return Err(VisionError::RegionError(
+            "Crop region has zero area after clamping to image bounds".to_string(),
+        ));
+    }
+
+    // Extract the region (RGBA for consistent output)
+    let rgba = img.to_rgba8();
+    let mut cropped = RgbaImage::new(crop_width, crop_height);
+
+    for y in 0..crop_height {
+        for x in 0..crop_width {
+            let src_pixel = rgba.get_pixel(x1 + x, y1 + y);
+            cropped.put_pixel(x, y, *src_pixel);
+        }
+    }
+
+    // Encode as PNG (lossless, good for screenshots and UI elements)
+    let mut png_bytes = Vec::new();
+    {
+        let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+        encoder
+            .write_image(cropped.as_raw(), crop_width, crop_height, image::ExtendedColorType::Rgba8)
+            .map_err(|e| {
+                VisionError::ImageProcessingError(format!("Failed to encode cropped PNG: {}", e))
+            })?;
+    }
+
+    tracing::info!(
+        original = format!("{}x{}", width, height),
+        crop = format!("[{}, {}, {}, {}]", x1, y1, x2, y2),
+        result = format!("{}x{}", crop_width, crop_height),
+        output_bytes = png_bytes.len(),
+        "Image region cropped"
+    );
+
+    Ok(png_bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::{ImageEncoder, RgbaImage};
 
     use std::sync::{Mutex, OnceLock};
 
@@ -517,5 +675,133 @@ mod tests {
             result.unwrap_err(),
             VisionError::ImageLoadError { .. }
         ));
+    }
+
+    #[test]
+    fn test_crop_image_region_valid() {
+        // Create a simple 10x10 red PNG image
+        let mut img = image::RgbaImage::new(10, 10);
+        for y in 0..10 {
+            for x in 0..10 {
+                img.put_pixel(x, y, image::Rgba([255, 0, 0, 255])); // Red
+            }
+        }
+
+        let mut png_bytes = Vec::new();
+        {
+            let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+            encoder.write_image(
+                img.as_raw(),
+                10,
+                10,
+                image::ExtendedColorType::Rgba8,
+            ).unwrap();
+        }
+
+        // Crop a 5x5 region from the center
+        let cropped = crop_image_region(&png_bytes, 2, 2, 7, 7).unwrap();
+        assert!(!cropped.is_empty());
+
+        // Verify the cropped image is valid PNG with correct dimensions
+        let decoded = image::load_from_memory(&cropped).unwrap();
+        assert_eq!(decoded.width(), 5);
+        assert_eq!(decoded.height(), 5);
+
+        // Verify pixel color is preserved (red)
+        let rgba = decoded.to_rgba8();
+        let pixel = rgba.get_pixel(0, 0);
+        assert_eq!(pixel[0], 255); // R
+        assert_eq!(pixel[1], 0);   // G
+        assert_eq!(pixel[2], 0);   // B
+    }
+
+    #[test]
+    fn test_crop_image_region_clamps_to_bounds() {
+        // Create a 10x10 image
+        let mut img = image::RgbaImage::new(10, 10);
+        for y in 0..10 {
+            for x in 0..10 {
+                img.put_pixel(x, y, image::Rgba([0, 255, 0, 255])); // Green
+            }
+        }
+
+        let mut png_bytes = Vec::new();
+        {
+            let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+            encoder.write_image(
+                img.as_raw(),
+                10,
+                10,
+                image::ExtendedColorType::Rgba8,
+            ).unwrap();
+        }
+
+        // Request a region that extends beyond bounds — should clamp
+        let cropped = crop_image_region(&png_bytes, 5, 5, 20, 20).unwrap();
+        let decoded = image::load_from_memory(&cropped).unwrap();
+        assert_eq!(decoded.width(), 5);  // Clamped to 10-5=5
+        assert_eq!(decoded.height(), 5); // Clamped to 10-5=5
+    }
+
+    #[test]
+    fn test_crop_image_region_invalid_coords() {
+        // Create a simple image
+        let mut img = image::RgbaImage::new(10, 10);
+        for y in 0..10 {
+            for x in 0..10 {
+                img.put_pixel(x, y, image::Rgba([0, 0, 255, 255])); // Blue
+            }
+        }
+
+        let mut png_bytes = Vec::new();
+        {
+            let encoder = image::codecs::png::PngEncoder::new(&mut png_bytes);
+            encoder.write_image(
+                img.as_raw(),
+                10,
+                10,
+                image::ExtendedColorType::Rgba8,
+            ).unwrap();
+        }
+
+        // x1 >= x2 after clamping should produce zero-width crop -> RegionError
+        let result = crop_image_region(&png_bytes, 7, 2, 5, 7);
+        assert!(matches!(result, Err(VisionError::RegionError(_))));
+    }
+
+    #[test]
+    fn test_crop_image_region_invalid_input() {
+        let result = crop_image_region(&[0xFF, 0xD8, 0xFF], 0, 0, 5, 5);
+        assert!(matches!(result, Err(VisionError::ImageProcessingError(_))));
+    }
+
+    #[tokio::test]
+    async fn test_analyze_with_region_invalid_coords() {
+        let config = VisionConfig {
+            base_url: "http://localhost:1234/v1".to_string(),
+            model: "test-model".to_string(),
+            api_key: None,
+            timeout_secs: 60,
+            max_tokens: 1024,
+        };
+        let client = VisionClient::new(config);
+
+        // Create a temp image file with .png extension
+        let mut img = image::RgbaImage::new(100, 100);
+        for y in 0..100 {
+            for x in 0..100 {
+                img.put_pixel(x, y, image::Rgba([255, 255, 255, 255]));
+            }
+        }
+
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let path = tmp_dir.path().join("test_image.png");
+        img.save(&path).unwrap();
+        let path_str = path.to_str().unwrap();
+
+        // Invalid region: x1 >= x2
+        let result = client.analyze_with_region(path_str, "What is this?", &[50, 0, 30, 100]).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), VisionError::RegionError(_)));
     }
 }
