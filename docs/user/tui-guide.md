@@ -177,6 +177,6 @@ If the TUI feels sluggish, check:
 ### Connection Issues
 
 If the TUI can't connect to the conductor service:
-1. Verify conductor is running: `curl http://localhost:8090/api/v1/fleet/status`
+1. Verify conductor is running: `curl http://localhost:8091/api/fleet/status`
 2. Check network connectivity between your machine and conductor host
 3. Verify configuration file has correct conductor URL

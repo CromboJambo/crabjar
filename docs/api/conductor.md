@@ -5,15 +5,22 @@ The crabjar conductor provides a comprehensive HTTP API for fleet coordination, 
 ## Base URL
 
 ```
-http://localhost:8090/api/v1
+http://localhost:8091/api
 ```
+
+Routes are served without a version prefix. The conductor defaults to port 8091 (configurable).
+
+## Endpoint Status
+
+- **[IMPLEMENTED]** — Available in the current release
+- **[PLANNED]** — Designed but not yet implemented
 
 ## Authentication
 
 Most endpoints are public. Protected endpoints require JWT Bearer token authentication via the `Authorization` header.
 
 ```bash
-curl -H "Authorization: Bearer <token>" http://localhost:8090/api/v1/goals
+curl -H "Authorization: Bearer <token>" http://localhost:8091/api/goals
 ```
 
 ## Fleet Management
@@ -23,7 +30,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8090/api/v1/goals
 Retrieve current status of all registered workers and fleet health metrics.
 
 ```http
-GET /fleet/status
+GET /fleet/status **[IMPLEMENTED]**
 ```
 
 **Response:**
@@ -44,7 +51,7 @@ GET /fleet/status
 Register a new worker node with the conductor.
 
 ```http
-POST /workers/register
+POST /workers/register **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -68,7 +75,7 @@ Content-Type: application/json
 Authenticate a worker for task polling.
 
 ```http
-POST /workers/login
+POST /workers/login **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -82,7 +89,7 @@ Content-Type: application/json
 Worker polls for available tasks assigned to it.
 
 ```http
-POST /workers/poll
+POST /workers/poll **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -95,7 +102,7 @@ Content-Type: application/json
 Report worker liveness.
 
 ```http
-POST /workers/heartbeat
+POST /workers/heartbeat **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -104,12 +111,46 @@ Content-Type: application/json
 }
 ```
 
+
+### Deploy Worker **[IMPLEMENTED]**
+
+Deploy a worker configuration to a target machine.
+
+```http
+POST /workers/deploy **[IMPLEMENTED]**
+Content-Type: application/json
+
+{
+  "hostname": "worker-01",
+  "profile": "standard",
+  "config": {
+    "max_concurrent_tasks": 4,
+    "capabilities": ["shell", "browser"]
+  }
+}
+```
+
+### Supervisor Heartbeat **[IMPLEMENTED]**
+
+Report supervisor liveness and status.
+
+```http
+POST /workers/heartbeat/supervisor **[IMPLEMENTED]**
+Content-Type: application/json
+
+{
+  "supervisor_id": "sup-001",
+  "status": "active",
+  "managed_workers": 3
+}
+```
+
 ### List Workers
 
 List all registered workers (requires auth).
 
 ```http
-GET /workers
+GET /workers **[IMPLEMENTED]**
 Authorization: Bearer <token>
 ```
 
@@ -120,7 +161,7 @@ Authorization: Bearer <token>
 Submit a new goal for task decomposition and execution.
 
 ```http
-POST /goals
+POST /goals **[IMPLEMENTED]**
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -136,7 +177,7 @@ Content-Type: application/json
 Check status of a submitted goal.
 
 ```http
-GET /goals/{id}
+GET /goals/{id} **[IMPLEMENTED]**
 Authorization: Bearer <token>
 ```
 
@@ -145,7 +186,7 @@ Authorization: Bearer <token>
 Worker reports completion of assigned task.
 
 ```http
-POST /tasks/{id}/result
+POST /tasks/{id}/result **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -162,7 +203,7 @@ Content-Type: application/json
 Submit a decision for conductor evaluation.
 
 ```http
-POST /evaluations/decision
+POST /evaluations/decision **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -180,7 +221,7 @@ Content-Type: application/json
 Poll status of a background decision evaluation.
 
 ```http
-GET /decide/evaluate/{id}
+GET /decide/evaluate/{id} **[IMPLEMENTED]**
 ```
 
 ### List Decision Capabilities
@@ -188,7 +229,7 @@ GET /decide/evaluate/{id}
 Get registered decision capabilities (public).
 
 ```http
-GET /decisions/capabilities
+GET /decisions/capabilities **[IMPLEMENTED]**
 ```
 
 ## Sandbox Management
@@ -198,7 +239,7 @@ GET /decisions/capabilities
 Create a new isolated execution environment.
 
 ```http
-POST /sandboxes
+POST /sandboxes **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -212,7 +253,7 @@ Content-Type: application/json
 List all active sandboxes.
 
 ```http
-GET /sandboxes
+GET /sandboxes **[IMPLEMENTED]**
 ```
 
 ### Get Sandbox Details
@@ -220,7 +261,7 @@ GET /sandboxes
 Retrieve details of a specific sandbox.
 
 ```http
-GET /sandboxes/{id}
+GET /sandboxes/{id} **[IMPLEMENTED]**
 ```
 
 ### Destroy Sandbox
@@ -228,7 +269,7 @@ GET /sandboxes/{id}
 Remove a sandbox environment.
 
 ```http
-DELETE /sandboxes/{id}
+DELETE /sandboxes/{id} **[IMPLEMENTED]**
 ```
 
 ### Assign Worker to Sandbox
@@ -236,7 +277,7 @@ DELETE /sandboxes/{id}
 Assign a worker to operate within a sandbox.
 
 ```http
-POST /sandboxes/{id}/worker
+POST /sandboxes/{id}/worker **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -251,7 +292,7 @@ Content-Type: application/json
 Evaluate a decision using Jev/SemIf-style semantic branching.
 
 ```http
-POST /jev/evaluate
+POST /jev/evaluate **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -268,7 +309,7 @@ Content-Type: application/json
 Postprocess a decision result.
 
 ```http
-POST /jev/postprocess
+POST /jev/postprocess **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -282,7 +323,7 @@ Content-Type: application/json
 Record feedback on a decision outcome.
 
 ```http
-POST /jev/feedback
+POST /jev/feedback **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -299,7 +340,7 @@ Content-Type: application/json
 Propose a schema change for review.
 
 ```http
-POST /schema/propose
+POST /schema/propose **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -317,7 +358,7 @@ Content-Type: application/json
 Get routing decision for a task.
 
 ```http
-POST /route/decide
+POST /route/decide **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -332,7 +373,7 @@ Content-Type: application/json
 Record the outcome of a routing decision.
 
 ```http
-POST /route/outcome
+POST /route/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -349,7 +390,7 @@ Content-Type: application/json
 Declare task dependencies.
 
 ```http
-POST /dependencies/declare
+POST /dependencies/declare **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -365,7 +406,7 @@ Content-Type: application/json
 Evaluate whether an upgrade should be performed.
 
 ```http
-POST /upgrade/evaluate
+POST /upgrade/evaluate **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -380,7 +421,7 @@ Content-Type: application/json
 Record the result of an upgrade.
 
 ```http
-POST /upgrade/outcome
+POST /upgrade/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -397,7 +438,7 @@ Content-Type: application/json
 Evaluate system health across components.
 
 ```http
-POST /health/evaluate
+POST /health/evaluate **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -410,7 +451,7 @@ Content-Type: application/json
 Record the outcome of a recovery action.
 
 ```http
-POST /health/outcome
+POST /health/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -427,7 +468,7 @@ Content-Type: application/json
 Evaluate cost optimization opportunities.
 
 ```http
-POST /cost/evaluate
+POST /cost/evaluate **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -442,7 +483,7 @@ Content-Type: application/json
 Record the outcome of a cost optimization.
 
 ```http
-POST /optimization/outcome
+POST /optimization/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -459,7 +500,7 @@ Content-Type: application/json
 Evaluate disaster recovery options.
 
 ```http
-POST /recovery/evaluate
+POST /recovery/evaluate **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -474,7 +515,7 @@ Content-Type: application/json
 Record the outcome of a disaster recovery operation.
 
 ```http
-POST /recovery/outcome
+POST /recovery/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -492,7 +533,7 @@ Content-Type: application/json
 Evaluate capacity planning needs.
 
 ```http
-POST /capacity/evaluate
+POST /capacity/evaluate **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -507,7 +548,7 @@ Content-Type: application/json
 Record the outcome of a capacity adjustment.
 
 ```http
-POST /capacity/outcome
+POST /capacity/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -524,7 +565,7 @@ Content-Type: application/json
 Evaluate security posture.
 
 ```http
-POST /security/evaluate
+POST /security/evaluate **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -543,7 +584,7 @@ Content-Type: application/json
 Record the outcome of a security action.
 
 ```http
-POST /security/outcome
+POST /security/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -560,7 +601,7 @@ Content-Type: application/json
 Evaluate compliance status.
 
 ```http
-POST /compliance/evaluate
+POST /compliance/evaluate **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -575,7 +616,7 @@ Content-Type: application/json
 Record the outcome of a compliance action.
 
 ```http
-POST /compliance/outcome
+POST /compliance/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -592,7 +633,7 @@ Content-Type: application/json
 Evaluate documentation quality and completeness.
 
 ```http
-POST /docs/evaluate
+POST /docs/evaluate **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -606,7 +647,7 @@ Content-Type: application/json
 Record the outcome of a documentation update.
 
 ```http
-POST /docs/outcome
+POST /docs/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -623,7 +664,7 @@ Content-Type: application/json
 Evaluate monitoring coverage and effectiveness.
 
 ```http
-POST /monitoring/evaluate
+POST /monitoring/evaluate **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -637,7 +678,7 @@ Content-Type: application/json
 Record the outcome of a monitoring action.
 
 ```http
-POST /monitoring/outcome
+POST /monitoring/outcome **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -654,7 +695,7 @@ Content-Type: application/json
 Evaluate configuration drift.
 
 ```http
-POST /drift/evaluate
+POST /drift/evaluate **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -668,7 +709,7 @@ Content-Type: application/json
 Record the outcome of a drift correction.
 
 ```http
-POST /drift/outcome
+POST /drift/outcome **[IMPLEMENTED]**
 Content-Type: application/json
 
 {
@@ -685,7 +726,7 @@ Content-Type: application/json
 Extract rules from decision history.
 
 ```http
-POST /rules/extract
+POST /rules/extract **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -699,7 +740,7 @@ Content-Type: application/json
 Promote a discovered rule to production.
 
 ```http
-POST /rules/promote
+POST /rules/promote **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -715,7 +756,7 @@ Content-Type: application/json
 Evaluate whether a worker should be promoted.
 
 ```http
-GET /promotion/evaluate/{worker_id}
+GET /promotion/evaluate/{worker_id} **[PLANNED]**
 ```
 
 ### Execute Promotion
@@ -723,7 +764,7 @@ GET /promotion/evaluate/{worker_id}
 Execute a worker promotion.
 
 ```http
-POST /promotion/execute/{worker_id}
+POST /promotion/execute/{worker_id} **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -737,7 +778,7 @@ Content-Type: application/json
 Retrieve promotion history for a worker.
 
 ```http
-GET /promotion/history/{worker_id}
+GET /promotion/history/{worker_id} **[PLANNED]**
 ```
 
 ### Get Worker Metrics
@@ -745,7 +786,7 @@ GET /promotion/history/{worker_id}
 Retrieve performance metrics for a worker.
 
 ```http
-GET /promotion/metrics/{worker_id}
+GET /promotion/metrics/{worker_id} **[PLANNED]**
 ```
 
 ## Audit Log
@@ -755,7 +796,7 @@ GET /promotion/metrics/{worker_id}
 Query the audit log for training pipeline evaluation.
 
 ```http
-GET /audit/log
+GET /audit/log **[IMPLEMENTED]**
 ```
 
 **Response:**
@@ -774,7 +815,7 @@ GET /audit/log
 Propose an optimization to a service interface.
 
 ```http
-POST /interface/propose
+POST /interface/propose **[PLANNED]**
 Content-Type: application/json
 
 {
@@ -791,7 +832,7 @@ Content-Type: application/json
 Submit a review for completed work.
 
 ```http
-POST /review
+POST /review **[IMPLEMENTED]**
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -809,7 +850,7 @@ Content-Type: application/json
 Submit a new goal for task decomposition.
 
 ```http
-POST /goals
+POST /goals **[IMPLEMENTED]**
 Authorization: Bearer <token>
 Content-Type: application/json
 
@@ -825,7 +866,7 @@ Content-Type: application/json
 Check status of a submitted goal.
 
 ```http
-GET /goals/{id}
+GET /goals/{id} **[IMPLEMENTED]**
 Authorization: Bearer <token>
 ```
 
@@ -836,7 +877,7 @@ Authorization: Bearer <token>
 Retrieve cache performance statistics.
 
 ```http
-GET /metrics/cache
+GET /metrics/cache **[IMPLEMENTED]**
 ```
 
 **Response:**
@@ -847,4 +888,80 @@ GET /metrics/cache
   "total_requests": 10000,
   "cached_responses": 8500
 }
+```## Deployments **[IMPLEMENTED]**
+
+### List Deployments **[IMPLEMENTED]**
+
+List all worker deployments.
+
+```http
+GET /deployments **[IMPLEMENTED]**
 ```
+
+### Get Deployment Details **[IMPLEMENTED]**
+
+Retrieve details of a specific deployment.
+
+```http
+GET /deployments/{id} **[IMPLEMENTED]**
+```
+
+### Pending Deployments **[IMPLEMENTED]**
+
+Get pending deployments for a supervisor.
+
+```http
+GET /workers/deployments/pending/{supervisor_id} **[IMPLEMENTED]**
+```
+
+### Update Deployment Status **[IMPLEMENTED]**
+
+Report the status of a deployment operation.
+
+```http
+POST /workers/deployments/{id}/status **[IMPLEMENTED]**
+Content-Type: application/json
+
+{
+  "status": "completed",
+  "message": "Worker deployed successfully"
+}
+```
+
+## Supervisors **[IMPLEMENTED]**
+
+### List Supervisor Statuses **[IMPLEMENTED]**
+
+Get status of all registered supervisors.
+
+```http
+GET /supervisors/status **[IMPLEMENTED]**
+```
+
+## Seed Reports **[IMPLEMENTED]**
+
+### Submit Seed Report **[IMPLEMENTED]**
+
+Seed container reports hardware/environment info to the conductor.
+
+```http
+POST /api/report **[IMPLEMENTED]**
+Content-Type: application/json
+
+{
+  "hostname": "seed-node-01",
+  "cpu_model": "AMD Ryzen 9 5950X",
+  "gpu_model": "NVIDIA RTX 3070 Ti",
+  "memory_gb": 64,
+  "os": "Arch Linux"
+}
+```
+
+### List Seed Reports **[IMPLEMENTED]**
+
+List all reported seed environments.
+
+```http
+GET /api/reports **[IMPLEMENTED]**
+```
+

@@ -15,7 +15,7 @@ This guide covers deploying crabjar's fleet coordination layer across multiple m
                    ┌─────────────▼─────────────┐
                    │   Conductor Service       │
                    │   (crabjar-conductor)     │
-                   │   :8090/api/v1            │
+                   │   :8091/api               │
                    └───────────────────────────┘
 ```
 
@@ -48,7 +48,7 @@ cp target/release/crabjar-conductor /opt/crabjar/conductor/
 cat > /opt/crabjar/conductor/config.toml << 'EOF'
 [server]
 host = "0.0.0.0"
-port = 8090
+port = 8091
 
 [database]
 path = "/var/lib/crabjar/conductor.db"
@@ -87,7 +87,7 @@ systemctl start crabjar-conductor
 
 # Verify it's running
 systemctl status crabjar-conductor
-curl http://localhost:8090/api/v1/fleet/status
+curl http://localhost:8091/api/fleet/status
 ```
 
 ## Step 2: Deploy Worker Nodes
@@ -111,7 +111,7 @@ cp target/release/crabjar /opt/crabjar/worker/
 # Create configuration file pointing to conductor
 cat > /opt/crabjar/worker/config.toml << 'EOF'
 [conductor]
-url = "http://<CONDUCTOR_HOST>:8090/api/v1"
+url = "http://<CONDUCTOR_HOST>:8091/api"
 hostname = "<THIS_NODE_HOSTNAME>"
 capabilities = ["shell", "browser"]
 max_concurrent_tasks = 4
@@ -160,7 +160,7 @@ systemctl status crabjar-worker
 From the conductor host, verify all workers are registered:
 
 ```bash
-curl http://localhost:8090/api/v1/fleet/status
+curl http://localhost:8091/api/fleet/status
 ```
 
 Expected response:
@@ -179,7 +179,7 @@ Expected response:
 Test the fleet by submitting a simple task through the conductor API:
 
 ```bash
-curl -X POST http://localhost:8090/api/v1/goals \
+curl -X POST http://localhost:8091/api/goals \
   -H "Content-Type: application/json" \
   -d '{
     "description": "Test task: echo hello from fleet",
@@ -192,10 +192,10 @@ Monitor execution through the conductor dashboard or API:
 
 ```bash
 # Check goal status
-curl http://localhost:8090/api/v1/goals/<goal_id>
+curl http://localhost:8091/api/goals/<goal_id>
 
 # List active workers
-curl http://localhost:8090/api/v1/workers
+curl http://localhost:8091/api/workers
 ```
 
 ## Configuration Reference
@@ -205,7 +205,7 @@ curl http://localhost:8090/api/v1/workers
 ```toml
 [server]
 host = "0.0.0.0"          # Bind address
-port = 8090                # HTTP port
+port = 8091                # HTTP port
 
 [database]
 path = "/var/lib/crabjar/conductor.db"  # SQLite database path
@@ -219,7 +219,7 @@ file = "/var/log/crabjar/conductor.log" # Log file path
 
 ```toml
 [conductor]
-url = "http://<CONDUCTOR_HOST>:8090/api/v1"  # Conductor API URL
+url = "http://<CONDUCTOR_HOST>:8091/api"  # Conductor API URL
 hostname = "<THIS_NODE_HOSTNAME>"             # Unique hostname for this worker
 capabilities = ["shell", "browser"]           # Task capabilities
 max_concurrent_tasks = 4                      # Maximum parallel tasks
@@ -277,7 +277,7 @@ Monitor worker health through the conductor API:
 
 ```bash
 # Check for workers that haven't sent heartbeats recently
-curl http://localhost:8090/api/v1/workers | jq '.workers[] | select(.last_heartbeat < now - 300)'
+curl http://localhost:8091/api/workers | jq '.workers[] | select(.last_heartbeat < now - 300)'
 ```
 
 ## Troubleshooting
@@ -288,7 +288,7 @@ Check network connectivity between worker and conductor:
 
 ```bash
 # From worker node
-curl http://<CONDUCTOR_HOST>:8090/api/v1/fleet/status
+curl http://<CONDUCTOR_HOST>:8091/api/fleet/status
 ```
 
 ### Tasks Not Completing
@@ -304,7 +304,7 @@ tail -f /var/log/crabjar/worker.log
 Monitor fleet utilization:
 
 ```bash
-curl http://localhost:8090/api/v1/fleet/status | jq '.tasks_in_progress'
+curl http://localhost:8091/api/fleet/status | jq '.tasks_in_progress'
 ```
 
 Consider adding more worker nodes if consistently at capacity.
