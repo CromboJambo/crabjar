@@ -96,12 +96,18 @@ impl CrabjarAgent {
 /// The CrabjarSurfaceAdapter translates conductor API state into herdr protocol
 /// surface patches for GPUI rendering.
 pub struct CrabjarSurfaceAdapter {
+    boot_id: String,
+    projection_revision: u64,
+    surface_revision: u64,
     agents: HashMap<String, CrabjarAgent>,
 }
 
 impl CrabjarSurfaceAdapter {
-    pub fn new(_boot_id: &str) -> Self {
+    pub fn new(boot_id: &str) -> Self {
         CrabjarSurfaceAdapter {
+            boot_id: boot_id.to_string(),
+            projection_revision: 0,
+            surface_revision: 0,
             agents: HashMap::new(),
         }
     }
@@ -112,10 +118,42 @@ impl CrabjarSurfaceAdapter {
             let agent = CrabjarAgent::from_conductor_response(worker);
             self.agents.insert(agent.id.clone(), agent);
         }
+        self.projection_revision += 1;
+        self.surface_revision += 1;
     }
 
     /// Get all agents for rendering.
     pub fn agents(&self) -> &HashMap<String, CrabjarAgent> {
         &self.agents
+    }
+
+    /// Generate a surface patch JSON from current adapter state.
+    pub fn generate_patch(&mut self) -> serde_json::Value {
+        let agents_vec: Vec<serde_json::Value> = self
+            .agents
+            .values()
+            .map(|a| {
+                serde_json::json!({
+                    "id": a.id,
+                    "name": a.name,
+                    "status": match a.status {
+                        AgentStatus::Idle => "idle",
+                        AgentStatus::Working => "working",
+                        AgentStatus::Blocked => "blocked",
+                        AgentStatus::Done => "done",
+                        AgentStatus::Unknown => "unknown",
+                    },
+                    "capabilities": a.capabilities,
+                    "trust_level": a.trust_level,
+                })
+            })
+            .collect();
+
+        serde_json::json!({
+            "boot_id": self.boot_id,
+            "projection_revision": self.projection_revision,
+            "surface_revision": self.surface_revision,
+            "agents": agents_vec,
+        })
     }
 }
