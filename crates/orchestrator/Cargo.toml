@@ -63,6 +63,7 @@ crabjar-delegation = { path = "../crabjar/crabjar-delegation" }
 
 # Browser automation tooling (P1-3)
 crabjar-browser = { path = "../crabjar/crabjar-browser" }
+crabjar-browser-vault = { path = "../crabjar/crabjar-browser-vault" }
 crabjar-homeassistant = { path = "../crabjar/crabjar-homeassistant" }
 
 # Directory detection for memory tool

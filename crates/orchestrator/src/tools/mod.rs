@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub mod browser_exec;
+pub mod browser_vault;
 pub mod by_source;
 pub mod clarify;
 pub mod delegate_task;
@@ -42,6 +43,7 @@ pub async fn execute(
         "session_search" => session_search::handle(args, ctx).await,
         "process_manage" => process_manage::handle(args, ctx).await,
         "browser_exec" => browser_exec::handle(args, ctx).await,
+        "browser_vault" => browser_vault::handle(args).await,
         name if name.starts_with("ha_") => homeassistant::handle(name, args, ctx).await,
         _ => Err(format!("Unknown tool: {}", function_name)),
     }

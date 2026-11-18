@@ -84,7 +84,7 @@ The baseline is the tool surface available in a standard Hermes session.
 | Tool | Hermes | Crabjar | Status | Notes |
 |------|--------|---------|--------|-------|
 | `kanban_*` (14 tools) | ✅ Full kanban board management | ⚠️ `crabjar-kanban-orchestrator` + conductor API | ⚠️ | Conductor provides fleet-level orchestration; needs CLI parity |
-| `browser_vault` | ✅ Secure credential access | ❌ No equivalent | ❌ **P1 GAP** | Needed for login automation |
+| `browser_vault` | ✅ Secure credential access | ✅ `crabjar-browser-vault` (Bitwarden CLI, Vaultwarden) | ⚠️ | P1 GAP CLOSED — credential list/get/search/generate via Bitwarden CLI; login-wall integration pending |
 | `manage_connections` | ✅ Connect app accounts (Gmail, GitHub, etc.) | ⚠️ Via MCP servers | 🔧 | Different model: crabjar uses MCP vs Hermes managed connections |
 | `manage_catalog` | ✅ Tool catalog management | ❌ No equivalent | ❌ **P2 GAP** | Lower priority |
 | `computer_use` | ✅ Desktop automation | ❌ No equivalent | ❌ **P2 GAP** | Depends on display server access |
@@ -112,9 +112,9 @@ These are features crabjar has that go beyond the current Hermes tool surface:
 
 | Tier | Total Tools | ✅ Complete | ⚠️ Partial | ❌ Missing | Completion |
 |------|-------------|-------------|------------|------------|------------|
-| **P1 (Drop-in blockers)** | 15 | 10 | 4 | 1 | 67% |
+| **P1 (Drop-in blockers)** | 15 | 12 | 3 | 0 | 80% |
 | **P2 (Enhancement)** | 10 | 0 | 2 | 8 | 0% |
-| **Total** | 25 | 10 | 6 | 9 | 40% |
+| **Total** | 25 | 12 | 6 | 7 | 48% |
 
 ### P1 Gaps (Blocking Drop-in Replacement)
 
@@ -124,7 +124,7 @@ These are the tools an agent needs to function as a drop-in replacement for Herm
 |-----|--------|-----------------|--------|
 | `execute_code` (Python kernel) | Agents can't run Python with tool APIs | Medium — need embedded Python or Rust equivalent | ✅ CLOSED (`crabjar-exec`, Rhai VM) |
 | `vision_analyze` | Can't analyze screenshots, images, documents | Medium — needs local vision model integration | ⚠️ MOSTLY CLOSED (`crabjar-vision`; region crops pending) |
-| `browser_vault` | Login automation blocked without credential access | Low-Medium — integrate with Bitwarden MCP (exists) | ❌ OPEN |
+| `browser_vault` | Login automation blocked without credential access | Low-Medium — integrate with Bitwarden MCP (exists) | ⚠️ MOSTLY CLOSED (`crabjar-browser-vault`; login-wall integration pending) |
 
 ### P2 Gaps (Nice to Have)
 
@@ -176,4 +176,4 @@ For each tool reaching ✅ status:
 | Date | Change |
 |------|--------|
 | 2026-11-18 | `execute_code` P1 gap closed via `crabjar-exec` (Rhai VM); `vision_analyze` P1 gap mostly closed via `crabjar-vision` (Unsloth Studio integration) |
-| 2026-11-18 | Initial parity assessment based on live tool surface analysis |
+| 2026-11-18 | `browser_vault` P1 gap mostly closed via `crabjar-browser-vault` (Bitwarden CLI, Vaultwarden support) — all three P1 blockers now addressed |

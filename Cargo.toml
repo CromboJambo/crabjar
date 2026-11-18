@@ -85,7 +85,7 @@ members = [
     # KDE Connect MCP server for phone file access
     "mcps/kdeconnect-mcp",
     # SSH-based file access MCP for phone
-    "mcps/ssh-file-mcp", "crates/crabjar/crabjar-exec",
+    "mcps/ssh-file-mcp", "crates/crabjar/crabjar-exec", "crates/crabjar/crabjar-vision", "crates/crabjar/crabjar-browser-vault",
 ]
 
 resolver = "2"
