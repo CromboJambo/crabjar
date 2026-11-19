@@ -212,7 +212,13 @@ pub async fn handle_exec(
     let outcome = match outcome {
         crabjar_guard::ConciergeOutcome::Queued(pending_action, _pending_entry) => {
             match super::exec_pipeline::resolve_arbiter(
-                pending_action, &mut flight_recorder, command, args, &effective_cwd, reason, &action_request_id,
+                pending_action,
+                &mut flight_recorder,
+                command,
+                args,
+                &effective_cwd,
+                reason,
+                &action_request_id,
             ) {
                 Ok(resolved) => resolved,
                 Err(final_json) => return Ok(final_json),

@@ -87,19 +87,10 @@ impl SessionSearchIndex {
             .as_str()
             .ok_or("Missing session_id in session data")?
             .to_string();
-        let timestamp = session_data["timestamp"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
-        let query = session_data["query"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let timestamp = session_data["timestamp"].as_str().unwrap_or("").to_string();
+        let query = session_data["query"].as_str().unwrap_or("").to_string();
         let tool_calls = session_data["tool_calls"].to_string();
-        let outcome = session_data["outcome"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let outcome = session_data["outcome"].as_str().unwrap_or("").to_string();
         let error_type = session_data["error_type"]
             .as_str()
             .unwrap_or("")
@@ -138,7 +129,9 @@ impl SessionSearchIndex {
         let sql = "SELECT s.session_id, s.timestamp, s.query, s.outcome \
                    FROM sessions_fts f JOIN sessions s ON s.id = f.rowid \
                    WHERE sessions_fts MATCH ?1 ORDER BY rank LIMIT ?2";
-        let mut stmt = conn.prepare(sql).map_err(|e| format!("Failed to prepare search: {}", e))?;
+        let mut stmt = conn
+            .prepare(sql)
+            .map_err(|e| format!("Failed to prepare search: {}", e))?;
 
         let results = stmt
             .query_map(rusqlite::params![query.to_string(), limit as i64], |row| {
@@ -189,7 +182,7 @@ mod tests {
         // Use a unique session ID to avoid conflicts with other tests
         let session_id = format!("test-session-{}", std::process::id());
         let mut idx = SessionSearchIndex::new();
-        
+
         let session_data = serde_json::json!({
             "session_id": session_id,
             "timestamp": "2026-11-18T12:00:00Z",
@@ -205,11 +198,11 @@ mod tests {
         // Search for the session
         let results = idx.search("terminal tool", 10).unwrap();
         assert!(!results.is_empty());
-        
+
         // Verify the result contains our session
-        let found = results.iter().any(|r| {
-            r["session_id"].as_str() == Some(&session_id)
-        });
+        let found = results
+            .iter()
+            .any(|r| r["session_id"].as_str() == Some(&session_id));
         assert!(found, "Expected to find indexed session in search results");
     }
 
@@ -217,7 +210,7 @@ mod tests {
     fn find_past_failures() {
         let session_id = format!("test-fail-session-{}", std::process::id());
         let mut idx = SessionSearchIndex::new();
-        
+
         let session_data = serde_json::json!({
             "session_id": session_id,
             "timestamp": "2026-11-18T12:00:00Z",

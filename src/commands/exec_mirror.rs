@@ -51,4 +51,3 @@ pub fn mirror_pending_to_celld(action_id: &str, description: &str) {
         }
     }
 }
-

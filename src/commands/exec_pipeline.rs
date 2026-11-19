@@ -18,13 +18,26 @@ pub fn resolve_arbiter(
 
     match arbitration {
         ArbitrationResult::Approved(approved_action, confidence, _evidence) => {
-            eprintln!("DEBUG arbiter: approved action (confidence={:.2})", confidence);
-            flight_recorder.record_guard_decision("exec-session", "exec", "approved", 3, confidence);
+            eprintln!(
+                "DEBUG arbiter: approved action (confidence={:.2})",
+                confidence
+            );
+            flight_recorder.record_guard_decision(
+                "exec-session",
+                "exec",
+                "approved",
+                3,
+                confidence,
+            );
             Ok(ConciergeOutcome::Approved(approved_action))
         }
         ArbitrationResult::Denied(denied_action, confidence, evidence) => {
             let reasons: Vec<String> = evidence.iter().map(|e| e.rationale.clone()).collect();
-            eprintln!("DEBUG arbiter: denied action (confidence={:.2}) — {}", confidence, reasons.join("; "));
+            eprintln!(
+                "DEBUG arbiter: denied action (confidence={:.2}) — {}",
+                confidence,
+                reasons.join("; ")
+            );
             flight_recorder.record_guard_decision("exec-session", "exec", "denied", 3, confidence);
             let _ = denied_action;
             Err(json!({
@@ -47,14 +60,21 @@ pub fn resolve_arbiter(
         }
         ArbitrationResult::Escalated(excuse, evidence) => {
             let reasons: Vec<String> = evidence.iter().map(|e| e.rationale.clone()).collect();
-            eprintln!("DEBUG arbiter: escalated — {} — {}", excuse, reasons.join("; "));
+            eprintln!(
+                "DEBUG arbiter: escalated — {} — {}",
+                excuse,
+                reasons.join("; ")
+            );
 
             let full_command = if args.is_empty() {
                 command.to_string()
             } else {
                 format!("{} {}", command, args.join(" "))
             };
-            let description = format!("[{}] {} (reason: {})", action_request_id, full_command, reason);
+            let description = format!(
+                "[{}] {} (reason: {})",
+                action_request_id, full_command, reason
+            );
             super::exec_mirror::mirror_pending_to_celld(action_request_id, &description);
 
             flight_recorder.record_guard_decision("exec-session", "exec", "pending", 3, 0.5);
