@@ -1,6 +1,6 @@
 //! Error types and endpoint auto-detection for the Unsloth Studio client.
 
-use super::types::{UnslothStudioEndpoint, ToolProviderInfo};
+use super::types::{ToolProviderInfo, UnslothStudioEndpoint};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

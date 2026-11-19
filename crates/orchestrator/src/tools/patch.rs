@@ -12,7 +12,7 @@
 //! 8. Substring match with context tolerance (find old_string lines within file)
 //! 9. Single-line fallback for single-line old_string
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
 
@@ -32,8 +32,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
         return Err("Error: patch requires a JSON argument with 'path', 'old_string', and 'new_string' fields".to_string());
     }
 
-    let request: Value = serde_json::from_str(&args[0])
-        .map_err(|e| format!("Invalid JSON arguments: {}", e))?;
+    let request: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("Invalid JSON arguments: {}", e))?;
 
     let path_str = request["path"]
         .as_str()
@@ -61,7 +61,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
         .map_err(|e| format!("Error reading file {}: {}", path.display(), e))?;
 
     // Find and replace using fuzzy matching strategies
-    let (new_content, matches_found, strategy_used) = find_and_replace(&content, old_string, new_string, replace_all);
+    let (new_content, matches_found, strategy_used) =
+        find_and_replace(&content, old_string, new_string, replace_all);
 
     if matches_found == 0 {
         return Err(format!(
@@ -86,7 +87,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
         "strategy_used": strategy_used,
         "old_line_count": old_lines,
         "new_line_count": new_lines
-    })).map_err(|e| e.to_string())?)
+    }))
+    .map_err(|e| e.to_string())?)
 }
 
 /// Find and replace using multiple fuzzy matching strategies.
@@ -122,7 +124,8 @@ fn find_and_replace(
     }
 
     // Strategy 6: Case-insensitive trimmed match
-    if let Some(result) = try_case_insensitive_trimmed(content, old_string, new_string, replace_all) {
+    if let Some(result) = try_case_insensitive_trimmed(content, old_string, new_string, replace_all)
+    {
         return (result.0, result.1, "case-insensitive-trimmed");
     }
 
@@ -287,7 +290,10 @@ fn try_case_insensitive_trimmed(
     new_string: &str,
     replace_all: bool,
 ) -> Option<(String, usize)> {
-    let trimmed_old: Vec<String> = old_string.lines().map(|l| l.trim().to_lowercase()).collect();
+    let trimmed_old: Vec<String> = old_string
+        .lines()
+        .map(|l| l.trim().to_lowercase())
+        .collect();
     if trimmed_old.is_empty() {
         return None;
     }
@@ -314,7 +320,12 @@ fn try_line_by_line_fuzzy(
     new_string: &str,
     replace_all: bool,
 ) -> Option<(String, usize)> {
-    let old_trimmed: Vec<String> = old_string.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).map(|s| s.to_string()).collect();
+    let old_trimmed: Vec<String> = old_string
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .map(|s| s.to_string())
+        .collect();
     if old_trimmed.is_empty() {
         return None;
     }
@@ -360,10 +371,15 @@ fn try_context_tolerance(
                     .iter()
                     .map(|l| l.trim().to_string())
                     .collect();
-                let expected: Vec<String> = old_string.lines().map(|l| l.trim().to_string()).collect();
+                let expected: Vec<String> =
+                    old_string.lines().map(|l| l.trim().to_string()).collect();
 
                 // Check if at least 80% of lines match
-                let matches = candidate.iter().zip(expected.iter()).filter(|(a, b)| a == b).count();
+                let matches = candidate
+                    .iter()
+                    .zip(expected.iter())
+                    .filter(|(a, b)| a == b)
+                    .count();
                 if matches >= (expected.len() as f64 * 0.8) as usize {
                     let mut result_lines = lines.clone();
                     result_lines.splice(i..i + old_lines_count, new_string.lines());
@@ -414,7 +430,11 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "hello world\nfoo bar\n").unwrap();
 
-        let result = handle(&[format!(r#"{{"path": "{}", "old_string": "hello world", "new_string": "goodbye world"}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "old_string": "hello world", "new_string": "goodbye world"}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
@@ -431,7 +451,11 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "  hello   world  \n").unwrap();
 
-        let result = handle(&[format!(r#"{{"path": "{}", "old_string": "hello world", "new_string": "hi there"}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "old_string": "hello world", "new_string": "hi there"}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
@@ -449,7 +473,10 @@ mod tests {
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
         // Either whitespace-normalized or trimmed-lines strategy should work here
-        assert!(output["strategy_used"].as_str().unwrap() == "whitespace-normalized" || output["strategy_used"].as_str().unwrap() == "trimmed-lines");
+        assert!(
+            output["strategy_used"].as_str().unwrap() == "whitespace-normalized"
+                || output["strategy_used"].as_str().unwrap() == "trimmed-lines"
+        );
     }
 
     #[tokio::test]
@@ -458,7 +485,11 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "Hello World\n").unwrap();
 
-        let result = handle(&[format!(r#"{{"path": "{}", "old_string": "hello world", "new_string": "Hi There"}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "old_string": "hello world", "new_string": "Hi There"}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
@@ -482,7 +513,11 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "foo\nbar\nfoo\nbaz\nfoo\n").unwrap();
 
-        let result = handle(&[format!(r#"{{"path": "{}", "old_string": "foo", "new_string": "qux", "replace_all": true}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "old_string": "foo", "new_string": "qux", "replace_all": true}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();

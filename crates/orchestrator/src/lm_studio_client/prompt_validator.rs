@@ -290,7 +290,12 @@ mod tests {
     fn envelope_new() {
         let sys = LabeledContent::new(SourceLabel::SystemConfig, "You are helpful.".to_string());
         let user = LabeledContent::new(SourceLabel::UserInput, "Hello".to_string());
-        let env = PromptEnvelope::new(sys, user, "session-1".to_string(), UnslothStudioEndpoint::Openai);
+        let env = PromptEnvelope::new(
+            sys,
+            user,
+            "session-1".to_string(),
+            UnslothStudioEndpoint::Openai,
+        );
         assert_eq!(env.system_content(), "You are helpful.");
         assert_eq!(env.user_content_str(), "Hello");
         assert_eq!(env.metadata.session_id, "session-1");

@@ -82,13 +82,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
     info!(vault_item = %item.name, "Found vault credentials for login");
 
     // Step 2: Detect login form fields if not provided
-    let (user_sel, pass_sel, submit_sel) = detect_login_form(
-        url,
-        username_field,
-        password_field,
-        submit_selector,
-    )
-    .await?;
+    let (user_sel, pass_sel, submit_sel) =
+        detect_login_form(url, username_field, password_field, submit_selector).await?;
 
     info!(
         user_selector = %user_sel,
@@ -154,11 +149,17 @@ login().then(r => console.log(JSON.stringify(r))).catch(e => {{
     // We inject them directly into the JS code to avoid shell escaping issues
     let login_code_with_creds = login_code.replace(
         "userField.value = '';",
-        &format!("userField.value = {};", serde_json::to_string(username).unwrap()),
+        &format!(
+            "userField.value = {};",
+            serde_json::to_string(username).unwrap()
+        ),
     );
     let login_code_final = login_code_with_creds.replace(
         "passField.value = '';",
-        &format!("passField.value = {};", serde_json::to_string(password).unwrap()),
+        &format!(
+            "passField.value = {};",
+            serde_json::to_string(password).unwrap()
+        ),
     );
 
     // Execute the login flow in the browser

@@ -111,9 +111,7 @@ async fn handle_get(
             .await
             .map_err(|e| format!("Failed to find credential by name '{}': {}", name, e))?
     } else {
-        return Err(
-            "One of 'url', 'name', or 'id' is required for the 'get' action".to_string(),
-        );
+        return Err("One of 'url', 'name', or 'id' is required for the 'get' action".to_string());
     };
 
     let response = json!({
@@ -171,11 +169,11 @@ async fn handle_generate(
     client: &Arc<BrowserVaultClient>,
     request: &serde_json::Value,
 ) -> Result<String, String> {
-    let length = request
-        .get("length")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(24) as usize;
-    let special = request.get("special").and_then(|v| v.as_bool()).unwrap_or(true);
+    let length = request.get("length").and_then(|v| v.as_u64()).unwrap_or(24) as usize;
+    let special = request
+        .get("special")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
 
     let password = client
         .generate_password(length, true, true, true, special)

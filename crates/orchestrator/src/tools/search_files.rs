@@ -1,7 +1,7 @@
 //! First-class `search_files` tool — ripgrep-backed content and filename search.
 //! Matches Hermes Agent API contract for drop-in parity.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 
 /// Handle the `search_files` tool call.
@@ -15,11 +15,13 @@ use std::path::PathBuf;
 ///   - offset (optional, default 0): skip first N results
 pub async fn handle(args: &[String]) -> Result<String, String> {
     if args.is_empty() || args[0].is_empty() {
-        return Err("Error: search_files requires a JSON argument with 'pattern' field".to_string());
+        return Err(
+            "Error: search_files requires a JSON argument with 'pattern' field".to_string(),
+        );
     }
 
-    let request: Value = serde_json::from_str(&args[0])
-        .map_err(|e| format!("Invalid JSON arguments: {}", e))?;
+    let request: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("Invalid JSON arguments: {}", e))?;
 
     let pattern = request["pattern"]
         .as_str()
@@ -32,13 +34,19 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
     let offset = request["offset"].as_u64().unwrap_or(0) as usize;
 
     if !search_path.exists() {
-        return Err(format!("Error: search path does not exist: {}", search_path.display()));
+        return Err(format!(
+            "Error: search path does not exist: {}",
+            search_path.display()
+        ));
     }
 
     match target {
         "content" => search_content(pattern, &search_path, file_glob, limit, offset).await,
         "files" => search_files_by_name(pattern, &search_path, limit, offset).await,
-        _ => Err(format!("Error: unknown target '{}'. Use 'content' or 'files'.", target)),
+        _ => Err(format!(
+            "Error: unknown target '{}'. Use 'content' or 'files'.",
+            target
+        )),
     }
 }
 
@@ -107,7 +115,8 @@ async fn search_content(
         "offset": offset,
         "limit": limit,
         "has_more": total_matches > offset + limit
-    })).map_err(|e| e.to_string())?)
+    }))
+    .map_err(|e| e.to_string())?)
 }
 
 /// Search for files by name using find or rg --files.
@@ -151,7 +160,8 @@ async fn search_files_by_name(
         "offset": offset,
         "limit": limit,
         "has_more": total_files > offset + limit
-    })).map_err(|e| e.to_string())?)
+    }))
+    .map_err(|e| e.to_string())?)
 }
 
 /// Expand leading ~ to the user's home directory.
@@ -179,13 +189,7 @@ mod tests {
         writeln!(f, "hello world").unwrap();
         writeln!(f, "goodbye world").unwrap();
 
-        let result = search_content(
-            "world",
-            &temp_dir.path().to_path_buf(),
-            None,
-            10,
-            0,
-        ).await;
+        let result = search_content("world", &temp_dir.path().to_path_buf(), None, 10, 0).await;
         assert!(result.is_ok());
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
@@ -198,12 +202,7 @@ mod tests {
         fs::write(temp_dir.path().join("test.txt"), "content").unwrap();
         fs::write(temp_dir.path().join("other.md"), "content").unwrap();
 
-        let result = search_files_by_name(
-            "*.txt",
-            &temp_dir.path().to_path_buf(),
-            10,
-            0,
-        ).await;
+        let result = search_files_by_name("*.txt", &temp_dir.path().to_path_buf(), 10, 0).await;
         assert!(result.is_ok());
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();

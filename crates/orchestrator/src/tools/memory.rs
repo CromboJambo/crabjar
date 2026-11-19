@@ -111,10 +111,9 @@ mod tests {
     fn test_memory_invalid_target() {
         let dir = tempdir().unwrap();
         let tool = MemoryTool::new(dir.path());
-        let input: MemoryToolInput = serde_json::from_str(
-            r#"{"target": "invalid", "action": "add", "content": "Test"}"#,
-        )
-        .unwrap();
+        let input: MemoryToolInput =
+            serde_json::from_str(r#"{"target": "invalid", "action": "add", "content": "Test"}"#)
+                .unwrap();
         let result = tool.execute(input);
         assert!(result.is_err());
     }

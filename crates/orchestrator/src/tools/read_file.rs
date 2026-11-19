@@ -1,7 +1,7 @@
 //! First-class `read_file` tool — line-numbered reads with pagination.
 //! Matches Hermes Agent API contract for drop-in parity.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
 
@@ -16,8 +16,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
         return Err("Error: read_file requires a JSON argument with 'path' field".to_string());
     }
 
-    let request: Value = serde_json::from_str(&args[0])
-        .map_err(|e| format!("Invalid JSON arguments: {}", e))?;
+    let request: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("Invalid JSON arguments: {}", e))?;
 
     let path_str = request["path"]
         .as_str()
@@ -51,7 +51,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
             "offset": offset,
             "limit": limit,
             "truncated": false
-        })).map_err(|e| e.to_string())?);
+        }))
+        .map_err(|e| e.to_string())?);
     }
 
     // Extract the requested range
@@ -67,7 +68,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
             "limit": limit,
             "truncated": false,
             "note": format!("Offset {} is past end of file ({} lines)", offset, total_lines)
-        })).map_err(|e| e.to_string())?);
+        }))
+        .map_err(|e| e.to_string())?);
     }
 
     // Format with line numbers: "LINE_NUM|CONTENT"
@@ -137,7 +139,11 @@ mod tests {
         writeln!(f, "line two").unwrap();
         writeln!(f, "line three").unwrap();
 
-        let result = handle(&[format!(r#"{{"path": "{}", "offset": 2}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "offset": 2}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
         let content = output["content"].as_str().unwrap();
@@ -154,7 +160,11 @@ mod tests {
             writeln!(f, "line {}", i).unwrap();
         }
 
-        let result = handle(&[format!(r#"{{"path": "{}", "limit": 3}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "limit": 3}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
         let content = output["content"].as_str().unwrap();

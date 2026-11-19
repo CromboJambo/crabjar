@@ -6,7 +6,7 @@
 
 use crabjar_tool_registry::ToolRegistry;
 use rusqlite::Connection;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use tempfile::TempDir;
@@ -88,12 +88,15 @@ fn handle_list(request: &Value) -> Result<String, String> {
         Ok(tools) => {
             let values: Vec<Value> = tools
                 .into_iter()
-                .map(|t| serde_json::to_value(t).unwrap_or(json!({"error": "serialization failed"})))
+                .map(|t| {
+                    serde_json::to_value(t).unwrap_or(json!({"error": "serialization failed"}))
+                })
                 .collect();
             Ok(serde_json::to_string_pretty(&json!({
                 "count": values.len(),
                 "tools": values
-            })).map_err(|e| e.to_string())?)
+            }))
+            .map_err(|e| e.to_string())?)
         }
         Err(e) => Err(format!("Error listing tools: {}", e)),
     }
@@ -112,12 +115,22 @@ fn handle_register(request: &Value) -> Result<String, String> {
     let handle = get_registry_handle()?;
     let reg = handle.get_registry().map_err(|e| e.to_string())?;
 
-    match reg.register_tool(name, tool_type, description, "{}", risk_level, priority, reliability, "{}") {
+    match reg.register_tool(
+        name,
+        tool_type,
+        description,
+        "{}",
+        risk_level,
+        priority,
+        reliability,
+        "{}",
+    ) {
         Ok(id) => Ok(serde_json::to_string_pretty(&json!({
             "status": "registered",
             "id": id,
             "name": name
-        })).map_err(|e| e.to_string())?),
+        }))
+        .map_err(|e| e.to_string())?),
         Err(e) => Err(format!("Error registering tool: {}", e)),
     }
 }
@@ -131,16 +144,17 @@ fn handle_query(request: &Value) -> Result<String, String> {
     let reg = handle.get_registry().map_err(|e| e.to_string())?;
 
     match reg.query_tool(name) {
-        Ok(Some(tool)) => serde_json::to_string_pretty(&serde_json::to_value(tool).unwrap_or(json!({"error": "serialization failed"}))).map_err(|e| e.to_string()),
+        Ok(Some(tool)) => serde_json::to_string_pretty(
+            &serde_json::to_value(tool).unwrap_or(json!({"error": "serialization failed"})),
+        )
+        .map_err(|e| e.to_string()),
         Ok(None) => Err(format!("Tool '{}' not found in catalog", name)),
         Err(e) => Err(format!("Error querying tool: {}", e)),
     }
 }
 
 fn handle_discover(request: &Value) -> Result<String, String> {
-    let project_root = request["project_root"]
-        .as_str()
-        .unwrap_or(".");
+    let project_root = request["project_root"].as_str().unwrap_or(".");
     let source_type = request["source_type"].as_str().unwrap_or("mcp_server");
 
     let handle = get_registry_handle()?;
@@ -150,7 +164,8 @@ fn handle_discover(request: &Value) -> Result<String, String> {
         Ok(discovered) => Ok(serde_json::to_string_pretty(&json!({
             "count": discovered.len(),
             "tools": discovered
-        })).map_err(|e| e.to_string())?),
+        }))
+        .map_err(|e| e.to_string())?),
         Err(e) => Err(format!("Error discovering tools: {}", e)),
     }
 }
@@ -174,15 +189,18 @@ fn handle_validate(request: &Value) -> Result<String, String> {
         Ok(results) => {
             let values: Vec<Value> = results
                 .iter()
-                .map(|(name, available, path)| json!({
-                    "name": name,
-                    "available": available,
-                    "path": path
-                }))
+                .map(|(name, available, path)| {
+                    json!({
+                        "name": name,
+                        "available": available,
+                        "path": path
+                    })
+                })
                 .collect();
             Ok(serde_json::to_string_pretty(&json!({
                 "results": values
-            })).map_err(|e| e.to_string())?)
+            }))
+            .map_err(|e| e.to_string())?)
         }
         Err(e) => Err(format!("Error validating tools: {}", e)),
     }
@@ -208,7 +226,8 @@ fn handle_auto_register(request: &Value) -> Result<String, String> {
             "status": "auto_registered",
             "count": registered.len(),
             "ids": registered
-        })).map_err(|e| e.to_string())?),
+        }))
+        .map_err(|e| e.to_string())?),
         Err(e) => Err(format!("Error auto-registering tools: {}", e)),
     }
 }
@@ -230,7 +249,11 @@ mod tests {
         let args = vec![json!({"action": "nonexistent"}).to_string()];
         let result = handle(&args).await;
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Unknown manage_catalog action"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Unknown manage_catalog action")
+        );
     }
 
     #[tokio::test]
@@ -245,19 +268,25 @@ mod tests {
     #[tokio::test]
     async fn test_manage_catalog_register_and_query() {
         // Register a tool
-        let register_args = vec![json!({
-            "action": "register",
-            "name": "test_tool_parity_check",
-            "description": "Test tool for parity verification"
-        }).to_string()];
+        let register_args = vec![
+            json!({
+                "action": "register",
+                "name": "test_tool_parity_check",
+                "description": "Test tool for parity verification"
+            })
+            .to_string(),
+        ];
         let result = handle(&register_args).await;
         assert!(result.is_ok());
 
         // Query it back
-        let query_args = vec![json!({
-            "action": "query",
-            "name": "test_tool_parity_check"
-        }).to_string()];
+        let query_args = vec![
+            json!({
+                "action": "query",
+                "name": "test_tool_parity_check"
+            })
+            .to_string(),
+        ];
         let result = handle(&query_args).await;
         assert!(result.is_ok());
         let parsed: Value = serde_json::from_str(&result.unwrap()).unwrap();

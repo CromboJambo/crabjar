@@ -4,7 +4,7 @@
 //! conditionals, and data processing between calls. Pure Rust (Rhai VM),
 //! no Python dependency.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Handle an execute_code tool call.
 pub async fn handle(args: &[String]) -> Result<String, String> {
@@ -12,12 +12,15 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
         return Err("Error: execute_code requires JSON arguments".to_string());
     }
 
-    let input: Value = serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
-    let code = input["code"].as_str().ok_or("Missing required field: code")?;
+    let input: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
+    let code = input["code"]
+        .as_str()
+        .ok_or("Missing required field: code")?;
 
     // Create execution context with current working directory
-    let workdir = std::env::current_dir()
-        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    let workdir =
+        std::env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
     let ctx = crabjar_exec::ExecutionContext::new(workdir)
         .with_timeout(300)
@@ -49,7 +52,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_code_basic() {
-        let result = handle(&[r#"{"code": "let x = 2 + 3; json(x.to_string())"}"#.to_string()]).await;
+        let result =
+            handle(&[r#"{"code": "let x = 2 + 3; json(x.to_string())"}"#.to_string()]).await;
         assert!(result.is_ok());
         let value: Value = serde_json::from_str(&result.unwrap()).unwrap();
         assert_eq!(value["success"], true);
@@ -58,7 +62,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_code_loop() {
-        let result = handle(&[r#"{"code": "let sum = 0; for i in 1..=10 { sum += i }; json(sum.to_string())"}"#.to_string()]).await;
+        let result = handle(&[
+            r#"{"code": "let sum = 0; for i in 1..=10 { sum += i }; json(sum.to_string())"}"#
+                .to_string(),
+        ])
+        .await;
         assert!(result.is_ok());
         let value: Value = serde_json::from_str(&result.unwrap()).unwrap();
         assert_eq!(value["success"], true);

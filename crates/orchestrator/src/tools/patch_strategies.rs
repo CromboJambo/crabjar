@@ -3,7 +3,6 @@
 //! Each strategy function attempts to find old_string in content using a specific
 //! matching approach and returns the replacement result if successful.
 
-
 use std::path::PathBuf;
 
 /// Strategy 1: Exact string match.
@@ -150,7 +149,10 @@ fn try_case_insensitive_trimmed(
     new_string: &str,
     replace_all: bool,
 ) -> Option<(String, usize)> {
-    let trimmed_old: Vec<String> = old_string.lines().map(|l| l.trim().to_lowercase()).collect();
+    let trimmed_old: Vec<String> = old_string
+        .lines()
+        .map(|l| l.trim().to_lowercase())
+        .collect();
     if trimmed_old.is_empty() {
         return None;
     }
@@ -177,7 +179,12 @@ fn try_line_by_line_fuzzy(
     new_string: &str,
     replace_all: bool,
 ) -> Option<(String, usize)> {
-    let old_trimmed: Vec<String> = old_string.lines().map(|l| l.trim()).filter(|l| !l.is_empty()).map(|s| s.to_string()).collect();
+    let old_trimmed: Vec<String> = old_string
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .map(|s| s.to_string())
+        .collect();
     if old_trimmed.is_empty() {
         return None;
     }
@@ -223,10 +230,15 @@ fn try_context_tolerance(
                     .iter()
                     .map(|l| l.trim().to_string())
                     .collect();
-                let expected: Vec<String> = old_string.lines().map(|l| l.trim().to_string()).collect();
+                let expected: Vec<String> =
+                    old_string.lines().map(|l| l.trim().to_string()).collect();
 
                 // Check if at least 80% of lines match
-                let matches = candidate.iter().zip(expected.iter()).filter(|(a, b)| a == b).count();
+                let matches = candidate
+                    .iter()
+                    .zip(expected.iter())
+                    .filter(|(a, b)| a == b)
+                    .count();
                 if matches >= (expected.len() as f64 * 0.8) as usize {
                     let mut result_lines = lines.clone();
                     result_lines.splice(i..i + old_lines_count, new_string.lines());
@@ -265,7 +277,6 @@ fn try_single_line_fallback(
     None
 }
 
-
 // --- Helper functions ---
 
 pub(crate) fn normalize_ws(s: &str) -> String {
@@ -273,10 +284,17 @@ pub(crate) fn normalize_ws(s: &str) -> String {
 }
 
 pub(crate) fn strip_trailing_ws(s: &str) -> String {
-    s.lines().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n")
+    s.lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
-pub(crate) fn count_normalized_matches(lines: &[&str], norm_old: &str, old_line_count: usize) -> usize {
+pub(crate) fn count_normalized_matches(
+    lines: &[&str],
+    norm_old: &str,
+    old_line_count: usize,
+) -> usize {
     let mut count = 0;
     for start in 0..=lines.len().saturating_sub(old_line_count) {
         let candidate: String = lines[start..start + old_line_count].join("\n");

@@ -396,7 +396,9 @@ mod tests {
             sandboxed: false,
             container_name: None,
         };
-        let list_resp = execute_process_management(list_req, &registry).await.unwrap();
+        let list_resp = execute_process_management(list_req, &registry)
+            .await
+            .unwrap();
         assert!(list_resp.success);
         assert_eq!(list_resp.result["count"], 1);
 
@@ -408,7 +410,9 @@ mod tests {
             sandboxed: false,
             container_name: None,
         };
-        let stop_resp = execute_process_management(stop_req, &registry).await.unwrap();
+        let stop_resp = execute_process_management(stop_req, &registry)
+            .await
+            .unwrap();
         assert!(stop_resp.success);
     }
 
@@ -433,7 +437,9 @@ mod tests {
             sandboxed: false,
             container_name: None,
         };
-        let inspect_resp = execute_process_management(inspect_req, &registry).await.unwrap();
+        let inspect_resp = execute_process_management(inspect_req, &registry)
+            .await
+            .unwrap();
         assert!(inspect_resp.success);
         assert_eq!(inspect_resp.result["pid"], pid);
 

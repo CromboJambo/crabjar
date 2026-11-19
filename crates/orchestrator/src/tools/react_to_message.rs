@@ -4,7 +4,7 @@
 //! this logs the reaction and returns confirmation. The tool exists for
 //! drop-in replacement parity — agents that call it won't error out.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Handle react_to_message tool invocation.
 ///

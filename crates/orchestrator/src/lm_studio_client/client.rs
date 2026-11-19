@@ -4,7 +4,7 @@
 //! providing instruction-hijack defense and provenance tracking.
 
 use super::endpoints::{anthropic, native, openai};
-use super::error::{UnslothStudioError, ToolCallInfo};
+use super::error::{ToolCallInfo, UnslothStudioError};
 use super::prompt_types::{PromptEnvelope, SourceLabel};
 use super::prompt_validator::PromptValidator;
 use super::session::{SessionError, SessionState, SessionStore};
@@ -121,7 +121,10 @@ impl UnslothStudioClient {
     /// The user input is wrapped in a `PromptEnvelope` with `SourceLabel::UserInput`
     /// and validated before being sent to the model. Returns `UnslothStudioError::PromptError`
     /// if the envelope fails validation (e.g., injection detected).
-    pub async fn chat(&mut self, user_input: String) -> Result<UnifiedChatResponse, UnslothStudioError> {
+    pub async fn chat(
+        &mut self,
+        user_input: String,
+    ) -> Result<UnifiedChatResponse, UnslothStudioError> {
         // Determine the previous response ID based on the endpoint.
         let previous_response_id = match self.config.endpoint {
             UnslothStudioEndpoint::Native => self.session.response_id.clone(),
@@ -320,7 +323,8 @@ impl UnslothStudioClient {
             .await
             .map_err(|e| UnslothStudioError::ParseError(format!("Native response: {}", e)))?;
 
-        native::from_native_response(&json).map_err(|e| UnslothStudioError::ParseError(e.to_string()))
+        native::from_native_response(&json)
+            .map_err(|e| UnslothStudioError::ParseError(e.to_string()))
     }
 
     /// Sends a request to the OpenAI-compatible endpoint.
@@ -360,7 +364,8 @@ impl UnslothStudioClient {
             .await
             .map_err(|e| UnslothStudioError::ParseError(format!("OpenAI response: {}", e)))?;
 
-        openai::from_openai_response(&json).map_err(|e| UnslothStudioError::ParseError(e.to_string()))
+        openai::from_openai_response(&json)
+            .map_err(|e| UnslothStudioError::ParseError(e.to_string()))
     }
 
     /// Sends a request to the Anthropic-compatible endpoint.
@@ -382,11 +387,10 @@ impl UnslothStudioClient {
             builder = builder.bearer_auth(token);
         }
 
-        let response = builder
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| UnslothStudioError::RequestError(format!("Anthropic endpoint: {}", e)))?;
+        let response =
+            builder.json(&body).send().await.map_err(|e| {
+                UnslothStudioError::RequestError(format!("Anthropic endpoint: {}", e))
+            })?;
 
         let status = response.status();
         if !status.is_success() {

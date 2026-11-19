@@ -2,8 +2,8 @@
 //!
 //! Supports 1-5 questions per call with single-select, multi-select, and open-ended responses.
 
-use tracing::info;
 use crate::clarify::{ClarifyInput, ClarifyQuestion};
+use tracing::info;
 
 pub async fn handle(args: &[String], ctx: &super::ToolContext) -> Result<String, String> {
     if args.is_empty() || args[0].is_empty() {
@@ -28,7 +28,10 @@ pub async fn handle(args: &[String], ctx: &super::ToolContext) -> Result<String,
             return Err(format!("Error: question {} has empty text", i + 1));
         }
         if !q.choices.is_empty() && q.choices.len() > 4 {
-            return Err(format!("Error: question {} has more than 4 choices (max 4)", i + 1));
+            return Err(format!(
+                "Error: question {} has more than 4 choices (max 4)",
+                i + 1
+            ));
         }
     }
 
@@ -118,7 +121,8 @@ mod tests {
                 {"question": "What's your name?"},
                 {"question": "How are you?", "choices": ["Good", "Bad"]},
                 {"question": "Any other comments?"}
-            ]}"#.to_string()],
+            ]}"#
+            .to_string()],
             &make_ctx(),
         )
         .await;
@@ -137,7 +141,8 @@ mod tests {
                 {"question": "Q4"},
                 {"question": "Q5"},
                 {"question": "Q6"}
-            ]}"#.to_string()],
+            ]}"#
+            .to_string()],
             &make_ctx(),
         )
         .await;
@@ -162,11 +167,15 @@ mod tests {
     }
 
     fn make_ctx() -> crate::tools::ToolContext {
-        use agent_context::{Source};
+        use agent_context::Source;
         // Use a unique path per test to avoid concurrent test conflicts
         static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let counter = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        let path = format!("/tmp/crabjar-test-clarify-{}-{}.db", std::process::id(), counter);
+        let path = format!(
+            "/tmp/crabjar-test-clarify-{}-{}.db",
+            std::process::id(),
+            counter
+        );
         // Remove any existing test DB
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{}-wal", path));
@@ -188,7 +197,8 @@ mod tests {
                 provenance_id TEXT NOT NULL DEFAULT ''
             )",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         conn.execute(
             "CREATE TABLE IF NOT EXISTS event_rows (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -196,7 +206,8 @@ mod tests {
                 timestamp TEXT NOT NULL
             )",
             [],
-        ).unwrap();
+        )
+        .unwrap();
         drop(conn);
         let store = agent_context::Store::open(String::from(path)).unwrap();
         crate::tools::ToolContext {

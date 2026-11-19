@@ -5,7 +5,7 @@
 
 use crabjar_vision::{VisionClient, VisionConfig};
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, OnceLock};
@@ -34,7 +34,9 @@ fn get_vision_client() -> Result<&'static VisionClient, String> {
 ///   - `interval` (optional): Seconds between frames (default: auto based on duration)
 pub async fn handle(args: &[String]) -> Result<String, String> {
     if args.is_empty() || args[0].is_empty() {
-        return Err("video_analyze requires a JSON argument with 'video' and 'question' fields".to_string());
+        return Err(
+            "video_analyze requires a JSON argument with 'video' and 'question' fields".to_string(),
+        );
     }
 
     let request: Value = serde_json::from_str(&args[0])
@@ -53,10 +55,10 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
 
     // Step 1: Get the video file (download if URL, use path if local)
     debug!(video_source, "Starting video analysis");
-    let temp_dir = TempDir::new()
-        .map_err(|e| format!("Failed to create temp directory: {}", e))?;
+    let temp_dir = TempDir::new().map_err(|e| format!("Failed to create temp directory: {}", e))?;
 
-    let video_path = if video_source.starts_with("http://") || video_source.starts_with("https://") {
+    let video_path = if video_source.starts_with("http://") || video_source.starts_with("https://")
+    {
         debug!(url = video_source, "Downloading video");
         download_video(video_source, &temp_dir).await?
     } else {
@@ -81,7 +83,11 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
     });
 
     // Step 4: Extract frames using ffmpeg
-    debug!(max_frames, interval = effective_interval, "Extracting frames");
+    debug!(
+        max_frames,
+        interval = effective_interval,
+        "Extracting frames"
+    );
     let frame_paths = extract_frames(&video_path, &temp_dir, max_frames, effective_interval)?;
 
     if frame_paths.is_empty() {
@@ -97,7 +103,10 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
 
     for (i, frame_path) in frame_paths.iter().enumerate() {
         debug!(frame = i + 1, total = frame_paths.len(), "Analyzing frame");
-        match vision_client.analyze(frame_path.to_str().unwrap(), question).await {
+        match vision_client
+            .analyze(frame_path.to_str().unwrap(), question)
+            .await
+        {
             Ok(analysis) => {
                 frame_analyses.push(json!({
                     "frame": i + 1,
@@ -162,8 +171,7 @@ async fn download_video(url: &str, temp_dir: &TempDir) -> Result<PathBuf, String
     };
 
     let path = temp_dir.path().join(format!("video.{}", safe_ext));
-    std::fs::write(&path, &bytes)
-        .map_err(|e| format!("Failed to write video to disk: {}", e))?;
+    std::fs::write(&path, &bytes).map_err(|e| format!("Failed to write video to disk: {}", e))?;
 
     Ok(path)
 }
@@ -171,9 +179,12 @@ async fn download_video(url: &str, temp_dir: &TempDir) -> Result<PathBuf, String
 fn get_video_duration(video_path: &PathBuf) -> Result<f64, String> {
     let output = Command::new("ffprobe")
         .args([
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
         ])
         .arg(video_path)
         .output()
@@ -250,8 +261,8 @@ fn extract_frames(
 
     // Collect extracted frame paths
     let mut frames = Vec::new();
-    for entry in std::fs::read_dir(temp_dir.path())
-        .map_err(|e| format!("Failed to read temp dir: {}", e))?
+    for entry in
+        std::fs::read_dir(temp_dir.path()).map_err(|e| format!("Failed to read temp dir: {}", e))?
     {
         let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
         let path = entry.path();
@@ -316,10 +327,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_video_analyze_nonexistent_file() {
-        let args = vec![json!({
-            "video": "/tmp/definitely_does_not_exist_12345.mp4",
-            "question": "what is this?"
-        }).to_string()];
+        let args = vec![
+            json!({
+                "video": "/tmp/definitely_does_not_exist_12345.mp4",
+                "question": "what is this?"
+            })
+            .to_string(),
+        ];
         let result = handle(&args).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not found"));

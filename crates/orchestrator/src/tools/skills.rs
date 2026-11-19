@@ -4,7 +4,7 @@
 //! procedural memory management. Skills are discovered from the filesystem
 //! using the crabjar-skills crate's SkillLoader.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 
 /// Handle a skills_list tool call.
@@ -12,7 +12,9 @@ pub async fn handle_skills_list(args: &[String]) -> Result<String, String> {
     let category = parse_optional_category(args)?;
 
     let loader = crabjar_skills::SkillLoader::new();
-    let skills = loader.discover().map_err(|e| format!("Failed to discover skills: {}", e))?;
+    let skills = loader
+        .discover()
+        .map_err(|e| format!("Failed to discover skills: {}", e))?;
 
     let mut skill_list: Vec<Value> = skills
         .into_iter()
@@ -52,12 +54,17 @@ pub async fn handle_skill_view(args: &[String]) -> Result<String, String> {
         return Err("Error: skill_view requires a skill name".to_string());
     }
 
-    let input: Value = serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
-    let name = input["name"].as_str().ok_or("Missing required field: name")?;
+    let input: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
+    let name = input["name"]
+        .as_str()
+        .ok_or("Missing required field: name")?;
     let file_path = input["file_path"].as_str();
 
     let loader = crabjar_skills::SkillLoader::new();
-    let skills = loader.discover().map_err(|e| format!("Failed to discover skills: {}", e))?;
+    let skills = loader
+        .discover()
+        .map_err(|e| format!("Failed to discover skills: {}", e))?;
 
     let skill = skills
         .get(name)
@@ -69,7 +76,8 @@ pub async fn handle_skill_view(args: &[String]) -> Result<String, String> {
         if !path.exists() {
             return Err(format!("File '{}' not found in skill '{}'", fp, name));
         }
-        let content = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+        let content =
+            std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
         let result = json!({
             "name": name,
             "file_path": fp,
@@ -99,7 +107,8 @@ pub async fn handle_skill_manage(args: &[String]) -> Result<String, String> {
         return Err("Error: skill_manage requires JSON arguments".to_string());
     }
 
-    let input: Value = serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
+    let input: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
     let operations = input["operations"]
         .as_array()
         .ok_or("Missing required field: operations")?;
@@ -154,7 +163,8 @@ fn handle_skill_create(op: &Value, results: &mut Vec<Value>) -> Result<(), Strin
         return Err(format!("Skill '{}' already exists", name));
     }
 
-    std::fs::create_dir_all(&skill_dir).map_err(|e| format!("Failed to create directory: {}", e))?;
+    std::fs::create_dir_all(&skill_dir)
+        .map_err(|e| format!("Failed to create directory: {}", e))?;
     std::fs::write(skill_dir.join("manifest.json"), content)
         .map_err(|e| format!("Failed to write manifest: {}", e))?;
 
@@ -176,7 +186,9 @@ fn handle_skill_patch(op: &Value, results: &mut Vec<Value>) -> Result<(), String
 
     // Find the skill
     let loader = crabjar_skills::SkillLoader::new();
-    let skills = loader.discover().map_err(|e| format!("Failed to discover skills: {}", e))?;
+    let skills = loader
+        .discover()
+        .map_err(|e| format!("Failed to discover skills: {}", e))?;
     let skill = skills
         .get(name)
         .ok_or_else(|| format!("Skill '{}' not found", name))?;
@@ -206,7 +218,9 @@ fn handle_skill_delete(op: &Value, results: &mut Vec<Value>) -> Result<(), Strin
 
     // Find the skill
     let loader = crabjar_skills::SkillLoader::new();
-    let skills = loader.discover().map_err(|e| format!("Failed to discover skills: {}", e))?;
+    let skills = loader
+        .discover()
+        .map_err(|e| format!("Failed to discover skills: {}", e))?;
     let skill = skills
         .get(name)
         .ok_or_else(|| format!("Skill '{}' not found", name))?;
@@ -225,7 +239,8 @@ fn parse_optional_category(args: &[String]) -> Result<Option<String>, String> {
     if args.is_empty() || args[0].is_empty() {
         return Ok(None);
     }
-    let input: Value = serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
+    let input: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
     Ok(input["category"].as_str().map(String::from))
 }
 

@@ -11,7 +11,7 @@
 //!
 //! Returns structured JSON with output, exit_code, and execution metadata.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 use tokio::process::Command;
 
@@ -21,9 +21,12 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
         return Err("Error: terminal requires JSON arguments".to_string());
     }
 
-    let input: Value = serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
+    let input: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("JSON parse error: {}", e))?;
 
-    let command = input["command"].as_str().ok_or("Missing required field: command")?;
+    let command = input["command"]
+        .as_str()
+        .ok_or("Missing required field: command")?;
     let background = input["background"].as_bool().unwrap_or(false);
     let timeout_s = input["timeout"].as_u64().unwrap_or(180).min(600);
     let workdir = input["workdir"].as_str().map(expand_path);
@@ -77,10 +80,7 @@ async fn handle_foreground(
 }
 
 /// Handle background process execution.
-async fn handle_background(
-    command: &str,
-    workdir: Option<&Path>,
-) -> Result<String, String> {
+async fn handle_background(command: &str, workdir: Option<&Path>) -> Result<String, String> {
     let mut cmd = Command::new("sh");
     cmd.arg("-c").arg(command);
     cmd.stdout(std::process::Stdio::null());
@@ -90,7 +90,9 @@ async fn handle_background(
         cmd.current_dir(dir);
     }
 
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to spawn background process: {}", e))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to spawn background process: {}", e))?;
     let pid = child.id().unwrap_or(0);
 
     // Detach the child so it keeps running after we return

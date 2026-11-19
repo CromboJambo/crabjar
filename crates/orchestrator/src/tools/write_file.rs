@@ -1,7 +1,7 @@
 //! First-class `write_file` tool — full file overwrite with parent directory creation.
 //! Matches Hermes Agent API contract for drop-in parity.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
 
@@ -12,11 +12,14 @@ use std::path::PathBuf;
 ///   - content (required): complete content to write
 pub async fn handle(args: &[String]) -> Result<String, String> {
     if args.is_empty() || args[0].is_empty() {
-        return Err("Error: write_file requires a JSON argument with 'path' and 'content' fields".to_string());
+        return Err(
+            "Error: write_file requires a JSON argument with 'path' and 'content' fields"
+                .to_string(),
+        );
     }
 
-    let request: Value = serde_json::from_str(&args[0])
-        .map_err(|e| format!("Invalid JSON arguments: {}", e))?;
+    let request: Value =
+        serde_json::from_str(&args[0]).map_err(|e| format!("Invalid JSON arguments: {}", e))?;
 
     let path_str = request["path"]
         .as_str()
@@ -50,7 +53,8 @@ pub async fn handle(args: &[String]) -> Result<String, String> {
         "path": path.display().to_string(),
         "bytes_written": bytes_written,
         "lines_written": lines_written
-    })).map_err(|e| e.to_string())?)
+    }))
+    .map_err(|e| e.to_string())?)
 }
 
 /// Expand leading ~ to the user's home directory.
@@ -73,7 +77,11 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.txt");
 
-        let result = handle(&[format!(r#"{{"path": "{}", "content": "hello world\n"}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "content": "hello world\n"}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
 
         let output: Value = serde_json::from_str(&result.unwrap()).unwrap();
@@ -89,9 +97,18 @@ mod tests {
     #[tokio::test]
     async fn test_write_file_creates_parents() {
         let temp_dir = TempDir::new().unwrap();
-        let file_path = temp_dir.path().join("a").join("b").join("c").join("test.txt");
+        let file_path = temp_dir
+            .path()
+            .join("a")
+            .join("b")
+            .join("c")
+            .join("test.txt");
 
-        let result = handle(&[format!(r#"{{"path": "{}", "content": "nested"}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "content": "nested"}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
         assert!(file_path.exists());
     }
@@ -102,7 +119,11 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
         fs::write(&file_path, "original content").unwrap();
 
-        let result = handle(&[format!(r#"{{"path": "{}", "content": "new content"}}"#, file_path.display())]).await;
+        let result = handle(&[format!(
+            r#"{{"path": "{}", "content": "new content"}}"#,
+            file_path.display()
+        )])
+        .await;
         assert!(result.is_ok());
 
         let written = fs::read_to_string(&file_path).unwrap();
