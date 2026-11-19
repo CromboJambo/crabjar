@@ -1,3 +1,0 @@
-[submodule "crates/code-audit"]
-	path = crates/code-audit
-	url = https://github.com/CromboJambo/crabjar-code-audit.git
