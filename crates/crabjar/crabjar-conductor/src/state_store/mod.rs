@@ -121,7 +121,21 @@ impl StateStore {
                 health          JSON,
                 last_heartbeat  TEXT,
                 active_deployments INTEGER NOT NULL DEFAULT 0
-            );",
+            );
+
+            -- Deployment artifacts (artifact storage for deployment outputs)
+            CREATE TABLE IF NOT EXISTS deployment_artifacts (
+                id              TEXT PRIMARY KEY,
+                deployment_id   TEXT NOT NULL REFERENCES worker_deployments(id),
+                name            TEXT NOT NULL,
+                type            TEXT NOT NULL,
+                content_type    TEXT NOT NULL DEFAULT 'application/octet-stream',
+                size            INTEGER NOT NULL DEFAULT 0,
+                blob_data       BLOB,
+                path            TEXT,
+                created_at      TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_artifacts_deployment ON deployment_artifacts(deployment_id);",
         )?;
 
         // Migration: add resources_json column to existing tasks tables (idempotent)
