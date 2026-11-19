@@ -5,7 +5,7 @@ use rusqlite::params;
 use crate::action::{ActionRequest, ActionStatus};
 use crate::guard_db::{GuardDb, GuardDbError};
 use crate::guard_db_queries::{RawActionRow, raw_to_action_request};
-use crate::guard_db_types::{TrustResolutionEntry};
+use crate::guard_db_types::TrustResolutionEntry;
 
 impl GuardDb {
     /// Read action requests with scope information.
