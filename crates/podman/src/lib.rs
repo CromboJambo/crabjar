@@ -9,4 +9,4 @@ pub mod sandbox_config;
 
 pub use error::PodmanError;
 pub use executor::PodmanExecutor;
-pub use sandbox_config::{GpuConfig, SandboxConfig, SandboxProfile};
+pub use sandbox_config::{GpuConfig, NetworkConfig, ResourceLimits, SandboxConfig, SandboxProfile};
