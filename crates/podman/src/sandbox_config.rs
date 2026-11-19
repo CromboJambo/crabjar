@@ -37,6 +37,17 @@ pub struct SandboxConfig {
     pub resource_limits: Option<ResourceLimits>,
     /// Network configuration.
     pub network: Option<NetworkConfig>,
+    /// GPU passthrough configuration for containers that need direct device access.
+    pub gpu: Option<GpuConfig>,
+}
+
+/// GPU passthrough configuration for containerized workloads.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GpuConfig {
+    /// DRM devices to pass through (e.g., ["/dev/dri/card0", "/dev/dri/renderD128"]).
+    pub devices: Vec<String>,
+    /// Run container in privileged mode (required for some DRM/KMS operations).
+    pub privileged: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +77,7 @@ impl SandboxConfig {
             command,
             resource_limits: None,
             network: None,
+            gpu: None,
         }
     }
 
@@ -82,6 +94,12 @@ impl SandboxConfig {
     pub fn with_mount(mut self, host_path: &str, container_path: &str) -> Self {
         self.mounts
             .push((host_path.to_string(), container_path.to_string()));
+        self
+    }
+
+    /// Enable GPU passthrough for this sandbox.
+    pub fn with_gpu_passthrough(mut self, devices: Vec<String>, privileged: bool) -> Self {
+        self.gpu = Some(GpuConfig { devices, privileged });
         self
     }
 }

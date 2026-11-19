@@ -68,6 +68,24 @@ impl PodmanExecutor {
         })
     }
 
+    /// Execute a podman command without treating non-zero exit as an error.
+    /// Returns the full Output for commands where stderr may contain useful info
+    /// (e.g., `podman build` which writes progress to stderr).
+    pub fn run_raw(&self, args: &[String]) -> Result<Output, PodmanError> {
+        let cmd_str = args.join(" ");
+        debug!(command = %cmd_str, "executing podman (raw)");
+
+        let output = Command::new(&self.podman_binary)
+            .args(args)
+            .output()
+            .map_err(|e| PodmanError::ExecutionFailed {
+                source: e,
+                command: cmd_str.clone(),
+            })?;
+
+        Ok(output)
+    }
+
     /// Create a new container from the given config.
     pub fn create_container(&self, config: &SandboxConfig) -> Result<String, PodmanError> {
         let mut args = vec![
@@ -106,13 +124,27 @@ impl PodmanExecutor {
 
         // Network configuration
         if let Some(network) = &config.network {
-            if network.network_name != "host" {
+            if network.network_name == "host" {
+                args.push("--network".to_string());
+                args.push("host".to_string());
+            } else {
                 args.push("--network".to_string());
                 args.push(network.network_name.clone());
             }
             for (container_port, host_port) in &network.port_mappings {
                 args.push("-p".to_string());
                 args.push(format!("{}:{}", host_port, container_port));
+            }
+        }
+
+        // GPU passthrough
+        if let Some(gpu) = &config.gpu {
+            for device in &gpu.devices {
+                args.push("--device".to_string());
+                args.push(format!("{}:{}", device, device));
+            }
+            if gpu.privileged {
+                args.push("--privileged".to_string());
             }
         }
 
