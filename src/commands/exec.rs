@@ -209,122 +209,16 @@ pub async fn handle_exec(
     );
 
     // JEV Arbiter: resolve Queued outcomes via belief-revision passes.
-    // Runs synchronously (all passes are local computation). If the arbiter
-    // reaches high confidence in either direction, it transitions the action
-    // state and we proceed accordingly. If it escalates, we fall through to
-    // the human-review path.
     let outcome = match outcome {
         crabjar_guard::ConciergeOutcome::Queued(pending_action, _pending_entry) => {
-            let arbiter = crabjar_guard::JevArbiter::with_standard_passes();
-            let arbitration = arbiter.arbitrate(pending_action);
-
-            match arbitration {
-                crabjar_guard::ArbitrationResult::Approved(
-                    approved_action,
-                    confidence,
-                    _evidence,
-                ) => {
-                    eprintln!(
-                        "DEBUG arbiter: approved action (confidence={:.2})",
-                        confidence
-                    );
-                    // Update telemetry with the final decision
-                    flight_recorder.record_guard_decision(
-                        "exec-session",
-                        "exec",
-                        "approved",
-                        3,
-                        confidence,
-                    );
-                    crabjar_guard::ConciergeOutcome::Approved(approved_action)
-                }
-                crabjar_guard::ArbitrationResult::Denied(denied_action, confidence, evidence) => {
-                    let reasons: Vec<String> =
-                        evidence.iter().map(|e| e.rationale.clone()).collect();
-                    eprintln!(
-                        "DEBUG arbiter: denied action (confidence={:.2}) — {}",
-                        confidence,
-                        reasons.join("; ")
-                    );
-                    flight_recorder.record_guard_decision(
-                        "exec-session",
-                        "exec",
-                        "denied",
-                        3,
-                        confidence,
-                    );
-                    let _ = denied_action; // Terminal state preserved in GuardDb
-                    return Ok(json!({
-                        "success": false,
-                        "exec": {
-                            "command": command,
-                            "args": args,
-                            "cwd": effective_cwd,
-                            "reason": reason,
-                            "gate_result": "denied",
-                            "arbiter_denied": true,
-                            "confidence": confidence,
-                            "evidence": evidence.iter().map(|e| json!({
-                                "pass": e.source,
-                                "delta": e.delta,
-                                "rationale": e.rationale,
-                            })).collect::<Vec<_>>(),
-                        },
-                    }));
-                }
-                crabjar_guard::ArbitrationResult::Escalated(excuse, evidence) => {
-                    let reasons: Vec<String> =
-                        evidence.iter().map(|e| e.rationale.clone()).collect();
-                    eprintln!(
-                        "DEBUG arbiter: escalated — {} — {}",
-                        excuse,
-                        reasons.join("; ")
-                    );
-
-                    // Fire-and-forget mirror to celld for remote approval.
-                    // GuardDb remains authoritative; this is a durable copy that
-                    // allows approval from any node. Failure here never blocks.
-                    let full_command = if args.is_empty() {
-                        command.to_string()
-                    } else {
-                        format!("{} {}", command, args.join(" "))
-                    };
-                    let description = format!(
-                        "[{}] {} (reason: {})",
-                        action_request_id, full_command, reason
-                    );
-                    mirror_pending_to_celld(&action_request_id, &description);
-
-                    // Update telemetry to reflect escalation
-                    flight_recorder.record_guard_decision(
-                        "exec-session",
-                        "exec",
-                        "pending",
-                        3,
-                        0.5,
-                    );
-                    return Ok(json!({
-                        "success": false,
-                        "exec": {
-                            "command": command,
-                            "args": args,
-                            "cwd": effective_cwd,
-                            "reason": reason,
-                            "gate_result": "pending",
-                            "requires_review": true,
-                            "arbiter_escalated": true,
-                            "excuse": excuse.to_string(),
-                            "evidence": evidence.iter().map(|e| json!({
-                                "pass": e.source,
-                                "delta": e.delta,
-                                "rationale": e.rationale,
-                            })).collect::<Vec<_>>(),
-                        },
-                    }));
-                }
+            match super::exec_pipeline::resolve_arbiter(
+                pending_action, &mut flight_recorder, command, args, &effective_cwd, reason, &action_request_id,
+            ) {
+                Ok(resolved) => resolved,
+                Err(final_json) => return Ok(final_json),
             }
         }
-        other => other, // Approved or Denied — pass through unchanged
+        other => other,
     };
 
     // Record guard decision via OTel telemetry (for non-arbiter paths)
@@ -502,54 +396,4 @@ pub async fn handle_exec(
     }
 }
 
-/// Fire-and-forget mirror of a pending action to the celld approval-queue worker.
-///
-/// GuardDb remains the local authority — this is a durable copy for remote approval.
-/// Failure here never blocks or fails the main command; reconciliation catches up later.
-///
-/// The celld endpoint is configured via CELLD_MIRROR_URL (default: http://127.0.0.1:8788).
-fn mirror_pending_to_celld(action_id: &str, description: &str) {
-    let base_url =
-        std::env::var("CELLD_MIRROR_URL").unwrap_or_else(|_| "http://127.0.0.1:8788".to_string());
-    let queue = std::env::var("CELLD_MIRROR_QUEUE").unwrap_or_else(|_| "crabjar-guard".to_string());
-
-    let url = format!("{}/?queue={}&action={}", base_url, queue, action_id);
-    // Escape for JSON body
-    let escaped_desc = description.replace('"', "\\\"");
-    let body = format!(r#"{{"description": "{}"}}"#, escaped_desc);
-
-    let result = std::process::Command::new("curl")
-        .args([
-            "-s",
-            "-X",
-            "POST",
-            "-H",
-            "Content-Type: application/json",
-            "-d",
-            &body,
-            "--max-time",
-            "3",
-            &url,
-        ])
-        .output();
-
-    match result {
-        Ok(output) if output.status.success() => {
-            eprintln!(
-                "DEBUG mirror: pending action {} mirrored to celld ({})",
-                action_id, queue
-            );
-        }
-        Ok(output) => {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            eprintln!(
-                "DEBUG mirror: failed to mirror {}: {}",
-                action_id,
-                stderr.trim()
-            );
-        }
-        Err(e) => {
-            eprintln!("DEBUG mirror: curl error mirroring {}: {}", action_id, e);
-        }
-    }
-}
+use super::exec_mirror::mirror_pending_to_celld;

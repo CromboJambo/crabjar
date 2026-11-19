@@ -16,6 +16,10 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
 
+#[path = "patch_strategies.rs"]
+mod patch_strategies;
+use patch_strategies::*;
+
 /// Handle the `patch` tool call.
 ///
 /// Arguments: JSON string in args[0] with fields:
@@ -140,7 +144,6 @@ fn find_and_replace(
     (content.to_string(), 0, "none")
 }
 
-/// Strategy 1: Exact string match.
 fn try_exact(
     content: &str,
     old_string: &str,
@@ -397,45 +400,6 @@ fn try_single_line_fallback(
         }
     }
     None
-}
-
-// --- Helper functions ---
-
-fn normalize_ws(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn strip_trailing_ws(s: &str) -> String {
-    s.lines().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n")
-}
-
-fn count_normalized_matches(lines: &[&str], norm_old: &str, old_line_count: usize) -> usize {
-    let mut count = 0;
-    for start in 0..=lines.len().saturating_sub(old_line_count) {
-        let candidate: String = lines[start..start + old_line_count].join("\n");
-        if normalize_ws(&candidate) == norm_old {
-            count += 1;
-        }
-    }
-    count
-}
-
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len])
-    }
-}
-
-/// Expand leading ~ to the user's home directory.
-fn expand_path(path_str: &str) -> PathBuf {
-    if let Some(rest) = path_str.strip_prefix("~/") {
-        if let Some(home) = dirs::home_dir() {
-            return home.join(rest);
-        }
-    }
-    PathBuf::from(path_str)
 }
 
 #[cfg(test)]

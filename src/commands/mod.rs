@@ -18,6 +18,8 @@ pub mod cell;
 pub mod dinitctl;
 pub mod dotfile;
 pub mod exec;
+pub mod exec_mirror;
+pub mod exec_pipeline;
 pub mod fleet;
 pub mod goals;
 pub mod ha;

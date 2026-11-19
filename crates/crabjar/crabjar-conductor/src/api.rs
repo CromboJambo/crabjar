@@ -5,6 +5,7 @@ pub mod compliance;
 pub mod cost;
 pub mod decisions;
 pub mod dependencies;
+pub mod deployments;
 pub mod docs;
 pub mod drift;
 pub mod evaluations;

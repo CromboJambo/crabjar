@@ -42,6 +42,7 @@ pub mod guard_db;
 pub mod guard_db_handoffs;
 pub mod guard_db_impl;
 pub mod guard_db_queries;
+pub mod guard_db_queries_extra;
 pub mod guard_db_types;
 pub mod handoff;
 pub mod inference;
