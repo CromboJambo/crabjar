@@ -1,0 +1,28 @@
+[package]
+name = "code-audit"
+version = "0.1.0"
+edition = "2024"
+description = "Structural code vulnerability analyzer using pesti tokens and AST parsing"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+regex = "1"
+url = "2"
+async-trait = "0.1"
+syn = { version = "2", features = ["full", "extra-traits"] }
+
+# Crabjar analysis types (local path)
+analyze-common = { path = "../../crates/analyze/analyze-common" }
+
+# Pesti structural tokenizer for code understanding
+pesti-structural-tokenizer = { workspace = true }
+pesti-structural = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
