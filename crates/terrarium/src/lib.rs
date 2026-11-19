@@ -18,4 +18,5 @@ pub mod sim_state;
 pub mod simulator;
 pub mod ui;
 #[cfg(test)]
+#[path = "ui_tests.rs"]
 mod ui_tests;

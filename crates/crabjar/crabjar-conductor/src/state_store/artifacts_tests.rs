@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::super::*;
     use tempfile::tempdir;
 
     fn test_store() -> (StateStore, tempfile::TempDir) {
@@ -13,13 +13,13 @@ mod tests {
     #[test]
     fn store_and_retrieve_blob_artifact() {
         let (store, _dir) = test_store();
-        let dep_id = "dep-test-001";
 
         // Create a deployment first
         let task_spec = serde_json::json!({"id": "test-task"});
-        store
+        let deployment = store
             .create_deployment("test-supervisor".to_string(), task_spec)
             .unwrap();
+        let dep_id = &deployment.id;
 
         // Store a small artifact as BLOB
         let data = b"test log output\nline 2\n";
@@ -33,7 +33,7 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(artifact.deployment_id, dep_id);
+        assert_eq!(artifact.deployment_id.as_str(), dep_id);
         assert_eq!(artifact.name, "stdout.log");
         assert_eq!(artifact.artifact_type, ArtifactType::Log);
         assert_eq!(artifact.size, data.len());
@@ -51,12 +51,12 @@ mod tests {
     #[test]
     fn store_large_artifact_on_filesystem() {
         let (store, _dir) = test_store();
-        let dep_id = "dep-test-002";
 
         let task_spec = serde_json::json!({"id": "test-task"});
-        store
+        let deployment = store
             .create_deployment("test-supervisor".to_string(), task_spec)
             .unwrap();
+        let dep_id = &deployment.id;
 
         // Create a large artifact (> 1MB) that should be stored on disk
         let large_data = vec![0u8; MAX_BLOB_SIZE + 1024];
@@ -93,12 +93,12 @@ mod tests {
     #[test]
     fn list_deployment_artifacts() {
         let (store, _dir) = test_store();
-        let dep_id = "dep-test-003";
 
         let task_spec = serde_json::json!({"id": "test-task"});
-        store
+        let deployment = store
             .create_deployment("test-supervisor".to_string(), task_spec)
             .unwrap();
+        let dep_id = &deployment.id;
 
         // Store multiple artifacts
         store
@@ -141,12 +141,12 @@ mod tests {
     #[test]
     fn delete_artifact() {
         let (store, _dir) = test_store();
-        let dep_id = "dep-test-004";
 
         let task_spec = serde_json::json!({"id": "test-task"});
-        store
+        let deployment = store
             .create_deployment("test-supervisor".to_string(), task_spec)
             .unwrap();
+        let dep_id = &deployment.id;
 
         let artifact = store
             .store_artifact(

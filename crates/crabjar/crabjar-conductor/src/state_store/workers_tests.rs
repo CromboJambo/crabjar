@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::super::*;
     use tempfile::tempdir;
 
     fn test_store() -> (StateStore, tempfile::TempDir) {

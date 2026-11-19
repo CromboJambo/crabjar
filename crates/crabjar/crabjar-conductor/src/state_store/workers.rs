@@ -394,4 +394,5 @@ impl StateStore {
 }
 
 #[cfg(test)]
+#[path = "workers_tests.rs"]
 mod workers_tests;

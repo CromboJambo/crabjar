@@ -129,6 +129,7 @@ impl StateStore {
         let id = Uuid::new_v4().to_string();
         let created_at = Utc::now().to_rfc3339();
         let size = data.len();
+        let content_type = content_type.unwrap_or_else(|| "application/octet-stream".to_string());
 
         // Decide storage location based on size
         if size <= MAX_BLOB_SIZE {
@@ -168,7 +169,7 @@ impl StateStore {
                 deployment_id: deployment_id.to_string(),
                 name,
                 artifact_type,
-                content_type,
+                content_type: Some(content_type),
                 size,
                 storage,
                 created_at,
@@ -275,4 +276,5 @@ impl StateStore {
 }
 
 #[cfg(test)]
+#[path = "artifacts_tests.rs"]
 mod artifacts_tests;

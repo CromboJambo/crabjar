@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-#[cfg(test)]
-mod tests {
     use super::*;
+    use crate::image_ops::{crop_image_region, detect_mime_from_extension};
+    use crate::{VisionClient, VisionConfig, VisionError};
     use image::{ImageEncoder, RgbaImage};
 
     use std::sync::{Mutex, OnceLock};

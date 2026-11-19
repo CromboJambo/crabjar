@@ -343,4 +343,5 @@ impl GuardedAction<TrustApproved> {
 // (The blanket impl above provides as_ref() and into_inner().)
 
 #[cfg(test)]
+#[path = "action_tests.rs"]
 mod action_tests;
