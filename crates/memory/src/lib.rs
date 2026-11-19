@@ -4,6 +4,7 @@ pub mod habitat;
 pub mod lineage;
 pub mod loss_accounting;
 pub mod models;
+pub mod observer;
 pub mod schema;
 pub mod state_docs;
 pub mod store;
