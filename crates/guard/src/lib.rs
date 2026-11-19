@@ -25,6 +25,7 @@ pub mod action;
 pub mod arbiter;
 #[cfg(test)]
 pub mod authorization_order;
+pub mod capabilities;
 pub mod command_risk;
 pub mod concierge;
 pub mod concierge_types;
