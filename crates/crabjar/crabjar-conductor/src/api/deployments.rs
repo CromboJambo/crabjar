@@ -6,7 +6,6 @@ use axum::{Json, extract::Path};
 use serde_json::json;
 use tracing::info;
 
-
 /// POST /workers/deploy - Deploy a worker sandbox for a task (public).
 ///
 /// Accepts a `TaskSpec` and `supervisor_id`, creates a deployment record,

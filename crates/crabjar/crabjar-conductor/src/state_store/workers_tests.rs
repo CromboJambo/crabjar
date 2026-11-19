@@ -154,4 +154,3 @@ mod tests {
         assert!(!stored_res.can_satisfy(&gpu_task));
     }
 }
-
