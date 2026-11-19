@@ -2,10 +2,10 @@
 //!
 //! Registers crabjar tools as callable functions within scripts.
 
-use crate::error::{ExecError, ExecResult};
 use crate::ExecutionContext;
+use crate::error::{ExecError, ExecResult};
 use rhai::{Engine, EvalAltResult};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -130,20 +130,15 @@ fn read_file_impl(
         return Err(format!("File not found: {}", full_path.display()).into());
     }
 
-    let content = std::fs::read_to_string(&full_path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    let content =
+        std::fs::read_to_string(&full_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
     let lines: Vec<&str> = content.lines().collect();
     let start = offset.max(1) as usize - 1;
     let end = (start + limit as usize).min(lines.len());
 
     if start >= lines.len() {
-        return Err(format!(
-            "Offset {} exceeds file length ({})",
-            offset,
-            lines.len()
-        )
-        .into());
+        return Err(format!("Offset {} exceeds file length ({})", offset, lines.len()).into());
     }
 
     let numbered: Vec<String> = lines[start..end]
@@ -189,11 +184,7 @@ fn search_files_impl(
 /// Resolve a potentially relative path against the working directory.
 fn resolve_path(workdir: &PathBuf, path: &str) -> PathBuf {
     let p = PathBuf::from(path);
-    if p.is_absolute() {
-        p
-    } else {
-        workdir.join(p)
-    }
+    if p.is_absolute() { p } else { workdir.join(p) }
 }
 
 /// Recursively search a directory for files matching a pattern.

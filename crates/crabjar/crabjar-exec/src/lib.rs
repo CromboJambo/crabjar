@@ -13,8 +13,8 @@
 //! 5. **Observable**: Execution traced via `tracing` crate
 
 use anyhow::Result;
-use rhai::{Engine};
-use serde_json::{json, Value};
+use rhai::Engine;
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -86,8 +86,8 @@ impl CodeExecutor {
             "json",
             |value: String| -> Result<String, Box<rhai::EvalAltResult>> {
                 // Parse the input as JSON and re-serialize it (validation)
-                let parsed: Value = serde_json::from_str(&value)
-                    .map_err(|e| format!("Invalid JSON: {}", e))?;
+                let parsed: Value =
+                    serde_json::from_str(&value).map_err(|e| format!("Invalid JSON: {}", e))?;
                 Ok(serde_json::to_string(&parsed)
                     .map_err(|e| format!("JSON serialization failed: {}", e))?)
             },
@@ -110,7 +110,9 @@ impl CodeExecutor {
         // Check tool call limit before starting
         let count = *self.context.tool_call_count.lock().await;
         if count >= self.context.max_tool_calls {
-            return Err(ExecError::ToolCallLimitExceeded(self.context.max_tool_calls));
+            return Err(ExecError::ToolCallLimitExceeded(
+                self.context.max_tool_calls,
+            ));
         }
 
         // Evaluate the script in the VM as a string, then parse as JSON
@@ -165,10 +167,8 @@ impl CodeExecutor {
         let engine = &mut self.engine;
         let rust_func = move |args: Vec<String>| -> Result<String, Box<rhai::EvalAltResult>> {
             // Convert string args to JSON values
-            let json_args: Result<Vec<Value>, _> = args
-                .into_iter()
-                .map(|s| serde_json::from_str(&s))
-                .collect();
+            let json_args: Result<Vec<Value>, _> =
+                args.into_iter().map(|s| serde_json::from_str(&s)).collect();
             match json_args {
                 Ok(values) => func(&values)
                     .and_then(|v| serde_json::to_string(&v).map_err(|e| e.to_string()))
@@ -234,7 +234,9 @@ mod tests {
         let executor = CodeExecutor::new(ctx);
 
         let result: Value = executor
-            .execute(r#"if 5 > 3 { json("\"yes\"".to_string()) } else { json("\"no\"".to_string()) }"#)
+            .execute(
+                r#"if 5 > 3 { json("\"yes\"".to_string()) } else { json("\"no\"".to_string()) }"#,
+            )
             .await
             .unwrap();
         assert_eq!(result, json!("yes"));
@@ -247,7 +249,8 @@ mod tests {
 
         // Build a JSON array string manually using a while loop
         let result: Value = executor
-            .execute(r#"
+            .execute(
+                r#"
                 let nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
                 let evens = [];
                 for n in nums {
@@ -266,7 +269,8 @@ mod tests {
                     i += 1;
                 }
                 json("[" + joined + "]")
-            "#)
+            "#,
+            )
             .await
             .unwrap();
         assert_eq!(result, json!([4, 8, 12, 16, 20]));
