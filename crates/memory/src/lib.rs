@@ -1,6 +1,7 @@
 pub mod context;
 pub mod error;
 pub mod habitat;
+pub mod lineage;
 pub mod models;
 pub mod schema;
 pub mod state_docs;
