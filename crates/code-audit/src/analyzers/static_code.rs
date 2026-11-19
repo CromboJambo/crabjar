@@ -205,8 +205,6 @@ impl StaticCodeAnalyzer {
         findings
     }
 
-
-
     /// Get the name of a local variable.
     pub(crate) fn local_name(&self, local: &syn::Local) -> String {
         if let syn::Pat::Ident(pat_ident) = &local.pat {

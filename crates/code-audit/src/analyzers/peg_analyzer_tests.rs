@@ -4,8 +4,8 @@ mod tests {
     use std::path::Path;
 
     use super::super::peg_analyzer::{
-        byte_to_line, count_params_from_captures, detect_language, estimate_depth, truncate,
-        PegFeature,
+        PegFeature, byte_to_line, count_params_from_captures, detect_language, estimate_depth,
+        truncate,
     };
 
     #[test]

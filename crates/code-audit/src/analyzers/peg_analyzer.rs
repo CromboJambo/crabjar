@@ -333,7 +333,6 @@ fn traverse_and_check(
     }
 }
 
-
 /// Count parameters from captures (heuristic).
 pub(crate) fn count_params_from_captures(captures: &HashMap<String, String>) -> usize {
     if let Some(params) = captures.get("params").or(captures.get("parameters")) {

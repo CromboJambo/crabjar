@@ -1,9 +1,11 @@
 //! Structural vulnerability rules for PegStructuralAnalyzer.
 
-use crate::types::{Evidence, Finding, Severity, AnalyzerType};
+use crate::types::{AnalyzerType, Evidence, Finding, Severity};
 use std::path::Path;
 
-use super::peg_analyzer::{PegFeature, byte_to_line, truncate, simple_hash, count_params_from_captures, estimate_depth};
+use super::peg_analyzer::{
+    PegFeature, byte_to_line, count_params_from_captures, estimate_depth, simple_hash, truncate,
+};
 
 /// Check a single structural feature against vulnerability patterns (no recursion).
 pub(crate) fn check_structural_rules_single(

@@ -1,7 +1,7 @@
 //! Injection detection for StaticCodeAnalyzer — SQL, command, and path traversal.
 
-use crate::types::*;
 use super::static_code::find_line_for_var;
+use crate::types::*;
 use syn::{Expr, Item, parse_file};
 
 impl super::static_code::StaticCodeAnalyzer {
