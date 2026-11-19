@@ -7,7 +7,7 @@ pub fn handle_backend_command(command: BackendCommand) -> Result<serde_json::Val
         BackendCommand::Set { backend } => {
             // Validate backend type
             match backend.as_str() {
-                "lm-studio" | "native" => {
+                "unsloth-studio" | "native" => {
                     // Update environment variable for the orchestrator
                     unsafe {
                         std::env::set_var("INFERENCE_BACKEND", &backend);
@@ -18,14 +18,14 @@ pub fn handle_backend_command(command: BackendCommand) -> Result<serde_json::Val
                     }))
                 }
                 _ => Err(format!(
-                    "Invalid backend: {}. Use 'lm-studio' or 'native'.",
+                    "Invalid backend: {}. Use 'unsloth-studio' or 'native'.",
                     backend
                 )),
             }
         }
         BackendCommand::Get => {
             let current_backend =
-                std::env::var("INFERENCE_BACKEND").unwrap_or_else(|_| "lm-studio".to_string());
+                std::env::var("INFERENCE_BACKEND").unwrap_or_else(|_| "unsloth-studio".to_string());
             Ok(json!({
                 "success": true,
                 "current_backend": current_backend,

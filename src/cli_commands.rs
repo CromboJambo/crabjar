@@ -200,7 +200,7 @@ pub enum BitwardenCommand {
 /// Inference backend management commands
 #[derive(Debug, Subcommand, Clone)]
 pub enum BackendCommand {
-    /// Set the inference backend (lm-studio or native)
+    /// Set the inference backend (unsloth-studio or native)
     Set {
         #[arg(short, long)]
         backend: String,

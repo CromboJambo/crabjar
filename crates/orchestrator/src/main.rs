@@ -23,7 +23,7 @@ mod session_search;
 mod tools;
 
 use backend::InferenceBackend;
-use lm_studio_client::LmStudioClient;
+use lm_studio_client::UnslothStudioClient;
 
 use axum::middleware;
 use std::collections::HashMap;
@@ -1245,9 +1245,9 @@ async fn main() -> anyhow::Result<()> {
     let store = Store::open(&knowledge_db_path)
         .map_err(|e| anyhow::anyhow!("Failed to open knowledge store: {e}"))?;
 
-    // Initialize default inference backend (LM Studio client).
+    // Initialize default inference backend (Unsloth Studio client).
     // Native/PESTI inference was moved to the PESTI portable execution substrate.
-    let backend: Box<dyn InferenceBackend> = Box::new(LmStudioClient::from_env());
+    let backend: Box<dyn InferenceBackend> = Box::new(UnslothStudioClient::from_env());
 
     // Shared state across request handlers — construct scope for gate context
     let actor_scope = crabjar_guard::Scope::project("orchestrator");

@@ -1,6 +1,6 @@
-//! Error types and endpoint auto-detection for the LM Studio client.
+//! Error types and endpoint auto-detection for the Unsloth Studio client.
 
-use super::types::{LmStudioEndpoint, ToolProviderInfo};
+use super::types::{UnslothStudioEndpoint, ToolProviderInfo};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -21,10 +21,10 @@ pub struct ToolCallInfo {
     pub provider_info: Option<ToolProviderInfo>,
 }
 
-/// Errors from LM Studio client operations.
+/// Errors from Unsloth Studio client operations.
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, Error)]
-pub enum LmStudioError {
+pub enum UnslothStudioError {
     #[error("request failed: {0}")]
     RequestError(String),
     #[error("response parse error: {0}")]
@@ -46,7 +46,7 @@ pub enum LmStudioError {
 // Endpoint auto-detection
 // ---------------------------------------------------------------------------
 
-/// Checks which LM Studio endpoints are available by probing them.
+/// Checks which Unsloth Studio endpoints are available by probing them.
 ///
 /// Returns a list of available endpoints. If none are available, returns
 /// an error.
@@ -55,7 +55,7 @@ pub enum LmStudioError {
 pub async fn detect_available_endpoints(
     base_url: &str,
     serve_url: Option<&str>,
-) -> Result<Vec<LmStudioEndpoint>, LmStudioError> {
+) -> Result<Vec<UnslothStudioEndpoint>, UnslothStudioError> {
     let client = reqwest::Client::new();
     let mut available = Vec::new();
 
@@ -68,7 +68,7 @@ pub async fn detect_available_endpoints(
         .map(|r| r.status().is_success())
         .unwrap_or(false)
     {
-        available.push(LmStudioEndpoint::Openai);
+        available.push(UnslothStudioEndpoint::Openai);
     }
 
     // Check Anthropic-compatible endpoint.
@@ -80,7 +80,7 @@ pub async fn detect_available_endpoints(
         .map(|r| r.status().is_success())
         .unwrap_or(false)
     {
-        available.push(LmStudioEndpoint::Anthropic);
+        available.push(UnslothStudioEndpoint::Anthropic);
     }
 
     // Check native endpoint.
@@ -92,7 +92,7 @@ pub async fn detect_available_endpoints(
         .map(|r| r.status().is_success())
         .unwrap_or(false)
     {
-        available.push(LmStudioEndpoint::Native);
+        available.push(UnslothStudioEndpoint::Native);
     }
 
     // Check mistral.rs serve endpoint.
@@ -109,12 +109,12 @@ pub async fn detect_available_endpoints(
         .map(|r| r.status().is_success())
         .unwrap_or(false)
     {
-        available.push(LmStudioEndpoint::MistralRsServe);
+        available.push(UnslothStudioEndpoint::MistralRsServe);
     }
 
     if available.is_empty() {
-        Err(LmStudioError::RequestError(
-            "No LM Studio endpoints available".to_string(),
+        Err(UnslothStudioError::RequestError(
+            "No Unsloth Studio endpoints available".to_string(),
         ))
     } else {
         Ok(available)

@@ -100,7 +100,7 @@ impl SessionState {
 
 /// SQLite-backed session store for persisting chat state across process restarts.
 ///
-/// This complements LM Studio's native stateful chat by storing session
+/// This complements Unsloth Studio's native stateful chat by storing session
 /// metadata and message history in SQLite. When the orchestrator restarts,
 /// it can restore sessions from the database.
 #[derive(Debug)]

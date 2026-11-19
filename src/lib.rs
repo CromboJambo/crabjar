@@ -95,7 +95,7 @@ pub enum CliCommand {
         command: DoctorCommand,
     },
 
-    /// Manage inference backend (LM Studio vs Native)
+    /// Manage inference backend (Unsloth Studio vs Native)
     Backend {
         #[command(subcommand)]
         command: BackendCommand,

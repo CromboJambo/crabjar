@@ -6,7 +6,7 @@
 //! - `PromptMetadata`: audit metadata attached to every envelope
 //! - `PromptEnvelope`: wraps system + user content before sending to the model
 
-use super::types::LmStudioEndpoint;
+use super::types::UnslothStudioEndpoint;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
@@ -143,13 +143,13 @@ pub struct PromptMetadata {
     /// Session this envelope belongs to.
     pub session_id: String,
     /// Which endpoint this envelope targets.
-    pub endpoint: LmStudioEndpoint,
+    pub endpoint: UnslothStudioEndpoint,
     /// Schema version of the validator (for future compatibility).
     pub validator_version: u32,
 }
 
 impl PromptMetadata {
-    pub fn new(session_id: String, endpoint: LmStudioEndpoint) -> Self {
+    pub fn new(session_id: String, endpoint: UnslothStudioEndpoint) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -180,7 +180,7 @@ impl PromptEnvelope {
         system_prompt: LabeledContent,
         user_content: LabeledContent,
         session_id: String,
-        endpoint: LmStudioEndpoint,
+        endpoint: UnslothStudioEndpoint,
     ) -> Self {
         Self {
             system_prompt,
@@ -196,7 +196,7 @@ impl PromptEnvelope {
         user_content: String,
         user_label: SourceLabel,
         session_id: String,
-        endpoint: LmStudioEndpoint,
+        endpoint: UnslothStudioEndpoint,
     ) -> Self {
         Self::new(
             LabeledContent::new(system_label, system_content),

@@ -26,7 +26,7 @@ impl InferenceMetrics {
         }
     }
 
-    /// Estimate cost in cents. LM Studio local inference is "free" (zero marginal).
+    /// Estimate cost in cents. Unsloth Studio local inference is "free" (zero marginal).
     pub fn estimated_cost_cents(&self) -> f64 {
         0.0
     }

@@ -1,25 +1,25 @@
-//! The unified LM Studio client that abstracts endpoint differences.
+//! The unified Unsloth Studio client that abstracts endpoint differences.
 //!
 //! Every outbound prompt is wrapped in a `PromptEnvelope` before sending,
 //! providing instruction-hijack defense and provenance tracking.
 
 use super::endpoints::{anthropic, native, openai};
-use super::error::{LmStudioError, ToolCallInfo};
+use super::error::{UnslothStudioError, ToolCallInfo};
 use super::prompt_types::{PromptEnvelope, SourceLabel};
 use super::prompt_validator::PromptValidator;
 use super::session::{SessionError, SessionState, SessionStore};
 use super::types::*;
 use tracing::{info, warn};
 
-/// The unified LM Studio client that abstracts endpoint differences.
+/// The unified Unsloth Studio client that abstracts endpoint differences.
 ///
 /// It routes requests to the configured endpoint and converts responses
 /// to the unified format so the orchestrator doesn't need to know which
 /// endpoint it's talking to.
 #[derive(Debug)]
-pub struct LmStudioClient {
+pub struct UnslothStudioClient {
     /// Configuration.
-    config: LmStudioConfig,
+    config: UnslothStudioConfig,
     /// HTTP client.
     http_client: reqwest::Client,
     /// Session state for stateful continuation.
@@ -30,10 +30,10 @@ pub struct LmStudioClient {
     current_session_id: Option<String>,
 }
 
-impl LmStudioClient {
+impl UnslothStudioClient {
     /// Creates a new client from environment configuration.
     pub fn from_env() -> Self {
-        let config = LmStudioConfig::from_env();
+        let config = UnslothStudioConfig::from_env();
         let http_client = reqwest::Client::new();
         let session = SessionState::new();
 
@@ -47,7 +47,7 @@ impl LmStudioClient {
     }
 
     /// Creates a new client with explicit configuration.
-    pub fn new(config: LmStudioConfig) -> Self {
+    pub fn new(config: UnslothStudioConfig) -> Self {
         let http_client = reqwest::Client::new();
         let session = SessionState::new();
 
@@ -119,12 +119,12 @@ impl LmStudioClient {
     /// Sends a chat request and returns the unified response.
     ///
     /// The user input is wrapped in a `PromptEnvelope` with `SourceLabel::UserInput`
-    /// and validated before being sent to the model. Returns `LmStudioError::PromptError`
+    /// and validated before being sent to the model. Returns `UnslothStudioError::PromptError`
     /// if the envelope fails validation (e.g., injection detected).
-    pub async fn chat(&mut self, user_input: String) -> Result<UnifiedChatResponse, LmStudioError> {
+    pub async fn chat(&mut self, user_input: String) -> Result<UnifiedChatResponse, UnslothStudioError> {
         // Determine the previous response ID based on the endpoint.
         let previous_response_id = match self.config.endpoint {
-            LmStudioEndpoint::Native => self.session.response_id.clone(),
+            UnslothStudioEndpoint::Native => self.session.response_id.clone(),
             _ => None,
         };
 
@@ -154,7 +154,7 @@ impl LmStudioClient {
         // Validate the envelope before sending.
         if let Err(e) = PromptValidator::validate(&envelope) {
             warn!("Prompt envelope validation failed: {}", e);
-            return Err(LmStudioError::PromptError(e.to_string()));
+            return Err(UnslothStudioError::PromptError(e.to_string()));
         }
 
         // Build the unified request from the validated envelope.
@@ -168,10 +168,10 @@ impl LmStudioClient {
 
         // Convert to endpoint-specific format and send.
         let response = match self.config.endpoint {
-            LmStudioEndpoint::Native => self.send_native(&req_with_system).await,
-            LmStudioEndpoint::Openai => self.send_openai(&req_with_system).await,
-            LmStudioEndpoint::Anthropic => self.send_anthropic(&req_with_system).await,
-            LmStudioEndpoint::MistralRsServe => self.send_openai(&req_with_system).await,
+            UnslothStudioEndpoint::Native => self.send_native(&req_with_system).await,
+            UnslothStudioEndpoint::Openai => self.send_openai(&req_with_system).await,
+            UnslothStudioEndpoint::Anthropic => self.send_anthropic(&req_with_system).await,
+            UnslothStudioEndpoint::MistralRsServe => self.send_openai(&req_with_system).await,
         }?;
 
         // Update session state with the response.
@@ -194,9 +194,9 @@ impl LmStudioClient {
         &mut self,
         system_prompt: String,
         user_input: String,
-    ) -> Result<UnifiedChatResponse, LmStudioError> {
+    ) -> Result<UnifiedChatResponse, UnslothStudioError> {
         let previous_response_id = match self.config.endpoint {
-            LmStudioEndpoint::Native => self.session.response_id.clone(),
+            UnslothStudioEndpoint::Native => self.session.response_id.clone(),
             _ => None,
         };
 
@@ -217,7 +217,7 @@ impl LmStudioClient {
         // Validate the envelope before sending.
         if let Err(e) = PromptValidator::validate(&envelope) {
             warn!("Prompt envelope validation failed: {}", e);
-            return Err(LmStudioError::PromptError(e.to_string()));
+            return Err(UnslothStudioError::PromptError(e.to_string()));
         }
 
         // Build the unified request from the validated envelope.
@@ -230,10 +230,10 @@ impl LmStudioClient {
         req_with_system.system_prompt = Some(envelope.system_content().to_string());
 
         let response = match self.config.endpoint {
-            LmStudioEndpoint::Native => self.send_native(&req_with_system).await,
-            LmStudioEndpoint::Openai => self.send_openai(&req_with_system).await,
-            LmStudioEndpoint::Anthropic => self.send_anthropic(&req_with_system).await,
-            LmStudioEndpoint::MistralRsServe => self.send_openai(&req_with_system).await,
+            UnslothStudioEndpoint::Native => self.send_native(&req_with_system).await,
+            UnslothStudioEndpoint::Openai => self.send_openai(&req_with_system).await,
+            UnslothStudioEndpoint::Anthropic => self.send_anthropic(&req_with_system).await,
+            UnslothStudioEndpoint::MistralRsServe => self.send_openai(&req_with_system).await,
         }?;
 
         self.session.update_with_response(&response);
@@ -287,7 +287,7 @@ impl LmStudioClient {
     async fn send_native(
         &self,
         req: &UnifiedChatRequest,
-    ) -> Result<UnifiedChatResponse, LmStudioError> {
+    ) -> Result<UnifiedChatResponse, UnslothStudioError> {
         let url = self.config.endpoint_url();
         let body = native::to_native_request(req);
 
@@ -303,12 +303,12 @@ impl LmStudioClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| LmStudioError::RequestError(format!("Native endpoint: {}", e)))?;
+            .map_err(|e| UnslothStudioError::RequestError(format!("Native endpoint: {}", e)))?;
 
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(LmStudioError::HttpError {
+            return Err(UnslothStudioError::HttpError {
                 status: status.as_u16(),
                 body,
                 endpoint: self.config.endpoint.name().to_string(),
@@ -318,16 +318,16 @@ impl LmStudioClient {
         let json = response
             .json::<serde_json::Value>()
             .await
-            .map_err(|e| LmStudioError::ParseError(format!("Native response: {}", e)))?;
+            .map_err(|e| UnslothStudioError::ParseError(format!("Native response: {}", e)))?;
 
-        native::from_native_response(&json).map_err(|e| LmStudioError::ParseError(e.to_string()))
+        native::from_native_response(&json).map_err(|e| UnslothStudioError::ParseError(e.to_string()))
     }
 
     /// Sends a request to the OpenAI-compatible endpoint.
     async fn send_openai(
         &self,
         req: &UnifiedChatRequest,
-    ) -> Result<UnifiedChatResponse, LmStudioError> {
+    ) -> Result<UnifiedChatResponse, UnslothStudioError> {
         let url = self.config.endpoint_url();
         let body = openai::to_openai_request(req);
 
@@ -343,12 +343,12 @@ impl LmStudioClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| LmStudioError::RequestError(format!("OpenAI endpoint: {}", e)))?;
+            .map_err(|e| UnslothStudioError::RequestError(format!("OpenAI endpoint: {}", e)))?;
 
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(LmStudioError::HttpError {
+            return Err(UnslothStudioError::HttpError {
                 status: status.as_u16(),
                 body,
                 endpoint: self.config.endpoint.name().to_string(),
@@ -358,16 +358,16 @@ impl LmStudioClient {
         let json = response
             .json::<serde_json::Value>()
             .await
-            .map_err(|e| LmStudioError::ParseError(format!("OpenAI response: {}", e)))?;
+            .map_err(|e| UnslothStudioError::ParseError(format!("OpenAI response: {}", e)))?;
 
-        openai::from_openai_response(&json).map_err(|e| LmStudioError::ParseError(e.to_string()))
+        openai::from_openai_response(&json).map_err(|e| UnslothStudioError::ParseError(e.to_string()))
     }
 
     /// Sends a request to the Anthropic-compatible endpoint.
     async fn send_anthropic(
         &self,
         req: &UnifiedChatRequest,
-    ) -> Result<UnifiedChatResponse, LmStudioError> {
+    ) -> Result<UnifiedChatResponse, UnslothStudioError> {
         let url = self.config.endpoint_url();
         let body = anthropic::to_anthropic_request(req);
 
@@ -386,12 +386,12 @@ impl LmStudioClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| LmStudioError::RequestError(format!("Anthropic endpoint: {}", e)))?;
+            .map_err(|e| UnslothStudioError::RequestError(format!("Anthropic endpoint: {}", e)))?;
 
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(LmStudioError::HttpError {
+            return Err(UnslothStudioError::HttpError {
                 status: status.as_u16(),
                 body,
                 endpoint: self.config.endpoint.name().to_string(),
@@ -401,9 +401,9 @@ impl LmStudioClient {
         let json = response
             .json::<serde_json::Value>()
             .await
-            .map_err(|e| LmStudioError::ParseError(format!("Anthropic response: {}", e)))?;
+            .map_err(|e| UnslothStudioError::ParseError(format!("Anthropic response: {}", e)))?;
 
         anthropic::from_anthropic_response(&json)
-            .map_err(|e| LmStudioError::ParseError(e.to_string()))
+            .map_err(|e| UnslothStudioError::ParseError(e.to_string()))
     }
 }

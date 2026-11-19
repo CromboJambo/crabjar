@@ -1,6 +1,6 @@
 /// Unified inference backend abstraction.
 ///
-/// Currently supports LM Studio via the `lm_studio_client` module.
+/// Currently supports Unsloth Studio via the `lm_studio_client` module.
 /// Native inference was moved to the PESTI portable execution substrate.
 pub use lm_studio_client::UnifiedChatResponse;
 
@@ -53,13 +53,13 @@ pub trait InferenceBackend: Send + Sync {
 /// Which inference backend is in use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BackendKind {
-    LmStudio,
+    UnslothStudio,
 }
 
 impl std::fmt::Display for BackendKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::LmStudio => write!(f, "lm-studio"),
+            Self::UnslothStudio => write!(f, "unsloth-studio"),
         }
     }
 }
@@ -83,11 +83,11 @@ pub enum InferenceError {
 }
 
 // ---------------------------------------------------------------------------
-// LmStudioClient adapter — implements InferenceBackend for the existing client
+// UnslothStudioClient adapter — implements InferenceBackend for the existing client
 // ---------------------------------------------------------------------------
 
 #[async_trait::async_trait]
-impl InferenceBackend for lm_studio_client::LmStudioClient {
+impl InferenceBackend for lm_studio_client::UnslothStudioClient {
     async fn generate(
         &mut self,
         user_input: String,
@@ -99,7 +99,7 @@ impl InferenceBackend for lm_studio_client::LmStudioClient {
             .map_err(|e| InferenceError::RequestError(e.to_string()))?;
         let latency_ms = start.elapsed().as_millis() as u64;
 
-        // Use real token counts from LM Studio API stats when available,
+        // Use real token counts from Unsloth Studio API stats when available,
         // fall back to estimation otherwise.
         let (tokens_in, tokens_out) = match response.stats {
             Some(ref s) => (s.input_tokens as u32, s.total_output_tokens as u32),
@@ -111,7 +111,7 @@ impl InferenceBackend for lm_studio_client::LmStudioClient {
 
         // Use the model instance ID from the response if available.
         let model_id = if response.model_instance_id.is_empty() {
-            "lm-studio".to_string()
+            "unsloth-studio".to_string()
         } else {
             response.model_instance_id.clone()
         };
@@ -151,7 +151,7 @@ impl InferenceBackend for lm_studio_client::LmStudioClient {
     }
 
     fn kind(&self) -> BackendKind {
-        BackendKind::LmStudio
+        BackendKind::UnslothStudio
     }
 }
 

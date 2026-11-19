@@ -1,4 +1,4 @@
-//! lm_studio_client: Unified client for LM Studio's multiple API endpoints.
+//! unsloth_studio_client: Unified client for Unsloth Studio's multiple API endpoints.
 //!
 //! Supports three endpoints with a toggle:
 //! - Native `/api/v1/chat` — stateful chat via `previous_response_id`
@@ -35,7 +35,7 @@ mod types;
 
 // Re-export public API
 #[allow(unused_imports)]
-pub use client::LmStudioClient;
+pub use client::UnslothStudioClient;
 #[allow(unused_imports)]
 pub use error::ToolCallInfo;
 #[allow(unused_imports)]

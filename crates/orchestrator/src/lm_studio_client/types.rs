@@ -1,4 +1,4 @@
-//! Types for the LM Studio client: endpoints, config, and unified message types.
+//! Types for the Unsloth Studio client: endpoints, config, and unified message types.
 
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -7,10 +7,10 @@ use std::env;
 // Endpoint selection
 // ---------------------------------------------------------------------------
 
-/// Which LM Studio endpoint to use.
+/// Which Unsloth Studio endpoint to use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LmStudioEndpoint {
+pub enum UnslothStudioEndpoint {
     /// Native `/api/v1/chat` endpoint — supports stateful chat.
     Native,
     /// OpenAI-compatible `/v1/chat/completions` endpoint.
@@ -21,11 +21,14 @@ pub enum LmStudioEndpoint {
     MistralRsServe,
 }
 
-impl LmStudioEndpoint {
-    /// Parses from environment variable `LM_STUDIO_ENDPOINT`.
+impl UnslothStudioEndpoint {
+    /// Parses from environment variable `UNSLOTH_STUDIO_ENDPOINT` (or `LM_STUDIO_ENDPOINT` for backward compat).
     /// Defaults to `Openai` if not set or unrecognized.
     pub fn from_env() -> Self {
-        match env::var("LM_STUDIO_ENDPOINT").ok().as_deref() {
+        let endpoint_val = env::var("UNSLOTH_STUDIO_ENDPOINT")
+            .or_else(|_| env::var("LM_STUDIO_ENDPOINT"))
+            .ok();
+        match endpoint_val.as_deref() {
             Some("native") => Self::Native,
             Some("openai") => Self::Openai,
             Some("anthropic") => Self::Anthropic,
@@ -59,15 +62,15 @@ impl LmStudioEndpoint {
 // Configuration
 // ---------------------------------------------------------------------------
 
-/// Configuration for connecting to LM Studio.
+/// Configuration for connecting to Unsloth Studio.
 #[derive(Debug, Clone)]
-pub struct LmStudioConfig {
-    /// Base URL of the LM Studio server (e.g. `http://127.0.0.1:1234`).
+pub struct UnslothStudioConfig {
+    /// Base URL of the Unsloth Studio server (e.g. `http://127.0.0.1:8081`).
     pub base_url: String,
     /// Base URL for mistral.rs serve (overrides `base_url` when endpoint is `MistralRsServe`).
     pub serve_base_url: Option<String>,
     /// Which endpoint to use.
-    pub endpoint: LmStudioEndpoint,
+    pub endpoint: UnslothStudioEndpoint,
     /// API token for authentication (optional).
     pub api_token: Option<String>,
     /// Default model to use if not specified in a request.
@@ -80,30 +83,35 @@ pub struct LmStudioConfig {
     pub default_max_output_tokens: Option<i64>,
 }
 
-impl LmStudioConfig {
+impl UnslothStudioConfig {
     /// Loads configuration from environment variables.
     pub fn from_env() -> Self {
-        let base_url =
-            env::var("LM_STUDIO_URL").unwrap_or_else(|_| "http://127.0.0.1:1234".to_string());
+        let base_url = env::var("UNSLOTH_STUDIO_URL")
+            .or_else(|_| env::var("LM_STUDIO_URL"))
+            .unwrap_or_else(|_| "http://127.0.0.1:8081".to_string());
 
         let serve_base_url = env::var("MISTRALRS_SERVE_URL").ok();
 
-        let endpoint = LmStudioEndpoint::from_env();
+        let endpoint = UnslothStudioEndpoint::from_env();
 
         let api_token = env::var("LM_API_TOKEN").ok();
 
-        let default_model =
-            env::var("LM_STUDIO_MODEL").unwrap_or_else(|_| "local-model".to_string());
+        let default_model = env::var("UNSLOTH_STUDIO_MODEL")
+            .or_else(|_| env::var("LM_STUDIO_MODEL"))
+            .unwrap_or_else(|_| "local-model".to_string());
 
-        let default_context_length = env::var("LM_STUDIO_CONTEXT_LENGTH")
+        let default_context_length = env::var("UNSLOTH_STUDIO_CONTEXT_LENGTH")
+            .or_else(|_| env::var("LM_STUDIO_CONTEXT_LENGTH"))
             .ok()
             .and_then(|v| v.parse::<i64>().ok());
 
-        let default_temperature = env::var("LM_STUDIO_TEMPERATURE")
+        let default_temperature = env::var("UNSLOTH_STUDIO_TEMPERATURE")
+            .or_else(|_| env::var("LM_STUDIO_TEMPERATURE"))
             .ok()
             .and_then(|v| v.parse::<f64>().ok());
 
-        let default_max_output_tokens = env::var("LM_STUDIO_MAX_OUTPUT_TOKENS")
+        let default_max_output_tokens = env::var("UNSLOTH_STUDIO_MAX_OUTPUT_TOKENS")
+            .or_else(|_| env::var("LM_STUDIO_MAX_OUTPUT_TOKENS"))
             .ok()
             .and_then(|v| v.parse::<i64>().ok());
 
@@ -125,7 +133,7 @@ impl LmStudioConfig {
     /// otherwise falls back to `base_url`.
     pub fn endpoint_url(&self) -> String {
         let base = match self.endpoint {
-            LmStudioEndpoint::MistralRsServe => {
+            UnslothStudioEndpoint::MistralRsServe => {
                 self.serve_base_url.as_deref().unwrap_or(&self.base_url)
             }
             _ => &self.base_url,
@@ -184,7 +192,7 @@ pub struct UnifiedChatRequest {
 impl UnifiedChatRequest {
     /// Builds a request from config defaults, overriding with explicit values.
     pub fn from_config(
-        config: &LmStudioConfig,
+        config: &UnslothStudioConfig,
         user_input: String,
         previous_response_id: Option<String>,
     ) -> Self {

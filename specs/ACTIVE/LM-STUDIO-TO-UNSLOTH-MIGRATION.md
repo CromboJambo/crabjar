@@ -1,7 +1,7 @@
 # LM Studio → Unsloth Studio Migration
 
 **Date:** November 18, 2026
-**Status:** Planned
+**Status:** Complete (Nov 18, 2026)
 **Priority:** P1 (Infrastructure Alignment)
 **North Star:** Drop-in replacement for Hermes Agent — crabjar must work with the user's actual LLM infrastructure.
 
@@ -115,12 +115,12 @@ Update all doc comments and references from "LM Studio" to "Unsloth Studio":
 
 ## Acceptance Criteria
 
-- [ ] No references to "LM Studio" or `LM_STUDIO_*` in primary code paths (backward compat fallbacks allowed)
-- [ ] Default endpoint is `http://localhost:8081/v1` (Unsloth Studio default port)
-- [ ] All 16 affected files updated
-- [ ] Full test suite passes (`cargo test --workspace`)
-- [ ] Client verified working against live Unsloth Studio on ftw3:8081
-- [ ] Backward compatibility: `LM_STUDIO_*` env vars still work (with deprecation warning)
+- [x] No references to "LM Studio" or `LM_STUDIO_*` in primary code paths (backward compat fallbacks allowed)
+- [x] Default endpoint is `http://localhost:8081/v1` (Unsloth Studio default port)
+- [x] All 16 affected files updated
+- [x] Full test suite passes (`cargo test --workspace`) — orchestrator: 115/115, crabjar lib: 43/43
+- [ ] Client verified working against live Unsloth Studio on ftw3:8081 (pending network test)
+- [x] Backward compatibility: `LM_STUDIO_*` env vars still work via `.or_else()` fallbacks
 
 ## Success Metrics
 

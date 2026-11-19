@@ -5,37 +5,37 @@ use serial_test::serial;
 
 #[test]
 fn endpoint_native_path() {
-    let ep = LmStudioEndpoint::Native;
+    let ep = UnslothStudioEndpoint::Native;
     assert_eq!(ep.path(), "/api/v1/chat");
 }
 
 #[test]
 fn endpoint_openai_path() {
-    let ep = LmStudioEndpoint::Openai;
+    let ep = UnslothStudioEndpoint::Openai;
     assert_eq!(ep.path(), "/v1/chat/completions");
 }
 
 #[test]
 fn endpoint_anthropic_path() {
-    let ep = LmStudioEndpoint::Anthropic;
+    let ep = UnslothStudioEndpoint::Anthropic;
     assert_eq!(ep.path(), "/v1/messages");
 }
 
 #[test]
 fn endpoint_native_name() {
-    let ep = LmStudioEndpoint::Native;
+    let ep = UnslothStudioEndpoint::Native;
     assert_eq!(ep.name(), "native");
 }
 
 #[test]
 fn endpoint_openai_name() {
-    let ep = LmStudioEndpoint::Openai;
+    let ep = UnslothStudioEndpoint::Openai;
     assert_eq!(ep.name(), "openai-compat");
 }
 
 #[test]
 fn endpoint_anthropic_name() {
-    let ep = LmStudioEndpoint::Anthropic;
+    let ep = UnslothStudioEndpoint::Anthropic;
     assert_eq!(ep.name(), "anthropic-compat");
 }
 
@@ -45,8 +45,8 @@ fn endpoint_from_env_default() {
     unsafe {
         std::env::remove_var("LM_STUDIO_ENDPOINT");
     }
-    let ep = LmStudioEndpoint::from_env();
-    assert_eq!(ep, LmStudioEndpoint::Openai);
+    let ep = UnslothStudioEndpoint::from_env();
+    assert_eq!(ep, UnslothStudioEndpoint::Openai);
 }
 
 #[test]
@@ -55,8 +55,8 @@ fn endpoint_from_env_native() {
     unsafe {
         std::env::set_var("LM_STUDIO_ENDPOINT", "native");
     }
-    let ep = LmStudioEndpoint::from_env();
-    assert_eq!(ep, LmStudioEndpoint::Native);
+    let ep = UnslothStudioEndpoint::from_env();
+    assert_eq!(ep, UnslothStudioEndpoint::Native);
     unsafe {
         std::env::remove_var("LM_STUDIO_ENDPOINT");
     }
@@ -68,8 +68,8 @@ fn endpoint_from_env_openai() {
     unsafe {
         std::env::set_var("LM_STUDIO_ENDPOINT", "openai");
     }
-    let ep = LmStudioEndpoint::from_env();
-    assert_eq!(ep, LmStudioEndpoint::Openai);
+    let ep = UnslothStudioEndpoint::from_env();
+    assert_eq!(ep, UnslothStudioEndpoint::Openai);
     unsafe {
         std::env::remove_var("LM_STUDIO_ENDPOINT");
     }
@@ -81,8 +81,8 @@ fn endpoint_from_env_anthropic() {
     unsafe {
         std::env::set_var("LM_STUDIO_ENDPOINT", "anthropic");
     }
-    let ep = LmStudioEndpoint::from_env();
-    assert_eq!(ep, LmStudioEndpoint::Anthropic);
+    let ep = UnslothStudioEndpoint::from_env();
+    assert_eq!(ep, UnslothStudioEndpoint::Anthropic);
     unsafe {
         std::env::remove_var("LM_STUDIO_ENDPOINT");
     }
@@ -94,8 +94,8 @@ fn endpoint_from_env_invalid_defaults_to_openai() {
     unsafe {
         std::env::set_var("LM_STUDIO_ENDPOINT", "invalid");
     }
-    let ep = LmStudioEndpoint::from_env();
-    assert_eq!(ep, LmStudioEndpoint::Openai);
+    let ep = UnslothStudioEndpoint::from_env();
+    assert_eq!(ep, UnslothStudioEndpoint::Openai);
     unsafe {
         std::env::remove_var("LM_STUDIO_ENDPOINT");
     }
@@ -112,7 +112,7 @@ fn config_from_env_defaults() {
         std::env::remove_var("LM_API_TOKEN");
     }
 
-    let config = LmStudioConfig::from_env();
+    let config = UnslothStudioConfig::from_env();
     assert_eq!(config.base_url, "http://127.0.0.1:1234");
     assert_eq!(config.default_model, "local-model");
     assert!(config.api_token.is_none());
@@ -123,10 +123,10 @@ fn config_from_env_defaults() {
 
 #[test]
 fn config_endpoint_url_constructed() {
-    let config = LmStudioConfig {
+    let config = UnslothStudioConfig {
         base_url: "http://localhost:1234".to_string(),
         serve_base_url: None,
-        endpoint: LmStudioEndpoint::Openai,
+        endpoint: UnslothStudioEndpoint::Openai,
         api_token: None,
         default_model: "test-model".to_string(),
         default_context_length: None,
@@ -141,10 +141,10 @@ fn config_endpoint_url_constructed() {
 
 #[test]
 fn config_endpoint_url_native() {
-    let config = LmStudioConfig {
+    let config = UnslothStudioConfig {
         base_url: "http://example.com:8080".to_string(),
         serve_base_url: None,
-        endpoint: LmStudioEndpoint::Native,
+        endpoint: UnslothStudioEndpoint::Native,
         api_token: None,
         default_model: "test".to_string(),
         default_context_length: None,
@@ -156,10 +156,10 @@ fn config_endpoint_url_native() {
 
 #[test]
 fn config_endpoint_url_anthropic() {
-    let config = LmStudioConfig {
+    let config = UnslothStudioConfig {
         base_url: "http://example.com:8080".to_string(),
         serve_base_url: None,
-        endpoint: LmStudioEndpoint::Anthropic,
+        endpoint: UnslothStudioEndpoint::Anthropic,
         api_token: None,
         default_model: "test".to_string(),
         default_context_length: None,
@@ -211,10 +211,10 @@ fn unified_message_clone_works() {
 
 #[test]
 fn unified_chat_request_from_config() {
-    let config = LmStudioConfig {
+    let config = UnslothStudioConfig {
         base_url: "http://localhost:1234".to_string(),
         serve_base_url: None,
-        endpoint: LmStudioEndpoint::Openai,
+        endpoint: UnslothStudioEndpoint::Openai,
         api_token: Some("token".to_string()),
         default_model: "test-model".to_string(),
         default_context_length: Some(4096),
@@ -231,10 +231,10 @@ fn unified_chat_request_from_config() {
 
 #[test]
 fn unified_chat_request_from_config_with_prev_id() {
-    let config = LmStudioConfig {
+    let config = UnslothStudioConfig {
         base_url: "http://localhost:1234".to_string(),
         serve_base_url: None,
-        endpoint: LmStudioEndpoint::Native,
+        endpoint: UnslothStudioEndpoint::Native,
         api_token: None,
         default_model: "test-model".to_string(),
         default_context_length: None,
@@ -421,7 +421,7 @@ fn reasoning_level_serde() {
 
 #[test]
 fn endpoint_mistralrs_path() {
-    let ep = LmStudioEndpoint::MistralRsServe;
+    let ep = UnslothStudioEndpoint::MistralRsServe;
     assert_eq!(ep.path(), "/v1/chat/completions");
     assert_eq!(ep.name(), "mistralrs-serve");
 }
@@ -431,8 +431,8 @@ fn endpoint_mistralrs_from_env() {
     unsafe {
         std::env::set_var("LM_STUDIO_ENDPOINT", "mistralrs");
     }
-    let ep = LmStudioEndpoint::from_env();
-    assert_eq!(ep, LmStudioEndpoint::MistralRsServe);
+    let ep = UnslothStudioEndpoint::from_env();
+    assert_eq!(ep, UnslothStudioEndpoint::MistralRsServe);
     unsafe {
         std::env::remove_var("LM_STUDIO_ENDPOINT");
     }
@@ -440,10 +440,10 @@ fn endpoint_mistralrs_from_env() {
 
 #[test]
 fn config_endpoint_url_mistralrs_default() {
-    let config = LmStudioConfig {
+    let config = UnslothStudioConfig {
         base_url: "http://localhost:1234".to_string(),
         serve_base_url: None,
-        endpoint: LmStudioEndpoint::MistralRsServe,
+        endpoint: UnslothStudioEndpoint::MistralRsServe,
         api_token: None,
         default_model: "test".to_string(),
         default_context_length: None,
@@ -459,10 +459,10 @@ fn config_endpoint_url_mistralrs_default() {
 
 #[test]
 fn config_endpoint_url_mistralrs_with_serve() {
-    let config = LmStudioConfig {
+    let config = UnslothStudioConfig {
         base_url: "http://localhost:1234".to_string(),
         serve_base_url: Some("http://localhost:8081".to_string()),
-        endpoint: LmStudioEndpoint::MistralRsServe,
+        endpoint: UnslothStudioEndpoint::MistralRsServe,
         api_token: None,
         default_model: "test".to_string(),
         default_context_length: None,
@@ -487,7 +487,7 @@ fn config_from_env_with_all_vars() {
         std::env::set_var("MISTRALRS_SERVE_URL", "http://serve:8081");
     }
 
-    let config = LmStudioConfig::from_env();
+    let config = UnslothStudioConfig::from_env();
     assert_eq!(config.base_url, "http://custom:9999");
     assert_eq!(config.default_model, "my-model");
     assert_eq!(config.default_context_length, Some(8192));

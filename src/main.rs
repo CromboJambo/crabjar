@@ -408,7 +408,7 @@ fn usage_lines() -> &'static [&'static str] {
         "crabjar guard revoke --pid=<pid>",
         "crabjar bitwarden <subcommand>",
         "crabjar doctor check",
-        "crabjar backend set --backend=<lm-studio|native>",
+        "crabjar backend set --backend=<unsloth-studio|native>",
         "crabjar backend get",
         "crabjar attempts status",
         "crabjar attempts rewind <commit> [--workdir <dir>] [--trunk <sha>] [--dry-run]",
