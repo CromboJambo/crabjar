@@ -6,9 +6,13 @@ This document tracks **upcoming** crabjar development priorities. Completed work
 
 **Full P1 + P2 tool parity achieved.** All 25 core Hermes Agent tools at ✅ — crabjar is a drop-in replacement for Hermes Agent's tool surface. Version 0.13.0 shipped with complete first-class implementations of execute_code, terminal, file tools (read/write/patch/search), delegate_task (full spawn/list/steer/stop/continue lifecycle), session_search (FTS5), and all P2 productivity tools.
 
+**v0.14.0 adds the Waypoint Navigation System** — durable navigational objects for agent context management (`crates/memory/src/waypoints/`). Implements WAYPOINT-SYSTEM spec (P1): SQLite-backed waypoints with categories, recoverability states, freshness checks, and nearest-neighbor orientation. 16 unit tests, all under 500 LoC CI gate.
+
+**Test suite fully stabilized.** Fixed pre-existing compilation and runtime failures across conductor, vision, guard, and terrarium crates (edition 2024 module resolution, missing migrations, broken test data). Full workspace test suite now passes with zero failures.
+
 New crates added: `crabjar-vision` (image analysis), `crabjar-exec` (Rust code execution engine), `crabjar-browser-vault` (Bitwarden credential bridge). Module size governance enforced via CI gate (`just module-sizes-check`, 500 LoC limit) — all 11 oversized modules split.
 
-See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complete parity assessment.
+See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complete parity assessment. Active architectural specs in `specs/ACTIVE/`: LINEAGE-PROVENANCE (P1), POSITIVE-BOUNDARY-MODEL (P1), LOSS-ACCOUNTING (P2), OBSERVER-WORKER-STATE (P2), CRATE-PUBLISHING-STRATEGY (operational).
 
 ## Production Readiness Phase
 

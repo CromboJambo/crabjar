@@ -2,6 +2,28 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 19, 2026 — v0.14.0: Waypoint Navigation System and Test Stabilization
+
+### WAYPOINT-SYSTEM (P1 Spec)
+New durable navigational objects for agent context management (`crates/memory/src/waypoints/`):
+- **Data model** (`models.rs`) — `Waypoint`, `WaypointCategory`, `Recoverability` enums with strict parsing (`parse()` not `from_str()`)
+- **SQLite schema** (`schema.rs`) — migration for `waypoints` table in existing `crabjar-state` ledger
+- **Navigator trait + SQLite impl** (`navigator.rs`) — create, update, set_root, find_nearest, check_freshness (strict `<` threshold)
+- **16 unit tests** covering orientation flow, freshness checks, category parsing, recoverability states
+- Total: 7 files, 1177 lines. All under 500 LoC CI gate (tests extracted to `navigator/tests.rs`)
+
+### Test Suite Stabilization
+Fixed pre-existing test compilation and runtime failures across 4 crates:
+- **`crabjar-conductor`** — Added `#[path]` attributes for sibling test modules (edition 2024 requirement), fixed `use super::*` scope resolution, added missing `deployment_artifacts` table migration, fixed tests to use actual deployment IDs instead of hardcoded values
+- **`crabjar-vision`** — Removed duplicate `mod tests` declaration, added missing imports for `VisionClient`, `VisionConfig`, `VisionError`, `crop_image_region`
+- **`crabjar-guard`** — Added `#[path]` attribute for `action_tests.rs`, fixed scope resolution
+- **`terrarium`** — Added `#[path]` attribute for `ui_tests.rs`
+
+Result: full workspace test suite passes with zero failures (previously 5 runtime failures + multiple compilation errors).
+
+### Formatting
+Applied rustfmt to 41 files across orchestrator tools, code-audit analyzers, guard tests, conductor API/state store tests, exec pipeline, browser-vault, delegation, web-extract, podman, and crabjar-exec bindings.
+
 ## November 18, 2026 — v0.13.0: Full Tool Parity and Module Governance
 
 ### Tool Parity Complete (P1 + P2)
