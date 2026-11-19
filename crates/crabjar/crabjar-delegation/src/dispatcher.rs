@@ -118,7 +118,11 @@ impl TaskDispatcher {
 
     /// Continue a finished task with a follow-up message.
     #[allow(clippy::unused_async)] // Stub awaiting conductor endpoint
-    pub async fn continue_task(&self, _task_id: &str, _message: &str) -> Result<(), DelegationError> {
+    pub async fn continue_task(
+        &self,
+        _task_id: &str,
+        _message: &str,
+    ) -> Result<(), DelegationError> {
         // TODO: Implement when conductor adds goal continuation
         Ok(())
     }

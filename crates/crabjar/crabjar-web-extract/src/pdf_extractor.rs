@@ -27,16 +27,17 @@ impl PdfExtractor {
     }
 
     /// Extract text content from a PDF URL.
-    pub async fn extract(&self, url: &str, char_limit: usize) -> Result<ExtractResult, WebExtractError> {
+    pub async fn extract(
+        &self,
+        url: &str,
+        char_limit: usize,
+    ) -> Result<ExtractResult, WebExtractError> {
         debug!(url, "Downloading PDF for extraction");
 
         // Download the PDF
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| WebExtractError::HttpRequestFailed(format!("Failed to download PDF: {}", e)))?;
+        let response = self.client.get(url).send().await.map_err(|e| {
+            WebExtractError::HttpRequestFailed(format!("Failed to download PDF: {}", e))
+        })?;
 
         if !response.status().is_success() {
             return Err(WebExtractError::NetworkError(format!(
@@ -45,12 +46,15 @@ impl PdfExtractor {
             )));
         }
 
-        let pdf_bytes = response
-            .bytes()
-            .await
-            .map_err(|e| WebExtractError::HttpRequestFailed(format!("Failed to read PDF bytes: {}", e)))?;
+        let pdf_bytes = response.bytes().await.map_err(|e| {
+            WebExtractError::HttpRequestFailed(format!("Failed to read PDF bytes: {}", e))
+        })?;
 
-        debug!(url, size = pdf_bytes.len(), "PDF downloaded, extracting text");
+        debug!(
+            url,
+            size = pdf_bytes.len(),
+            "PDF downloaded, extracting text"
+        );
 
         // Extract text using pdf-extract
         let text = extract_text_from_mem(&pdf_bytes)
@@ -62,7 +66,12 @@ impl PdfExtractor {
         // Apply character limit with head+tail truncation
         let (content, truncated) = truncate_content(&cleaned, char_limit);
 
-        debug!(url, chars = content.len(), truncated, "PDF extraction complete");
+        debug!(
+            url,
+            chars = content.len(),
+            truncated,
+            "PDF extraction complete"
+        );
 
         Ok(ExtractResult {
             url: url.to_string(),

@@ -11,10 +11,7 @@ pub enum VaultError {
 
     /// The Bitwarden CLI returned a non-zero exit code.
     #[error("Bitwarden CLI error (exit {code}): {stderr}")]
-    CliError {
-        code: i32,
-        stderr: String,
-    },
+    CliError { code: i32, stderr: String },
 
     /// The requested credential was not found.
     #[error("Credential not found: {0}")]

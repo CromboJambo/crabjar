@@ -99,7 +99,10 @@ impl SandboxConfig {
 
     /// Enable GPU passthrough for this sandbox.
     pub fn with_gpu_passthrough(mut self, devices: Vec<String>, privileged: bool) -> Self {
-        self.gpu = Some(GpuConfig { devices, privileged });
+        self.gpu = Some(GpuConfig {
+            devices,
+            privileged,
+        });
         self
     }
 }

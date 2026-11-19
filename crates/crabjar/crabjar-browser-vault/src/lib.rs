@@ -135,7 +135,8 @@ impl VaultItem {
 fn extract_hostname(url: &str) -> Option<String> {
     // Handle URLs with or without scheme
     let cleaned = if url.starts_with("http://") || url.starts_with("https://") {
-        url.trim_start_matches("https://").trim_start_matches("http://")
+        url.trim_start_matches("https://")
+            .trim_start_matches("http://")
     } else {
         url
     };
@@ -171,7 +172,10 @@ impl BrowserVaultClient {
 
         let status: serde_json::Value =
             serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
-        let is_unlocked = status.get("unlocked").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_unlocked = status
+            .get("unlocked")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         Ok(is_unlocked)
     }
@@ -355,7 +359,10 @@ mod tests {
 
     #[test]
     fn test_extract_hostname_with_scheme() {
-        assert_eq!(extract_hostname("https://github.com"), Some("github.com".to_string()));
+        assert_eq!(
+            extract_hostname("https://github.com"),
+            Some("github.com".to_string())
+        );
         assert_eq!(
             extract_hostname("http://example.com/path"),
             Some("example.com".to_string())
@@ -364,7 +371,10 @@ mod tests {
 
     #[test]
     fn test_extract_hostname_without_scheme() {
-        assert_eq!(extract_hostname("github.com"), Some("github.com".to_string()));
+        assert_eq!(
+            extract_hostname("github.com"),
+            Some("github.com".to_string())
+        );
         assert_eq!(
             extract_hostname("example.com/some/path"),
             Some("example.com".to_string())
