@@ -153,3 +153,9 @@ jobs:
         sudo apt-get install -y pkg-config libglib2.0-dev libgdk-pixbuf2.0-dev libnotify-dev
     - name: Run full E2E integration suite (~5min)
       run: cargo test --test e2e_full --release
+  semver-check:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v4
+    - name: Validate semver discipline
+      run: bash tools/semver-check.sh

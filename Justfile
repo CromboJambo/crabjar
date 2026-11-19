@@ -131,3 +131,7 @@ dep-audit-quick:
 # Validate all skills against documentation standards
 validate-skills:
     python scripts/validate-skills.py
+
+# Validate semver discipline (workspace + leaf crate versions)
+semver-check:
+    bash tools/semver-check.sh

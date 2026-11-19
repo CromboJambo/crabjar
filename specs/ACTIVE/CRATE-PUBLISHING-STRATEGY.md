@@ -166,6 +166,40 @@ Publish in this order (dependencies first):
 - **Publish cadence**: Batch publish after significant feature work, not on every commit.
 - **Changelog**: Each crate should have a `CHANGELOG.md` (or use the workspace-level one with per-crate sections).
 
+### 3.4 Semver Policy (Enforced)
+
+**Workspace version** (`Cargo.toml` `[workspace.package].version`):
+- **Patch** (0.14.x → 0.14.y): Bug fixes, test fixes, formatting, doc updates, spec archival
+- **Minor** (0.14.x → 0.15.0): New features, new modules, new tools, new specs implemented — no breaking changes to existing APIs
+- **Major-ish** (still 0.x): Architectural shifts that break internal contracts between crates
+
+**Leaf crate versions** (Tier 1, independent tracks):
+- Start at **0.1.0** regardless of workspace version
+- Bump independently based on their own API changes
+- Must NOT use `version.workspace = true` — they publish independently
+
+**Enforcement rules:**
+1. Every version bump MUST have a corresponding CHANGELOG.md entry
+2. Leaf crates (Tier 1) MUST have explicit versions, never `workspace = true`
+3. Version format MUST be valid semver (`MAJOR.MINOR.PATCH`)
+4. No version may be published twice to crates.io (cargo enforces this)
+
+**Enforcement mechanism:**
+- **Local**: `just semver-check` — validates version consistency before commit
+- **CI**: GitHub Actions job runs `tools/semver-check.sh` on every PR
+- **Pre-publish**: `cargo publish --dry-run` catches path deps and missing fields
+
+```bash
+# Run locally before committing version changes
+just semver-check
+
+# What it checks:
+# 1. Workspace version is valid semver
+# 2. Tier 1 leaf crates have explicit versions (not workspace = true)
+# 3. Leaf crate versions are valid semver
+# 4. No duplicate version tags in git history
+```
+
 ## §4 Migration from Git Dependencies
 
 Projects currently using git dependencies (`branch = "main"`) can migrate to registry deps once crates are published:
