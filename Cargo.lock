@@ -77,7 +77,7 @@ dependencies = [
 
 [[package]]
 name = "agent-context"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -139,7 +139,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "analyze-apk"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "analyze-common",
  "chrono",
@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "analyze-common"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "serde",
@@ -161,7 +161,7 @@ dependencies = [
 
 [[package]]
 name = "analyze-dotnet"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "analyze-common",
  "chrono",
@@ -172,7 +172,7 @@ dependencies = [
 
 [[package]]
 name = "analyze-firmware"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "analyze-common",
  "chrono",
@@ -186,7 +186,7 @@ dependencies = [
 
 [[package]]
 name = "analyze-har"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "analyze-common",
  "chrono",
@@ -198,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "analyze-js"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "analyze-common",
  "chrono",
@@ -227,7 +227,7 @@ dependencies = [
 
 [[package]]
 name = "analyze-native"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "analyze-common",
  "regex",
@@ -2109,7 +2109,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "agent-context",
  "cargo-declared",
@@ -2154,7 +2154,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-analyze"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "analyze-apk",
  "analyze-common",
@@ -2176,7 +2176,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-app-teams"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2193,7 +2193,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-architecture"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "path-absolutize",
@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-browser-vault"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -2313,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-compress"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "insta",
  "regex",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-conductor"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "axum 0.8.9",
@@ -2370,7 +2370,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-cron"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2386,7 +2386,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-delegation"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "reqwest 0.13.5",
@@ -2400,11 +2400,11 @@ dependencies = [
 
 [[package]]
 name = "crabjar-deploy"
-version = "0.12.5"
+version = "0.14.0"
 
 [[package]]
 name = "crabjar-durable-objects"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2419,7 +2419,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-email-smtp"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2436,7 +2436,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-exec"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "crabjar-memory",
@@ -2454,7 +2454,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-git"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "git2",
@@ -2497,7 +2497,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-guard"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "rusqlite",
@@ -2566,7 +2566,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-host-agent"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2589,7 +2589,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-host-core"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2607,7 +2607,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-host-observe"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "crabjar-host-core",
@@ -2625,7 +2625,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-host-system"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "arboard",
  "chrono",
@@ -2643,7 +2643,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-host-webview"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -2685,7 +2685,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-mcp-tool-registry"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "crabjar-tool-registry",
@@ -2699,7 +2699,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-memory"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2713,7 +2713,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-plugin"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2747,7 +2747,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-review"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "git2",
@@ -2762,7 +2762,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-sandbox"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "path-absolutize",
@@ -2778,7 +2778,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-scheduler"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "crabjar-guard",
@@ -2808,7 +2808,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-skills"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2819,7 +2819,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-ssh-bastion"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2844,7 +2844,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-structured-aux"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2859,7 +2859,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-telemetry"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "base64 0.22.1",
  "bitcode",
@@ -2886,7 +2886,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-terminal"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2903,7 +2903,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-tool-binding"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "crabjar-skills",
  "crabjar-tool-registry",
@@ -2916,7 +2916,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-tool-registry"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "path-absolutize",
@@ -2934,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-train-dedup"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "clap",
@@ -2966,7 +2966,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-train-filewatcher"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "clap",
@@ -2983,7 +2983,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-train-secret-stripper"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "clap",
  "regex",
@@ -3020,7 +3020,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-vision"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3036,7 +3036,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-web-extract"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "pdf-extract",
  "reqwest 0.13.5",
@@ -3064,7 +3064,7 @@ dependencies = [
 
 [[package]]
 name = "crabjar-worker"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3630,7 +3630,7 @@ checksum = "5729f5117e208430e437df2f4843f5e5952997175992d1414f94c57d61e270b4"
 
 [[package]]
 name = "deploy"
-version = "0.12.5"
+version = "0.14.0"
 
 [[package]]
 name = "der"
@@ -5488,7 +5488,7 @@ dependencies = [
 
 [[package]]
 name = "hermes-wrapper"
-version = "0.12.5"
+version = "0.14.0"
 
 [[package]]
 name = "hermit-abi"
@@ -5582,7 +5582,7 @@ dependencies = [
 
 [[package]]
 name = "host-graph"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5600,7 +5600,7 @@ dependencies = [
 
 [[package]]
 name = "host-mqtt"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5618,7 +5618,7 @@ dependencies = [
 
 [[package]]
 name = "host-screen"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7900,7 +7900,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "orchestrator"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "agent-context",
  "anyhow",
@@ -10668,7 +10668,7 @@ checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "skill-process-management"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -10682,7 +10682,7 @@ dependencies = [
 
 [[package]]
 name = "skill-reference-store"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -10697,7 +10697,7 @@ dependencies = [
 
 [[package]]
 name = "skill-script-runner"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "ignore",
@@ -10738,7 +10738,7 @@ dependencies = [
 
 [[package]]
 name = "slow-friend"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "chrono",
  "serde",
@@ -12391,7 +12391,7 @@ dependencies = [
 
 [[package]]
 name = "universal-structure"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "object 0.36.7",
  "pesti-structural-tokenizer",
@@ -12579,7 +12579,7 @@ dependencies = [
 
 [[package]]
 name = "vm-core"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -14369,7 +14369,7 @@ dependencies = [
 
 [[package]]
 name = "zed-acp-bridge"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "agent-context",
  "chrono",
@@ -14385,7 +14385,7 @@ dependencies = [
 
 [[package]]
 name = "zed-acp-server"
-version = "0.12.5"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",

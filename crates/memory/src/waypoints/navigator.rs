@@ -1,7 +1,7 @@
 use crate::error::{Error, Result};
 use crate::waypoints::models::*;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde_json;
 use std::sync::Mutex;
 

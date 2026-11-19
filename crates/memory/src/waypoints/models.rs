@@ -286,11 +286,7 @@ impl Waypoint {
     /// This is a placeholder — actual implementation needs DB access.
     pub fn ancestry_depth(&self) -> i64 {
         // Without DB access, we can only report direct predecessor existence.
-        if self.predecessor.is_some() {
-            1
-        } else {
-            0
-        }
+        if self.predecessor.is_some() { 1 } else { 0 }
     }
 }
 

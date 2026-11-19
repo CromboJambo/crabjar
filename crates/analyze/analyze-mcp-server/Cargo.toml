@@ -10,11 +10,11 @@ name = "analyze-mcp"
 path = "src/main.rs"
 
 [dependencies]
-analyze-common = { path = "../analyze-common", version = "0.12.4" }
-analyze-native = { path = "../analyze-native", version = "0.12.4" }
-analyze-har = { path = "../analyze-har", version = "0.12.4" }
-analyze-js = { path = "../analyze-js", version = "0.12.4" }
-analyze-apk = { path = "../analyze-apk", version = "0.12.4" }
+analyze-common = { path = "../analyze-common" }
+analyze-native = { path = "../analyze-native" }
+analyze-har = { path = "../analyze-har" }
+analyze-js = { path = "../analyze-js" }
+analyze-apk = { path = "../analyze-apk" }
 rmcp = { version = "3.5", features = ["server"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
