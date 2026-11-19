@@ -2,6 +2,30 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 19, 2026 — v0.14.1: Spec Completion and Crate Versioning Cleanup
+
+### Architecture Specs Completed (P1 + P2)
+All P1/P2 architectural specs implemented and archived to `specs/IMPLemented/`:
+- **LINEAGE-PROVENANCE** (`cf15023`) — Provenance tracking for agent context lineage
+- **POSITIVE-BOUNDARY-MODEL** (`554cd27`) — Capability broker in guard crate, positive grant model with intersection semantics and expiring capabilities
+- **LOSS-ACCOUNTING** (`98c6670`) — Compression loss estimation and fidelity profiles
+- **OBSERVER-WORKER-STATE** (`3d59f5e`) — Observer pattern for worker lifecycle state tracking (144 tests)
+- **P2-1-MEMORY-COMPAT-LAYER** (`c8744f0`) — Hermes-compatible memory format integration tests (25/25 passing)
+- **P2-3-SKILL-ECOSYSTEM** — All 29 priority skills ported (60 total in `.agents/skills/`)
+- **HOME-ASSISTANT-TOOLS-P2-2** — `crabjar-homeassistant` crate + orchestrator integration
+- **SUPERVISOR-DEPLOYMENT-READINESS** — Phases 1-3 core complete, validated on 3 nodes
+- **JEV Structural Phases** (phase1/phase2) — Implemented in `crates/universal-structure/`
+
+### Crate Versioning Cleanup
+Tier 1 leaf crates now version independently from their own 0.1.0 tracks:
+- `crabjar-guard`, `crabjar-sandbox`, `agent-context`, `crabjar-memory`
+- `crabjar-web-search`, `crabjar-web-extract`, `crabjar-telemetry`, `crabjar-terminal`
+
+These crates have no internal dependencies and can be published to crates.io independently of the workspace version. Per `specs/ACTIVE/CRATE-PUBLISHING-STRATEGY.md`.
+
+### Spec Archive
+Archived 12 completed specs to `specs/IMPLemented/`. Only `CRATE-PUBLISHING-STRATEGY` remains ACTIVE (reference doc for future publishing).
+
 ## November 19, 2026 — v0.14.0: Waypoint Navigation System and Test Stabilization
 
 ### WAYPOINT-SYSTEM (P1 Spec)
