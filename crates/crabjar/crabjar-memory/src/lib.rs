@@ -21,7 +21,7 @@ pub mod tool;
 pub use capacity::MemoryCapacity;
 pub use error::{MemoryError, MemoryResult};
 pub use store::{MemoryStore, MemoryTarget};
-pub use tool::{MemoryAction, MemoryTool, MemoryToolInput};
+pub use tool::{MemoryAction, MemoryOperation, MemoryTool, MemoryToolInput};
 
 /// Character limit for MEMORY.md (agent notes)
 pub const MEMORY_CHAR_LIMIT: usize = 2200;
