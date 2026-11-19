@@ -5,6 +5,7 @@ pub mod models;
 pub mod schema;
 pub mod state_docs;
 pub mod store;
+pub mod waypoints;
 
 pub use context::{
     ContextBudget, ContextError, ContextFragment, ContextFragmentBuilder, ContextQueryResult,
@@ -17,3 +18,4 @@ pub use state_docs::models::{
     Annotation, CodeBlock, ConfidenceAssessment, DocMetadata, Section, Table,
 };
 pub use store::Store;
+pub use waypoints::{SqliteWaypointNavigator, Waypoint, WaypointCategory, WaypointId};
