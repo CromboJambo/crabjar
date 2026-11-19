@@ -2,6 +2,68 @@
 
 All notable changes to crabjar, organized chronologically. Completed work moves here from ROADMAP.md as it ships.
 
+## November 18, 2026 — v0.13.0: Full Tool Parity and Module Governance
+
+### Tool Parity Complete (P1 + P2)
+All 25 core Hermes Agent tools now at ✅ parity. This release closes every P1 drop-in replacement blocker and all P2 productivity gaps.
+
+**First-class tool implementations:**
+- **`execute_code`** — Python execution with persistent kernel, `hermes_tools` API (web_search, web_extract, read_file, write_file, search_files, patch, terminal), 5-min timeout, 50-call limit
+- **`terminal`** — Foreground/background execution with timeouts (max 600s foreground), PTY support for interactive CLIs, process tracking via `process_manage`, notify/heartbeat for background jobs, `persist_on_release` for durable sessions
+- **File tools** — `read_file` (pagination, auto-extraction of PDF/Office/ipynb/SQLite), `write_file` (syntax checking, overwrite protection), `patch` (fuzzy matching, 9 strategies), `search_files` (ripgrep-backed content and filename search)
+- **`delegate_task`** — Full Hermes API: spawn (up to 5 concurrent, output_schema validation), list, steer (mid-run course correction), stop, continue (follow-up to finished children). Subagent profiles, depth limiting (max 3), self-reported summary verification
+- **`session_search`** — FTS5 full-text search across session history with keyword expansion and recency weighting
+- **`process_manage`** — Full lifecycle: list, kill, restart, status, output streaming for tracked background processes
+- **`clarify`** — Multi-question forms (1-5 questions per call), single-select/multi-select/open-ended, recommended option highlighting
+- **`manage_catalog`** — MCP tool catalog management: discover, register, validate, query tools across connected servers
+- **`react_to_message`** — Emoji reactions to messages with tapback semantics
+- **`video_analyze`** — Video content analysis via frame extraction + vision models
+
+**Upgrades to existing tools:**
+- **`web_extract`** — Added PDF text extraction (arxiv papers, documents) as first-class input
+- **`vision_analyze`** — Region cropping (`region: [x1,y1,x2,y2]`) for zooming into small text/fine detail; full image + cropped region both supported
+- **`browser_exec`** — `browser_login` tool added for login-wall integration with credential vault
+- **`memory`** — Verified full Hermes API compatibility (batch operations, atomic apply, char budget enforcement)
+
+### New Crates
+- **`crabjar-vision`** — Image analysis via LLM vision models (OpenAI-compatible API). Supports local file paths, HTTP URLs, data: URLs. Region cropping with coordinate mapping back to original image space. 807→split into lib.rs + vision_types.rs
+- **`crabjar-exec`** — Rust-first code execution engine for `execute_code` tool. Persistent Python kernel via subprocess, structured result return (stdout, exit_code, error), timeout enforcement
+- **`crabjar-browser-vault`** — Bitwarden credential access for browser automation. Zero-knowledge secrets bridge: credentials never leave the vault in plaintext; injected directly into browser session context
+
+### Module Size Governance (CI Gate)
+Split 11 oversized modules (>500 LoC) to pass `just module-sizes-check`:
+- `code-audit/static_code.rs` (919→split by AST helper strategies)
+- `crabjar-vision/lib.rs` (807→lib.rs + vision_types.rs)
+- `guard/guard_db_queries.rs` (641→+ guard_db_queries_extra.rs)
+- `guard/action.rs` (621→+ action_types.rs)
+- `bitwarden-mcp/main.rs` (582→+ bitwarden_handlers.rs)
+- `commands/exec.rs` (555→+ exec_mirror.rs)
+- `conductor/api/workers.rs` (552→+ deployments.rs)
+- `conductor/state_store/workers.rs` (551→+ worker_state.rs)
+- `orchestrator/tools/patch.rs` (540→+ patch_strategies.rs)
+- `guard/guard_db_impl.rs` (536→+ guard_db_handoffs.rs)
+- `memory/state_docs/querier.rs` (529→+ state_doc_querier_impl.rs)
+
+### Security & CI Hardening
+- **cargo-audit** — Automated dependency security audit in CI on every PR
+- **ADR-045 red team tests** — Regression test suite for security model changes
+- **Clippy cleanup** — 158 warnings fixed across workspace; `-- -D warnings` now passes clean
+- **E2E nightly** — Full integration test suite scheduled nightly via GitHub Actions
+- **Boundary tests** — Fixed architecture boundary test path resolution and crate mappings
+- **Test isolation** — Fixed parallel workspace test failures
+
+### Documentation
+- **FEATURE-PARITY-HERMES.md** — Complete tool surface parity assessment (52 ✅ marks)
+- **LM Studio → Unsloth Studio migration spec** — Migration path for local LLM infrastructure
+- **Conductor API docs** — Marked endpoints as implemented vs planned, corrected base URLs
+- **Parity reclassification** — P2/P3 gap priorities updated based on user input (image gen → P3)
+
+### Parity Status
+- **Core tools:** 25/25 at ✅ (100%)
+- **P1 blockers:** All complete
+- **P2 gaps:** All closed
+- **Remaining (P3):** Image generation, desktop project management, mirror-log attention tracking
+
 ## November 7, 2026 — v0.12.7: JEV Evolution System and pesti Integration
 
 ### JEV Decision Evolution System

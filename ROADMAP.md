@@ -4,9 +4,11 @@ This document tracks **upcoming** crabjar development priorities. Completed work
 
 ## Current State (November 2026)
 
-All P1 drop-in replacement blockers are complete. crabjar provides feature parity with Hermes Agent's core tooling suite. Recent focus has been on security hardening (ADR-045 red team analysis), clippy cleanup, dynamic component loading infrastructure (v0.12.6), and pre-release preparation.
+**Full P1 + P2 tool parity achieved.** All 25 core Hermes Agent tools at ✅ — crabjar is a drop-in replacement for Hermes Agent's tool surface. Version 0.13.0 shipped with complete first-class implementations of execute_code, terminal, file tools (read/write/patch/search), delegate_task (full spawn/list/steer/stop/continue lifecycle), session_search (FTS5), and all P2 productivity tools.
 
-See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complete gap analysis.
+New crates added: `crabjar-vision` (image analysis), `crabjar-exec` (Rust code execution engine), `crabjar-browser-vault` (Bitwarden credential bridge). Module size governance enforced via CI gate (`just module-sizes-check`, 500 LoC limit) — all 11 oversized modules split.
+
+See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complete parity assessment.
 
 ## Production Readiness Phase
 
@@ -26,9 +28,9 @@ See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complet
 - [ ] Memory usage optimization for long-running orchestrator instances
 
 ### Comprehensive Integration Test Matrix
-- [ ] Cross-crate integration test coverage expansion
-- [ ] E2E test slices wired into GitHub Actions (smoke on PR, full on merge/nightly)
-- [ ] Regression test suite for security model changes
+- [x] Cross-crate integration test coverage — **complete** (commit c2562ff)
+- [x] E2E test slices in GitHub Actions — **complete**: smoke on PR, full nightly schedule (commit e27bf1b)
+- [x] Regression test suite for security model changes — **complete** (ADR-045 red team tests, commit 4a2ae08)
 
 ### Documentation Overhaul
 - [ ] End-user documentation for TUI and CLI workflows
@@ -36,9 +38,9 @@ See [FEATURE-PARITY-HERMES.md](./specs/FEATURE-PARITY-HERMES.md) for the complet
 - [ ] Deployment guides for fleet coordination setup
 
 ### CI/CD Pipeline Hardening
+- [x] Dependency security audit automation — **complete** (cargo-audit job on every PR, commit e415b24)
 - [ ] Automated snapshot review in CI (insta baseline updates)
 - [ ] Reproducible build verification on every PR
-- [ ] Dependency security audit automation (cargo-audit integration)
 
 ## Nice-to-Have Features (P3 Differentiation)
 

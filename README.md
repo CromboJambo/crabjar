@@ -2,7 +2,7 @@
 
 An execution framework where agents calibrate their own confidence, test their assumptions against reality, and build knowledge through relationships rather than flat assertions.
 
-Multi-agent orchestration with execution gating, trust layers, and knowledge compression. Drop-in replacement for Hermes Agent if that's what you need.
+Multi-agent orchestration with execution gating, trust layers, and knowledge compression. Full tool parity with Hermes Agent — 25/25 core tools implemented natively in Rust.
 
 ## The Idea
 
@@ -32,12 +32,13 @@ Use `just` for all workflows — see [Justfile](./Justfile).
 | Path | Purpose |
 |------|---------|
 | `src/` | CLI entry point + shared library surface |
-| `memory/` | Agent-context SQLite storage + state-docs querier |
-| `guard/` | Execution gate, trust layers, scope isolation |
-| `orchestrator/` | Axum SSE server (ACP orchestrator) |
-| `host/host-agent/` | ReAct agent loop with model routing |
-| `crabjar-conductor/` | Fleet coordination layer |
-| `apps/` | Standalone host applications (teams, terrarium) |
+| `crates/guard/` | Execution gate, trust layers, scope isolation |
+| `crates/memory/` | Agent-context SQLite storage + state-docs querier |
+| `crates/orchestrator/` | Axum SSE server (ACP orchestrator) + tool dispatch |
+| `crates/crabjar/` | Capability crates: conductor, vision, exec, browser-vault, delegation, etc. |
+| `host/` | Host applications and ReAct agent loop |
+| `apps/` | Standalone applications (teams, terrarium) |
+| `mcps/` | MCP servers (bitwarden, kdeconnect, ssh-file) |
 | `state-docs/` | Durable Markdown state documentation |
 
 ## Documentation
@@ -90,7 +91,7 @@ The chicken-and-egg problem: how can an agent self-correct if it can't identify 
 
 ## Version
 
-0.12.6
+0.13.0
 
 ## Repository
 
