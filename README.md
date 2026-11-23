@@ -96,3 +96,6 @@ The chicken-and-egg problem: how can an agent self-correct if it can't identify 
 ## Repository
 
 https://github.com/crombojambo/crabjar
+---
+
+**Contact**: [projects@crombo.dev](mailto:projects@crombo.dev) · **Security**: [Private vulnerability reporting](https://github.com/CromboJambo/crabjar/security/advisories/new)
