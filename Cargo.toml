@@ -70,6 +70,8 @@ members = [
     # PESTI structural tokenization (vendored from pesti repo for CI self-containment)
     "crates/pesti-structural-tokenizer",
     "crates/pesti-structural",
+    # Resource supervisor client (vendored from riod repo for CI self-containment)
+    "crates/riod-client",
     # SSH bastion host using russh (transparent proxy, no client app needed)
     "crates/ssh-bastion", "vm/vm-core", "crates/crabjar/crabjar-conductor", "crates/crabjar/crabjar-worker", "crates/crabjar/crabjar-durable-objects",
  "crates/crabjar/crabjar-analyze", "crates/crabjar/crabjar-review", "crates/crabjar/crabjar-mcp-tool-registry",    "crates/crabjar/crabjar-web-search",
