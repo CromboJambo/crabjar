@@ -326,3 +326,6 @@ crabjar-memory = { path = "crates/crabjar/crabjar-memory" }
 universal-structure = { path = "crates/universal-structure" }
 serial_test.workspace = true
 
+[patch.crates-io]
+xattr = { path = "patches/xattr-0.2.3" }
+
