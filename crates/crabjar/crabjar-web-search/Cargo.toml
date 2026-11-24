@@ -3,6 +3,7 @@ name = "crabjar-web-search"
 version = "0.1.0"
 edition.workspace = true
 description = "Web search tooling for crabjar agents"
+readme = "README.md"
 license.workspace = true
 
 [dependencies]
