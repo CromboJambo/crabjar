@@ -1,0 +1,19 @@
+[package]
+name = "phone-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified phone MCP — KDE Connect + SSH file access for the Pixel 9a"
+
+[[bin]]
+name = "phone-mcp"
+path = "src/main.rs"
+
+[dependencies]
+rmcp = { version = "3.5", features = ["server"] }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+anyhow = "1.0"
+base64 = "0.22"
