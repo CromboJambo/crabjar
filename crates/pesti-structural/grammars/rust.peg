@@ -1,0 +1,262 @@
+// rust.peg — Structural grammar for Rust source code
+//
+// This grammar operates on terminal kinds from a Rust lexer, not raw characters.
+// It captures the top-level structural constructs needed for embedding features:
+// functions, structs, enums, impl blocks, use statements, and modules.
+//
+// Attributes (#[...]) are skipped by the lexer — they don't affect structure.
+
+grammar rust_structural;
+
+// Entry point: a module (file) contains zero or more items.
+Module       = { item: Item* }
+
+// An item is any top-level construct.
+Item         = { kind: FuncDef / StructDef / EnumDef / ImplBlock / UseStmt / ModDecl / TypeAlias / ConstDef / StaticDef / TraitDef }
+
+// Function definition: [vis] fn name<generics>(params) -> ret { body }
+FuncDef      = {
+    visibility?,
+    'fn',
+    name: Ident,
+    (generics: GenericParams)?,
+    params: ParamList,
+    (return_type: ( '->' Type ))?,
+    body: Block
+}
+
+// Struct definition: [vis] struct name<generics> { fields } | ( tuple ) | ;
+StructDef    = {
+    visibility?,
+    'struct',
+    name: Ident,
+    (generics: GenericParams)?,
+    body: StructBody
+}
+
+// Struct body: brace form (no trailing ;), tuple form (; after parens), or unit (;)
+StructBody   = { '{' field: Field* '}' / '(' field: FieldType* ')' ';' / ';' }
+
+// Enum definition: [vis] enum name<generics> { variants }
+EnumDef      = {
+    visibility?,
+    'enum',
+    name: Ident,
+    (generics: GenericParams)?,
+    '{' variant: EnumVariant* '}'
+}
+
+// Trait definition: trait Name { methods }
+TraitDef     = {
+    visibility?,
+    'trait',
+    name: Ident,
+    (generics: GenericParams)?,
+    body: ImplBody
+}
+
+// Impl block: impl Type { methods } or impl Trait for Type { methods }
+ImplBlock    = {
+    'impl',
+    (generics: GenericParams)?,
+    (trait_path: Path 'for')?,
+    type_name: Type,
+    body: ImplBody
+}
+
+// Impl body contains method definitions (not statements).
+ImplBody     = { '{' method: FuncDef* '}' }
+
+// Use statement: use path::to::{item1, item2}; or pub use path;
+UseStmt      = {
+    visibility?,
+    'use',
+    path: UsePath,
+    ';'
+}
+
+// Use path: simple path or path with brace group at the end.
+// The brace group is always preceded by :: in Rust syntax (e.g., utils::{A, B}).
+UsePath      = { seg: Ident ('::' seg: Ident)* ('::' '{' use_item: UseItem* '}')? }
+UseItem      = { ident: Ident (':' alias: Ident)? ','? }
+
+// Module declaration: [vis] mod name { ... } | mod name;
+ModDecl      = { visibility?, 'mod', name: Ident (body: Block / ';')? }
+
+// Type alias: type Name = Type;
+TypeAlias    = { 'type' name: Ident '=' type_ref: Type ';' }
+
+// Const definition: const NAME: Type = value;
+ConstDef     = { visibility?, 'const' name: Ident ':' type_ref: Type '=' value: Expr ';' }
+
+// Static definition: static NAME: Type = value;
+StaticDef    = { visibility?, 'static' name: Ident ':' type_ref: Type '=' value: Expr ';' }
+
+// Visibility modifier: pub, pub(crate), pub(super), pub(in path)
+visibility   = { 'pub' ('(' ( 'crate' / 'super' / 'in' Path ) ')')? }
+
+// Generic parameters: <T, U: Bound, 'a>
+GenericParams = { '<' generic: GenericParam+ '>' }
+GenericParam  = { name: Ident (':' bounds: BoundList)? }
+BoundList     = { bound: Type ('+' bound: Type)* }
+
+// Parameter list: (name: Type, ...) — supports self, &self, &mut self
+ParamList    = { '(' param: Param? (',' param: Param)* ')' }
+Param        = { SelfParam / name: Ident ':' type_ref: Type }
+SelfParam    = { '&' ('mut')? 'self' / 'self' }
+
+// Field in a struct: [vis] name: Type
+Field        = { visibility?, name: Ident ':' type_ref: Type ','? }
+FieldType    = { type_ref: Type ','? }
+
+// Enum variant: Name | Name { fields } | Name ( tuple )
+EnumVariant  = {
+    name: Ident,
+    (body: ( '{' field: Field* '}' / '(' field: FieldType* ')' ))?,
+    ','?
+}
+
+// Block: { statements... [optional trailing expr without semicolon] }
+Block        = { '{' stmt: Stmt* (tail_expr: Expr)? '}' }
+
+// Statement: expression statement, let binding, or control flow
+Stmt         = { LetBinding / ForLoop / WhileLoop / IfExpr / IfLetExpr / MatchExpr / ReturnStmt / ExprStmt }
+LetBinding   = { 'let' 'mut'? name: Ident '=' value: Expr ';' }
+ExprStmt     = { expr: Expr ';' }
+
+// Return statement: return expr; or return;
+ReturnStmt   = { 'return' (value: Expr)? ';' }
+
+// For loop: for pat in expr { body }
+ForLoop      = { 'for' pat: Ident 'in' iter_expr: Expr body: Block }
+
+// While loop: while cond { body }
+WhileLoop    = { 'while' cond: Expr body: Block }
+
+// If expression: if cond { then } else { else_ }?
+IfExpr       = { 'if' cond: Expr then_block: Block ('else' else_block: (Block / IfExpr))? }
+
+// If-let expression: if let pattern = expr { then } else { ... }?
+IfLetExpr    = { 'if' 'let' pat: Pat '=' value: Expr then_block: Block ('else' else_block: (Block / IfExpr))? }
+
+// Pattern (simplified): ident, wildcard, tuple pattern, Some(x), etc.
+Pat          = { Wildcard / TuplePat / PathPat / Ident }
+Wildcard     = { '_' }
+TuplePat     = { '(' pat: Pat? (',' pat: Pat)* ')' }
+PathPat      = { Path ('(' pat: Pat? (',' pat: Pat)* ')')? }
+
+// Match expression: match scrutinee { Pattern => expr, ... }
+MatchExpr    = { 'match' scrutinee: Expr '{' arm: MatchArm* '}' }
+MatchArm     = { pattern: Pat '=>' body: Expr ','? }
+
+// Expression — ordered choice matters (PEG first-match-wins).
+// BinaryExpr comes BEFORE PostfixExpr so that `1 + 2` is parsed as a binary
+// operation, not just `1` (which PostfixExpr would match via Literal).
+// Control flow constructs come first since they have distinctive keywords.
+Expr         = { AwaitExpr / ClosureExpr / ForLoop / WhileLoop / IfLetExpr / IfExpr / MatchExpr / BinaryExpr / UnaryExpr / PostfixExpr / RangeExpr }
+
+// Await: expr.await
+AwaitExpr    = { receiver: PrimaryExpr '.await' }
+
+// Closure: |args| body or |args| -> Type body
+// Closure params are just patterns (idents), not typed params like fn params.
+ClosureExpr  = { '|' closure_param: ClosureParam? (',' closure_param: ClosureParam)* '|' ('->' type_ref: Type)? body: (Block / Expr) }
+ClosureParam = { '_' / name: Ident }
+
+// Postfix expression: a primary expression followed by zero or more postfix operators.
+// This handles method chains (a.b().c()), field access chains (a.b.c), indexing (arr[i]),
+// the try operator (?), AND chains off of calls/macros (Command::new("x").args()).
+PostfixExpr  = { base: PrimaryExpr op: PostfixOp* }
+PostfixOp    = { '.' name: Ident '(' arg: Arg* ')' / '.' name: Ident / '.' idx: IntLit / '[' index: Expr ']' / '?' }
+
+// Binary expression: left op right. Operands are PostfixExpr (which includes
+// all primaries + method chains). Non-associative for simplicity — captures
+// structure, not semantics or precedence.
+BinaryExpr   = { left: PostfixExpr op: BinOp right: PostfixExpr }
+BinOp        = { '+' / '-' / '*' / '/' / '%' / '==' / '!=' / '<' / '>' / '<=' / '>=' / '&&' / '||' }
+
+// Unary expression: -x, !x, *x, &x, &mut x
+UnaryExpr    = { op: UnOp operand: PostfixExpr }
+UnOp         = { '-' / '!' / '*' / '&' ('mut')? }
+
+// Primary expressions: the base of any expression chain.
+// Ordered choice matters: more specific forms first (PathCall before PathExpr,
+// MacroCall before Call, Call before bare PathExpr).
+PrimaryExpr  = { PathCall / MacroCall / Call / StructLit / TupleLit / ArrayLit / Literal / PathExpr / BlockExpr }
+
+// Path call: path::to::name(args) — e.g., Point::new(1.0, 2.0)
+PathCall     = { name: Path '(' arg: Arg* ')' }
+
+// Macro call: name!(args) or name![args] or name!{args}
+MacroCall    = { name: Ident '!' ('(' arg: Arg* ')' / '[' arg: Arg* ']' / '{' arg: Arg* '}') }
+
+// Function call: name(args)
+Call         = { name: Ident '(' arg: Arg* ')' }
+
+// Struct literal: Name { field: value, ... } or Name { field, ... } (shorthand)
+StructLit    = { name: PathSeg '{' field_assign: FieldAssign* '}' }
+FieldAssign  = { name: Ident (':' value: Expr)? ','? }
+
+// Tuple literal: (a, b, c) or () for unit
+TupleLit     = { '(' expr: Expr? (',' expr: Expr)* ')' }
+
+// Array literal: [expr; len] or [expr, expr, ...]
+ArrayLit     = { '[' (expr: Expr ';')? elem: Expr* ']' }
+
+// Range expression: a..b, a..=b, ..b, a.., ..
+RangeExpr    = { left: PrimaryExpr '.' '.' ('=' right: PrimaryExpr / right: PrimaryExpr)? / '.' '.' ('=' right: PrimaryExpr / right: PrimaryExpr)? / left: PrimaryExpr '.' '.' '.' '=' right: PrimaryExpr }
+
+// Literal values
+Literal      = { IntLit / FloatLit / StrLit / CharLit / BoolLit }
+
+// Boolean literal (matched by text since lexer may classify as Ident)
+BoolLit      = { 'true' / 'false' }
+
+// Path expression: ident or path::to::ident
+PathExpr     = { Path }
+
+// Block expression: { ... } (as an expression)
+BlockExpr    = { Block }
+
+// Argument in a call expression
+Arg          = { expr: Expr ','? }
+
+// Type reference. Note: some types are keywords in Rust (Self, str, etc.)
+// so we accept both Ident and specific keyword literals here.
+Type         = { GenericType / ReferenceType / TupleType / SliceType / ArrayType / ImplTraitType / DynTraitType / 'Self' / Path / Ident }
+GenericType  = { name: Path params: GenericParams }
+ReferenceType = { '&' (lifetime: lifetime)? ('mut')? type_ref: Type }
+TupleType     = { '(' type_ref: Type* ')' }
+SliceType     = { '[' type_ref: Type ']' }
+ArrayType     = { '[' type_ref: Type ';' len: Expr ']' }
+ImplTraitType = { 'impl' trait_bound: BoundList }
+DynTraitType  = { 'dyn' trait_bound: BoundList }
+
+// Path: ident or path::ident. Also accepts keywords that can appear in paths
+// (Self, super, crate) since the lexer classifies them as keywords, not idents.
+Path         = { seg: PathSeg ('::' seg: PathSeg)* }
+PathSeg      = { Ident / 'Self' / 'self' / 'super' / 'crate' }
+
+// Lifetime (simplified)
+lifetime     = { '\'' Ident }
+
+annotations {
+    FuncDef     { role: "definition", embed_fields: ["name", "params", "return_type"], class: "declaration" }
+    StructDef   { role: "definition", embed_fields: ["name"], class: "declaration" }
+    EnumDef     { role: "definition", embed_fields: ["name"], class: "declaration" }
+    TraitDef    { role: "definition", embed_fields: ["name"], class: "declaration" }
+    ImplBlock   { role: "implementation", embed_fields: ["type_name"], class: "declaration" }
+    UseStmt     { role: "import", embed_fields: ["path"], class: "declaration" }
+    ModDecl     { role: "module", embed_fields: ["name"], class: "declaration" }
+    TypeAlias   { role: "definition", embed_fields: ["name"], class: "declaration" }
+    ConstDef    { role: "definition", embed_fields: ["name"], class: "declaration" }
+    StaticDef   { role: "definition", embed_fields: ["name"], class: "declaration" }
+    Call        { role: "expression", embed_fields: ["name", "arg"], class: "invocation" }
+    PostfixExpr { role: "expression", embed_fields: ["base", "op"], class: "access" }
+    StructLit   { role: "expression", embed_fields: ["name"], class: "construction" }
+    IfExpr      { role: "control_flow", embed_fields: ["cond", "then_block"], class: "conditional" }
+    IfLetExpr   { role: "control_flow", embed_fields: ["pat", "value"], class: "conditional" }
+    MatchExpr   { role: "control_flow", embed_fields: ["scrutinee"], class: "conditional" }
+    ForLoop     { role: "control_flow", embed_fields: ["pat", "iter_expr"], class: "loop" }
+    WhileLoop   { role: "control_flow", embed_fields: ["cond"], class: "loop" }
+}
