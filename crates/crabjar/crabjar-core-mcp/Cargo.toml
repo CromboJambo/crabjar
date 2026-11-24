@@ -1,0 +1,20 @@
+[package]
+name = "crabjar-core-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Crabjar core tools MCP server — substrate file, search, and execution tools for agents"
+
+[[bin]]
+name = "crabjar-core-mcp"
+path = "src/main.rs"
+
+[dependencies]
+rmcp = { version = "3.5", features = ["server"] }
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+schemars = { workspace = true }
+anyhow = "1.0"
+reqwest = { version = "0.12", features = ["json"] }
+urlencoding = "2.1"
