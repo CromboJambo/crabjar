@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PESTI Structural Tokenizer — Folded Map Demo</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --fg: #c9d1d9;
+            --accent: #58a6ff;
+            --border: #30363d;
+            --token-bg: #161b22;
+            --span-1: #f472b6;
+            --span-2: #a5d6ff;
+            --span-3: #79c0ff;
+            --span-4: #7ee787;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            background: var(--bg);
+            color: var(--fg);
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+        }
+
+        .subtitle {
+            color: #8b949e;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .code-input {
+            width: 100%;
+            background: var(--token-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 0.9rem;
+            min-height: 80px;
+            margin-bottom: 1rem;
+        }
+
+        .code-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+
+        button:hover { opacity: 0.9; }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .tokens {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 1rem;
+            background: var(--token-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .token {
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            background: #21262d;
+            color: var(--fg);
+        }
+
+        .token.keyword { color: var(--span-1); }
+        .token.identifier { color: var(--span-2); }
+        .token.punctuation { color: #8b949e; }
+        .token.literal { color: var(--span-4); }
+
+        .spans {
+            padding: 1rem;
+            background: var(--token-bg);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .span-node {
+            margin-left: 0.5rem;
+            border-left: 2px solid var(--span-1);
+            padding-left: 0.75rem;
+        }
+
+        .span-node.level-1 { border-left-color: var(--span-1); }
+        .span-node.level-2 { border-left-color: var(--span-2); }
+        .span-node.level-3 { border-left-color: var(--span-3); }
+        .span-node.level-4 { border-left-color: var(--span-4); }
+
+        .span-header {
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .span-body {
+            color: #8b949e;
+            font-size: 0.85rem;
+        }
+
+        .arrow {
+            text-align: center;
+            font-size: 2rem;
+            color: var(--accent);
+            margin: 1rem 0;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .tokens, .spans { overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PESTI Structural Tokenizer</h1>
+        <p class="subtitle">Folded Map Visualization — flat tokens → nested spans</p>
+
+        <div class="section">
+            <label class="section-title" for="code-input">Input Code</label>
+            <textarea id="code-input" class="code-input">fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}</textarea>
+            <button onclick="tokenizeAndFold()">Tokenize & Fold</button>
+        </div>
+
+        <div class="section">
+            <div class="section-title">1. Token Stream (Flat)</div>
+            <div id="tokens" class="tokens"></div>
+        </div>
+
+        <div class="arrow">↓ fold()</div>
+
+        <div class="section">
+            <div class="section-title">2. Span Tree (Folded Map)</div>
+            <div id="spans" class="spans"></div>
+        </div>
+    </div>
+
+    <script>
+        // Simplified tokenizer for demo purposes
+        function tokenize(code) {
+            const tokens = [];
+            const pattern = /(\w+|[{}();=<>+\-*/]|"[^"]*"|'[^']*')/g;
+            let match;
+            while ((match = pattern.exec(code)) !== null) {
+                const text = match[1];
+                let kind = 'punctuation';
+                if (/^[a-zA-Z_]/.test(text)) {
+                    if (['fn', 'let', 'return', 'if', 'else', 'while', 'for'].includes(text)) {
+                        kind = 'keyword';
+                    } else {
+                        kind = 'identifier';
+                    }
+                } else if (/^\d+$/.test(text) || text.startsWith('"') || text.startsWith("'")) {
+                    kind = 'literal';
+                }
+                tokens.push({ text, kind });
+            }
+            return tokens;
+        }
+
+        // Simplified folder for demo
+        function fold(tokens) {
+            const root = { kind: 'root', body: [], open_token: null, close_token: null };
+            let stack = [root];
+
+            for (const tok of tokens) {
+                if (tok.text === '{') {
+                    const child = { kind: 'block', body: [], open_token: tok, close_token: null };
+                    stack.push(child);
+                } else if (tok.text === '}') {
+                    const span = stack.pop();
+                    span.close_token = tok;
+                    if (stack.length > 0) {
+                        stack[stack.length - 1].body.push(span);
+                    } else {
+                        return span;
+                    }
+                } else {
+                    if (stack.length > 0) {
+                        stack[stack.length - 1].body.push({ kind: 'token', text: tok.text, tok });
+                    }
+                }
+            }
+
+            return root;
+        }
+
+        function renderTokens(tokens) {
+            const container = document.getElementById('tokens');
+            container.innerHTML = '';
+            tokens.forEach(tok => {
+                const el = document.createElement('span');
+                el.className = `token ${tok.kind}`;
+                el.textContent = tok.text;
+                container.appendChild(el);
+            });
+        }
+
+        function renderSpans(span, level = 0) {
+            const container = document.getElementById('spans');
+            if (level === 0) container.innerHTML = '';
+
+            const node = document.createElement('div');
+            node.className = `span-node level-${(level % 4) + 1}`;
+
+            const header = document.createElement('div');
+            header.className = 'span-header';
+            if (span.open_token) {
+                header.textContent = `[${span.kind}] ${span.open_token.text}`;
+            } else {
+                header.textContent = `[${span.kind}]`;
+            }
+            node.appendChild(header);
+
+            const body = document.createElement('div');
+            body.className = 'span-body';
+
+            span.body.forEach(item => {
+                if (item.kind === 'token') {
+                    const tokEl = document.createElement('span');
+                    tokEl.textContent = item.text;
+                    body.appendChild(tokEl);
+                } else {
+                    renderSpans(item, level + 1);
+                }
+            });
+
+            node.appendChild(body);
+            container.appendChild(node);
+        }
+
+        function tokenizeAndFold() {
+            const code = document.getElementById('code-input').value;
+            const tokens = tokenize(code);
+            renderTokens(tokens);
+
+            const folded = fold(tokens);
+            renderSpans(folded, 0);
+        }
+
+        // Run on load
+        window.onload = tokenizeAndFold;
+    </script>
+</body>
+</html>

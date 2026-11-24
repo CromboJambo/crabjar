@@ -67,6 +67,9 @@ members = [
     "crates/crabjar/crabjar-kanban-orchestrator",
     # Home-lab topology definitions (shared with home-lab repo)
     "crates/home-lab-topology",
+    # PESTI structural tokenization (vendored from pesti repo for CI self-containment)
+    "crates/pesti-structural-tokenizer",
+    "crates/pesti-structural",
     # SSH bastion host using russh (transparent proxy, no client app needed)
     "crates/ssh-bastion", "vm/vm-core", "crates/crabjar/crabjar-conductor", "crates/crabjar/crabjar-worker", "crates/crabjar/crabjar-durable-objects",
  "crates/crabjar/crabjar-analyze", "crates/crabjar/crabjar-review", "crates/crabjar/crabjar-mcp-tool-registry",    "crates/crabjar/crabjar-web-search",
@@ -202,8 +205,11 @@ crabjar_lib = { path = ".", package = "crabjar" }
 
 # Tokenization
 tiktoken-rs = "0.11.0"
-pesti-structural-tokenizer = { path = "../pesti/crates/pesti-structural-tokenizer" }
-pesti-structural = { path = "../pesti/crates/pesti-structural" }
+pesti-structural-tokenizer = { path = "crates/pesti-structural-tokenizer" }
+pesti-structural = { path = "crates/pesti-structural" }
+syn = { version = "2.0", features = ["full"] }
+criterion = "0.5"
+ahash = "0.8"
 
 # Model weights (dataset manifests; same crate pesti uses)
 safetensors = { version = "0.7.0", default-features = false, features = ["std"] }
