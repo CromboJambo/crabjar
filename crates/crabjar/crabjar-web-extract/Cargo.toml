@@ -8,6 +8,7 @@ repository.workspace = true
 documentation.workspace = true
 homepage.workspace = true
 description = "Web content extraction tooling for crabjar agents"
+readme = "README.md"
 keywords.workspace = true
 categories.workspace = true
 
