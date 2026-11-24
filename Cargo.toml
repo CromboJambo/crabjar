@@ -65,6 +65,8 @@ members = [
     "crates/crabjar/crabjar-commit-cli",
     # Kanban orchestrator — maps inputs to hermes agent kanban operations
     "crates/crabjar/crabjar-kanban-orchestrator",
+    # Home-lab topology definitions (shared with home-lab repo)
+    "crates/home-lab-topology",
     # SSH bastion host using russh (transparent proxy, no client app needed)
     "crates/ssh-bastion", "vm/vm-core", "crates/crabjar/crabjar-conductor", "crates/crabjar/crabjar-worker", "crates/crabjar/crabjar-durable-objects",
  "crates/crabjar/crabjar-analyze", "crates/crabjar/crabjar-review", "crates/crabjar/crabjar-mcp-tool-registry",    "crates/crabjar/crabjar-web-search",
@@ -73,6 +75,7 @@ members = [
     "crates/crabjar/crabjar-skill-scanner",
     "crates/crabjar/crabjar-trust-manager",    "crates/crabjar/crabjar-compress",
     "crates/crabjar/crabjar-compress-mcp",
+    "crates/crabjar/crabjar-core-mcp",
     "crates/crabjar/crabjar-unsloth-mcp",
     "crates/crabjar/crabjar-herdr-mcp",
     "crates/crabjar/crabjar-structured-aux",
@@ -83,9 +86,9 @@ members = [
     # Performance benchmarks for execution pipeline
     "crates/benchmarks", "crates/crabjar/hermes-wrapper", "crates/crabjar/deploy",
     # KDE Connect MCP server for phone file access
-    "mcps/kdeconnect-mcp",
+    "mcps/phone-mcp",
     # SSH-based file access MCP for phone
-    "mcps/ssh-file-mcp", "crates/crabjar/crabjar-exec", "crates/crabjar/crabjar-vision", "crates/crabjar/crabjar-browser-vault",
+     "crates/crabjar/crabjar-exec", "crates/crabjar/crabjar-vision", "crates/crabjar/crabjar-browser-vault",
 ]
 
 resolver = "2"

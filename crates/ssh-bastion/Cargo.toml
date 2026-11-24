@@ -26,7 +26,7 @@ toml = "0.8"
 tempfile.workspace = true
 
 # Optional topology support — consumers provide their own LabTopology implementation
-home-lab-topology = { path = "/home/crombo/projects/active/home-lab/home-lab-topology", optional = true }
+home-lab-topology = { path = "../home-lab-topology", optional = true }
 
 [features]
 default = []
